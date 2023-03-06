@@ -818,7 +818,7 @@ PyObject *python_rotate_extrude(PyObject *self, PyObject *args, PyObject *kwargs
   if(obj->ob_type == &PyFunction_Type) {
 	Py_XINCREF(obj); // TODO there to decref it ?
 	node->profile_func = obj;
-  	auto dummy_node = std::make_shared<SquareNode>(&todo_fix_inst);
+  	auto dummy_node = std::make_shared<SquareNode>(instance);
 	node->children.push_back(dummy_node);
   } else {
   	child = PyOpenSCADObjectToNodeMulti(obj);
@@ -909,7 +909,7 @@ PyObject *python_linear_extrude(PyObject *self, PyObject *args, PyObject *kwargs
   if(obj->ob_type == &PyFunction_Type) {
         Py_XINCREF(obj); // TODO there to decref it ?
 	node->profile_func = obj;
-  	auto dummy_node = std::make_shared<SquareNode>(&todo_fix_inst);
+  	auto dummy_node = std::make_shared<SquareNode>(instance);
 	node->children.push_back(dummy_node);
   } else {
 	  child = PyOpenSCADObjectToNodeMulti(obj);
@@ -976,9 +976,10 @@ PyObject* python_linear_extrude_oo(PyObject *self, PyObject *args, PyObject *kwa
 
 PyObject* python_path_extrude(PyObject *self, PyObject *args, PyObject *kwargs)
 {
+  DECLARE_INSTANCE
   std::shared_ptr<AbstractNode> child;
 
-  auto node = std::make_shared<PathExtrudeNode>(&todo_fix_inst);
+  auto node = std::make_shared<PathExtrudeNode>(instance);
 
   PyObject *obj = NULL;
   double height=1;
@@ -1014,7 +1015,7 @@ PyObject* python_path_extrude(PyObject *self, PyObject *args, PyObject *kwargs)
   if(obj->ob_type == &PyFunction_Type) {
         Py_XINCREF(obj); // TODO there to decref it ?
 	node->profile_func = obj;
-  	auto dummy_node = std::make_shared<SquareNode>(&todo_fix_inst);
+  	auto dummy_node = std::make_shared<SquareNode>(instance);
 	node->children.push_back(dummy_node);
   } else {
 	  child = PyOpenSCADObjectToNodeMulti(obj);
