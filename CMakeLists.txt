@@ -1056,6 +1056,9 @@ if(OFFLINE_DOCS)
 endif()
 
 include(CPack)
+get_target_property(LINK_LIBS OpenSCAD LINK_LIBRARIES)
+LIST(REMOVE_ITEM LINK_LIBS /home/gsohler/openscad_deps/mxe/usr/x86_64-w64-mingw32.static.posix/lib/libdouble-conversion.a )
+set_property(TARGET OpenSCAD PROPERTY LINK_LIBRARIES  ${LINK_LIBS} )
 
 if(INFO)
   include("cmake/Modules/info.cmake")
