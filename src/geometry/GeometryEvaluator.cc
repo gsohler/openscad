@@ -1713,7 +1713,7 @@ void  append_linear_vertex(PolySet *ps,const Outline2d *face, int index, double 
 
 void  append_rotary_vertex(PolySet *ps,const Outline2d *face, int index, double ang)
 {
-	double a=ang*M_PI / 180.0;
+	double a=ang*G_PI / 180.0;
 	ps->append_vertex(
 			face->vertices[index][0]*cos(a),
 			face->vertices[index][0]*sin(a),
