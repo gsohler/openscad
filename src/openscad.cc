@@ -1043,7 +1043,7 @@ int main(int argc, char **argv)
   }
 #ifdef ENABLE_PYTHON
   if (vm.count("enable-python")) {
-    LOG(message_group::None, Location::NONE, "", "Python Engine enabled", OpenSCAD::debug);
+    LOG("Python Engine enabled");
     python_unlocked = true;
   }
 #endif
