@@ -48,7 +48,7 @@ public:
     if (geom) {
       glPushMatrix();
       glMultMatrixd(m.data());
-      renderer.render_surface(*geom, csgmode, m);
+      renderer.render_surface(*geom, csgmode, m,0);
       glPopMatrix();
     }
   }
@@ -215,6 +215,7 @@ void OpenCSGRenderer::createCSGProducts(const CSGProducts& products, const Rende
         if (!ps) continue;
 
         const Color4f& c = csgobj.leaf->color;
+        const int& ti = csgobj.leaf->textureind;
         csgmode_e csgmode = get_csgmode(highlight_mode, background_mode);
 
         ColorMode colormode = ColorMode::NONE;
@@ -239,6 +240,8 @@ void OpenCSGRenderer::createCSGProducts(const CSGProducts& products, const Rende
           GL_CHECKD(glUniform4f(shader_info.data.csg_rendering.color_area, last_color[0], last_color[1], last_color[2], last_color[3]));
           GL_TRACE("glUniform4f(%d, %f, %f, %f, 1.0)", shader_info.data.csg_rendering.color_edge % ((last_color[0] + 1) / 2) % ((last_color[1] + 1) / 2) % ((last_color[2] + 1) / 2));
           GL_CHECKD(glUniform4f(shader_info.data.csg_rendering.color_edge, (last_color[0] + 1) / 2, (last_color[1] + 1) / 2, (last_color[2] + 1) / 2, 1.0));
+          glUniform1f(shader_info.data.csg_rendering.texturefactor, 0.0);
+          glUniform1i(shader_info.data.csg_rendering.tex1, 0);
         });
         vertex_states->emplace_back(std::move(color_state));
 
@@ -298,6 +301,7 @@ void OpenCSGRenderer::createCSGProducts(const CSGProducts& products, const Rende
         const auto *ps = dynamic_cast<const PolySet *>(csgobj.leaf->geom.get());
         if (!ps) continue;
         const Color4f& c = csgobj.leaf->color;
+        const int& ti = csgobj.leaf->textureind;
         csgmode_e csgmode = get_csgmode(highlight_mode, background_mode, OpenSCADOperator::DIFFERENCE);
 
         ColorMode colormode = ColorMode::NONE;
@@ -395,6 +399,7 @@ void OpenCSGRenderer::renderCSGProducts(const std::shared_ptr<CSGProducts>& prod
       if (shaderinfo && shaderinfo->progid) {
         if (shaderinfo->type != EDGE_RENDERING || (shaderinfo->type == EDGE_RENDERING && showedges)) {
           GL_CHECKD(glUseProgram(shaderinfo->progid));
+          glUniform1f(shaderinfo->data.csg_rendering.texturefactor, 0.0);
         }
       }
 
@@ -407,9 +412,11 @@ void OpenCSGRenderer::renderCSGProducts(const std::shared_ptr<CSGProducts>& prod
           GL_CHECKD(glUniform3f(shaderinfo->data.select_rendering.identifier,
                                 ((identifier >> 0) & 0xff) / 255.0f, ((identifier >> 8) & 0xff) / 255.0f,
                                 ((identifier >> 16) & 0xff) / 255.0f));
+              glUniform1f(shaderinfo->data.csg_rendering.texturefactor, 0.0);
         }
 
         const Color4f& c = csgobj.leaf->color;
+        const int& ti = csgobj.leaf->textureind;
         csgmode_e csgmode = get_csgmode(highlight_mode, background_mode);
 
         ColorMode colormode = ColorMode::NONE;
@@ -424,17 +431,17 @@ void OpenCSGRenderer::renderCSGProducts(const std::shared_ptr<CSGProducts>& prod
         glPushMatrix();
         glMultMatrixd(csgobj.leaf->matrix.data());
 
-        const Color4f color = setColor(colormode, c.data(), shaderinfo);
+        const Color4f color = setColor(colormode, c.data(),ti, shaderinfo);
         if (color[3] == 1.0f) {
           // object is opaque, draw normally
-          render_surface(*ps, csgmode, csgobj.leaf->matrix, shaderinfo);
+          render_surface(*ps, csgmode, csgobj.leaf->matrix, ti, shaderinfo);
         } else {
           // object is transparent, so draw rear faces first.  Issue #1496
           glEnable(GL_CULL_FACE);
           glCullFace(GL_FRONT);
-          render_surface(*ps, csgmode, csgobj.leaf->matrix, shaderinfo);
+          render_surface(*ps, csgmode, csgobj.leaf->matrix, ti, shaderinfo);
           glCullFace(GL_BACK);
-          render_surface(*ps, csgmode, csgobj.leaf->matrix, shaderinfo);
+          render_surface(*ps, csgmode, csgobj.leaf->matrix, ti, shaderinfo);
           glDisable(GL_CULL_FACE);
         }
 
@@ -445,6 +452,7 @@ void OpenCSGRenderer::renderCSGProducts(const std::shared_ptr<CSGProducts>& prod
         if (!ps) continue;
 
         const Color4f& c = csgobj.leaf->color;
+        const int ti = csgobj.leaf->textureind;
         csgmode_e csgmode = get_csgmode(highlight_mode, background_mode, OpenSCADOperator::DIFFERENCE);
 
         ColorMode colormode = ColorMode::NONE;
@@ -456,13 +464,13 @@ void OpenCSGRenderer::renderCSGProducts(const std::shared_ptr<CSGProducts>& prod
           colormode = ColorMode::CUTOUT;
         }
 
-        (void) setColor(colormode, c.data(), shaderinfo);
+        const Color4f color = setColor(colormode, c.data(), ti, shaderinfo);
         glPushMatrix();
         glMultMatrixd(csgobj.leaf->matrix.data());
         // negative objects should only render rear faces
         glEnable(GL_CULL_FACE);
         glCullFace(GL_FRONT);
-        render_surface(*ps, csgmode, csgobj.leaf->matrix, shaderinfo);
+        render_surface(*ps, csgmode, csgobj.leaf->matrix, ti, shaderinfo);
         glDisable(GL_CULL_FACE);
 
         glPopMatrix();
@@ -473,6 +481,7 @@ void OpenCSGRenderer::renderCSGProducts(const std::shared_ptr<CSGProducts>& prod
       glDepthFunc(GL_LEQUAL);
     }
   } else {
+    glUniform1f(shaderinfo->data.csg_rendering.texturefactor , 0.0);
     for (const auto& product : vbo_vertex_products) {
       if (product->primitives().size() > 1) {
         GL_CHECKD(OpenCSG::render(product->primitives()));
@@ -487,6 +496,7 @@ void OpenCSGRenderer::renderCSGProducts(const std::shared_ptr<CSGProducts>& prod
         if (shaderinfo->type == EDGE_RENDERING && showedges) {
           shader_attribs_enable();
         }
+        glUniform1f(shaderinfo->data.csg_rendering.texturefactor, 0.0);
       }
 
       for (const auto& vs : product->states()) {
@@ -502,6 +512,7 @@ void OpenCSGRenderer::renderCSGProducts(const std::shared_ptr<CSGProducts>& prod
                                     ((csg_vs->csgObjectIndex() >> 0) & 0xff) / 255.0f,
                                     ((csg_vs->csgObjectIndex() >> 8) & 0xff) / 255.0f,
                                     ((csg_vs->csgObjectIndex() >> 16) & 0xff) / 255.0f));
+              glUniform1f(shaderinfo->data.csg_rendering.texturefactor, 0.0);
             }
           }
           std::shared_ptr<VBOShaderVertexState> shader_vs = std::dynamic_pointer_cast<VBOShaderVertexState>(vs);
