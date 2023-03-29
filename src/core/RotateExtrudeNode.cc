@@ -44,6 +44,10 @@ namespace fs = boost::filesystem;
 static std::shared_ptr<AbstractNode> builtin_rotate_extrude(const ModuleInstantiation *inst, Arguments arguments, const Children& children)
 {
   auto node = std::make_shared<RotateExtrudeNode>(inst);
+#ifdef ENABLE_PYTHON  
+  node->profile_func = NULL;
+  node->twist_func = NULL;
+#endif
 
   Parameters parameters = Parameters::parse(std::move(arguments), inst->location(),
                                             {"file", "layer", "origin", "scale"},

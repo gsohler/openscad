@@ -71,6 +71,10 @@ static std::shared_ptr<AbstractNode> builtin_path_extrude(const ModuleInstantiat
 {
   auto node = std::make_shared<PathExtrudeNode>(inst);
 
+#ifdef ENABLE_PYTHON  
+  node->profile_func = NULL;
+  node->twist_func = NULL;
+#endif
   Parameters parameters = parse_parameters_path(std::move(arguments), inst->location());
   parameters.set_caller("path_extrude");
 

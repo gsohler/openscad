@@ -572,7 +572,7 @@ PolySet *offset3D(const PolySet *ps,double off) {
 					yind=indexes[i];
 				}
 			}
-			if(yind == -1) { printf("b\n"); break; }
+			if(yind == -1) {  break; }
 
 			// find closest  normal to zdir
 			for(int i=0;i<indexes.size();i++) {
@@ -581,7 +581,7 @@ PolySet *offset3D(const PolySet *ps,double off) {
 					zind=indexes[i];
 				}
 			}
-			if(zind == -1) { printf("c\n"); break; }
+			if(zind == -1) {  break; }
 			
 			// now calculate the new pt
 			if(cut_face_face_face(

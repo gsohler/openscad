@@ -43,6 +43,7 @@ PyObject *python_cylinder(PyObject *self, PyObject *args, PyObject *kwargs);
 PyObject *python_sphere(PyObject *self, PyObject *args, PyObject *kwargs);
 PyObject *python_polyhedron(PyObject *self, PyObject *args, PyObject *kwargs);
 PyObject *python_text(PyObject *self, PyObject *args, PyObject *kwargs);
+PyObject *python_sdf(PyObject *self, PyObject *args, PyObject *kwargs);
 
 PyObject *python_translate(PyObject *self, PyObject *args, PyObject *kwargs);
 PyObject *python_translate_oo(PyObject *self, PyObject *args, PyObject *kwargs);

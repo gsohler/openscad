@@ -2048,7 +2048,7 @@ void MainWindow::sendToOctoPrint()
   if (fileFormat == "OBJ") {
     exportFileFormat = FileFormat::OBJ;
   } else if (fileFormat == "OFF") {
-    exportFileFormat = FileFormat::OFF;
+    exportFileFormat = FileFormat::OFF_FMT;
   } else if (fileFormat == "ASCIISTL") {
     exportFileFormat = FileFormat::ASCIISTL;
   } else if (fileFormat == "AMF") {
@@ -2603,7 +2603,7 @@ void MainWindow::actionExportOBJ()
 
 void MainWindow::actionExportOFF()
 {
-  actionExport(FileFormat::OFF, "OFF", ".off", 3);
+  actionExport(FileFormat::OFF_FMT, "OFF", ".off", 3);
 }
 
 void MainWindow::actionExportWRL()

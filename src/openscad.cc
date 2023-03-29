@@ -596,7 +596,7 @@ int do_export(const CommandLine& cmd, const RenderVariables& render_variables, F
     if (curFormat == FileFormat::ASCIISTL ||
         curFormat == FileFormat::STL ||
         curFormat == FileFormat::OBJ ||
-        curFormat == FileFormat::OFF ||
+        curFormat == FileFormat::OFF_FMT ||
         curFormat == FileFormat::WRL ||
         curFormat == FileFormat::AMF ||
         curFormat == FileFormat::_3MF ||

@@ -142,6 +142,7 @@ static PyMethodDef PyOpenSCADFunctions[] = {
   {"cylinder", (PyCFunction) python_cylinder, METH_VARARGS | METH_KEYWORDS, "Create Cylinder."},
   {"sphere", (PyCFunction) python_sphere, METH_VARARGS | METH_KEYWORDS, "Create Sphere."},
   {"polyhedron", (PyCFunction) python_polyhedron, METH_VARARGS | METH_KEYWORDS, "Create Polyhedron."},
+  {"sdf", (PyCFunction) python_sdf, METH_VARARGS | METH_KEYWORDS, "Create SDF."},
 
   {"translate", (PyCFunction) python_translate, METH_VARARGS | METH_KEYWORDS, "Move  Object."},
   {"rotate", (PyCFunction) python_rotate, METH_VARARGS | METH_KEYWORDS, "Rotate Object."},
@@ -356,6 +357,11 @@ double python_doublefunc(PyObject *cbfunc, double arg)
 
 static PyObject *pythonInitDict=NULL;
 
+extern PyObject *PyInit_libfive(void);
+//extern void PyInit_PyLibFive(void);
+
+PyMODINIT_FUNC PyInit_PyLibFive(void);
+
 char *evaluatePython(const char *code, double time)
 {
   char *error;
@@ -374,12 +380,14 @@ char *evaluatePython(const char *code, double time)
     if(!pythonInitDict) {
 	    char run_str[80];
 	    PyImport_AppendInittab("openscad", &PyInit_openscad);
+	    PyImport_AppendInittab("libfive", &PyInit_libfive);
 	    Py_Initialize();
 
 	    PyObject *py_main = PyImport_AddModule("__main__");
 	    pythonInitDict = PyModule_GetDict(py_main);
 	    PyInit_PyOpenSCAD();
-	    sprintf(run_str,"from openscad import *\nfa=12.0\nfn=0.0\nfs=2.0\nt=%g",time);
+	    PyInit_PyLibFive();
+	    sprintf(run_str,"from openscad import *\nfrom libfive import *\nfa=12.0\nfn=0.0\nfs=2.0\nt=%g",time);
 	    PyRun_String(run_str, Py_file_input, pythonInitDict, pythonInitDict);
     }
     PyObject *result = PyRun_String(code, Py_file_input, pythonInitDict, pythonInitDict);

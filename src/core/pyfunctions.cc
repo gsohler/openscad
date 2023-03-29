@@ -30,12 +30,14 @@
 
 #include <Python.h>
 #include <pyopenscad.h>
+#include <pylibfive.h>
 
 #include "primitives.h"
 #include "TransformNode.h"
 #include "RotateExtrudeNode.h"
 #include "LinearExtrudeNode.h"
 #include "PathExtrudeNode.h"
+#include "SdfNode.h"
 #include "CgalAdvNode.h"
 #include "CsgOpNode.h"
 #include "ColorNode.h"
@@ -238,6 +240,22 @@ PyObject *python_polyhedron(PyObject *self, PyObject *args, PyObject *kwargs)
 
   return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
 }
+
+PyObject *python_sdf(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+  DECLARE_INSTANCE
+  auto node = std::make_shared<SdfNode>(instance);
+  PyObject *expression=NULL;
+
+  char *kwlist[] = {"exp", NULL};
+
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|O!", kwlist,
+                                   &PyLibFiveType, &expression)) return NULL;
+  node->expression = expression;
+  printf("parsed expression is %p\n",expression);
+  return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
+}
+
 
 
 PyObject *python_square(PyObject *self, PyObject *args, PyObject *kwargs)
@@ -1794,7 +1812,7 @@ PyObject *do_import_python(PyObject *self, PyObject *args, PyObject *kwargs, Imp
     std::string extraw = fs::path(filename).extension().generic_string();
     std::string ext = boost::algorithm::to_lower_copy(extraw);
     if (ext == ".stl") actualtype = ImportType::STL;
-    else if (ext == ".off") actualtype = ImportType::OFF;
+    else if (ext == ".off") actualtype = ImportType::OFF_FMT;
     else if (ext == ".dxf") actualtype = ImportType::DXF;
     else if (ext == ".nef3") actualtype = ImportType::NEF3;
     else if (ext == ".3mf") actualtype = ImportType::_3MF;

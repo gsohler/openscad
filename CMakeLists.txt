@@ -619,6 +619,7 @@ set(CORE_SOURCES
   src/core/ImportNode.cc
   src/core/LinearExtrudeNode.cc
   src/core/PathExtrudeNode.cc
+  src/core/SdfNode.cc
   src/core/LocalScope.cc
   src/core/ScopeContext.cc
   src/core/module.cc
@@ -731,6 +732,7 @@ set(CORE_SOURCES
 if(ENABLE_PYTHON)
 	list(APPEND CORE_SOURCES
 		    src/core/pyopenscad.cc
+		    src/core/pylibfive.cc
 		    src/core/pyfunctions.cc)
 	target_compile_definitions(OpenSCAD PRIVATE ENABLE_PYTHON)
 endif()
@@ -796,6 +798,13 @@ if(ENABLE_MANIFOLD)
   target_compile_definitions(OpenSCAD PRIVATE ENABLE_MANIFOLD)
   list(APPEND Sources ${MANIFOLD_SOURCES})
 endif()
+
+add_subdirectory(submodules/libfive EXCLUDE_FROM_ALL)
+target_link_libraries(OpenSCAD PRIVATE libfive)
+target_compile_definitions(OpenSCAD PRIVATE BUILD_STUDIO_APP OFF)
+target_compile_definitions(OpenSCAD PRIVATE BUILD_GUILE_BINDINGS OFF)
+target_compile_definitions(OpenSCAD PRIVATE BUILD_PYTHON_BINDINGS OFF)
+
 
 #
 # Offscreen OpenGL context source code

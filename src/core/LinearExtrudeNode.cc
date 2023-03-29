@@ -74,6 +74,10 @@ static std::shared_ptr<AbstractNode> builtin_linear_extrude(const ModuleInstanti
 {
   auto node = std::make_shared<LinearExtrudeNode>(inst);
 
+#ifdef ENABLE_PYTHON  
+  node->profile_func = NULL;
+  node->twist_func = NULL;
+#endif
   Parameters parameters = parse_parameters(std::move(arguments), inst->location());
   parameters.set_caller("linear_extrude");
 
