@@ -84,19 +84,37 @@ PyObject *python_lv_un_int(PyObject *self, PyObject *args, PyObject *kwargs,int 
 
 PyObject *python_lv_bin_int(PyObject *self, PyObject *args, PyObject *kwargs,int op)
 {
+#if 1
   char *kwlist[] = {"arg1","arg2",  NULL};
   PyObject *arg1 = NULL;
   PyObject *arg2 = NULL;
 
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O!O!", kwlist,
-                                   &PyLibFiveType, &arg1,
-                                   &PyLibFiveType, &arg2
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OO", kwlist,
+                                   &arg1,
+                                   &arg2
 				   )) return NULL;
 
   libfive_tree a1 = PyLibFiveObjectToTree(arg1);
   libfive_tree a2 = PyLibFiveObjectToTree(arg2);
   libfive_tree res = libfive_tree_binary(op, a1,a2);
   libfive_tree_stubs.push_back(res);
+#else
+  int i;
+  PyObject *obj = NULL;
+  if(args == NULL) return Py_None;
+  if(PyTuple_Size(args) == 0) return Py_None;
+  obj= PyTuple_GetItem(args, 0);
+//  Py_INCREF(obj);
+  libfive_tree res = PyLibFiveObjectToTree(obj);
+  for(i=1;i<PyTuple_Size(args);i++)
+  {
+  	obj= PyTuple_GetItem(args, i);
+  	//Py_INCREF(obj);
+  	libfive_tree tmp = PyLibFiveObjectToTree(obj);
+  	libfive_tree res = libfive_tree_binary(op, res,tmp);
+	libfive_tree_stubs.push_back(res);
+  }
+#endif
   return PyLibFiveObjectFromTree(&PyLibFiveType, res);
 }
 
@@ -160,6 +178,7 @@ PyObject *python_lv_add(PyObject *arg1, PyObject *arg2) { return python_lv_binop
 PyObject *python_lv_substract(PyObject *arg1, PyObject *arg2) { return python_lv_binop_int(arg1, arg2,  Opcode::OP_SUB); }
 PyObject *python_lv_multiply(PyObject *arg1, PyObject *arg2) { return python_lv_binop_int(arg1, arg2,  Opcode::OP_MUL); }
 PyObject *python_lv_remainder(PyObject *arg1, PyObject *arg2) { return python_lv_binop_int(arg1, arg2,  Opcode::OP_MOD); }
+PyObject *python_lv_divide(PyObject *arg1, PyObject *arg2) { return python_lv_binop_int(arg1, arg2,  Opcode::OP_DIV); }
 PyObject *python_lv_negate(PyObject *arg) { return python_lv_unop_int(arg, Opcode::OP_NEG); }
 
 
@@ -197,7 +216,7 @@ PyNumberMethods PyLibFiveNumbers =
   0, /* binaryfunc nb_inplace_or; */
 
   0, /* binaryfunc nb_floor_divide; */
-  0, /* binaryfunc nb_true_divide; */
+  &python_lv_divide, /* binaryfunc nb_true_divide; */
   0, /* binaryfunc nb_inplace_floor_divide; */
   0, /* binaryfunc nb_inplace_true_divide; */
 
