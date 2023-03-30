@@ -172,14 +172,14 @@ void Renderer::setColor(const float color[4],const int &textureind, const shader
   if (shaderinfo) {
     glUniform4f(shaderinfo->data.csg_rendering.color_area, c[0], c[1], c[2], c[3]);
     glUniform4f(shaderinfo->data.csg_rendering.color_edge, (c[0] + 1) / 2, (c[1] + 1) / 2, (c[2] + 1) / 2, 1.0);
-  }
-#endif
     if(textureind == 0){
     	    glUniform1f(shaderinfo->data.csg_rendering.texturefactor, 0.0);
     } else {
             glBindTexture(GL_TEXTURE_2D, textureIDs[textureind-1]);
     	    glUniform1f(shaderinfo->data.csg_rendering.texturefactor, 1.0);
     }
+  }
+#endif
 }
 
 // returns the color which has been set, which may differ from the color input parameter
