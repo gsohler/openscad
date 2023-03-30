@@ -481,7 +481,7 @@ void OpenCSGRenderer::renderCSGProducts(const std::shared_ptr<CSGProducts>& prod
       glDepthFunc(GL_LEQUAL);
     }
   } else {
-    glUniform1f(shaderinfo->data.csg_rendering.texturefactor , 0.0);
+    if(shaderinfo) glUniform1f(shaderinfo->data.csg_rendering.texturefactor , 0.0);
     for (const auto& product : vbo_vertex_products) {
       if (product->primitives().size() > 1) {
         GL_CHECKD(OpenCSG::render(product->primitives()));
