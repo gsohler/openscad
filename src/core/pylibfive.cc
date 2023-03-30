@@ -4,6 +4,9 @@
 
 #include <Python.h>
 #include "pylibfive.h"
+#include <libfive/tree/opcode.hpp>
+
+using namespace libfive;
 
 std::vector<libfive_tree> libfive_tree_stubs;
 // https://docs.python.it/html/ext/dnt-basics.html
@@ -65,7 +68,7 @@ PyObject *python_lv_void_int(PyObject *self, PyObject *args, PyObject *kwargs,li
 }
 
 
-PyObject *python_lv_un_int(PyObject *self, PyObject *args, PyObject *kwargs,const char *op)
+PyObject *python_lv_un_int(PyObject *self, PyObject *args, PyObject *kwargs,int op)
 {
   char *kwlist[] = {"arg",  NULL};
   PyObject *arg = NULL;
@@ -74,12 +77,12 @@ PyObject *python_lv_un_int(PyObject *self, PyObject *args, PyObject *kwargs,cons
                                    &PyLibFiveType, &arg)) return NULL;
 
   libfive_tree tv = PyLibFiveObjectToTree(arg);
-  libfive_tree res = libfive_tree_unary(libfive_opcode_enum(op), tv);
+  libfive_tree res = libfive_tree_unary(op, tv);
   libfive_tree_stubs.push_back(res);
   return PyLibFiveObjectFromTree(&PyLibFiveType, res);
 }
 
-PyObject *python_lv_bin_int(PyObject *self, PyObject *args, PyObject *kwargs,const char *op)
+PyObject *python_lv_bin_int(PyObject *self, PyObject *args, PyObject *kwargs,int op)
 {
   char *kwlist[] = {"arg1","arg2",  NULL};
   PyObject *arg1 = NULL;
@@ -92,17 +95,26 @@ PyObject *python_lv_bin_int(PyObject *self, PyObject *args, PyObject *kwargs,con
 
   libfive_tree a1 = PyLibFiveObjectToTree(arg1);
   libfive_tree a2 = PyLibFiveObjectToTree(arg2);
-  libfive_tree res = libfive_tree_binary(libfive_opcode_enum(op), a1,a2);
+  libfive_tree res = libfive_tree_binary(op, a1,a2);
   libfive_tree_stubs.push_back(res);
   return PyLibFiveObjectFromTree(&PyLibFiveType, res);
 }
 
-PyObject *python_lv_op_int(PyObject *arg1, PyObject *arg2, const char *op)
+PyObject *python_lv_unop_int(PyObject *arg, int op)
+{
+  libfive_tree t = PyLibFiveObjectToTree(arg);
+
+  libfive_tree res = libfive_tree_unary(op, t);
+  libfive_tree_stubs.push_back(res);
+  return PyLibFiveObjectFromTree(&PyLibFiveType, res);
+}
+
+PyObject *python_lv_binop_int(PyObject *arg1, PyObject *arg2, int op)
 {
   libfive_tree t1 = PyLibFiveObjectToTree(arg1);
   libfive_tree t2 = PyLibFiveObjectToTree(arg2);
 
-  libfive_tree res = libfive_tree_binary(libfive_opcode_enum(op), t1, t2);
+  libfive_tree res = libfive_tree_binary(op, t1, t2);
   libfive_tree_stubs.push_back(res);
   return PyLibFiveObjectFromTree(&PyLibFiveType, res);
 }
@@ -110,26 +122,45 @@ PyObject *python_lv_op_int(PyObject *arg1, PyObject *arg2, const char *op)
 PyObject *python_lv_x(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_void_int(self, args, kwargs,libfive_tree_x()); }
 PyObject *python_lv_y(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_void_int(self, args, kwargs,libfive_tree_y()); }
 PyObject *python_lv_z(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_void_int(self, args, kwargs,libfive_tree_z()); }
-PyObject *python_lv_add(PyObject *arg1, PyObject *arg2) { return python_lv_op_int(arg1, arg2,  "add"); }
-PyObject *python_lv_substract(PyObject *arg1, PyObject *arg2) { return python_lv_op_int(arg1, arg2,  "sub"); }
-PyObject *python_lv_multiply(PyObject *arg1, PyObject *arg2) { return python_lv_op_int(arg1, arg2,  "mul"); }
-PyObject *python_lv_divide(PyObject *arg1, PyObject *arg2) { return python_lv_op_int(arg1, arg2,  "div"); }
-PyObject *python_lv_sqrt(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_un_int(self, args, kwargs,"sqrt"); }
-PyObject *python_lv_abs(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_un_int(self, args, kwargs,"abs"); }
-PyObject *python_lv_max(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_bin_int(self, args, kwargs,"max"); }
-PyObject *python_lv_min(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_bin_int(self, args, kwargs,"min"); }
+PyObject *python_lv_sqrt(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_un_int(self, args, kwargs,Opcode::OP_SQRT); }
+PyObject *python_lv_abs(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_un_int(self, args, kwargs,Opcode::OP_ABS); }
+PyObject *python_lv_max(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_bin_int(self, args, kwargs,Opcode::OP_MAX); }
+PyObject *python_lv_min(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_bin_int(self, args, kwargs,Opcode::OP_MIN); }
+
+PyObject *python_lv_sin(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_un_int(self, args, kwargs,Opcode::OP_SIN); }
+PyObject *python_lv_cos(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_un_int(self, args, kwargs,Opcode::OP_COS); }
+PyObject *python_lv_tan(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_un_int(self, args, kwargs,Opcode::OP_TAN); }
+PyObject *python_lv_asin(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_un_int(self, args, kwargs,Opcode::OP_ASIN); }
+PyObject *python_lv_acos(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_un_int(self, args, kwargs,Opcode::OP_ACOS); }
+PyObject *python_lv_atan(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_un_int(self, args, kwargs,Opcode::OP_ATAN); }
+PyObject *python_lv_exp(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_un_int(self, args, kwargs,Opcode::OP_EXP); }
+PyObject *python_lv_log(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_un_int(self, args, kwargs,Opcode::OP_LOG); }
 
 static PyMethodDef PyLibFiveFunctions[] = {
   {"libfive_x", (PyCFunction) python_lv_x, METH_VARARGS | METH_KEYWORDS, "Get X."},
   {"libfive_y", (PyCFunction) python_lv_y, METH_VARARGS | METH_KEYWORDS, "Get Y."},
   {"libfive_z", (PyCFunction) python_lv_z, METH_VARARGS | METH_KEYWORDS, "Get Z."},
   {"libfive_sqrt", (PyCFunction) python_lv_sqrt, METH_VARARGS | METH_KEYWORDS, "Square Root"},
-  {"libfive_abs", (PyCFunction) python_lv_sqrt, METH_VARARGS | METH_KEYWORDS, "Absolute"},
+  {"libfive_abs", (PyCFunction) python_lv_abs, METH_VARARGS | METH_KEYWORDS, "Absolute"},
   {"libfive_max", (PyCFunction) python_lv_max, METH_VARARGS | METH_KEYWORDS, "Maximal"},
   {"libfive_min", (PyCFunction) python_lv_min, METH_VARARGS | METH_KEYWORDS, "Minimal"},
+
+  {"libfive_sin", (PyCFunction) python_lv_sin, METH_VARARGS | METH_KEYWORDS, "Sin"},
+  {"libfive_cos", (PyCFunction) python_lv_cos, METH_VARARGS | METH_KEYWORDS, "Cos"},
+  {"libfive_tan", (PyCFunction) python_lv_tan, METH_VARARGS | METH_KEYWORDS, "Tan"},
+  {"libfive_asin", (PyCFunction) python_lv_asin, METH_VARARGS | METH_KEYWORDS, "Asin"},
+  {"libfive_acos", (PyCFunction) python_lv_acos, METH_VARARGS | METH_KEYWORDS, "Acos"},
+  {"libfive_atan", (PyCFunction) python_lv_atan, METH_VARARGS | METH_KEYWORDS, "Atan"},
+  {"libfive_exp", (PyCFunction) python_lv_atan, METH_VARARGS | METH_KEYWORDS, "Exp"},
+  {"libfive_log", (PyCFunction) python_lv_atan, METH_VARARGS | METH_KEYWORDS, "Log"},
   {NULL, NULL, 0, NULL}
 };
 
+PyObject *python_lv_add(PyObject *arg1, PyObject *arg2) { return python_lv_binop_int(arg1, arg2,  Opcode::OP_ADD); }
+PyObject *python_lv_substract(PyObject *arg1, PyObject *arg2) { return python_lv_binop_int(arg1, arg2,  Opcode::OP_SUB); }
+PyObject *python_lv_multiply(PyObject *arg1, PyObject *arg2) { return python_lv_binop_int(arg1, arg2,  Opcode::OP_MUL); }
+PyObject *python_lv_remainder(PyObject *arg1, PyObject *arg2) { return python_lv_binop_int(arg1, arg2,  Opcode::OP_MOD); }
+PyObject *python_lv_negate(PyObject *arg) { return python_lv_unop_int(arg, Opcode::OP_NEG); }
 
 
 PyNumberMethods PyLibFiveNumbers =
@@ -137,7 +168,43 @@ PyNumberMethods PyLibFiveNumbers =
   &python_lv_add,
   &python_lv_substract,
   &python_lv_multiply,
-  &python_lv_divide
+  &python_lv_remainder,
+  0, /* binaryfunc nb_divmod; */
+  0, /* ternaryfunc nb_power; */
+  &python_lv_negate,
+  0, /* unaryfunc nb_positive; */
+  0, /* unaryfunc nb_absolute; */
+  0, /* inquiry nb_bool; */
+  0, /* unaryfunc nb_invert; */
+  0, /* binaryfunc nb_lshift; */
+  0, /* binaryfunc nb_rshift; */
+  0, /* binaryfunc nb_and; */
+  0, /* binaryfunc nb_xor; */
+  0, /* binaryfunc nb_or; */
+  0, /* unaryfunc nb_int; */
+  0, /* void *nb_reserved; */
+  0, /* unaryfunc nb_float; */
+
+  0, /* binaryfunc nb_inplace_add; */
+  0, /* binaryfunc nb_inplace_subtract; */
+  0, /* binaryfunc nb_inplace_multiply; */
+  0, /* binaryfunc nb_inplace_remainder; */
+  0, /* ternaryfunc nb_inplace_power; */
+  0, /* binaryfunc nb_inplace_lshift; */
+  0, /* binaryfunc nb_inplace_rshift; */
+  0, /* binaryfunc nb_inplace_and; */
+  0, /* binaryfunc nb_inplace_xor; */
+  0, /* binaryfunc nb_inplace_or; */
+
+  0, /* binaryfunc nb_floor_divide; */
+  0, /* binaryfunc nb_true_divide; */
+  0, /* binaryfunc nb_inplace_floor_divide; */
+  0, /* binaryfunc nb_inplace_true_divide; */
+
+  0, /* unaryfunc nb_index; */
+
+  0, /* binaryfunc nb_matrix_multiply; */
+  0, /* binaryfunc nb_inplace_matrix_multiply; */
 };
 
 PyTypeObject PyLibFiveType = {
