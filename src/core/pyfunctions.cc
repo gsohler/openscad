@@ -37,7 +37,7 @@
 #include "RotateExtrudeNode.h"
 #include "LinearExtrudeNode.h"
 #include "PathExtrudeNode.h"
-#include "SdfNode.h"
+#include "FrepNode.h"
 #include "CgalAdvNode.h"
 #include "CsgOpNode.h"
 #include "ColorNode.h"
@@ -241,10 +241,10 @@ PyObject *python_polyhedron(PyObject *self, PyObject *args, PyObject *kwargs)
   return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
 }
 
-PyObject *python_sdf(PyObject *self, PyObject *args, PyObject *kwargs)
+PyObject *python_frep(PyObject *self, PyObject *args, PyObject *kwargs)
 {
   DECLARE_INSTANCE
-  auto node = std::make_shared<SdfNode>(instance);
+  auto node = std::make_shared<FrepNode>(instance);
   PyObject *expression=NULL;
   PyObject *bmin=NULL, *bmax=NULL;
   double res=10;

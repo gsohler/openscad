@@ -24,7 +24,7 @@
  *
  */
 
-#include "SdfNode.h"
+#include "FrepNode.h"
 #include "pylibfive.h"
 
 #include "module.h"
@@ -46,7 +46,7 @@
 
 using namespace libfive;
 
-const Geometry *SdfNode::createGeometry() const
+const Geometry *FrepNode::createGeometry() const
 {
 	auto p = new PolySet(3, true);
 	PyObject *exp = this->expression;

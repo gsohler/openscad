@@ -619,7 +619,7 @@ set(CORE_SOURCES
   src/core/ImportNode.cc
   src/core/LinearExtrudeNode.cc
   src/core/PathExtrudeNode.cc
-  src/core/SdfNode.cc
+  src/core/FrepNode.cc
   src/core/LocalScope.cc
   src/core/ScopeContext.cc
   src/core/module.cc

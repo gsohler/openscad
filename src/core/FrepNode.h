@@ -10,10 +10,10 @@
 #endif
 #include <libfive.h>
 
-class SdfNode : public LeafNode
+class FrepNode : public LeafNode
 {
 public:
-  SdfNode(const ModuleInstantiation *mi) : LeafNode(mi) {}
+  FrepNode(const ModuleInstantiation *mi) : LeafNode(mi) {}
   std::string toString() const override
   {
     std::ostringstream stream;

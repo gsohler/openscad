@@ -137,22 +137,22 @@ PyObject *python_lv_exp(PyObject *self, PyObject *args, PyObject *kwargs) { retu
 PyObject *python_lv_log(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_un_int(self, args, kwargs,Opcode::OP_LOG); }
 
 static PyMethodDef PyLibFiveFunctions[] = {
-  {"libfive_x", (PyCFunction) python_lv_x, METH_VARARGS | METH_KEYWORDS, "Get X."},
-  {"libfive_y", (PyCFunction) python_lv_y, METH_VARARGS | METH_KEYWORDS, "Get Y."},
-  {"libfive_z", (PyCFunction) python_lv_z, METH_VARARGS | METH_KEYWORDS, "Get Z."},
-  {"libfive_sqrt", (PyCFunction) python_lv_sqrt, METH_VARARGS | METH_KEYWORDS, "Square Root"},
-  {"libfive_abs", (PyCFunction) python_lv_abs, METH_VARARGS | METH_KEYWORDS, "Absolute"},
-  {"libfive_max", (PyCFunction) python_lv_max, METH_VARARGS | METH_KEYWORDS, "Maximal"},
-  {"libfive_min", (PyCFunction) python_lv_min, METH_VARARGS | METH_KEYWORDS, "Minimal"},
+  {"x", (PyCFunction) python_lv_x, METH_VARARGS | METH_KEYWORDS, "Get X."},
+  {"y", (PyCFunction) python_lv_y, METH_VARARGS | METH_KEYWORDS, "Get Y."},
+  {"z", (PyCFunction) python_lv_z, METH_VARARGS | METH_KEYWORDS, "Get Z."},
+  {"sqrt", (PyCFunction) python_lv_sqrt, METH_VARARGS | METH_KEYWORDS, "Square Root"},
+  {"abs", (PyCFunction) python_lv_abs, METH_VARARGS | METH_KEYWORDS, "Absolute"},
+  {"max", (PyCFunction) python_lv_max, METH_VARARGS | METH_KEYWORDS, "Maximal"},
+  {"min", (PyCFunction) python_lv_min, METH_VARARGS | METH_KEYWORDS, "Minimal"},
 
-  {"libfive_sin", (PyCFunction) python_lv_sin, METH_VARARGS | METH_KEYWORDS, "Sin"},
-  {"libfive_cos", (PyCFunction) python_lv_cos, METH_VARARGS | METH_KEYWORDS, "Cos"},
-  {"libfive_tan", (PyCFunction) python_lv_tan, METH_VARARGS | METH_KEYWORDS, "Tan"},
-  {"libfive_asin", (PyCFunction) python_lv_asin, METH_VARARGS | METH_KEYWORDS, "Asin"},
-  {"libfive_acos", (PyCFunction) python_lv_acos, METH_VARARGS | METH_KEYWORDS, "Acos"},
-  {"libfive_atan", (PyCFunction) python_lv_atan, METH_VARARGS | METH_KEYWORDS, "Atan"},
-  {"libfive_exp", (PyCFunction) python_lv_atan, METH_VARARGS | METH_KEYWORDS, "Exp"},
-  {"libfive_log", (PyCFunction) python_lv_atan, METH_VARARGS | METH_KEYWORDS, "Log"},
+  {"sin", (PyCFunction) python_lv_sin, METH_VARARGS | METH_KEYWORDS, "Sin"},
+  {"cos", (PyCFunction) python_lv_cos, METH_VARARGS | METH_KEYWORDS, "Cos"},
+  {"tan", (PyCFunction) python_lv_tan, METH_VARARGS | METH_KEYWORDS, "Tan"},
+  {"asin", (PyCFunction) python_lv_asin, METH_VARARGS | METH_KEYWORDS, "Asin"},
+  {"acos", (PyCFunction) python_lv_acos, METH_VARARGS | METH_KEYWORDS, "Acos"},
+  {"atan", (PyCFunction) python_lv_atan, METH_VARARGS | METH_KEYWORDS, "Atan"},
+  {"exp", (PyCFunction) python_lv_atan, METH_VARARGS | METH_KEYWORDS, "Exp"},
+  {"log", (PyCFunction) python_lv_atan, METH_VARARGS | METH_KEYWORDS, "Log"},
   {NULL, NULL, 0, NULL}
 };
 
