@@ -358,7 +358,6 @@ double python_doublefunc(PyObject *cbfunc, double arg)
 static PyObject *pythonInitDict=NULL;
 
 extern PyObject *PyInit_libfive(void);
-//extern void PyInit_PyLibFive(void);
 
 PyMODINIT_FUNC PyInit_PyLibFive(void);
 
@@ -381,7 +380,12 @@ char *evaluatePython(const char *code, double time)
 	    char run_str[80];
 	    PyImport_AppendInittab("openscad", &PyInit_openscad);
 	    PyImport_AppendInittab("libfive", &PyInit_libfive);
-	    Py_Initialize();
+	    PyConfig config;
+            PyConfig_InitPythonConfig(&config);
+	    PyConfig_SetString(&config, &config.pythonpath_env, L"/home/gsohler/git/openscad/lib/pylibfive/");
+	    // Py_Initialize();
+            Py_InitializeFromConfig(&config);
+            PyConfig_Clear(&config);
 
 	    PyObject *py_main = PyImport_AddModule("__main__");
 	    pythonInitDict = PyModule_GetDict(py_main);
