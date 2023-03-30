@@ -53,18 +53,17 @@ const Geometry *SdfNode::createGeometry() const
 	if(exp == NULL || exp->ob_type != &PyLibFiveType) 
 		return p;
 	libfive_tree tree = PyLibFiveObjectToTree(exp);
-	printf("tree: %s\n",libfive_tree_print(tree)); // TODO free all tree
+//	printf("tree: %s\n",libfive_tree_print(tree)); // TODO free all tree
 
 	libfive_region3 reg;
-	reg.X.lower = -10; // TODO parameter
-	reg.X.upper =  10;
-	reg.Y.lower = -10;
-	reg.Y.upper =  10;
-	reg.Z.lower = -10;
-	reg.Z.upper =  10;
+	reg.X.lower = this->x1; 
+	reg.X.upper = this->x2;
+	reg.Y.lower = this->y1;
+	reg.Y.upper = this->y2;
+	reg.Z.lower = this->z1;
+	reg.Z.upper = this->z2;
 
-	libfive_mesh *mesh = libfive_tree_render_mesh(tree,  reg, 2); // TODO understand 10
-	printf("t %d %d\n",mesh->tri_count, mesh->vert_count);
+	libfive_mesh *mesh = libfive_tree_render_mesh(tree,  reg, this->res);
 	libfive_tri t;
 	for(int i=0;i<mesh->tri_count;i++) 
 	{
@@ -76,9 +75,10 @@ const Geometry *SdfNode::createGeometry() const
 	}
 	libfive_mesh_delete(mesh);
 
-/*
-	libfive_tree_delete(out);
-*/
+	for(libfive_tree t: libfive_tree_stubs) {
+		libfive_tree_delete(t);
+	}
+	libfive_tree_stubs.clear();
 
 	return p;
 }

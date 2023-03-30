@@ -8,6 +8,7 @@
 #ifdef ENABLE_PYTHON
 #include <Python.h>
 #endif
+#include <libfive.h>
 
 class SdfNode : public LeafNode
 {
@@ -24,5 +25,8 @@ public:
  #ifdef ENABLE_PYTHON
   PyObject *expression;
  #endif  
+  double x1,y1,z1;
+  double x2,y2,z2;
+  double res;
 };
 

@@ -246,13 +246,20 @@ PyObject *python_sdf(PyObject *self, PyObject *args, PyObject *kwargs)
   DECLARE_INSTANCE
   auto node = std::make_shared<SdfNode>(instance);
   PyObject *expression=NULL;
+  PyObject *bmin=NULL, *bmax=NULL;
+  double res=10;
 
-  char *kwlist[] = {"exp", NULL};
+  char *kwlist[] = {"exp","min","max","res", NULL};
 
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|O!", kwlist,
-                                   &PyLibFiveType, &expression)) return NULL;
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O!OO|d", kwlist,
+                                   &PyLibFiveType, &expression,
+				   &bmin, &bmax, &res
+				   )) return NULL;
+
+  python_vectorval(bmin, &(node->x1), &(node->y1), &(node->z1));
+  python_vectorval(bmax, &(node->x2), &(node->y2), &(node->z2));
+  node->res = res;
   node->expression = expression;
-  printf("parsed expression is %p\n",expression);
   return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
 }
 

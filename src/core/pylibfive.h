@@ -4,10 +4,7 @@
 
 #pragma GCC diagnostic ignored "-Wwrite-strings"
 
-#define DECLARE_INSTANCE	std::string instance_name; \
-	AssignmentList inst_asslist;\
-	ModuleInstantiation *instance = new ModuleInstantiation(instance_name,inst_asslist, Location::NONE);
-
+extern std::vector<libfive_tree> libfive_tree_stubs;
 
 typedef struct {
   PyObject_HEAD
