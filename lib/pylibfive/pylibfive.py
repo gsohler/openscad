@@ -1,5 +1,7 @@
 import libfive as lv
 
+#http://www.gradientspace.com/tutorials/category/g3sharp
+
 class Coord:
     def __init__(self):
         self.pos = lv.x(),lv.y(),lv.z()
