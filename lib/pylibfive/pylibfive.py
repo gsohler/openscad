@@ -25,7 +25,7 @@ def lv_trans(c,v):
     return c[0]-v[0] ,c[1]-v[1],c[2]-v[2]
 
 def lv_sphere(c,r):
-    return c[0]*c[0]+c[1]*c[1]+c[2]*c[2]-r*r
+    return lv.sqrt(c[0]*c[0]+c[1]*c[1]+c[2]*c[2])-r
 
 def lv_box(c, box):
     return lv.max(lv.max(
@@ -40,6 +40,13 @@ def lv_union(a, b):
 def lv_union_chamfer(a, b,r): # Credit: Doug Moen
     e = lv.max(r - lv.abs(a - b), 0);
     return lv.min( a, b) - e*0.5
+
+def lv_union_ring(a, b,r):
+    return lv.min(lv.min(a, b),lv.sqrt(a*a+b*b)-r)
+
+def lv_union_groove(a, b,r):
+    x=lv_clamp(r-lv.sqrt(a*a+b*b),0,r)
+    return lv.min(a+x, b+x)
 
 def lv_union_smooth(a, b, r): #Credit: original algorithm in GLSL by Inigo Quilez
 
@@ -58,6 +65,12 @@ def lv_intersection(a, b):
 def lv_intersection_chamfer(a, b,r):
     return -lv_union_chamfer(-a,-b,r)
 
+def lv_intersection_ring(a, b,r):
+    return -lv_union_ring(-a,-b,r)
+
+def lv_intersection_groove(a, b,r):
+    return -lv_union_groove(-a,-b,r)
+
 def lv_intersection_smooth(a, b,r):
     return -lv_union_smooth(-a,-b,r)
 
@@ -70,10 +83,19 @@ def lv_difference(a, b):
 def lv_difference_chamfer(a, b,r):
     return -lv_union_chamfer(-a,b,r)
 
+def lv_difference_ring(a, b,r):
+    return -lv_union_ring(-a,b,r)
+
+def lv_difference_groove(a, b,r):
+    return -lv_union_groove(-a,b,r)
+
 def lv_difference_smooth(a, b,r):
     return -lv_union_smooth(-a,b,r)
 
 def lv_difference_stairs(a, b,r,n):
     return -lv_union_stairs(-a,b,r,n)
+
+def lv_juntion_ring(a,b,r):
+    return lv.sqrt(a*a+b*b)-r
 
          
