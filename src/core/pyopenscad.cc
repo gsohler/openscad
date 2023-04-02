@@ -143,6 +143,8 @@ static PyMethodDef PyOpenSCADFunctions[] = {
   {"sphere", (PyCFunction) python_sphere, METH_VARARGS | METH_KEYWORDS, "Create Sphere."},
   {"polyhedron", (PyCFunction) python_polyhedron, METH_VARARGS | METH_KEYWORDS, "Create Polyhedron."},
   {"frep", (PyCFunction) python_frep, METH_VARARGS | METH_KEYWORDS, "Create F-Rep."},
+  {"ifrep", (PyCFunction) python_ifrep, METH_VARARGS | METH_KEYWORDS, "Create Inverse F-Rep."},
+
 
   {"translate", (PyCFunction) python_translate, METH_VARARGS | METH_KEYWORDS, "Move  Object."},
   {"rotate", (PyCFunction) python_rotate, METH_VARARGS | METH_KEYWORDS, "Rotate Object."},

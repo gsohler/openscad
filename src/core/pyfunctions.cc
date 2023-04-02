@@ -264,6 +264,28 @@ PyObject *python_frep(PyObject *self, PyObject *args, PyObject *kwargs)
 }
 
 
+PyObject *python_ifrep(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+  DECLARE_INSTANCE
+  PyObject *object = NULL;
+
+  char *kwlist[] = {"obj"};
+  std::shared_ptr<AbstractNode> child;
+
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O!", kwlist,
+                                   &PyOpenSCADType, &object
+				   )) return NULL;
+
+  child = PyOpenSCADObjectToNodeMulti(object);
+  LeafNode *node = (LeafNode *)   child.get();
+  auto geom = node->createGeometry();
+  const PolySet *ps = dynamic_cast<const PolySet *>(geom);
+  ifrep(ps);
+ 
+  return Py_None;
+}
+
+
 
 PyObject *python_square(PyObject *self, PyObject *args, PyObject *kwargs)
 {

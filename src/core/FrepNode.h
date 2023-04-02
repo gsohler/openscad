@@ -10,6 +10,8 @@
 #endif
 #include <libfive.h>
 
+void ifrep(const PolySet *ps);
+
 class FrepNode : public LeafNode
 {
 public:
