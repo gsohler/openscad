@@ -52,11 +52,8 @@ const Geometry *FrepNode::createGeometry() const
 {
 	auto p = new PolySet(3, true);
 	PyObject *exp = this->expression;
-	if(exp == NULL || exp->ob_type != &PyLibFiveType) 
-		return p;
-	libfive_tree tree = PyLibFiveObjectToTree(exp);
-//	printf("tree: %s\n",libfive_tree_print(tree)); // TODO free all tree
-
+	libfive_mesh *mesh=NULL;
+	if(exp == NULL ) return p;
 	libfive_region3 reg;
 	reg.X.lower = this->x1; 
 	reg.X.upper = this->x2;
@@ -64,18 +61,27 @@ const Geometry *FrepNode::createGeometry() const
 	reg.Y.upper = this->y2;
 	reg.Z.lower = this->z1;
 	reg.Z.upper = this->z2;
-
-	libfive_mesh *mesh = libfive_tree_render_mesh(tree,  reg, this->res);
+	if(exp->ob_type == &PyLibFiveType) {
+		libfive_tree tree = PyLibFiveObjectToTree(exp);
+//		printf("tree: %s\n",libfive_tree_print(tree)); 
+	        mesh = libfive_tree_render_mesh(tree,  reg, this->res);
+	} else if(exp->ob_type == &PyFunction_Type) {
+		printf("Python Function!\n");
+		mesh = NULL;
+	} else { printf("xxx\n"); }
 	libfive_tri t;
-	for(int i=0;i<mesh->tri_count;i++) 
-	{
-		t = mesh->tris[i];
-		p->append_poly(); 
-		p->append_vertex(mesh->verts[t.a].x, mesh->verts[t.a].y, mesh->verts[t.a].z );
-		p->append_vertex(mesh->verts[t.b].x, mesh->verts[t.b].y, mesh->verts[t.b].z );
-		p->append_vertex(mesh->verts[t.c].x, mesh->verts[t.c].y, mesh->verts[t.c].z );
+	// TODO libfive trees mergen
+	if(mesh != NULL) {
+		for(int i=0;i<mesh->tri_count;i++) 
+		{
+			t = mesh->tris[i];
+			p->append_poly(); 
+			p->append_vertex(mesh->verts[t.a].x, mesh->verts[t.a].y, mesh->verts[t.a].z );
+			p->append_vertex(mesh->verts[t.b].x, mesh->verts[t.b].y, mesh->verts[t.b].z );
+			p->append_vertex(mesh->verts[t.c].x, mesh->verts[t.c].y, mesh->verts[t.c].z );
+		}
+		libfive_mesh_delete(mesh);
 	}
-	libfive_mesh_delete(mesh);
 
 	for(libfive_tree t: libfive_tree_stubs) {
 		libfive_tree_delete(t);
@@ -85,7 +91,8 @@ const Geometry *FrepNode::createGeometry() const
 	return p;
 }
 
-typedef std::vector<int> intList;
+
+// polyset to SDF converter
 
 void convertToIndex(const PolySet *ps, std::vector<Vector3d> &pointList,  std::vector<intList> &polygons,std::vector<intList>  &pointToFaceInds)
 {
@@ -114,18 +121,6 @@ void convertToIndex(const PolySet *ps, std::vector<Vector3d> &pointList,  std::v
   }
 
 }
-
-typedef struct CutFace
-{
-  double a,b,c,d;
-} ;
-
-typedef struct CutProgram
-{
-  double a,b,c,d;
-  int posbranch;
-  int negbranch;
-} ;
 
 int operator==(const CutFace &a, const CutFace &b)
 {
@@ -184,14 +179,12 @@ std::vector<CutFace> calculateEdgeFaces( std::vector<Vector3d> &pointList,std::v
       p2=pointList[opoly[1]];
       p3=pointList[opoly[2]];
       Vector3d no=(p2-p1).cross(p3-p1).normalized();
-//      printf("no %.2g/%.2g/%.2g\n",no[0],no[1],no[2]);
       
-      // create angle face
+      // create edge face
       p1=nb.cross(no);
       p2=no+nb;
       p3=p2.cross(p1).normalized();
       p1=pointList[ind1];
-//      printf("testpt %g %g %g\n",p1[0],p1[1],p1[2]);
       cf.a=p3[0];
       cf.b=p3[1];
       cf.c=p3[2];
@@ -206,20 +199,13 @@ std::vector<CutFace> calculateEdgeFaces( std::vector<Vector3d> &pointList,std::v
      }
      if(swap) { cf.a =-cf.a; cf.b =-cf.b; cf.c =-cf.c; cf.d =-cf.d; }
 //      printf("nf\t%.2g\t%.2g\t%.2g\t%.2g\n",cf.a, cf.b, cf.c, cf.d);
-      if(!edgeFacePresent.count(cf)) { // TODO improve here!
-//	printf("Adding\n");
+      if(!edgeFacePresent.count(cf)) { 
       	edgeFaces.push_back(cf);
 	edgeFacePresent.insert(cf);
-      } else {
-//	printf("Ignoring\n");
-     }
-
-
+      } 
     }
-
   }
   return edgeFaces;
-
 }
 
 int generateProgram(intList &table, std::vector<CutProgram> &program,std::vector<CutFace> &edgeFaces, int faces, intList &validFaces) 
@@ -233,17 +219,10 @@ int generateProgram(intList &table, std::vector<CutProgram> &program,std::vector
 		for(int j=0;j<validFaces.size();j++)
 		{
 			int v=table[i*faces+validFaces[j]];
-//			switch(v)
-//			{
-//				case 0: printf("0"); break;
-//				case 1: printf("+"); break;
-//				case -1: printf("-"); break;
-//			}
 
 			if(v == 1) poscount++;
 			if(v == -1) negcount++;
 		}
-//		printf(" %d %d\n",poscount, negcount);
 		rate=poscount<negcount?poscount:negcount;
 		if(rate > ratebest) {
 			ratebest=rate;
@@ -255,7 +234,6 @@ int generateProgram(intList &table, std::vector<CutProgram> &program,std::vector
 		printf("Program Error!\n");
 		exit(1);
 	}
-//	printf("edgebest=%d\n",edgebest);
 	CutProgram cp;
 	cp.a=edgeFaces[edgebest].a;
 	cp.b=edgeFaces[edgebest].b;
@@ -280,7 +258,6 @@ int generateProgram(intList &table, std::vector<CutProgram> &program,std::vector
 				break;
 		}
 	}
-//	printf("split is %d %d %d\n",validFaces.size(),validPos.size(), validNeg.size());
 
 	int startind=program.size();
 	program.push_back(cp);
@@ -308,14 +285,12 @@ double evaluateProgram(std::vector<CutProgram> &program,int ind,std::vector<CutF
 	printf("eval %f/%f/%f\n",x,y,z);
 
 	while(1) {
-//		printf("ind=%d\n",ind);
 		CutProgram &prg = program[ind];
 		e=prg.a*x+prg.b*y+prg.c*z+prg.d;
 		if(e >= 0) nextind=prg.posbranch; else nextind=prg.negbranch;
 		if(nextind < 0) {
 			CutFace cf = normFaces[~nextind];
 			double d=cf.a*x+cf.b*y+cf.c*z+cf.d;
-//			printf("Final distance with face %d %f\n",~nextind,d);
 			return d;
 		}
 		ind=nextind;
@@ -324,18 +299,62 @@ double evaluateProgram(std::vector<CutProgram> &program,int ind,std::vector<CutF
 	return 0;
 }
 
-void ifrep(const PolySet *ps)
+
+
+// Libfive Oracle interface
+OpenSCADOracle::OpenSCADOracle(int x) 
+{
+        // Nothing to do here
+}
+
+void OpenSCADOracle::evalInterval(libfive::Interval& out) {
+	// Just pick a big ambiguous value.
+	out = {-10000.0, 10000.0};
+}
+
+void OpenSCADOracle::evalPoint(float& out, size_t index) {
+        const auto pt = points.col(index);
+        out = 1; // TODO fix f(pt.x(), pt.y(), pt.z());
+}
+
+void OpenSCADOracle::checkAmbiguous( Eigen::Block<Eigen::Array<bool, 1, LIBFIVE_EVAL_ARRAY_SIZE>, 1, Eigen::Dynamic> /* out */)
+{
+        // Nothing to do here, because we can only find one derivative
+        // per point (points on sharp features may not be handled correctly)
+}
+
+void OpenSCADOracle::evalFeatures(boost::container::small_vector<libfive::Feature, 4>& out) {
+        const float EPSILON = 1e-6;
+        float center, dx, dy, dz;
+
+        Eigen::Vector3f before = points.col(0);
+        evalPoint(center);
+
+        points.col(0) = before + Eigen::Vector3f(EPSILON, 0.0, 0.0);
+        evalPoint(dx);
+
+        points.col(0) = before + Eigen::Vector3f(0.0, EPSILON, 0.0);
+        evalPoint(dy);
+
+        points.col(0) = before + Eigen::Vector3f(0.0, 0.0, EPSILON);
+        evalPoint(dz);
+
+        points.col(0) = before;
+
+        out.push_back(Eigen::Vector3f(
+            (dx - center) / EPSILON,
+            (dy - center) / EPSILON,
+            (dz - center) / EPSILON));
+}
+
+
+PyObject *ifrep(const PolySet *ps)
 {
   std::vector<Vector3d> pointList; // list of all the points in the object
   std::vector<intList> polygons; // list polygons represented by indexes
   std::vector<intList>  pointToFaceInds; //  mapping pt_ind -> list of polygon inds which use it
 
   convertToIndex(ps,pointList, polygons,pointToFaceInds); // index umwandeln
-
-//  printf("points\n");
-//  for(int i=0;i<pointList.size();i++) {
-//    printf("%d\t%g\t%g\t%g\n",i,pointList[i][0], pointList[i][1], pointList[i][2]);
-//  }
 
   std::vector<CutFace> edgeFaces;
   std::vector<CutFace> normFaces;
@@ -371,6 +390,7 @@ void ifrep(const PolySet *ps)
   for(int i=0;i<program.size();i++) {
 	printf("%d\t%.3f\t%.3f\t%.3f\t%.3f\tP:%d\tN:%d\n",i,program[i].a,program[i].b,program[i].c,program[i].d,program[i].posbranch, program[i].negbranch);
   }
+  /*
   printf("dist=%f\n",evaluateProgram(program,startind,normFaces, 0.5,0.5,1.5));
   printf("dist=%f\n",evaluateProgram(program,startind,normFaces, 0.5,0.5,-0.5));
   printf("dist=%f\n",evaluateProgram(program,startind,normFaces, 1.5,0.5,0.5));
@@ -378,5 +398,10 @@ void ifrep(const PolySet *ps)
   printf("dist=%f\n",evaluateProgram(program,startind,normFaces, 0.5,1.5,0.5));
   printf("dist=%f\n",evaluateProgram(program,startind,normFaces, 0.5,-0.5,0.5));
   printf("dist=%f\n",evaluateProgram(program,startind,normFaces, 0.5,0.5,0.9));
+*/ 
+// std::function<float(float, float, float)> f=test_sdffunc;
+  libfive_tree o = libfive_tree_nullary(Opcode::ORACLE);
+//  Tree oc = Tree(std::unique_ptr<OracleClause>(new OpenSCADOracleClause(1)));
+  return PyLibFiveObjectFromTree(&PyLibFiveType,o);		  
 }
 

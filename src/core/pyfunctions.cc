@@ -251,15 +251,25 @@ PyObject *python_frep(PyObject *self, PyObject *args, PyObject *kwargs)
 
   char *kwlist[] = {"exp","min","max","res", NULL};
 
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O!OO|d", kwlist,
-                                   &PyLibFiveType, &expression,
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OOO|d", kwlist,
+                                   &expression,
 				   &bmin, &bmax, &res
 				   )) return NULL;
 
   python_vectorval(bmin, &(node->x1), &(node->y1), &(node->z1));
   python_vectorval(bmax, &(node->x2), &(node->y2), &(node->z2));
   node->res = res;
-  node->expression = expression;
+
+  if(expression->ob_type == &PyLibFiveType) {
+  	node->expression = expression;
+  } else if(expression->ob_type == &PyFunction_Type) {
+  	node->expression = expression;
+	printf("pyton func\n");
+  } else {
+    PyErr_SetString(PyExc_TypeError, "Unknown frep expression type\n");
+    return NULL;
+  }
+
   return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
 }
 
@@ -280,9 +290,8 @@ PyObject *python_ifrep(PyObject *self, PyObject *args, PyObject *kwargs)
   LeafNode *node = (LeafNode *)   child.get();
   auto geom = node->createGeometry();
   const PolySet *ps = dynamic_cast<const PolySet *>(geom);
-  ifrep(ps);
  
-  return Py_None;
+  return ifrep(ps);
 }
 
 
