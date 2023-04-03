@@ -8,7 +8,6 @@
 
 using namespace libfive;
 
-std::vector<libfive_tree> libfive_tree_stubs;
 // https://docs.python.it/html/ext/dnt-basics.html
 
 void PyLibFiveObject_dealloc(PyLibFiveObject *self)
@@ -26,7 +25,7 @@ static PyObject *PyLibFiveObject_new(PyTypeObject *type, PyObject *args,  PyObje
   return (PyObject *)self;
 }
 
-PyObject *PyLibFiveObjectFromTree(PyTypeObject *type, libfive_tree tree)
+PyObject *PyLibFiveObjectFromTree(PyTypeObject *type, Tree *tree)
 {
   PyLibFiveObject *self;
   self = (PyLibFiveObject *)  type->tp_alloc(type, 0);
@@ -38,17 +37,15 @@ PyObject *PyLibFiveObjectFromTree(PyTypeObject *type, libfive_tree tree)
   return NULL;
 }
 
-libfive_tree PyLibFiveObjectToTree(PyObject *obj)
+Tree *PyLibFiveObjectToTree(PyObject *obj)
 {
-  libfive_tree result = NULL;
+  libfive::Tree *result = NULL;
   if(obj != NULL && obj->ob_type == &PyLibFiveType) {
         result	= ((PyLibFiveObject *) obj)->tree;
   } else if(PyLong_Check(obj)) { 
-	result=  libfive_tree_const(PyLong_AsLong(obj));
-  	libfive_tree_stubs.push_back(result);
+  	result = new libfive::Tree(PyLong_AsLong(obj));
   } else if(PyFloat_Check(obj)) { 
-	result=  libfive_tree_const(PyFloat_AsDouble(obj));
-  	libfive_tree_stubs.push_back(result);
+  	result = new libfive::Tree(PyFloat_AsDouble(obj));
   } else {
 	  printf("Unknown type! %p %p\n",obj->ob_type, &PyFloat_Type);
   }
@@ -61,14 +58,13 @@ static int PyLibFiveInit(PyLibFiveObject *self, PyObject *arfs, PyObject *kwds)
   return 0;
 }
 
-PyObject *python_lv_void_int(PyObject *self, PyObject *args, PyObject *kwargs,libfive_tree t)
+PyObject *python_lv_void_int(PyObject *self, PyObject *args, PyObject *kwargs,Tree *t)
 {
-  libfive_tree_stubs.push_back(t);
   return PyLibFiveObjectFromTree(&PyLibFiveType, t);
 }
 
 
-PyObject *python_lv_un_int(PyObject *self, PyObject *args, PyObject *kwargs,int op)
+PyObject *python_lv_un_int(PyObject *self, PyObject *args, PyObject *kwargs,libfive::Opcode::Opcode op)
 {
   char *kwlist[] = {"arg",  NULL};
   PyObject *arg = NULL;
@@ -76,13 +72,12 @@ PyObject *python_lv_un_int(PyObject *self, PyObject *args, PyObject *kwargs,int 
   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O!", kwlist,
                                    &PyLibFiveType, &arg)) return NULL;
 
-  libfive_tree tv = PyLibFiveObjectToTree(arg);
-  libfive_tree res = libfive_tree_unary(op, tv);
-  libfive_tree_stubs.push_back(res);
-  return PyLibFiveObjectFromTree(&PyLibFiveType, res);
+  libfive::Tree *tv = PyLibFiveObjectToTree(arg);
+  libfive::Tree res = Tree::unary(op, *tv);
+  return PyLibFiveObjectFromTree(&PyLibFiveType, new Tree(res));
 }
 
-PyObject *python_lv_bin_int(PyObject *self, PyObject *args, PyObject *kwargs,int op)
+PyObject *python_lv_bin_int(PyObject *self, PyObject *args, PyObject *kwargs,libfive::Opcode::Opcode op)
 {
 #if 1
   char *kwlist[] = {"arg1","arg2",  NULL};
@@ -94,10 +89,9 @@ PyObject *python_lv_bin_int(PyObject *self, PyObject *args, PyObject *kwargs,int
                                    &arg2
 				   )) return NULL;
 
-  libfive_tree a1 = PyLibFiveObjectToTree(arg1);
-  libfive_tree a2 = PyLibFiveObjectToTree(arg2);
-  libfive_tree res = libfive_tree_binary(op, a1,a2);
-  libfive_tree_stubs.push_back(res);
+  libfive::Tree *a1 = PyLibFiveObjectToTree(arg1);
+  libfive::Tree *a2 = PyLibFiveObjectToTree(arg2);
+  libfive::Tree res = Tree::binary(op, *a1,*a2);
 #else
   int i;
   PyObject *obj = NULL;
@@ -105,41 +99,41 @@ PyObject *python_lv_bin_int(PyObject *self, PyObject *args, PyObject *kwargs,int
   if(PyTuple_Size(args) == 0) return Py_None;
   obj= PyTuple_GetItem(args, 0);
 //  Py_INCREF(obj);
-  libfive_tree res = PyLibFiveObjectToTree(obj);
+  Tree res = PyLibFiveObjectToTree(obj);
   for(i=1;i<PyTuple_Size(args);i++)
   {
   	obj= PyTuple_GetItem(args, i);
   	//Py_INCREF(obj);
-  	libfive_tree tmp = PyLibFiveObjectToTree(obj);
-  	libfive_tree res = libfive_tree_binary(op, res,tmp);
-	libfive_tree_stubs.push_back(res);
+  	Tree tmp = PyLibFiveObjectToTree(obj);
+  	Tree res = libfive_tree_binary(op, res,tmp);
   }
 #endif
-  return PyLibFiveObjectFromTree(&PyLibFiveType, res);
+  return PyLibFiveObjectFromTree(&PyLibFiveType, new Tree(res));
 }
 
-PyObject *python_lv_unop_int(PyObject *arg, int op)
+PyObject *python_lv_unop_int(PyObject *arg, libfive::Opcode::Opcode op)
 {
-  libfive_tree t = PyLibFiveObjectToTree(arg);
+  libfive::Tree *t = PyLibFiveObjectToTree(arg);
 
-  libfive_tree res = libfive_tree_unary(op, t);
-  libfive_tree_stubs.push_back(res);
-  return PyLibFiveObjectFromTree(&PyLibFiveType, res);
+  libfive::Tree res = Tree::unary(op, *t);
+  return PyLibFiveObjectFromTree(&PyLibFiveType, new Tree(res));
 }
 
-PyObject *python_lv_binop_int(PyObject *arg1, PyObject *arg2, int op)
+PyObject *python_lv_binop_int(PyObject *arg1, PyObject *arg2, libfive::Opcode::Opcode op)
 {
-  libfive_tree t1 = PyLibFiveObjectToTree(arg1);
-  libfive_tree t2 = PyLibFiveObjectToTree(arg2);
+  libfive::Tree *t1 = PyLibFiveObjectToTree(arg1);
+  libfive::Tree *t2 = PyLibFiveObjectToTree(arg2);
 
-  libfive_tree res = libfive_tree_binary(op, t1, t2);
-  libfive_tree_stubs.push_back(res);
-  return PyLibFiveObjectFromTree(&PyLibFiveType, res);
+  libfive::Tree res = Tree::binary(op, *t1, *t2);
+  return PyLibFiveObjectFromTree(&PyLibFiveType, new  Tree(res));
 }
 
-PyObject *python_lv_x(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_void_int(self, args, kwargs,libfive_tree_x()); }
-PyObject *python_lv_y(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_void_int(self, args, kwargs,libfive_tree_y()); }
-PyObject *python_lv_z(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_void_int(self, args, kwargs,libfive_tree_z()); }
+Tree lv_x = Tree::X();
+Tree lv_y = Tree::Y();
+Tree lv_z = Tree::Z();
+PyObject *python_lv_x(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_void_int(self, args, kwargs,&lv_x); }
+PyObject *python_lv_y(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_void_int(self, args, kwargs,&lv_y); }
+PyObject *python_lv_z(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_void_int(self, args, kwargs,&lv_z); }
 PyObject *python_lv_sqrt(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_un_int(self, args, kwargs,Opcode::OP_SQRT); }
 PyObject *python_lv_abs(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_un_int(self, args, kwargs,Opcode::OP_ABS); }
 PyObject *python_lv_max(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_bin_int(self, args, kwargs,Opcode::OP_MAX); }

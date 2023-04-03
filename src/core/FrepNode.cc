@@ -41,7 +41,11 @@
 #include <cmath>
 #include <sstream>
 
-#include "libfive.h"
+#include "libfive/render/brep/dc/dc_mesher.hpp"
+#include "libfive/render/brep/dc/dc_worker_pool.hpp"
+#include "libfive/render/brep/region.hpp"
+#include "libfive/render/brep/mesh.hpp"
+
 #include <hash.h>
 #include <unordered_set>
 
@@ -52,41 +56,32 @@ const Geometry *FrepNode::createGeometry() const
 {
 	auto p = new PolySet(3, true);
 	PyObject *exp = this->expression;
-	libfive_mesh *mesh=NULL;
+	std::unique_ptr<Mesh> mesh;
 	if(exp == NULL ) return p;
-	libfive_region3 reg;
-	reg.X.lower = this->x1; 
-	reg.X.upper = this->x2;
-	reg.Y.lower = this->y1;
-	reg.Y.upper = this->y2;
-	reg.Z.lower = this->z1;
-	reg.Z.upper = this->z2;
+	libfive::Region<3> reg(
+			{this->x1, this->y1, this->z1}, 
+			{this->x2, this->y2, this->z2});
+	libfive::BRepSettings settings;
+	settings.workers = 1;
+	settings.min_feature = 1.0 / this->res;
+
 	if(exp->ob_type == &PyLibFiveType) {
-		libfive_tree tree = PyLibFiveObjectToTree(exp);
+		libfive::Tree *tree = PyLibFiveObjectToTree(exp);
 //		printf("tree: %s\n",libfive_tree_print(tree)); 
-	        mesh = libfive_tree_render_mesh(tree,  reg, this->res);
+                mesh = Mesh::render(*tree, reg ,settings);
 	} else if(exp->ob_type == &PyFunction_Type) {
 		printf("Python Function!\n");
 		mesh = NULL;
 	} else { printf("xxx\n"); }
 	libfive_tri t;
 	// TODO libfive trees mergen
-	if(mesh != NULL) {
-		for(int i=0;i<mesh->tri_count;i++) 
-		{
-			t = mesh->tris[i];
-			p->append_poly(); 
-			p->append_vertex(mesh->verts[t.a].x, mesh->verts[t.a].y, mesh->verts[t.a].z );
-			p->append_vertex(mesh->verts[t.b].x, mesh->verts[t.b].y, mesh->verts[t.b].z );
-			p->append_vertex(mesh->verts[t.c].x, mesh->verts[t.c].y, mesh->verts[t.c].z );
-		}
-		libfive_mesh_delete(mesh);
+	for (const auto& t : mesh->branes)
+	{
+		p->append_poly(); 
+		p->append_vertex(mesh->verts[t[0]].x(), mesh->verts[t[0]].y(), mesh->verts[t[0]].z() );
+		p->append_vertex(mesh->verts[t[1]].x(), mesh->verts[t[1]].y(), mesh->verts[t[1]].z() );
+		p->append_vertex(mesh->verts[t[2]].x(), mesh->verts[t[2]].y(), mesh->verts[t[2]].z() );
 	}
-
-	for(libfive_tree t: libfive_tree_stubs) {
-		libfive_tree_delete(t);
-	}
-	libfive_tree_stubs.clear();
 
 	return p;
 }
@@ -400,8 +395,8 @@ PyObject *ifrep(const PolySet *ps)
   printf("dist=%f\n",evaluateProgram(program,startind,normFaces, 0.5,0.5,0.9));
 */ 
 // std::function<float(float, float, float)> f=test_sdffunc;
-  libfive_tree o = libfive_tree_nullary(Opcode::ORACLE);
-//  Tree oc = Tree(std::unique_ptr<OracleClause>(new OpenSCADOracleClause(1)));
-  return PyLibFiveObjectFromTree(&PyLibFiveType,o);		  
+//  libfive::Tree o = libfive_tree_nullary(Opcode::ORACLE);
+//  libfive::Tree oc = libfive::Tree(std::unique_ptr<OracleClause>(new OpenSCADOracleClause(1)));
+  return Py_None; // PyLibFiveObjectFromTree(&PyLibFiveType,o);		  
 }
 

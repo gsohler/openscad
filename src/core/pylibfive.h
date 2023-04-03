@@ -4,11 +4,9 @@
 
 #pragma GCC diagnostic ignored "-Wwrite-strings"
 
-extern std::vector<libfive_tree> libfive_tree_stubs;
-
 typedef struct {
   PyObject_HEAD
-  libfive_tree tree;  
+  libfive::Tree *tree;
   /* Type-specific fields go here. */
 } PyLibFiveObject;
 
@@ -18,6 +16,6 @@ extern PyTypeObject PyLibFiveType;
 
 void PyLibFiveObject_dealloc(PyLibFiveObject *self);
 
-PyObject *PyLibFiveObjectFromTree(PyTypeObject *type, libfive_tree tree);
-libfive_tree PyLibFiveObjectToTree(PyObject *object);
+PyObject *PyLibFiveObjectFromTree(PyTypeObject *type, libfive::Tree *tree);
+libfive::Tree *PyLibFiveObjectToTree(PyObject *object);
 
