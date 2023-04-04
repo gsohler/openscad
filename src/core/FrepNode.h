@@ -29,7 +29,7 @@ struct CutProgram
 
 class OpenSCADOracle : public libfive::OracleStorage<LIBFIVE_EVAL_ARRAY_SIZE> {
 public:
-    OpenSCADOracle(int x);
+    OpenSCADOracle(const  std::vector<CutProgram> &program, const std::vector<CutFace> &normFaces);
     void evalInterval(libfive::Interval& out) override;
     void evalPoint(float& out, size_t index=0) override;
     void checkAmbiguous( Eigen::Block<Eigen::Array<bool, 1, LIBFIVE_EVAL_ARRAY_SIZE>, 1, Eigen::Dynamic> /* out */) override;
@@ -38,26 +38,28 @@ public:
     void evalFeatures(boost::container::small_vector<libfive::Feature, 4>& out) override;
 
 protected:
-    int x;
+    std::vector<CutProgram> program;
+    std::vector<CutFace> normFaces;
 };
 
 class OpenSCADOracleClause: public libfive::OracleClause
 {
 public:
-    OpenSCADOracleClause(int x)
-        : x(x)
+    OpenSCADOracleClause(const std::vector<CutProgram> &program, const std::vector<CutFace> &normFaces)
+        : program(program), normFaces(normFaces)
     {
         // Nothing to do here
     }
 
     std::unique_ptr<libfive::Oracle> getOracle() const override {
-        return std::unique_ptr<libfive::Oracle>(new OpenSCADOracle(x));
+        return std::unique_ptr<libfive::Oracle>(new OpenSCADOracle(program, normFaces));
     }
 
     std::string name() const override { return "OpenSCADOracleClause"; }
 
 protected:
-    int x;
+    std::vector<CutProgram> program;
+    std::vector<CutFace> normFaces;
 };
 
 class FrepNode : public LeafNode

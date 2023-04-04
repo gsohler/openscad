@@ -277,8 +277,6 @@ double evaluateProgram(std::vector<CutProgram> &program,int ind,std::vector<CutF
 {
 	double e;
 	int nextind;
-	printf("eval %f/%f/%f\n",x,y,z);
-
 	while(1) {
 		CutProgram &prg = program[ind];
 		e=prg.a*x+prg.b*y+prg.c*z+prg.d;
@@ -297,7 +295,7 @@ double evaluateProgram(std::vector<CutProgram> &program,int ind,std::vector<CutF
 
 
 // Libfive Oracle interface
-OpenSCADOracle::OpenSCADOracle(int x) 
+OpenSCADOracle::OpenSCADOracle( const std::vector<CutProgram> &program, const std::vector<CutFace> &normFaces):program(program), normFaces(normFaces)
 {
         // Nothing to do here
 }
@@ -307,15 +305,15 @@ void OpenSCADOracle::evalInterval(libfive::Interval& out) {
 	out = {-10000.0, 10000.0};
 }
 
+int evalCalled=0;
 void OpenSCADOracle::evalPoint(float& out, size_t index) {
         const auto pt = points.col(index);
-        out = 1; // TODO fix f(pt.x(), pt.y(), pt.z());
+	evalCalled++;
+        out = evaluateProgram(this->program,0,this->normFaces, pt.x(), pt.y(), pt.z());
 }
 
 void OpenSCADOracle::checkAmbiguous( Eigen::Block<Eigen::Array<bool, 1, LIBFIVE_EVAL_ARRAY_SIZE>, 1, Eigen::Dynamic> /* out */)
 {
-        // Nothing to do here, because we can only find one derivative
-        // per point (points on sharp features may not be handled correctly)
 }
 
 void OpenSCADOracle::evalFeatures(boost::container::small_vector<libfive::Feature, 4>& out) {
@@ -381,7 +379,6 @@ PyObject *ifrep(const PolySet *ps)
   for(int i=0;i<polygons.size();i++) validFaces.push_back(i); 
   std::vector<CutProgram> program;
   int startind=generateProgram(table ,program,edgeFaces, polygons.size(),validFaces); // create recursive program
-  printf("startind=%d\n",startind);
   for(int i=0;i<program.size();i++) {
 	printf("%d\t%.3f\t%.3f\t%.3f\t%.3f\tP:%d\tN:%d\n",i,program[i].a,program[i].b,program[i].c,program[i].d,program[i].posbranch, program[i].negbranch);
   }
@@ -394,9 +391,9 @@ PyObject *ifrep(const PolySet *ps)
   printf("dist=%f\n",evaluateProgram(program,startind,normFaces, 0.5,-0.5,0.5));
   printf("dist=%f\n",evaluateProgram(program,startind,normFaces, 0.5,0.5,0.9));
 */ 
-// std::function<float(float, float, float)> f=test_sdffunc;
-//  libfive::Tree o = libfive_tree_nullary(Opcode::ORACLE);
-//  libfive::Tree oc = libfive::Tree(std::unique_ptr<OracleClause>(new OpenSCADOracleClause(1)));
-  return Py_None; // PyLibFiveObjectFromTree(&PyLibFiveType,o);		  
+  libfive::Tree oc = libfive::Tree(std::unique_ptr<OracleClause>(new OpenSCADOracleClause(program, normFaces)));
+  printf("eval Called is %d\n",evalCalled);
+  evalCalled=0;
+  return PyLibFiveObjectFromTree(&PyLibFiveType,new Tree(oc));		  
 }
 
