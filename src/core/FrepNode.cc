@@ -202,18 +202,32 @@ std::vector<CutFace> calculateEdgeFaces( std::vector<Vector3d> &pointList,std::v
   }
   return edgeFaces;
 }
+struct ProgramState
+{
+	intList validFaces;
+	int state=0;
+	int resultind;
+};
+
+std::vector<ProgramState> programStack;
+
 
 int generateProgram(intList &table, std::vector<CutProgram> &program,std::vector<CutFace> &edgeFaces, int faces, intList &validFaces) 
 {
+	std::vector<int> validPos, validNeg;
+	int i,j,v;
+	CutProgram cp;
 	// find out , which row has most equal balance between + and -
 	int rate,ratebest=-1,edgebest=-1;
+	int edgefaces = edgeFaces.size();
+	int valid_size = validFaces.size();
 //	printf("generateProgram round=%d\n",generateRound++);
-	for(int i=0;i<edgeFaces.size();i++) {
+	for(i=0;i<edgefaces;i++) {
 		int poscount=0;
 		int negcount=0;
-		for(int j=0;j<validFaces.size();j++)
+		for(j=0;j<valid_size;j++)
 		{
-			int v=table[i*faces+validFaces[j]];
+			v=table[i*faces+validFaces[j]];
 
 			if(v == 1) poscount++;
 			if(v == -1) negcount++;
@@ -229,13 +243,13 @@ int generateProgram(intList &table, std::vector<CutProgram> &program,std::vector
 		printf("Program Error!\n");
 		exit(1);
 	}
-	CutProgram cp;
 	cp.a=edgeFaces[edgebest].a;
 	cp.b=edgeFaces[edgebest].b;
 	cp.c=edgeFaces[edgebest].c;
 	cp.d=edgeFaces[edgebest].d;
+	cp.posbranch=~1;
+	cp.negbranch=~1; // TODO fix
 
-	intList validPos, validNeg;
 	// split into positive and negative branch
 	for(int i=0;i<validFaces.size();i++)
 	{
@@ -256,21 +270,58 @@ int generateProgram(intList &table, std::vector<CutProgram> &program,std::vector
 
 	int startind=program.size();
 	program.push_back(cp);
-	// now recursively call
-	if(validPos.size() > 1) {
-		program[startind].posbranch =generateProgram(table ,program,edgeFaces, faces,validPos); 
-	} else {
+
+	if(validPos.size() == validFaces.size())
+	{
 		program[startind].posbranch = ~(validPos[0]);
+		program[startind].negbranch = ~(validPos[0]);
+		return startind;
 	}
 
+	if(validNeg.size() == validFaces.size())
+	{
+		program[startind].posbranch = ~(validNeg[0]);
+		program[startind].negbranch = ~(validNeg[0]);
+		return startind;
+	}
+
+
 	if(validNeg.size() > 1) {
-		program[startind].negbranch =generateProgram(table ,program,edgeFaces, faces,validNeg); 
+  		ProgramState state;
+		state.validFaces=validNeg;	
+		state.resultind=~startind;
+		programStack.push_back(state);
 	} else {
 		program[startind].negbranch = ~(validNeg[0]);
 	}
 
-
+	if(validPos.size() > 1) {
+  		ProgramState state;
+		state.validFaces=validPos;
+		state.resultind=startind;
+		programStack.push_back(state);
+	} else {
+		program[startind].posbranch = ~(validPos[0]);
+	}
 	return startind;
+}
+
+int generateProgramFlat(intList &table, std::vector<CutProgram> &program, std::vector<CutFace> &edgeFaces, int faces, std::vector<ProgramState> &stack) 
+{
+	printf("fglat\n");
+	while(1)
+	{
+		if(stack.size() == 0) return 0;
+		ProgramState state = stack[stack.size()-1];
+		stack.pop_back();
+
+		int result=generateProgram(table ,program, edgeFaces, faces,state.validFaces); // create recursive program
+		if(state.resultind == 0x80000000) continue;
+		if(state.resultind >= 0) program[state.resultind].posbranch = result;		
+		else program[~(state.resultind)].negbranch = result;
+
+	}
+	return 0;
 }
 
 double evaluateProgram(std::vector<CutProgram> &program,int ind,std::vector<CutFace> &normFaces, double x,double y, double z)
@@ -343,17 +394,20 @@ void OpenSCADOracle::evalFeatures(boost::container::small_vector<libfive::Featur
 
 PyObject *ifrep(const PolySet *ps)
 {
+  printf("ifrep\n");
   std::vector<Vector3d> pointList; // list of all the points in the object
   std::vector<intList> polygons; // list polygons represented by indexes
   std::vector<intList>  pointToFaceInds; //  mapping pt_ind -> list of polygon inds which use it
 
   convertToIndex(ps,pointList, polygons,pointToFaceInds); // index umwandeln
+  printf("%d Faces, %d Points\n",polygons.size(),pointList.size());
 
   std::vector<CutFace> edgeFaces;
   std::vector<CutFace> normFaces;
   edgeFaces = calculateEdgeFaces(pointList, polygons,pointToFaceInds,normFaces);
+  printf("%d EdgeFaces generated\n",edgeFaces.size());
 
-  intList table; // x(0) dimenstion faces y(1) dimenions edgefas
+  std::vector<int> table; // x(0) dimenstion faces y(1) dimenions edgefas
   for(int i=0;i<edgeFaces.size();i++) // create table
   {
     CutFace &ef = edgeFaces[i];
@@ -373,12 +427,16 @@ PyObject *ifrep(const PolySet *ps)
       else table.push_back(0); 
     }	    
   }	  
+  printf("Table generated\n");
 
 
-  intList validFaces;
-  for(int i=0;i<polygons.size();i++) validFaces.push_back(i); 
+  ProgramState state;
+  for(int i=0;i<polygons.size();i++) state.validFaces.push_back(i); 
+  state.state=0;
+  state.resultind=0x80000000;
+  programStack.push_back(state); // initially all the work
   std::vector<CutProgram> program;
-  int startind=generateProgram(table ,program,edgeFaces, polygons.size(),validFaces); // create recursive program
+  int startind=generateProgramFlat(table ,program,edgeFaces, polygons.size(),programStack); // create recursive program
   for(int i=0;i<program.size();i++) {
 	printf("%d\t%.3f\t%.3f\t%.3f\t%.3f\tP:%d\tN:%d\n",i,program[i].a,program[i].b,program[i].c,program[i].d,program[i].posbranch, program[i].negbranch);
   }
