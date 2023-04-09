@@ -69,8 +69,8 @@ PyObject *python_lv_un_int(PyObject *self, PyObject *args, PyObject *kwargs,libf
   char *kwlist[] = {"arg",  NULL};
   PyObject *arg = NULL;
 
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O!", kwlist,
-                                   &PyLibFiveType, &arg)) return NULL;
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O", kwlist,
+                                   &arg)) return NULL;
 
   libfive::Tree *tv = PyLibFiveObjectToTree(arg);
   libfive::Tree res = Tree::unary(op, *tv);
@@ -135,6 +135,7 @@ PyObject *python_lv_x(PyObject *self, PyObject *args, PyObject *kwargs) { return
 PyObject *python_lv_y(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_void_int(self, args, kwargs,&lv_y); }
 PyObject *python_lv_z(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_void_int(self, args, kwargs,&lv_z); }
 PyObject *python_lv_sqrt(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_un_int(self, args, kwargs,Opcode::OP_SQRT); }
+PyObject *python_lv_square(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_un_int(self, args, kwargs,Opcode::OP_SQUARE); }
 PyObject *python_lv_abs(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_un_int(self, args, kwargs,Opcode::OP_ABS); }
 PyObject *python_lv_max(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_bin_int(self, args, kwargs,Opcode::OP_MAX); }
 PyObject *python_lv_min(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_bin_int(self, args, kwargs,Opcode::OP_MIN); }
@@ -153,6 +154,7 @@ static PyMethodDef PyLibFiveFunctions[] = {
   {"y", (PyCFunction) python_lv_y, METH_VARARGS | METH_KEYWORDS, "Get Y."},
   {"z", (PyCFunction) python_lv_z, METH_VARARGS | METH_KEYWORDS, "Get Z."},
   {"sqrt", (PyCFunction) python_lv_sqrt, METH_VARARGS | METH_KEYWORDS, "Square Root"},
+  {"square", (PyCFunction) python_lv_square, METH_VARARGS | METH_KEYWORDS, "Square"},
   {"abs", (PyCFunction) python_lv_abs, METH_VARARGS | METH_KEYWORDS, "Absolute"},
   {"max", (PyCFunction) python_lv_max, METH_VARARGS | METH_KEYWORDS, "Maximal"},
   {"min", (PyCFunction) python_lv_min, METH_VARARGS | METH_KEYWORDS, "Minimal"},

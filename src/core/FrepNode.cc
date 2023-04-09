@@ -56,7 +56,7 @@ const Geometry *FrepNode::createGeometry() const
 {
 	auto p = new PolySet(3, true);
 	PyObject *exp = this->expression;
-	std::unique_ptr<Mesh> mesh;
+	std::unique_ptr<Mesh> mesh=NULL;
 	if(exp == NULL ) return p;
 	libfive::Region<3> reg(
 			{this->x1, this->y1, this->z1}, 
@@ -73,16 +73,17 @@ const Geometry *FrepNode::createGeometry() const
 		printf("Python Function!\n");
 		mesh = NULL;
 	} else { printf("xxx\n"); }
-	libfive_tri t;
-	// TODO libfive trees mergen
-	for (const auto& t : mesh->branes)
-	{
-		p->append_poly(); 
-		p->append_vertex(mesh->verts[t[0]].x(), mesh->verts[t[0]].y(), mesh->verts[t[0]].z() );
-		p->append_vertex(mesh->verts[t[1]].x(), mesh->verts[t[1]].y(), mesh->verts[t[1]].z() );
-		p->append_vertex(mesh->verts[t[2]].x(), mesh->verts[t[2]].y(), mesh->verts[t[2]].z() );
+	if(mesh != NULL) {
+		libfive_tri t;
+		// TODO libfive trees mergen
+		for (const auto& t : mesh->branes)
+		{
+			p->append_poly(); 
+			p->append_vertex(mesh->verts[t[0]].x(), mesh->verts[t[0]].y(), mesh->verts[t[0]].z() );
+			p->append_vertex(mesh->verts[t[1]].x(), mesh->verts[t[1]].y(), mesh->verts[t[1]].z() );
+			p->append_vertex(mesh->verts[t[2]].x(), mesh->verts[t[2]].y(), mesh->verts[t[2]].z() );
+		}
 	}
-
 	return p;
 }
 
