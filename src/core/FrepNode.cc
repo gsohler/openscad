@@ -176,21 +176,22 @@ std::vector<CutFace> calculateEdgeFaces( std::vector<Vector3d> &pointList,std::v
       Vector3d no=(p2-p1).cross(p3-p1).normalized();
       
       // create edge face
-      p1=nb.cross(no);
+      p1=pointList[ind2]-pointList[ind1]; // this is safe against coplanar  adjacent faces
       p2=no+nb;
       p3=p2.cross(p1).normalized();
+
       p1=pointList[ind1];
       cf.a=p3[0];
       cf.b=p3[1];
       cf.c=p3[2];
       cf.d=-(cf.a*p1[0]+cf.b*p1[1]+cf.c*p1[2]);
       int swap=0;
-     if(cf.a < 0) swap=1;
-     if(cf.a == 0) {
-	if(cf.b < 0) swap=1;
-	if(cf.b == 0) {
-          if(cf.c < 0) swap=1;
-	}
+      if(cf.a < 0) swap=1;
+      if(cf.a == 0) {
+ 	if(cf.b < 0) swap=1;
+ 	if(cf.b == 0) {
+           if(cf.c < 0) swap=1;
+ 	}
      }
      if(swap) { cf.a =-cf.a; cf.b =-cf.b; cf.c =-cf.c; cf.d =-cf.d; }
 //      printf("nf\t%.2g\t%.2g\t%.2g\t%.2g\n",cf.a, cf.b, cf.c, cf.d);
@@ -212,22 +213,23 @@ struct ProgramState
 std::vector<ProgramState> programStack;
 
 
-int generateProgram(intList &table, std::vector<CutProgram> &program,std::vector<CutFace> &edgeFaces, int faces, intList &validFaces) 
+int generateProgram(intList &table, std::vector<CutProgram> &program,std::vector<CutFace> &edgeFaces, const std::vector<intList> &faces, intList &validFaces) 
 {
-	std::vector<int> validPos, validNeg;
+	std::vector<int> posFaces, negFaces;
 	int i,j,v;
 	CutProgram cp;
 	// find out , which row has most equal balance between + and -
 	int rate,ratebest=-1,edgebest=-1;
-	int edgefaces = edgeFaces.size();
-	int valid_size = validFaces.size();
+	int edgeFaceLen = edgeFaces.size();
+	int validFacesLen = validFaces.size();
+	int facesLen=faces.size();
 //	printf("generateProgram round=%d\n",generateRound++);
-	for(i=0;i<edgefaces;i++) {
+	for(i=0;i<edgeFaceLen;i++) {
 		int poscount=0;
 		int negcount=0;
-		for(j=0;j<valid_size;j++)
+		for(j=0;j<validFacesLen;j++)
 		{
-			v=table[i*faces+validFaces[j]];
+			v=table[i*facesLen+validFaces[j]];
 
 			if(v == 1) poscount++;
 			if(v == -1) negcount++;
@@ -247,23 +249,21 @@ int generateProgram(intList &table, std::vector<CutProgram> &program,std::vector
 	cp.b=edgeFaces[edgebest].b;
 	cp.c=edgeFaces[edgebest].c;
 	cp.d=edgeFaces[edgebest].d;
-	cp.posbranch=~1;
-	cp.negbranch=~1; // TODO fix
 
 	// split into positive and negative branch
 	for(int i=0;i<validFaces.size();i++)
 	{
-		switch(table[edgebest*faces+validFaces[i]])
+		switch(table[edgebest*facesLen+validFaces[i]])
 		{
 			case 1:
-				validPos.push_back(validFaces[i]);
+				posFaces.push_back(validFaces[i]);
 				break;
 			case 0:
-				validPos.push_back(validFaces[i]);
-				validNeg.push_back(validFaces[i]);
+				posFaces.push_back(validFaces[i]);
+				negFaces.push_back(validFaces[i]);
 				break;
 			case -1:
-				validNeg.push_back(validFaces[i]);
+				negFaces.push_back(validFaces[i]);
 				break;
 		}
 	}
@@ -271,42 +271,66 @@ int generateProgram(intList &table, std::vector<CutProgram> &program,std::vector
 	int startind=program.size();
 	program.push_back(cp);
 
-	if(validPos.size() == validFaces.size())
+	if(posFaces.size() == validFaces.size())
 	{
-		program[startind].posbranch = ~(validPos[0]);
-		program[startind].negbranch = ~(validPos[0]);
+		for(i=0;i<edgeFaces.size();i++)
+		{
+			for(j=0;j< validFaces.size();j++) 
+			{
+				switch(table[i*facesLen+validFaces[j]])
+				{
+					case 1:printf("+"); break;
+					case 0:printf("/"); break;
+					case -1:printf("/"); break;
+				}
+			}
+			printf("\n");
+		}
+		printf("faces are \n");
+		for(i=0;i<validFaces.size();i++) {
+			int faceind=validFaces[i];
+			for(j=0;j<faces[faceind].size();j++)
+			{
+				printf("%d ",faces[faceind][j]);
+			}
+			printf("\n");
+		}
+		exit(1);
+
+		program[startind].posbranch = ~(posFaces[0]);
+		program[startind].negbranch = ~(posFaces[1]);
 		return startind;
 	}
 
-	if(validNeg.size() == validFaces.size())
+	if(negFaces.size() == validFaces.size())
 	{
-		program[startind].posbranch = ~(validNeg[0]);
-		program[startind].negbranch = ~(validNeg[0]);
+		program[startind].posbranch = ~(negFaces[0]);
+		program[startind].negbranch = ~(negFaces[1]);
 		return startind;
 	}
 
 
-	if(validNeg.size() > 1) {
+	if(negFaces.size() > 1) {
   		ProgramState state;
-		state.validFaces=validNeg;	
+		state.validFaces=negFaces;	
 		state.resultind=~startind;
 		programStack.push_back(state);
 	} else {
-		program[startind].negbranch = ~(validNeg[0]);
+		program[startind].negbranch = ~(negFaces[0]);
 	}
 
-	if(validPos.size() > 1) {
+	if(posFaces.size() > 1) {
   		ProgramState state;
-		state.validFaces=validPos;
+		state.validFaces=posFaces;
 		state.resultind=startind;
 		programStack.push_back(state);
 	} else {
-		program[startind].posbranch = ~(validPos[0]);
+		program[startind].posbranch = ~(posFaces[0]);
 	}
 	return startind;
 }
 
-int generateProgramFlat(intList &table, std::vector<CutProgram> &program, std::vector<CutFace> &edgeFaces, int faces, std::vector<ProgramState> &stack) 
+int generateProgramFlat(intList &table, std::vector<CutProgram> &program, std::vector<CutFace> &edgeFaces, const std::vector<intList> &faces, std::vector<ProgramState> &stack) 
 {
 	printf("fglat\n");
 	while(1)
@@ -419,8 +443,8 @@ PyObject *ifrep(const PolySet *ps)
       {
 	      Vector3d pt=pointList[poly[k]];
 	      double e=ef.a*pt[0]+ef.b*pt[1]+ef.c*pt[2]+ef.d;
-	      if(e > 0.00001) poscount++;
-	      if(e <  -0.00001) negcount++;
+	      if(e >  0.00001) poscount++;
+	      if(e < -0.00001) negcount++;
       }      
       if(poscount > 0 && negcount == 0) table.push_back(1);
       else if(poscount == 0 && negcount > 0) table.push_back(-1);
@@ -436,7 +460,7 @@ PyObject *ifrep(const PolySet *ps)
   state.resultind=0x80000000;
   programStack.push_back(state); // initially all the work
   std::vector<CutProgram> program;
-  int startind=generateProgramFlat(table ,program,edgeFaces, polygons.size(),programStack); // create recursive program
+  int startind=generateProgramFlat(table ,program,edgeFaces, polygons,programStack); // create recursive program
   for(int i=0;i<program.size();i++) {
 	printf("%d\t%.3f\t%.3f\t%.3f\t%.3f\tP:%d\tN:%d\n",i,program[i].a,program[i].b,program[i].c,program[i].d,program[i].posbranch, program[i].negbranch);
   }
