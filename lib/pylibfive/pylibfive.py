@@ -21,7 +21,15 @@ def lv_length(c):
     return lv.sqrt(c[0]*c[0]+c[1]*c[1]+c[2]*c[2])
 
 def lv_coord():
-        return lv.x(),lv.y(),lv.z()
+    return lv.x(),lv.y(),lv.z()
+
+def lv_matrix(c,rep, pitch):
+    x=(lv_clamp(c[0]+pitch[0]/2,0,rep[0]*pitch[0])%pitch[0])-pitch[0]/2
+    y=(lv_clamp(c[1]+pitch[1]/2,0,rep[1]*pitch[1])%pitch[1])-pitch[1]/2
+    z=c[2] # (lv_clamp(c[2]+pitch[2]/2,0,rep[2]*pitch[2])%pitch[2])-pitch[2]/2
+    return x,y,z
+
+
 
 def lv_trans(c,v):
     return c[0]-v[0] ,c[1]-v[1],c[2]-v[2]

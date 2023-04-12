@@ -65,7 +65,7 @@ const Geometry *FrepNode::createGeometry() const
 	settings.workers = 1;
 	settings.min_feature = 1.0 / this->res;
 
-#ifdef EMABLE_PYTHON	
+#ifdef ENABLE_PYTHON	
 	PyObject *exp = this->expression;
 	if(exp == NULL ) return p;
 	if(exp->ob_type == &PyLibFiveType) {
