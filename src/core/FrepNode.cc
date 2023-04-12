@@ -25,7 +25,9 @@
  */
 
 #include "FrepNode.h"
+#ifdef ENABLE_PYTHON
 #include "pylibfive.h"
+#endif
 
 #include "module.h"
 #include "ModuleInstantiation.h"
@@ -55,9 +57,7 @@ using namespace libfive;
 const Geometry *FrepNode::createGeometry() const
 {
 	auto p = new PolySet(3, true);
-	PyObject *exp = this->expression;
 	std::unique_ptr<Mesh> mesh=NULL;
-	if(exp == NULL ) return p;
 	libfive::Region<3> reg(
 			{this->x1, this->y1, this->z1}, 
 			{this->x2, this->y2, this->z2});
@@ -65,6 +65,9 @@ const Geometry *FrepNode::createGeometry() const
 	settings.workers = 1;
 	settings.min_feature = 1.0 / this->res;
 
+#ifdef EMABLE_PYTHON	
+	PyObject *exp = this->expression;
+	if(exp == NULL ) return p;
 	if(exp->ob_type == &PyLibFiveType) {
 		libfive::Tree *tree = PyLibFiveObjectToTree(exp);
 //		printf("tree: %s\n",libfive_tree_print(tree)); 
@@ -73,6 +76,7 @@ const Geometry *FrepNode::createGeometry() const
 		printf("Python Function!\n");
 		mesh = NULL;
 	} else { printf("xxx\n"); }
+#endif	
 	if(mesh != NULL) {
 		libfive_tri t;
 		// TODO libfive trees mergen
@@ -416,7 +420,7 @@ void OpenSCADOracle::evalFeatures(boost::container::small_vector<libfive::Featur
             (dz - center) / EPSILON));
 }
 
-
+#ifdef ENABLE_PYTHON
 PyObject *ifrep(const PolySet *ps)
 {
   printf("ifrep\n");
@@ -479,4 +483,5 @@ PyObject *ifrep(const PolySet *ps)
   evalCalled=0;
   return PyLibFiveObjectFromTree(&PyLibFiveType,new Tree(oc));		  
 }
+#endif
 

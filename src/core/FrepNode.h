@@ -12,7 +12,10 @@
 #include "libfive/oracle/oracle_clause.hpp"
 #include "libfive/oracle/oracle_storage.hpp"
 
+#ifdef  ENABLE_PYTHON
 PyObject *ifrep(const PolySet *ps);
+#endif
+
 typedef std::vector<int> intList;
 
 struct CutFace

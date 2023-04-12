@@ -10,8 +10,24 @@
 
 void PyOpenSCADObject_dealloc(PyOpenSCADObject *self)
 {
-//  Py_XDECREF(self->dict);
+  Py_XDECREF(self->dict);
 //  Py_TYPE(self)->tp_free((PyObject *)self);
+}
+
+PyObject *PyOpenSCADObject_alloc(PyTypeObject *cls, Py_ssize_t nitems)
+{
+  int memsize=cls->tp_basicsize + nitems*sizeof(PyOpenSCADObject);
+  memsize=4*((memsize+3)/4);
+  PyObject *self = (PyObject *)  malloc(memsize);
+  memset(self, 0,memsize);
+  if(self != NULL)
+  {
+    self->ob_type=cls;
+    ((PyOpenSCADObject *)self)->dict = PyDict_New();
+    Py_XINCREF(&( ((PyOpenSCADObject *)self)->dict));
+    Py_XINCREF(self);
+  }  
+  return (PyObject *) self;
 }
 
 static PyObject *PyOpenSCADObject_new(PyTypeObject *type, PyObject *args,  PyObject *kwds)
@@ -60,7 +76,7 @@ int python_more_obj(std::vector<std::shared_ptr<AbstractNode>>& children, PyObje
 std::shared_ptr<AbstractNode> PyOpenSCADObjectToNode(PyObject *obj)
 {
   std::shared_ptr<AbstractNode> result = ((PyOpenSCADObject *) obj)->node;
-//  Py_XDECREF(obj); TODO cannot activate
+  Py_XDECREF(obj); 
   return result;
 }
 
@@ -70,7 +86,7 @@ std::shared_ptr<AbstractNode> PyOpenSCADObjectToNodeMulti(PyObject *objs)
   if (Py_TYPE(objs) == &PyOpenSCADType) {
     result = ((PyOpenSCADObject *) objs)->node;
   } else if (PyList_Check(objs)) {
-    // TODO also decref the list ?
+
     DECLARE_INSTANCE
     auto node = std::make_shared<CsgOpNode>(instance, OpenSCADOperator::UNION);
 
@@ -79,10 +95,11 @@ std::shared_ptr<AbstractNode> PyOpenSCADObjectToNodeMulti(PyObject *objs)
       PyObject *obj = PyList_GetItem(objs, i);
       std::shared_ptr<AbstractNode> child = PyOpenSCADObjectToNode(obj);
       node->children.push_back(child);
+      Py_XDECREF(obj);
     }
     result=node;
   } else result=NULL;
-//  Py_XDECREF(objs); // TODO cannot activate
+  Py_XDECREF(objs);
   return result;
 }
 
@@ -286,7 +303,7 @@ PyTypeObject PyOpenSCADType = {
     0,                         			/* tp_descr_set */
     0,                         			/* tp_dictoffset */
     (initproc) PyOpenSCADInit,      		/* tp_init */
-    0,                         			/* tp_alloc */
+    PyOpenSCADObject_alloc,    			/* tp_alloc */
     PyOpenSCADObject_new,                	/* tp_new */
 };
 
