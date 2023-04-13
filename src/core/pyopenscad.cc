@@ -5,6 +5,7 @@
 #include <Python.h>
 #include "pyopenscad.h"
 #include "CsgOpNode.h"
+#include "PlatformUtils.h"
 
 // https://docs.python.it/html/ext/dnt-basics.html
 
@@ -387,6 +388,7 @@ char *evaluatePython(const char *code, double time)
   PyObject *pyExcType;
   PyObject *pyExcValue;
   PyObject *pyExcTraceback;
+  wchar_t libfivedir[256];
 
     if(pythonInitDict) {
       if (Py_FinalizeEx() < 0) {
@@ -401,7 +403,9 @@ char *evaluatePython(const char *code, double time)
 	    PyImport_AppendInittab("libfive", &PyInit_libfive);
 	    PyConfig config;
             PyConfig_InitPythonConfig(&config);
-	    PyConfig_SetString(&config, &config.pythonpath_env, L"/home/gsohler/git/openscad/lib/pylibfive/");
+	    swprintf(libfivedir, 256, L"%s/../lib/pylibfive/",PlatformUtils::applicationPath().c_str());
+
+	    PyConfig_SetString(&config, &config.pythonpath_env, libfivedir);
 	    // Py_Initialize();
             Py_InitializeFromConfig(&config);
             PyConfig_Clear(&config);
