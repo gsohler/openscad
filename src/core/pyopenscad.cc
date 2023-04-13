@@ -7,9 +7,9 @@
 #include "CsgOpNode.h"
 #include "PlatformUtils.h"
 
-// https://docs.python.it/html/ext/dnt-basics.html
+// https://docs.python.org/3.10/extending/newtypes.html TODO implement
 
-void PyOpenSCADObject_dealloc(PyOpenSCADObject *self)
+static void PyOpenSCADObject_dealloc(PyOpenSCADObject *self)
 {
   Py_XDECREF(self->dict);
 //  Py_TYPE(self)->tp_free((PyObject *)self);
@@ -17,18 +17,7 @@ void PyOpenSCADObject_dealloc(PyOpenSCADObject *self)
 
 PyObject *PyOpenSCADObject_alloc(PyTypeObject *cls, Py_ssize_t nitems)
 {
-  int memsize=cls->tp_basicsize + nitems*sizeof(PyOpenSCADObject);
-  memsize=4*((memsize+3)/4);
-  PyObject *self = (PyObject *)  malloc(memsize);
-  memset(self, 0,memsize);
-  if(self != NULL)
-  {
-    self->ob_type=cls;
-    ((PyOpenSCADObject *)self)->dict = PyDict_New();
-    Py_XINCREF(&( ((PyOpenSCADObject *)self)->dict));
-    Py_XINCREF(self);
-  }  
-  return (PyObject *) self;
+  return PyType_GenericAlloc(cls, nitems);
 }
 
 static PyObject *PyOpenSCADObject_new(PyTypeObject *type, PyObject *args,  PyObject *kwds)

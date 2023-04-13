@@ -44,11 +44,15 @@ def lv_box(c, box):
 def lv_cylinder(c, h,r1,r2=-1):
     if r2 == -1:
         r2=r1
-    xr=lv.sqrt(c[0]*c[0]+c[1]*c[1])
     r=lv_lerp(r1,r2,(c[2]/h))
-    q1= lv.abs(xr)-r
-    q2=lv.max(c[2]-h,-c[2])
-    return lv_length([ lv.max(q1,0), 0, lv.max(q2,0)])+ lv.min(lv.max(q1,q2),0)
+    distlat = lv_length([c[0],c[1],0]) - r
+    distvert = lv.max(c[2]-h,-c[2])
+    return lv_length([ lv.max(distlat,0), 0, lv.max(distvert,0)])+ lv.min(lv.max(distlat,distvert),0)
+
+def lv_cylinder_c(c, h,r):
+    distlat= lv.abs(xr)-r
+    distvert=lv.max(c[2]-h,-c[2])
+    return lv_length([ lv.max(distlat,0), 0, lv.max(distvert,0)])+ lv.min(lv.max(distlat,distvert),0)
 
 # https://www.youtube.com/watch?v=-pdSjBPH3zM    
 
