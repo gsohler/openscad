@@ -7,23 +7,25 @@
 #include "CsgOpNode.h"
 #include "PlatformUtils.h"
 
-// https://docs.python.org/3.10/extending/newtypes.html TODO implement
+// https://docs.python.org/3.10/extending/newtypes.html 
 
-static void PyOpenSCADObject_dealloc(PyOpenSCADObject *self)
+static void PyOpenSCADObject_dealloc(PyObject *obj)
 {
+  PyOpenSCADObject *self = (PyOpenSCADObject *) obj;
   Py_XDECREF(self->dict);
-//  Py_TYPE(self)->tp_free((PyObject *)self);
+//   Py_TYPE(self)->tp_free((PyObject *)self); TODO act
 }
 
-PyObject *PyOpenSCADObject_alloc(PyTypeObject *cls, Py_ssize_t nitems)
-{
-  return PyType_GenericAlloc(cls, nitems);
-}
 
 static PyObject *PyOpenSCADObject_new(PyTypeObject *type, PyObject *args,  PyObject *kwds)
 {
+  PyObject * empty_tuple;
   PyOpenSCADObject *self;
-  self = (PyOpenSCADObject *)  type->tp_alloc(type, 0);
+  empty_tuple = PyTuple_New(0);
+  Py_XINCREF(empty_tuple);
+  self = (PyOpenSCADObject *) PyBaseObject_Type.tp_new(type, empty_tuple, 0);
+  Py_XDECREF(empty_tuple);
+
   self->node = NULL;
   self->dict = PyDict_New();
   Py_XINCREF(self->dict);
@@ -261,7 +263,7 @@ PyTypeObject PyOpenSCADType = {
     "PyOpenSCAD",             			/* tp_name */
     sizeof(PyOpenSCADObject), 			/* tp_basicsize */
     0,                         			/* tp_itemsize */
-    (destructor) PyOpenSCADObject_dealloc,	/* tp_dealloc */
+    PyOpenSCADObject_dealloc,			/* tp_dealloc */
     0,                         			/* vectorcall_offset */
     0,                         			/* tp_getattr */
     0,                         			/* tp_setattr */
@@ -276,8 +278,8 @@ PyTypeObject PyOpenSCADType = {
     0,                         			/* tp_getattro */
     0,                         			/* tp_setattro */
     0,                         			/* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,	/* tp_flags */
-    "PyOpenSCAD Object",          		/* tp_doc */
+     Py_TPFLAGS_DEFAULT|Py_TPFLAGS_HAVE_VERSION_TAG|Py_TPFLAGS_BASETYPE, 	/* tp_flags */
+    0,			          		/* tp_doc */
     0,                         			/* tp_traverse */
     0,                         			/* tp_clear */
     0,                         			/* tp_richcompare */
@@ -293,7 +295,7 @@ PyTypeObject PyOpenSCADType = {
     0,                         			/* tp_descr_set */
     0,                         			/* tp_dictoffset */
     (initproc) PyOpenSCADInit,      		/* tp_init */
-    PyOpenSCADObject_alloc,    			/* tp_alloc */
+    0,			   			/* tp_alloc */
     PyOpenSCADObject_new,                	/* tp_new */
 };
 
