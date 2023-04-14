@@ -10,7 +10,7 @@ using namespace libfive;
 
 // https://docs.python.it/html/ext/dnt-basics.html
 
-void PyLibFiveObject_dealloc(PyLibFiveObject *self)
+void PyLibFiveObject_dealloc(PyObject *self)
 {
 //  Py_XDECREF(self->dict);
 //  Py_TYPE(self)->tp_free((PyObject *)self);
@@ -227,7 +227,7 @@ PyTypeObject PyLibFiveType = {
     "PyLibFive",             			/* tp_name */
     sizeof(PyLibFiveObject), 			/* tp_basicsize */
     0,                         			/* tp_itemsize */
-    (destructor) PyLibFiveObject_dealloc,	/* tp_dealloc */
+    PyLibFiveObject_dealloc,			/* tp_dealloc */
     0,                         			/* tp_print */
     0,                         			/* tp_getattr */
     0,                         			/* tp_setattr */
@@ -242,8 +242,8 @@ PyTypeObject PyLibFiveType = {
     0,                         			/* tp_getattro */
     0,                         			/* tp_setattro */
     0,                         			/* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,	/* tp_flags */
-    "PyLibFive Object",          		/* tp_doc */
+    Py_TPFLAGS_DEFAULT|Py_TPFLAGS_HAVE_VERSION_TAG|Py_TPFLAGS_BASETYPE, 	/* tp_flags */
+    0,			          		/* tp_doc */
     0,                         			/* tp_traverse */
     0,                         			/* tp_clear */
     0,                         			/* tp_richcompare */

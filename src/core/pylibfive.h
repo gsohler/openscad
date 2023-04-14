@@ -14,8 +14,6 @@ PyMODINIT_FUNC PyInit_PyLibFive(void);
 
 extern PyTypeObject PyLibFiveType;
 
-void PyLibFiveObject_dealloc(PyLibFiveObject *self);
-
 PyObject *PyLibFiveObjectFromTree(PyTypeObject *type, libfive::Tree *tree);
 libfive::Tree *PyLibFiveObjectToTree(PyObject *object);
 
