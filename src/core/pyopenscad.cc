@@ -394,7 +394,7 @@ char *evaluatePython(const char *code, double time)
 	    PyImport_AppendInittab("libfive", &PyInit_libfive);
 	    PyConfig config;
             PyConfig_InitPythonConfig(&config);
-	    swprintf(libfivedir, 256, L"%s/../lib/pylibfive/",PlatformUtils::applicationPath().c_str());
+	    swprintf(libfivedir, 256, L"%s/../libraries/pylibfive/",PlatformUtils::applicationPath().c_str());
 
 	    PyConfig_SetString(&config, &config.pythonpath_env, libfivedir);
 	    // Py_Initialize();
