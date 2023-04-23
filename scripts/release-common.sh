@@ -63,6 +63,8 @@ if [ ! -f $OPENSCADDIR/src/openscad.cc ]; then
   exit 1
 fi
 
+export DEPLOYDIR=${OPENSCADDIR}/build
+mkdir -p ${DEPLOYDIR}
 CMAKE_CONFIG=
 
 if [[ "$OSTYPE" =~ "darwin" ]]; then
@@ -193,9 +195,9 @@ CMAKE_CONFIG="${CMAKE_CONFIG}\
  -DOPENSCAD_COMMIT=${OPENSCAD_COMMIT}"
 
 echo "Running CMake from ${DEPLOYDIR}"
-echo "${CMAKE} .. ${CMAKE_CONFIG}"
+echo "${CMAKE}  ${CMAKE_CONFIG}" ..
 
-"${CMAKE}" .. ${CMAKE_CONFIG}
+"${CMAKE}"  ${CMAKE_CONFIG}  .. 
 cd $OPENSCADDIR
 
 echo "Building Project..."
@@ -227,7 +229,10 @@ case $OS in
         if [ $FAKEMAKE ]; then
             echo "notexe. debugging build process" > $TARGET/openscad
         else
-            make $TARGET -j$NUMCPU
+	    cd $DEPLOYDIR
+	    pwd
+            make $TARGET -j$NUMCPU 
+	    cd $OPENSCADDIR
         fi
     ;;
     *)
@@ -348,7 +353,7 @@ case $OS in
         mkdir openscad-$VERSION/bin
         mkdir -p openscad-$VERSION/lib/openscad
         cp scripts/openscad-linux openscad-$VERSION/bin/openscad
-        cp openscad openscad-$VERSION/lib/openscad/
+        cp $DEPLOYDIR/openscad openscad-$VERSION/lib/openscad/
         if [[ $ARCH == 64 ]]; then
               gcc -o chrpath_linux -DSIZEOF_VOID_P=8 scripts/chrpath_linux.c
         else
@@ -356,8 +361,8 @@ case $OS in
         fi
         ./chrpath_linux -d openscad-$VERSION/lib/openscad/openscad
 
-        QTLIBDIR=$(dirname $(ldd openscad | grep Qt5Gui | head -n 1 | awk '{print $3;}'))
-        ( ldd openscad ; ldd "$QTLIBDIR"/qt5/plugins/platforms/libqxcb.so ) \
+        QTLIBDIR=$(dirname $(ldd $DEPLOYDIR/openscad | grep Qt5Gui | head -n 1 | awk '{print $3;}'))
+        ( ldd $DEPLOYDIR/openscad ; ldd "$QTLIBDIR"/qt5/plugins/platforms/libqxcb.so ) \
           | sed -re 's,.* => ,,; s,[\t ].*,,;' -e '/^$/d' -e '/libc\.so|libm\.so|libdl\.so|libgcc_|libpthread\.so/d' \
           | sort -u \
           | xargs cp -vt "openscad-$VERSION/lib/openscad/"
@@ -372,9 +377,9 @@ case $OS in
           cp -av "$DRIDRIVERDIR"/swrast_dri.so "$DRILIB"
         fi
 
-        strip openscad-$VERSION/lib/openscad/*
+	find openscad-$VERSION/lib/openscad -type f | xargs strip
         mkdir -p openscad-$VERSION/share/appdata
-        cp icons/openscad.{desktop,png,xml} openscad-$VERSION/share/appdata
+        #cp icons/openscad.{desktop,png,xml} openscad-$VERSION/share/appdata NOT present
         cp scripts/installer-linux.sh openscad-$VERSION/install.sh
         chmod 755 -R openscad-$VERSION/
         PACKAGEFILE=openscad-$VERSION.x86-$ARCH.tar.gz
