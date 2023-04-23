@@ -1086,11 +1086,9 @@ PyObject* python_path_extrude(PyObject *self, PyObject *args, PyObject *kwargs)
 	   for(int i=0;i<n;i++) {
 	  	PyObject *point=PyList_GetItem(path, i);
 		double x,y,z,w=0;
-	  	if(python_vectorval(point,&x,&y,&z)){
-	  		if(python_vectorval(point,&x,&y,&z,&w )){
-    				PyErr_SetString(PyExc_TypeError,"Cannot parse vector in path_extrude path\n");
-				return NULL;
-			}
+  		if(python_vectorval(point,&x,&y,&z,&w )){
+			PyErr_SetString(PyExc_TypeError,"Cannot parse vector in path_extrude path\n");
+			return NULL;
 		}
 		Vector4d pt3d(x,y,z,w);
 		if(i > 0 &&  node->path[i-1] == pt3d) continue; //  prevent double pts
