@@ -63,8 +63,6 @@ if [ ! -f $OPENSCADDIR/src/openscad.cc ]; then
   exit 1
 fi
 
-export DEPLOYDIR=${OPENSCADDIR}/build
-mkdir -p ${DEPLOYDIR}
 CMAKE_CONFIG=
 
 if [[ "$OSTYPE" =~ "darwin" ]]; then
@@ -95,6 +93,9 @@ else
   echo "Error: Couldn't detect OSTYPE"
   exit
 fi
+
+export DEPLOYDIR=${OPENSCADDIR}/build_${OS}
+mkdir -p ${DEPLOYDIR}
 
 case $OS in
     MACOSX)
