@@ -752,12 +752,6 @@ PyObject *python_pull(PyObject *self, PyObject *args, PyObject *kwargs)
 }
 
 
-
-
-
-
-
-
 PyObject *python_output(PyObject *self, PyObject *args, PyObject *kwargs)
 {
   PyObject *object = NULL;

@@ -2510,6 +2510,7 @@ Response GeometryEvaluator::visit(State& state, const RotateExtrudeNode& node)
   }
   return Response::ContinueTraversal;
 }
+
 static int pullObject_calccut(const PullNode &node, Vector3d p1, Vector3d p2,Vector3d &r)
 {
 	Vector3d dir=p2-p1;
@@ -2629,11 +2630,7 @@ Response GeometryEvaluator::visit(State& state, const PullNode& node)
     }
   }
   return Response::ContinueTraversal;
-
-
 }
-
-
 
 /*!
    FIXME: Not in use
