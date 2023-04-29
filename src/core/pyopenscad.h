@@ -69,6 +69,7 @@ PyObject *python_roof(PyObject *self, PyObject *args, PyObject *kwargs);
 PyObject *python_roof_oo(PyObject *self, PyObject *args, PyObject *kwargs);
 PyObject *python_color(PyObject *self, PyObject *args, PyObject *kwargs);
 PyObject *python_color_oo(PyObject *self, PyObject *args, PyObject *kwargs);
+PyObject *python_pull(PyObject *self, PyObject *args, PyObject *kwargs);
 
 PyObject *python_linear_extrude(PyObject *self, PyObject *args, PyObject *kwargs);
 PyObject *python_linear_extrude_oo(PyObject *self, PyObject *args, PyObject *kwargs);

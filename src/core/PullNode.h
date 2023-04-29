@@ -1,12 +1,9 @@
 #pragma once
 
 #include "node.h"
-#include "Value.h"
+//#include "Value.h"
 #include "Geometry.h"
 
-#ifdef ENABLE_PYTHON
-#include <Python.h>
-#endif
 class PullNode : public AbstractPolyNode
 {
 public:

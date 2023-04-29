@@ -24,19 +24,6 @@
  *
  */
 
-#include "module.h"
-#include "ModuleInstantiation.h"
-#include "Children.h"
-#include "Parameters.h"
-#include "printutils.h"
-#include "io/fileutils.h"
-#include "Builtins.h"
-#include "handle_dep.h"
-#include <cmath>
-#include <sstream>
-#include <boost/assign/std/vector.hpp>
-#include "node.h"
-#include "Value.h"
 #include "PullNode.h"
 
 std::string PullNode::toString() const
@@ -44,8 +31,8 @@ std::string PullNode::toString() const
   std::ostringstream stream;
   stream << this->name() << "(";
   stream <<
-    "anchor = " << this->anchor[0] << ", " << this->anchor[1] << ", " << this->anchor[2] << ", "
-    "dir = " << this->dir[0] << ", " << this->dir[1] << ", " << this->dir[2] << ", "
+    "anchor = " << this->anchor[0] << ", " << this->anchor[1] << ", " << this->anchor[2] << ", " <<
+    "dir = " << this->dir[0] << ", " << this->dir[1] << ", " << this->dir[2] << ", " ;
   return stream.str();
 }
 
