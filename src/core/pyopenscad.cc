@@ -5,6 +5,8 @@
 #include <Python.h>
 #include "pyopenscad.h"
 #include "CsgOpNode.h"
+#include "Value.h"
+#include "Expression.h"
 
 // https://docs.python.it/html/ext/dnt-basics.html
 
@@ -357,7 +359,7 @@ double python_doublefunc(PyObject *cbfunc, double arg)
 	return result;
 }
 
-std::shared_ptr<AbstractNode> python_modulefunc(const std::string &funcname) // TODO add arguments
+std::shared_ptr<AbstractNode> python_modulefunc(const ModuleInstantiation *op_module)
 {
 	std::shared_ptr<AbstractNode> result=NULL;
 	PyObject *pFunc=NULL;
@@ -367,31 +369,58 @@ std::shared_ptr<AbstractNode> python_modulefunc(const std::string &funcname) // 
 			printf("Python not initialized!\n");
 			break;
 		}
-		PyObject *module = PyObject_GetAttrString(pythonMainModule, "pythonsub"); // funcname.c_str());
-		if(module == NULL) {
-			printf("Imported Module not found\n");
+		PyObject *maindict = PyModule_GetDict(pythonMainModule);
+
+		// search the function in all modules
+		PyObject *key, *value;
+		Py_ssize_t pos = 0;
+
+		while (PyDict_Next(maindict, &pos, &key, &value)) {
+			PyObject *module = PyObject_GetAttrString(pythonMainModule, PyUnicode_AsUTF8(key));
+			if(module == NULL) continue;
+			PyObject *moduledict = PyModule_GetDict(module);
+			if(moduledict == NULL) continue;
+	        	pFunc = PyDict_GetItemString(moduledict, op_module->name().c_str());
+			if(pFunc == NULL) continue;
 			break;
 		}
-		PyObject *moduledict = PyModule_GetDict(module);
-		if(moduledict == NULL) {
-			printf("Module dict not found\n");
-			break;
-		}
-	        pFunc = PyDict_GetItemString(moduledict, "mycube"); // funcname.c_str());
-		if(pFunc == NULL) {
+		if (!pFunc) {
 			printf("Function not found!\n");
 			break;
 		}
-
 		if (!PyCallable_Check(pFunc)) {
 			printf("Function not callable!\n");
 			break;
 		}
-		PyObject* args = PyTuple_Pack(0); // 1,PyFloat_FromDouble(arg)); // TODO free ?
+		// prepare args
+		const std::vector<std::shared_ptr<Assignment> > op_args=op_module->arguments;
+  		PyObject *args = PyTuple_New(op_args.size());
+
+		for(int i=0;i<op_args.size();i++)
+		{
+			Assignment *op_arg=op_args[i].get();
+			shared_ptr<Expression> expr=op_arg->getExpr();
+			Value val = expr.get()->evaluate(NULL);
+			switch(val.type())
+			{
+				case Value::Type::NUMBER:
+					PyTuple_SetItem(args, i, PyFloat_FromDouble(val.toDouble()));
+					break;
+				case Value::Type::STRING:
+					PyTuple_SetItem(args, i, PyUnicode_FromString(val.toString().c_str()));
+					break;
+// TODO more types RANGE, VECTOR, OBEJCT, FUNCTION
+				default:
+					printf("other\n");
+					PyTuple_SetItem(args, i, PyLong_FromLong(-1));
+					break;
+			}
+		}
+
+
 		PyObject* funcresult = PyObject_CallObject(pFunc, args);
 
 		if(funcresult == NULL) {
-			printf("func result zero!\n");
 			PyObject *pyExcType;
 			PyObject *pyExcValue;
 			PyObject *pyExcTraceback;
@@ -401,19 +430,17 @@ std::shared_ptr<AbstractNode> python_modulefunc(const std::string &funcname) // 
 			PyObject* str_exc_value = PyObject_Repr(pyExcValue);
 			PyObject* pyExcValueStr = PyUnicode_AsEncodedString(str_exc_value, "utf-8", "~");
 			const char *strExcValue =  PyBytes_AS_STRING(pyExcValueStr);
-			printf("error is %s\n", strExcValue); // TODO return error
 			Py_XDECREF(pyExcType);
 			Py_XDECREF(pyExcValue);
 			Py_XDECREF(pyExcTraceback);
 			break;
 		}
 
-		printf("funcresult is %p\n",funcresult);
-		if(funcresult->ob_type == &PyOpenSCADType) {
-			printf("e\n");
-			result=PyOpenSCADObjectToNode(funcresult);
-			printf("result is %p\n",result.get());
+		if(funcresult->ob_type != &PyOpenSCADType) {
+			printf("Result is  not a solid\n");
+			break;
 		}
+		result=PyOpenSCADObjectToNode(funcresult);
 	} while(0);
 	if(pFunc != NULL) Py_XDECREF(pFunc);	
 	return result;
@@ -438,7 +465,6 @@ char *evaluatePython(const char *code, double time)
       pythonInitDict=NULL;
     }
 
-    printf("code is %s\n",code);
     if(!pythonInitDict) {
 	    char run_str[80];
 	    PyImport_AppendInittab("openscad", &PyInit_openscad);

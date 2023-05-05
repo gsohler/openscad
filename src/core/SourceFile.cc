@@ -64,11 +64,10 @@ void SourceFile::registerUse(const std::string& path, const Location& loc)
 
   if (boost::iequals(ext, ".py")) {
     if (fs::is_regular_file(path)) {
-	    printf("running %s\n",path.c_str());
-	    std::string cmd="from " + path + " import *";
-	    cmd="import sys\nsys.path.append('/home/gsohler/git/openscad/build')\nprint(sys.path)\nimport pythonsub";
-	    const char *res=evaluatePython(cmd.c_str(),0); // TODO add trust and enable
-	    printf("res is %s\n",res);
+	    boost::filesystem::path boost_path(path);
+	    std::string cmd = "import sys\nsys.path.append('"+boost_path.parent_path().string()+"')\nimport "+boost_path.stem().string();
+	    const char *error=evaluatePython(cmd.c_str(),0); // TODO add trust and enable
+            if (error != NULL) LOG(message_group::Error, Location::NONE, "", error);
     } else {
       LOG(message_group::Error, "Can't read python with path '%1$s'", path);
     }

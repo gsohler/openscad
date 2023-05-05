@@ -63,13 +63,10 @@ static void NOINLINE print_trace(const ModuleInstantiation *mod, const std::shar
 
 std::shared_ptr<AbstractNode> ModuleInstantiation::evaluate(const std::shared_ptr<const Context>& context) const
 {
-	printf("evaluating\n");
   boost::optional<InstantiableModule> module = context->lookup_module(this->name(), this->loc);
   if (!module) {
 #ifdef ENABLE_PYTHON
-	  std::shared_ptr<AbstractNode> node =  python_modulefunc(this->name());
-	  printf("node is %p\n",node.get());
-	  return node;
+	  return python_modulefunc(this);
 #endif	  
     return nullptr;
   }
