@@ -45,6 +45,9 @@
 #include "boost-utils.h"
 #include <boost/regex.hpp>
 #include <boost/assign/std/vector.hpp>
+#ifdef ENABLE_PYTHON
+#include "pyopenscad.h"
+#endif
 using namespace boost::assign; // bring 'operator+=()' into scope
 
 Value Expression::checkUndef(Value&& val, const std::shared_ptr<const Context>& context) const {
@@ -463,7 +466,16 @@ FunctionCall::FunctionCall(Expression *expr, AssignmentList args, const Location
 boost::optional<CallableFunction> FunctionCall::evaluate_function_expression(const std::shared_ptr<const Context>& context) const
 {
   if (isLookup) {
-    return context->lookup_function(name, location());
+    boost::optional<CallableFunction> result = context->lookup_function(name, location());
+#ifdef ENABLE_PYTHON    
+    if(result == boost::none) {
+	result = python_functionfunc(name, location());	    
+    }
+#endif    
+    if(result == boost::none) {
+	LOG(message_group::Warning, location(), context->documentRoot(), "Ignoring unknown function '%1$s'", name);
+    }
+    return result;
   } else {
     auto v = expr->evaluate(context);
     if (v.type() == Value::Type::FUNCTION) {
