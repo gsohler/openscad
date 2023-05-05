@@ -113,7 +113,7 @@ boost::optional<InstantiableModule> Context::lookup_module(const std::string& na
       return result;
     }
   }
-  LOG(message_group::Warning, loc, this->documentRoot(), "Ignoring unknown module '%1$s'", name);
+//  LOG(message_group::Warning, loc, this->documentRoot(), "Ignoring unknown module '%1$s'", name);
   return boost::none;
 }
 

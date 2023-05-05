@@ -29,7 +29,6 @@ public:
   bool tag_root{false};
   bool tag_highlight{false};
   bool tag_background{false};
-protected:
   std::string modname;
 };
 

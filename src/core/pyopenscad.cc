@@ -8,6 +8,8 @@
 
 // https://docs.python.it/html/ext/dnt-basics.html
 
+static PyObject *pythonInitDict=NULL;
+static PyObject *pythonMainModule = NULL ;
 void PyOpenSCADObject_dealloc(PyOpenSCADObject *self)
 {
 //  Py_XDECREF(self->dict);
@@ -355,7 +357,67 @@ double python_doublefunc(PyObject *cbfunc, double arg)
 	return result;
 }
 
-static PyObject *pythonInitDict=NULL;
+std::shared_ptr<AbstractNode> python_modulefunc(const std::string &funcname) // TODO add arguments
+{
+	std::shared_ptr<AbstractNode> result=NULL;
+	PyObject *pFunc=NULL;
+	do {
+
+		if(!pythonMainModule){
+			printf("Python not initialized!\n");
+			break;
+		}
+		PyObject *module = PyObject_GetAttrString(pythonMainModule, "pythonsub"); // funcname.c_str());
+		if(module == NULL) {
+			printf("Imported Module not found\n");
+			break;
+		}
+		PyObject *moduledict = PyModule_GetDict(module);
+		if(moduledict == NULL) {
+			printf("Module dict not found\n");
+			break;
+		}
+	        pFunc = PyDict_GetItemString(moduledict, "mycube"); // funcname.c_str());
+		if(pFunc == NULL) {
+			printf("Function not found!\n");
+			break;
+		}
+
+		if (!PyCallable_Check(pFunc)) {
+			printf("Function not callable!\n");
+			break;
+		}
+		PyObject* args = PyTuple_Pack(0); // 1,PyFloat_FromDouble(arg)); // TODO free ?
+		PyObject* funcresult = PyObject_CallObject(pFunc, args);
+
+		if(funcresult == NULL) {
+			printf("func result zero!\n");
+			PyObject *pyExcType;
+			PyObject *pyExcValue;
+			PyObject *pyExcTraceback;
+			PyErr_Fetch(&pyExcType, &pyExcValue, &pyExcTraceback);
+			PyErr_NormalizeException(&pyExcType, &pyExcValue, &pyExcTraceback);
+
+			PyObject* str_exc_value = PyObject_Repr(pyExcValue);
+			PyObject* pyExcValueStr = PyUnicode_AsEncodedString(str_exc_value, "utf-8", "~");
+			const char *strExcValue =  PyBytes_AS_STRING(pyExcValueStr);
+			printf("error is %s\n", strExcValue); // TODO return error
+			Py_XDECREF(pyExcType);
+			Py_XDECREF(pyExcValue);
+			Py_XDECREF(pyExcTraceback);
+			break;
+		}
+
+		printf("funcresult is %p\n",funcresult);
+		if(funcresult->ob_type == &PyOpenSCADType) {
+			printf("e\n");
+			result=PyOpenSCADObjectToNode(funcresult);
+			printf("result is %p\n",result.get());
+		}
+	} while(0);
+	if(pFunc != NULL) Py_XDECREF(pFunc);	
+	return result;
+}
 
 extern PyObject *PyInit_libfive(void);
 
@@ -376,6 +438,7 @@ char *evaluatePython(const char *code, double time)
       pythonInitDict=NULL;
     }
 
+    printf("code is %s\n",code);
     if(!pythonInitDict) {
 	    char run_str[80];
 	    PyImport_AppendInittab("openscad", &PyInit_openscad);
@@ -387,8 +450,8 @@ char *evaluatePython(const char *code, double time)
             Py_InitializeFromConfig(&config);
             PyConfig_Clear(&config);
 
-	    PyObject *py_main = PyImport_AddModule("__main__");
-	    pythonInitDict = PyModule_GetDict(py_main);
+	    pythonMainModule =  PyImport_AddModule("__main__");
+	    pythonInitDict = PyModule_GetDict(pythonMainModule);
 	    PyInit_PyOpenSCAD();
 	    PyInit_PyLibFive();
 	    sprintf(run_str,"from openscad import *\nfa=12.0\nfn=0.0\nfs=2.0\nt=%g",time);
