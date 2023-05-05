@@ -64,7 +64,7 @@ void SourceFile::registerUse(const std::string& path, const Location& loc)
 
   if (boost::iequals(ext, ".py")) {
     if (fs::is_regular_file(path)) {
-	    boost::filesystem::path boost_path(path);
+	    boost::filesystem::path boost_path(path); // TODO check for trust
 	    std::string cmd = "import sys\nsys.path.append('"+boost_path.parent_path().string()+"')\nimport "+boost_path.stem().string();
 	    const char *error=evaluatePython(cmd.c_str(),0); // TODO add trust and enable
             if (error != NULL) LOG(message_group::Error, Location::NONE, "", error);

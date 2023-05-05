@@ -394,6 +394,9 @@ std::shared_ptr<AbstractNode> python_modulefunc(const ModuleInstantiation *op_mo
 		}
 		// prepare args
 		const std::vector<std::shared_ptr<Assignment> > op_args=op_module->arguments;
+		// TODO childs,
+		// TODO also do openscad functions
+
   		PyObject *args = PyTuple_New(op_args.size());
 
 		for(int i=0;i<op_args.size();i++)
@@ -444,6 +447,44 @@ std::shared_ptr<AbstractNode> python_modulefunc(const ModuleInstantiation *op_mo
 	} while(0);
 	if(pFunc != NULL) Py_XDECREF(pFunc);	
 	return result;
+}
+
+boost::optional<CallableFunction> python_functionfunc(const std::string &name, const Location &loc)
+{
+	PyObject *pFunc=NULL;
+	do {
+
+		if(!pythonMainModule){
+			printf("Python not initialized!\n");
+			break;
+		}
+		PyObject *maindict = PyModule_GetDict(pythonMainModule);
+
+		// search the function in all modules
+		PyObject *key, *value;
+		Py_ssize_t pos = 0;
+
+		while (PyDict_Next(maindict, &pos, &key, &value)) {
+			PyObject *module = PyObject_GetAttrString(pythonMainModule, PyUnicode_AsUTF8(key));
+			if(module == NULL) continue;
+			PyObject *moduledict = PyModule_GetDict(module);
+			if(moduledict == NULL) continue;
+	        	pFunc = PyDict_GetItemString(moduledict, name.c_str());
+			if(pFunc == NULL) continue;
+			break;
+		}
+		if (!pFunc) {
+			printf("Function not found!\n");
+			break;
+		}
+		if (!PyCallable_Check(pFunc)) {
+			printf("Function not callable!\n");
+			break;
+		}
+		printf("pfunc is %p\n",pFunc);
+	} while(0);
+	if(pFunc != NULL) Py_XDECREF(pFunc);	
+	return boost::none;
 }
 
 extern PyObject *PyInit_libfive(void);

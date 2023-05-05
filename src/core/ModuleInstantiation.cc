@@ -65,10 +65,13 @@ std::shared_ptr<AbstractNode> ModuleInstantiation::evaluate(const std::shared_pt
 {
   boost::optional<InstantiableModule> module = context->lookup_module(this->name(), this->loc);
   if (!module) {
+	std::shared_ptr<AbstractNode> result=nullptr;
 #ifdef ENABLE_PYTHON
-	  return python_modulefunc(this);
+	result = python_modulefunc(this);
 #endif	  
-    return nullptr;
+	if(result == NULL)
+		LOG(message_group::Warning, loc, context->documentRoot(), "Ignoring unknown module '%1$s'", this->name());
+	return result;
   }
 
   try{
