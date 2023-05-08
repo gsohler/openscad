@@ -466,16 +466,7 @@ FunctionCall::FunctionCall(Expression *expr, AssignmentList args, const Location
 boost::optional<CallableFunction> FunctionCall::evaluate_function_expression(const std::shared_ptr<const Context>& context) const
 {
   if (isLookup) {
-    boost::optional<CallableFunction> result = context->lookup_function(name, location());
-#ifdef ENABLE_PYTHON    
-    if(result == boost::none) {
-	result = python_functionfunc(name, location());	    
-    }
-#endif    
-    if(result == boost::none) {
-	LOG(message_group::Warning, location(), context->documentRoot(), "Ignoring unknown function '%1$s'", name);
-    }
-    return result;
+    return context->lookup_function(name, location());
   } else {
     auto v = expr->evaluate(context);
     if (v.type() == Value::Type::FUNCTION) {
@@ -521,8 +512,12 @@ static SimplificationResult simplify_function_body(const Expression *expression,
       const AssignmentList *required_parameters;
       std::shared_ptr<const Context> defining_context;
 
-      auto f = call->evaluate_function_expression(context);
+      boost::optional<CallableFunction> f = call->evaluate_function_expression(context);
+#ifdef ENABLE_PYTHON    
+      if(f == boost::none) return  python_functionfunc(call);
+#endif    
       if (!f) {
+	LOG(message_group::Warning, call->location(), context->documentRoot(), "Ignoring unknown function '%1$s'", call->name);
         return Value::undefined.clone();
       } else {
         auto index = f->index();

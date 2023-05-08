@@ -34,7 +34,7 @@ int python_more_obj(std::vector<std::shared_ptr<AbstractNode>>& children, PyObje
 Outline2d python_getprofile(PyObject *cbfunc, double arg);
 double python_doublefunc(PyObject *cbfunc, double arg);
 std::shared_ptr<AbstractNode> python_modulefunc(const ModuleInstantiation *module);
-boost::optional<CallableFunction> python_functionfunc(const std::string &name, const Location &loc);
+Value python_functionfunc(const FunctionCall *call);
 
 PyObject *python_square(PyObject *self, PyObject *args, PyObject *kwargs);
 PyObject *python_circle(PyObject *self, PyObject *args, PyObject *kwargs);
