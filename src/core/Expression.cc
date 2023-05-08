@@ -512,7 +512,7 @@ static SimplificationResult simplify_function_body(const Expression *expression,
       const AssignmentList *required_parameters;
       std::shared_ptr<const Context> defining_context;
 
-      boost::optional<CallableFunction> f = call->evaluate_function_expression(context);
+      auto f = call->evaluate_function_expression(context);
 #ifdef ENABLE_PYTHON    
       if(f == boost::none) return  python_functionfunc(call);
 #endif    

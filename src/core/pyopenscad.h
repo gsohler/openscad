@@ -2,7 +2,6 @@
 #include <memory>
 #include "node.h"
 #include <geometry/Polygon2d.h>
-#include "boost-utils.h"
 #include "src/core/function.h"
 
 #pragma GCC diagnostic ignored "-Wwrite-strings"

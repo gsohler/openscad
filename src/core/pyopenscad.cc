@@ -451,8 +451,7 @@ Value python_convertresult(PyObject *arg)
 {
 	if(arg == NULL) return Value::undefined.clone();
 	if(PyList_Check(arg)) {
-		VectorType vec(NULL); // TODO fix ?call->arguments.session());
-
+		VectorType vec(NULL);
 		for(int i=0;i<PyList_Size(arg);i++) {
 			PyObject *item=PyList_GetItem(arg,i);
 			vec.emplace_back(python_convertresult(item));
