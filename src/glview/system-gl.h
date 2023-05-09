@@ -5,8 +5,10 @@
 
 #ifdef __APPLE__
  #include <OpenGL/OpenGL.h>
+#elif defined(_WIN32)
+ #include <windef.h> // for APIENTRY
+ #include <GL/glu.h>
 #else
- #include <GL/gl.h>
  #include <GL/glu.h>
 #endif
 
@@ -98,5 +100,5 @@ inline void glColor4fv(float *c) {}
 
 #endif // NULLGL
 
-std::string glew_dump();
+std::string gl_dump();
 std::string glew_extensions_dump();

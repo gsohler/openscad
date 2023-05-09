@@ -191,19 +191,16 @@ macro(find_graphics)
     message(STATUS "OpenCSG: ${OPENCSG_VERSION_STRING}")
     target_compile_definitions(OpenSCAD PRIVATE ENABLE_OPENCSG)
 
+    find_package(GLEW REQUIRED QUIET)
+    message(STATUS "GLEW: ${GLEW_VERSION}")
+    target_link_libraries(OpenSCAD PRIVATE GLEW::glew)
+
     if(MSVC)
-      find_package(GLEW CONFIG REQUIRED QUIET)
       find_path(OPENCSG_INCLUDE_DIRS opencsg/opencsg.h)
-      message(STATUS "GLEW: Using target GLEW::GLEW")
       target_include_directories(OpenSCAD SYSTEM PRIVATE "${OPENCSG_INCLUDE_DIRS}/opencsg")
-      target_link_libraries(OpenSCAD PRIVATE GLEW::GLEW)
     else()
-      find_package(GLEW REQUIRED)
       find_path(OPENCSG_INCLUDE_DIRS opencsg.h)
-      message(STATUS "GLEW_INCLUDE_DIR: ${GLEW_INCLUDE_DIR}")
-      message(STATUS "GLEW_LIBRARY: ${GLEW_LIBRARY}")
-      target_include_directories(OpenSCAD SYSTEM PRIVATE ${GLEW_INCLUDE_DIR} ${OPENCSG_INCLUDE_DIRS})
-      target_link_libraries(OpenSCAD PRIVATE ${GLEW_LIBRARY})
+      target_include_directories(OpenSCAD SYSTEM PRIVATE ${OPENCSG_INCLUDE_DIRS})
     endif()
 
     find_package(OpenGL REQUIRED QUIET)
@@ -249,11 +246,19 @@ if (MSVC)
   find_graphics()
 
   # needed for Qt5QScintilla, maybe others
-  set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
+  set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules")
 else()
-  set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
+  set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules")
+  if(MXECROSS)
+    set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/MXE")
+  endif()
+
   if(NOT "$ENV{OPENSCAD_LIBRARIES}" STREQUAL "")
     list(APPEND CMAKE_PREFIX_PATH "$ENV{OPENSCAD_LIBRARIES}")
+    if(APPLE)
+      list(APPEND CMAKE_IGNORE_PREFIX_PATH "/opt/homebrew") # Homebrew Apple Silicon
+      list(APPEND CMAKE_IGNORE_PREFIX_PATH "/usr/local")    # Homebrew Intel
+    endif()
   endif()
 
   find_package(Eigen3 REQUIRED)
@@ -552,15 +557,15 @@ else()
 endif()
 if(APPLE)
   target_compile_definitions(OpenSCAD PRIVATE OPENSCAD_OS="Mac OS X")
-  message(STATUS "Offscreen OpenGL Context - using Apple CGL")
+  message(STATUS "Offscreen OpenGL Context - using Apple NSOpenGL")
   set(PLATFORM_SOURCES src/platform/PlatformUtils-mac.mm src/io/imageutils-macosx.cc src/platform/CocoaUtils.mm)
   if(NOT HEADLESS)
     set(PLATFORM_SOURCES ${PLATFORM_SOURCES} src/gui/AppleEvents.cc)
   endif()
   if(NOT NULLGL)
     target_compile_definitions(OpenSCAD PRIVATE GL_SILENCE_DEPRECATION)
-    set(OFFSCREEN_METHOD "Apple CGL")
-    set(PLATFORM_SOURCES ${PLATFORM_SOURCES} src/glview/OffscreenContextCGL.mm)
+    set(OFFSCREEN_METHOD "Apple NSOpenGL")
+    set(PLATFORM_SOURCES ${PLATFORM_SOURCES} src/glview/offscreen-old/OffscreenContextNSOpenGL.mm)
   endif()
   find_library(COCOA_LIBRARY Cocoa)
   target_link_libraries(OpenSCAD PRIVATE ${COCOA_LIBRARY})
@@ -569,15 +574,17 @@ elseif(UNIX)
   set(PLATFORM_SOURCES src/io/imageutils-lodepng.cc src/platform/PlatformUtils-posix.cc)
   if(NOT NULLGL)
     if(ENABLE_EGL AND OpenGL_EGL_FOUND)
+      target_compile_definitions(OpenSCAD PRIVATE ENABLE_EGL)
       set(OFFSCREEN_METHOD "Unix EGL")
       message(STATUS "Offscreen OpenGL Context - using Unix EGL")
-      set(PLATFORM_SOURCES ${PLATFORM_SOURCES} src/glview/OffscreenContextEGL.cc)
+      set(PLATFORM_SOURCES ${PLATFORM_SOURCES} src/glview/offscreen-old/OffscreenContextEGL.cc)
       target_compile_definitions(OpenSCAD PRIVATE GLEW_EGL)
       target_link_libraries(OpenSCAD PRIVATE OpenGL::EGL)
     else()
+      target_compile_definitions(OpenSCAD PRIVATE ENABLE_GLX)
       set(OFFSCREEN_METHOD "Unix GLX on X11")
       message(STATUS "Offscreen OpenGL Context - using Unix GLX on X11")
-      set(PLATFORM_SOURCES ${PLATFORM_SOURCES} src/glview/OffscreenContextGLX.cc)
+      set(PLATFORM_SOURCES ${PLATFORM_SOURCES} src/glview/offscreen-old/OffscreenContextGLX.cc)
       find_library(X11_LIBRARY X11)
       target_link_libraries(OpenSCAD PRIVATE ${X11_LIBRARY})
     endif()
@@ -590,7 +597,7 @@ elseif(WIN32)
   if(NOT NULLGL)
     set(OFFSCREEN_METHOD "Windows WGL")
     message(STATUS "Offscreen OpenGL Context - using Microsoft WGL")
-    set(PLATFORM_SOURCES ${PLATFORM_SOURCES} src/glview/OffscreenContextWGL.cc)
+    set(PLATFORM_SOURCES ${PLATFORM_SOURCES} src/glview/offscreen-old/OffscreenContextWGL.cc)
   endif()
 endif()
 
@@ -679,6 +686,7 @@ set(CORE_SOURCES
   src/geometry/PolySetUtils.cc
   src/geometry/roof_ss.cc
   src/geometry/roof_vd.cc
+  src/glview/OffscreenContextFactory.cc
   src/glview/RenderSettings.cc
   src/glview/Camera.cc
   src/glview/ColorMap.cc
@@ -778,7 +786,7 @@ set(MANIFOLD_SOURCES
   src/geometry/manifold/manifold-applyops-minkowski.cc
 )
 
-if(ENABLE_TBB AND ENABLE_MANIFOLD)
+if(EXPERIMENTAL AND ENABLE_TBB)
   # Note: currently only Manifold-related code makes use of TBB parallelization
   # ("exact" CGAL numerics are not thread-safe)
   target_compile_options(OpenSCAD PRIVATE 
@@ -787,7 +795,7 @@ if(ENABLE_TBB AND ENABLE_MANIFOLD)
   )
 endif()
 
-if(ENABLE_MANIFOLD)
+if(EXPERIMENTAL)
 
   # Hack to find our wanted version of Python before Manifold's included googletest finds Python2
   find_package(PythonInterp 3.4 REQUIRED)
@@ -801,7 +809,8 @@ if(ENABLE_MANIFOLD)
 
   add_subdirectory(submodules/manifold EXCLUDE_FROM_ALL)
   target_link_libraries(OpenSCAD PRIVATE manifold)
-  
+  add_sanitizers(manifold)
+
   target_compile_definitions(OpenSCAD PRIVATE ENABLE_MANIFOLD)
   list(APPEND Sources ${MANIFOLD_SOURCES})
 endif()
@@ -824,16 +833,17 @@ if(NULLGL)
     src/glview/OffscreenView.cc
     src/glview/OffscreenContextNULL.cc
     src/io/export_png.cc
-    src/io/imageutils.cc
-    ${OFFSCREEN_IMGUTILS_SOURCE})
+    src/io/imageutils.cc)
 else()
   set(OFFSCREEN_SOURCES
+    src/glview/OpenGLContext.cc
     src/glview/fbo.cc
     src/glview/Renderer.cc
     src/glview/system-gl.cc
     src/glview/VertexArray.cc
     src/glview/VBORenderer.cc
     src/glview/GLView.cc
+    src/glview/glew-utils.cc
     src/glview/OffscreenView.cc
     src/glview/cgal/CGALRenderer.cc
     src/glview/preview/OpenCSGRenderer.cc
@@ -1082,6 +1092,7 @@ set(CPACK_PROJECT_CONFIG_FILE "${CMAKE_BINARY_DIR}/openscad_cpack.cmake")
 set(CPACK_THREADS 0)
 
 if(ENABLE_TESTS)
+  enable_testing()
   add_subdirectory(tests)
 endif()
 
@@ -1093,6 +1104,8 @@ include(CPack)
 get_target_property(LINK_LIBS OpenSCAD LINK_LIBRARIES)
 LIST(REMOVE_ITEM LINK_LIBS /home/gsohler/openscad_deps/mxe/usr/x86_64-w64-mingw32.static.posix/lib/libdouble-conversion.a )
 set_property(TARGET OpenSCAD PROPERTY LINK_LIBRARIES  ${LINK_LIBS} )
+
+add_sanitizers(OpenSCAD)
 
 if(INFO)
   include("cmake/Modules/info.cmake")

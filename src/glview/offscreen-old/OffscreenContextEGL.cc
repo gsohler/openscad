@@ -23,62 +23,59 @@
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
-#include "OffscreenContext.h"
-#include "printutils.h"
-#include "imageutils.h"
-#include "system-gl.h"
+#include "OffscreenContextEGL.h"
 
-#include <GL/gl.h>
 #include <EGL/egl.h>
 #define EGL_EGLEXT_PROTOTYPES
 #include <EGL/eglext.h>
 
+#include "system-gl.h"
+
 #include <cassert>
 #include <sstream>
 #include <string>
-
 #include <sys/utsname.h> // for uname
 
-struct OffscreenContext {
+#include "OffscreenContext.h"
 
-  OffscreenContext(int width, int height) : context(nullptr), display(nullptr), width(width), height(height)
-  {
+namespace {
+
+class OffscreenContextEGL : public OffscreenContext {
+public:
+  OffscreenContextEGL(uint32_t width, uint32_t height) : OffscreenContext(width, height) {}
+  ~OffscreenContextEGL() {
+    if (this->display != nullptr) {
+      eglTerminate(this->display);
+    }
   }
 
-  EGLContext context;
-  EGLDisplay display;
-  int width;
-  int height;
+  std::string getInfo() const override {
+    if (!this->context) {
+      return {"No GL Context initialized. No information to report\n"};
+    }
+
+    std::ostringstream result;
+
+    const char *vendor = eglQueryString(display, EGL_VENDOR);
+    const char *version = eglQueryString(display, EGL_VERSION);
+
+    result << "GL context creator: EGL (old)\n"
+    << "EGL version: " << version << " (" << vendor << ")\n"
+    << "PNG generator: lodepng\n";
+
+    return result.str();
+  }
+  
+  bool makeCurrent() const override {
+    return eglMakeCurrent(this->display, this->surface, this->surface, this->context);
+  }
+
+  EGLContext context{nullptr};
+  EGLDisplay display{nullptr};
+  EGLSurface surface{EGL_NO_SURFACE};
 };
 
-#include "OffscreenContextAll.hpp"
-
-std::string get_gl_info(EGLDisplay display)
-{
-  std::stringstream result;
-
-  const char *vendor = eglQueryString(display, EGL_VENDOR);
-  const char *version = eglQueryString(display, EGL_VERSION);
-
-  result << "GL context creator: EGL\n"
-	 << "EGL version: " << version << " (" << vendor << ")\n"
-	 << "PNG generator: lodepng\n";
-
-  return result.str();
-}
-
-std::string offscreen_context_getinfo(OffscreenContext *ctx)
-{
-  assert(ctx);
-
-  if (!ctx->context) {
-    return {"No GL Context initialized. No information to report\n"};
-  }
-
-  return get_gl_info(ctx->display);
-}
-
-static bool create_egl_dummy_context(OffscreenContext& ctx)
+static bool create_egl_dummy_context(OffscreenContextEGL& ctx)
 {
   static const EGLint configAttribs[] = {
     EGL_SURFACE_TYPE, EGL_PBUFFER_BIT,
@@ -92,12 +89,11 @@ static bool create_egl_dummy_context(OffscreenContext& ctx)
   };
 
   const EGLint pbufferAttribs[] = {
-    EGL_WIDTH, ctx.width,
-    EGL_HEIGHT, ctx.height,
+    EGL_WIDTH, ctx.width(),
+    EGL_HEIGHT, ctx.height(),
     EGL_NONE,
   };
 
-  EGLDisplay display = EGL_NO_DISPLAY;
   PFNEGLQUERYDEVICESEXTPROC eglQueryDevicesEXT = (PFNEGLQUERYDEVICESEXTPROC) eglGetProcAddress("eglQueryDevicesEXT");
   PFNEGLGETPLATFORMDISPLAYEXTPROC eglGetPlatformDisplayEXT = (PFNEGLGETPLATFORMDISPLAYEXTPROC) eglGetProcAddress("eglGetPlatformDisplayEXT");
   if (eglQueryDevicesEXT && eglGetPlatformDisplayEXT) {
@@ -110,37 +106,37 @@ static bool create_egl_dummy_context(OffscreenContext& ctx)
     for (int idx = 0; idx < numDevices; idx++) {
       EGLDisplay disp = eglGetPlatformDisplayEXT(EGL_PLATFORM_DEVICE_EXT, eglDevs[idx], 0);
       if (disp != EGL_NO_DISPLAY) {
-        display = disp;
+        ctx.display = disp;
         break;
       }
     }
   } else {
     PRINTD("Trying default EGL display...");
-    display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+    ctx.display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
   }
 
-  if (display == EGL_NO_DISPLAY) {
+  if (ctx.display == EGL_NO_DISPLAY) {
     PRINTD("No EGL display found.");
     return false;
   }
 
   PFNEGLGETDISPLAYDRIVERNAMEPROC eglGetDisplayDriverName = (PFNEGLGETDISPLAYDRIVERNAMEPROC) eglGetProcAddress("eglGetDisplayDriverName");
   if (eglGetDisplayDriverName) {
-    const char *name = eglGetDisplayDriverName(display);
+    const char *name = eglGetDisplayDriverName(ctx.display);
     PRINTDB("Got EGL display with driver name '%s'", name);
   }
 
   EGLint major, minor;
-  if (!eglInitialize(display, &major, &minor)) {
+  if (!eglInitialize(ctx.display, &major, &minor)) {
     std::cerr << "Unable to initialize EGL" << std::endl;
     return false;
   }
 
-  PRINTDB("EGL Version: %d.%d (%s)", major % minor % eglQueryString(display, EGL_VENDOR));
+  PRINTDB("EGL Version: %d.%d (%s)", major % minor % eglQueryString(ctx.display, EGL_VENDOR));
 
   EGLint numConfigs;
   EGLConfig config;
-  if (!eglChooseConfig(display, configAttribs, &config, 1, &numConfigs)) {
+  if (!eglChooseConfig(ctx.display, configAttribs, &config, 1, &numConfigs)) {
     std::cerr << "Failed to choose config (eglError: " << std::hex << eglGetError() << ")" << std::endl;
     return false;
   }
@@ -148,8 +144,8 @@ static bool create_egl_dummy_context(OffscreenContext& ctx)
     std::cerr << "Bind EGL_OPENGL_API failed!" << std::endl;
     return false;
   }
-  EGLSurface surface = eglCreatePbufferSurface(display, config, pbufferAttribs);
-  if (surface == EGL_NO_SURFACE) {
+  ctx.surface = eglCreatePbufferSurface(ctx.display, config, pbufferAttribs);
+  if (ctx.surface == EGL_NO_SURFACE) {
     std::cerr << "Unable to create EGL surface (eglError: " << eglGetError() << ")" << std::endl;
     return false;
   }
@@ -160,48 +156,30 @@ static bool create_egl_dummy_context(OffscreenContext& ctx)
     EGL_CONTEXT_OPENGL_PROFILE_MASK, EGL_CONTEXT_OPENGL_COMPATIBILITY_PROFILE_BIT,
     EGL_NONE
   };
-  EGLContext context = eglCreateContext(display, config, EGL_NO_CONTEXT, ctxattr);
-  if (context == EGL_NO_CONTEXT) {
+  ctx.context = eglCreateContext(ctx.display, config, EGL_NO_CONTEXT, ctxattr);
+  if (ctx.context == EGL_NO_CONTEXT) {
     std::cerr << "Unable to create EGL context (eglError: " << eglGetError() << ")" << std::endl;
     return 1;
   }
 
-  eglMakeCurrent(display, surface, surface, context);
-  glClearColor(1.0, 1.0, 0.0, 1.0);
-  glClear(GL_COLOR_BUFFER_BIT);
-  glFlush();
-  eglSwapBuffers(display, surface);
-  ctx.display = display;
-  ctx.context = context;
   return true;
 }
 
-OffscreenContext *create_offscreen_context(int w, int h)
+}  // namespace
+
+namespace offscreen_old {
+
+std::shared_ptr<OffscreenContext> CreateOffscreenContextEGL(
+    uint32_t width, uint32_t height, uint32_t majorGLVersion, 
+    uint32_t minorGLVersion, bool gles, bool compatibilityProfile,
+    const std::string& drmNode)
 {
-  auto ctx = new OffscreenContext(w, h);
+  auto ctx = std::make_shared<OffscreenContextEGL>(width, height);
 
   if (!create_egl_dummy_context(*ctx)) {
-    delete ctx;
     return nullptr;
   }
-
-  typedef const GLubyte *(GLAPIENTRY *PFNGLGETSTRINGPROC)(GLenum name);
-  PFNGLGETSTRINGPROC getString = (PFNGLGETSTRINGPROC) eglGetProcAddress("glGetString");
-  PRINTDB("OpenGL Version: %s (%s)", getString(GL_VERSION) % getString(GL_VENDOR));
-
-  return create_offscreen_context_common(ctx);
+  return ctx;
 }
 
-bool teardown_offscreen_context(OffscreenContext *ctx)
-{
-  if (ctx) {
-    eglTerminate(ctx->display);
-    return true;
-  }
-  return false;
-}
-
-bool save_framebuffer(const OffscreenContext *ctx, std::ostream& output)
-{
-  return save_framebuffer_common(ctx, output);
-}
+}  // namespace offscreen_old

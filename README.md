@@ -135,7 +135,6 @@ To pull the various submodules (incl. the [MCAD library](https://github.com/open
 
     cd openscad
     git submodule update --init --recursive
-    ( cd submodules/manifold && git apply thrust.diff )
 
 ### Building for macOS
 
@@ -243,7 +242,9 @@ If you had problems compiling from source, raise a new issue in the
 This site and it's subpages can also be helpful:
 https://en.wikibooks.org/wiki/OpenSCAD_User_Manual/Building_OpenSCAD_from_Sources
 
-Once built, you can run tests with `cd build/tests && ctest`.
+Once built, you can run tests with `ctest` from the build directory.
+
+Note: Both `make` and `ctest` accepts a `-j N` argument for distributing the load over `N` parallel processes.
 
 ### Running CI workflows locally
 

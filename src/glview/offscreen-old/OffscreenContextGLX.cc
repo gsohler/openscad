@@ -34,9 +34,8 @@
  * AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
+#include "OffscreenContextGLX.h"
 
-#include "OffscreenContext.h"
-#include "printutils.h"
 
 #include "system-gl.h"
 #include <GL/gl.h>
@@ -45,40 +44,46 @@
 #include <cassert>
 #include <sstream>
 #include <string>
-
 #include <sys/utsname.h> // for uname
 
-struct OffscreenContext
-{
-  OffscreenContext(int width, int height) : width(width), height(height) {}
+#include "printutils.h"
+
+namespace {
+
+class OffscreenContextGLX : public OffscreenContext {
+public:
+  OffscreenContextGLX(uint32_t width, uint32_t height) : OffscreenContext(width, height) {}
+  ~OffscreenContextGLX() {
+    if (this->xwindow) XDestroyWindow(this->xdisplay, this->xwindow);
+    if (this->openGLContext) (this->xdisplay, this->openGLContext);
+    if (this->xdisplay) (this->xdisplay);
+  }
+
+  std::string getInfo() const override {
+    if (!this->xdisplay) {
+      return {"No GL Context initialized. No information to report\n"};
+    }
+
+    std::ostringstream result;
+
+    int major, minor;
+    glXQueryVersion(this->xdisplay, &major, &minor);
+
+    result << "GL context creator: GLX (old)\n"
+    << "GLX version: " << major << "." << minor << "\n"
+    << "PNG generator: lodepng\n";
+
+    return result.str();
+  }
+
+  bool makeCurrent() const override {
+    return glXMakeContextCurrent(this->xdisplay, this->xwindow, this->xwindow, this->openGLContext);
+  }
+
   GLXContext openGLContext{nullptr};
   Display *xdisplay{nullptr};
   Window xwindow{0};
-  int width;
-  int height;
 };
-
-#include "OffscreenContextAll.hpp"
-
-std::string offscreen_context_getinfo(OffscreenContext *ctx)
-{
-  assert(ctx);
-
-  if (!ctx->xdisplay) {
-    return {"No GL Context initialized. No information to report\n"};
-  }
-
-  std::stringstream result;
-
-  int major, minor;
-  glXQueryVersion(ctx->xdisplay, &major, &minor);
-
-  result << "GL context creator: GLX\n"
-	 << "GLX version: " << major << "." << minor << "\n"
-	 << "PNG generator: lodepng\n";
-
-  return result.str();
-}
 
 static XErrorHandler original_xlib_handler = nullptr;
 static auto XCreateWindow_failed = false;
@@ -104,7 +109,7 @@ static int XCreateWindow_error(Display *dpy, XErrorEvent *event)
 
    This function will alter ctx.openGLContext and ctx.xwindow if successful
  */
-bool create_glx_dummy_window(OffscreenContext& ctx)
+bool create_glx_dummy_window(OffscreenContextGLX& ctx)
 {
   int attributes[] = {
     GLX_DRAWABLE_TYPE, GLX_WINDOW_BIT | GLX_PIXMAP_BIT | GLX_PBUFFER_BIT, //support all 3, for OpenCSG
@@ -140,8 +145,8 @@ bool create_glx_dummy_window(OffscreenContext& ctx)
 
   auto root = DefaultRootWindow(dpy);
   XSetWindowAttributes xwin_attr;
-  auto width = ctx.width;
-  auto height = ctx.height;
+  auto width = ctx.width();
+  auto height = ctx.height();
   xwin_attr.background_pixmap = None;
   xwin_attr.background_pixel = 0;
   xwin_attr.border_pixel = 0;
@@ -177,16 +182,6 @@ bool create_glx_dummy_window(OffscreenContext& ctx)
 
   //GLXWindow glxWin = glXCreateWindow( dpy, fbconfigs[0], xWin, nullptr );
 
-  if (!glXMakeContextCurrent(dpy, xWin, xWin, context)) {
-    //if (!glXMakeContextCurrent( dpy, glxWin, glxWin, context )) {
-    std::cerr << "glXMakeContextCurrent failed\n";
-    glXDestroyContext(dpy, context);
-    XDestroyWindow(dpy, xWin);
-    XFree(visinfo);
-    XFree(fbconfigs);
-    return false;
-  }
-
   ctx.openGLContext = context;
   ctx.xwindow = xWin;
 
@@ -196,42 +191,9 @@ bool create_glx_dummy_window(OffscreenContext& ctx)
   return true;
 }
 
-bool create_glx_dummy_context(OffscreenContext& ctx);
-
-OffscreenContext *create_offscreen_context(int w, int h)
-{
-  auto ctx = new OffscreenContext(w, h);
-
-  // before an FBO can be setup, a GLX context must be created
-  // this call alters ctx->xDisplay and ctx->openGLContext
-  // and ctx->xwindow if successful
-  if (!create_glx_dummy_context(*ctx)) {
-    delete ctx;
-    return nullptr;
-  }
-
-  return create_offscreen_context_common(ctx);
-}
-
-bool teardown_offscreen_context(OffscreenContext *ctx)
-{
-  if (ctx) {
-    XDestroyWindow(ctx->xdisplay, ctx->xwindow);
-    glXDestroyContext(ctx->xdisplay, ctx->openGLContext);
-    XCloseDisplay(ctx->xdisplay);
-    return true;
-  }
-  return false;
-}
-
-bool save_framebuffer(const OffscreenContext *ctx, std::ostream& output)
-{
-  glXSwapBuffers(ctx->xdisplay, ctx->xwindow);
-  return save_framebuffer_common(ctx, output);
-}
 
 #pragma GCC diagnostic ignored "-Waddress"
-bool create_glx_dummy_context(OffscreenContext& ctx)
+bool create_glx_dummy_context(OffscreenContextGLX& ctx)
 {
   // This will alter ctx.openGLContext and ctx.xdisplay and ctx.xwindow if successful
   int major;
@@ -260,3 +222,25 @@ bool create_glx_dummy_context(OffscreenContext& ctx)
   if (!result) XCloseDisplay(ctx.xdisplay);
   return result;
 }
+
+}  // namespace
+
+namespace offscreen_old {
+
+std::shared_ptr<OffscreenContext> CreateOffscreenContextGLX(
+  uint32_t width, uint32_t height, uint32_t majorGLVersion, 
+  uint32_t minorGLVersion, bool gles, bool compatibilityProfile)   
+{
+  auto ctx = std::make_shared<OffscreenContextGLX>(width, height);
+
+  // before an FBO can be setup, a GLX context must be created
+  // this call alters ctx->xDisplay and ctx->openGLContext
+  // and ctx->xwindow if successful
+  if (!create_glx_dummy_context(*ctx)) {
+    return nullptr;
+  }
+
+  return ctx;
+}
+
+}  // namespace offscreen_old

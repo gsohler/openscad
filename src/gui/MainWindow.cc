@@ -104,12 +104,15 @@ std::string trusted_edit_document_name;
 std::string evaluatePython(const std::string &code, double time);
 extern bool python_trusted;
 extern bool python_active;
-
+/*
 #include "sha.h"
 #include "filters.h"
 #include "base64.h"
+*/
 
 std::string SHA256HashString(std::string aString){
+    return "";
+    /*
     std::string digest;
     CryptoPP::SHA256 hash;
 
@@ -119,8 +122,8 @@ std::string SHA256HashString(std::string aString){
          new CryptoPP::StringSink(digest))));
 
     return digest;
+    */
 }
-
 
 #endif
 
@@ -2137,7 +2140,7 @@ void MainWindow::sendToOctoPrint()
   if (fileFormat == "OBJ") {
     exportFileFormat = FileFormat::OBJ;
   } else if (fileFormat == "OFF") {
-    exportFileFormat = FileFormat::OFF;
+    exportFileFormat = FileFormat::OFF_FMT;
   } else if (fileFormat == "ASCIISTL") {
     exportFileFormat = FileFormat::ASCIISTL;
   } else if (fileFormat == "AMF") {
@@ -2692,7 +2695,7 @@ void MainWindow::actionExportOBJ()
 
 void MainWindow::actionExportOFF()
 {
-  actionExport(FileFormat::OFF, "OFF", ".off", 3);
+  actionExport(FileFormat::OFF_FMT, "OFF", ".off", 3);
 }
 
 void MainWindow::actionExportWRL()
