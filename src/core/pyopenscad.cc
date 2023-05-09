@@ -8,14 +8,22 @@
 #include "Value.h"
 #include "Expression.h"
 
-// https://docs.python.it/html/ext/dnt-basics.html
+// https://docs.python.org/3.10/extending/newtypes.html 
 
 static PyObject *pythonInitDict=NULL;
 static PyObject *pythonMainModule = NULL ;
+bool python_active;
+bool python_trusted;
+
 void PyOpenSCADObject_dealloc(PyOpenSCADObject *self)
 {
-//  Py_XDECREF(self->dict);
+  Py_XDECREF(self->dict);
 //  Py_TYPE(self)->tp_free((PyObject *)self);
+}
+
+PyObject *PyOpenSCADObject_alloc(PyTypeObject *cls, Py_ssize_t nitems)
+{
+  return PyType_GenericAlloc(cls, nitems);
 }
 
 static PyObject *PyOpenSCADObject_new(PyTypeObject *type, PyObject *args,  PyObject *kwds)
@@ -64,7 +72,7 @@ int python_more_obj(std::vector<std::shared_ptr<AbstractNode>>& children, PyObje
 std::shared_ptr<AbstractNode> PyOpenSCADObjectToNode(PyObject *obj)
 {
   std::shared_ptr<AbstractNode> result = ((PyOpenSCADObject *) obj)->node;
-//  Py_XDECREF(obj); TODO cannot activate
+  Py_XDECREF(obj); 
   return result;
 }
 
@@ -74,7 +82,7 @@ std::shared_ptr<AbstractNode> PyOpenSCADObjectToNodeMulti(PyObject *objs)
   if (Py_TYPE(objs) == &PyOpenSCADType) {
     result = ((PyOpenSCADObject *) objs)->node;
   } else if (PyList_Check(objs)) {
-    // TODO also decref the list ?
+
     DECLARE_INSTANCE
     auto node = std::make_shared<CsgOpNode>(instance, OpenSCADOperator::UNION);
 
@@ -83,10 +91,11 @@ std::shared_ptr<AbstractNode> PyOpenSCADObjectToNodeMulti(PyObject *objs)
       PyObject *obj = PyList_GetItem(objs, i);
       std::shared_ptr<AbstractNode> child = PyOpenSCADObjectToNode(obj);
       node->children.push_back(child);
+      Py_XDECREF(obj);
     }
     result=node;
   } else result=NULL;
-//  Py_XDECREF(objs); // TODO cannot activate
+  Py_XDECREF(objs);
   return result;
 }
 
@@ -102,6 +111,7 @@ int python_numberval(PyObject *number, double *result)
   }
   return 1;
 }
+
 int python_vectorval(PyObject *vec, double *x, double *y, double *z, double *w)
 {
   *x = 1;
@@ -257,10 +267,10 @@ PyTypeObject PyOpenSCADType = {
     sizeof(PyOpenSCADObject), 			/* tp_basicsize */
     0,                         			/* tp_itemsize */
     (destructor) PyOpenSCADObject_dealloc,	/* tp_dealloc */
-    0,                         			/* tp_print */
+    0,                         			/* vectorcall_offset */
     0,                         			/* tp_getattr */
     0,                         			/* tp_setattr */
-    0,                         			/* tp_reserved */
+    0,                         			/* tp_as_async */
     0,                         			/* tp_repr */
     &PyOpenSCADNumbers,        			/* tp_as_number */
     0,                         			/* tp_as_sequence */
@@ -288,7 +298,7 @@ PyTypeObject PyOpenSCADType = {
     0,                         			/* tp_descr_set */
     0,                         			/* tp_dictoffset */
     (initproc) PyOpenSCADInit,      		/* tp_init */
-    0,                         			/* tp_alloc */
+    PyOpenSCADObject_alloc,    			/* tp_alloc */
     PyOpenSCADObject_new,                	/* tp_new */
 };
 
@@ -362,7 +372,6 @@ PyObject *python_callfunction(const std::string &name, const std::vector<std::sh
 {
 	PyObject *pFunc = NULL;
 	if(!pythonMainModule){
-		printf("Python not initialized!\n");
 		return NULL;
 	}
 	PyObject *maindict = PyModule_GetDict(pythonMainModule);
@@ -381,11 +390,9 @@ PyObject *python_callfunction(const std::string &name, const std::vector<std::sh
 		break;
 	}
 	if (!pFunc) {
-		printf("Function not found!\n");
 		return NULL;
 	}
 	if (!PyCallable_Check(pFunc)) {
-		printf("Function not callable!\n");
 		return NULL;
 	}
 	
@@ -437,7 +444,11 @@ std::shared_ptr<AbstractNode> python_modulefunc(const ModuleInstantiation *op_mo
 	const char *errorstr = NULL;
 	do {
 		PyObject *funcresult = python_callfunction(op_module->name(),op_module->arguments, errorstr);
-		if (errorstr != NULL) PyErr_SetString(PyExc_TypeError, errorstr);
+		if (errorstr != NULL){
+			PyErr_SetString(PyExc_TypeError, errorstr);
+			return NULL;
+		}
+		if(funcresult == NULL) return NULL;
 
 		if(funcresult->ob_type == &PyOpenSCADType) result=PyOpenSCADObjectToNode(funcresult);
 		else {
@@ -472,7 +483,13 @@ Value python_functionfunc(const FunctionCall *call )
 {
 	const char *errorstr = NULL;
 	PyObject *funcresult = python_callfunction(call->name, call->arguments, errorstr);
-	if (errorstr != NULL) PyErr_SetString(PyExc_TypeError, errorstr);
+	if (errorstr != NULL)
+	{
+		PyErr_SetString(PyExc_TypeError, errorstr);
+		return Value::undefined.clone();
+	}
+	if(funcresult == NULL) return Value::undefined.clone();
+
 	return  python_convertresult(funcresult);
 }
 
@@ -480,9 +497,9 @@ extern PyObject *PyInit_libfive(void);
 
 PyMODINIT_FUNC PyInit_PyLibFive(void);
 
-char *evaluatePython(const char *code, double time)
+std::string evaluatePython(const std::string & code, double time)
 {
-  char *error;
+  std::string error;
   python_result_node = NULL;
   PyObject *pyExcType;
   PyObject *pyExcValue;
@@ -494,7 +511,6 @@ char *evaluatePython(const char *code, double time)
       }
       pythonInitDict=NULL;
     }
-
     if(!pythonInitDict) {
 	    char run_str[80];
 	    PyImport_AppendInittab("openscad", &PyInit_openscad);
@@ -513,7 +529,7 @@ char *evaluatePython(const char *code, double time)
 	    sprintf(run_str,"from openscad import *\nfa=12.0\nfn=0.0\nfs=2.0\nt=%g",time);
 	    PyRun_String(run_str, Py_file_input, pythonInitDict, pythonInitDict);
     }
-    PyObject *result = PyRun_String(code, Py_file_input, pythonInitDict, pythonInitDict);
+    PyObject *result = PyRun_String(code.c_str(), Py_file_input, pythonInitDict, pythonInitDict);
 
     PyErr_Fetch(&pyExcType, &pyExcValue, &pyExcTraceback);
     PyErr_NormalizeException(&pyExcType, &pyExcValue, &pyExcTraceback);
@@ -521,7 +537,7 @@ char *evaluatePython(const char *code, double time)
     PyObject* str_exc_value = PyObject_Repr(pyExcValue);
     PyObject* pyExcValueStr = PyUnicode_AsEncodedString(str_exc_value, "utf-8", "~");
     const char *strExcValue =  PyBytes_AS_STRING(pyExcValueStr);
-    if(strExcValue != NULL  && !strcmp(strExcValue,"<NULL>")) error=NULL;
+    if(strExcValue != NULL  && !strcmp(strExcValue,"<NULL>")) error="";
     else error=strdup(strExcValue);
 
     Py_XDECREF(pyExcType);
@@ -530,7 +546,6 @@ char *evaluatePython(const char *code, double time)
 
     Py_XDECREF(str_exc_value);
     Py_XDECREF(pyExcValueStr);
-
     return error;
 }
 

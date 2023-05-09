@@ -89,9 +89,9 @@
 
 #ifdef ENABLE_PYTHON
 extern std::shared_ptr<AbstractNode> python_result_node;
-char *evaluatePython(const char *code, double time);
-extern bool python_unlocked;
-int python_active = 0;
+std::string evaluatePython(const std::string &code, double time);
+extern bool python_active;
+extern bool python_trusted;
 #endif
 namespace po = boost::program_options;
 namespace fs = boost::filesystem;
@@ -104,10 +104,15 @@ using boost::is_any_of;
 
 std::string commandline_commands;
 static bool arg_info = false;
-#ifdef ENABLE_PYTHON
-bool python_unlocked = true;
-#endif
 static std::string arg_colorscheme;
+
+
+bool  is_cmdline_mode(int hidden) {
+	static bool cmdline=false;
+	if(hidden == 1) cmdline=true;
+	if(hidden == 0) cmdline=false;
+	return cmdline;
+}
 
 class Echostream
 {
@@ -156,8 +161,8 @@ static int info()
   try {
     OffscreenView glview(512, 512);
     std::cout << glview.getRendererInfo() << "\n";
-  } catch (int error) {
-    LOG("Can't create OpenGL OffscreenView. Code: %1$i. Exiting.\n", error);
+  } catch (const OffscreenViewException &ex) {
+    LOG("Can't create OpenGL OffscreenView: %1$s. Exiting.\n", ex.what());
     return 1;
   }
 
@@ -399,21 +404,18 @@ int cmdline(const CommandLine& cmd)
   }
 
 #ifdef ENABLE_PYTHON  
-  python_active = 0;
+  python_active = false;
   if(cmd.filename.c_str() != NULL) {
-	  const char *fname = cmd.filename.c_str();
-	  int len=strlen(fname);
-	  if(len >= 3 && ! strcmp(fname+len-3,".py")) {
-		  if( python_unlocked == true) python_active = 1;
-		  else  LOG(message_group::Warning, Location::NONE, "","Python is not enabled");
+	  if(boost::algorithm::ends_with(cmd.filename, ".py")) {
+		  if( python_trusted == true) python_active = true;
+		  else  LOG("Python is not enabled");
 	  }
   }
 
   if(python_active) {
     auto fulltext_py = text;
-
-    char *error  = evaluatePython(fulltext_py.c_str(), 0.0);
-    if(error != NULL) LOG(message_group::Error, Location::NONE, "", error);
+    auto error  = evaluatePython(fulltext_py, 0.0);
+    if(error.size() > 0) LOG(error.c_str());
     text ="\n";
   }
 #endif	  
@@ -570,6 +572,7 @@ int do_export(const CommandLine& cmd, const RenderVariables& render_variables, F
     if ((curFormat == FileFormat::ECHO || curFormat == FileFormat::PNG) && (cmd.viewOptions.renderer == RenderType::OPENCSG || cmd.viewOptions.renderer == RenderType::THROWNTOGETHER)) {
       // OpenCSG or throwntogether png -> just render a preview
       glview = prepare_preview(tree, cmd.viewOptions, camera);
+      if (!glview) return 1;
     } else {
       // Force creation of CGAL objects (for testing)
       root_geom = geomevaluator.evaluateGeometry(*tree.root(), true);
@@ -592,7 +595,6 @@ int do_export(const CommandLine& cmd, const RenderVariables& render_variables, F
         root_geom.reset(new CGAL_Nef_polyhedron());
       }
     }
-
     if (curFormat == FileFormat::ASCIISTL ||
         curFormat == FileFormat::STL ||
         curFormat == FileFormat::OBJ ||
@@ -1011,7 +1013,7 @@ int main(int argc, char **argv)
     ("s,s", po::value<string>(), "stl_file deprecated, use -o")
     ("x,x", po::value<string>(), "dxf_file deprecated, use -o")
 #ifdef ENABLE_PYTHON
-  ("enable-python",  "Enable python")
+  ("trust-python",  "Trust python")
 #endif
   ;
 
@@ -1042,9 +1044,9 @@ int main(int argc, char **argv)
     LOG("Debug on. --debug=%1$s", OpenSCAD::debug);
   }
 #ifdef ENABLE_PYTHON
-  if (vm.count("enable-python")) {
-    LOG("Python Engine enabled");
-    python_unlocked = true;
+  if (vm.count("trust-python")) {
+    LOG("Python Code globally trusted", OpenSCAD::debug);
+    python_trusted = true;
   }
 #endif
   if (vm.count("quiet")) {
@@ -1199,6 +1201,8 @@ int main(int argc, char **argv)
     cmdlinemode = true;
     if (!inputFiles.size()) help(argv[0], desc, true);
   }
+
+  is_cmdline_mode(cmdlinemode?1:0);
 
   if (arg_info || cmdlinemode) {
     if (inputFiles.size() > 1) help(argv[0], desc, true);

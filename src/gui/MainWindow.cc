@@ -99,8 +99,29 @@
 
 #ifdef ENABLE_PYTHON
 extern std::shared_ptr<AbstractNode> python_result_node;
-char *evaluatePython(const char *code, double time);
-extern bool python_unlocked;
+std::string untrusted_edit_document_name;
+std::string trusted_edit_document_name;
+std::string evaluatePython(const std::string &code, double time);
+extern bool python_trusted;
+extern bool python_active;
+
+#include "sha.h"
+#include "filters.h"
+#include "base64.h"
+
+std::string SHA256HashString(std::string aString){
+    std::string digest;
+    CryptoPP::SHA256 hash;
+
+    CryptoPP::StringSource foo(aString, true,
+    new CryptoPP::HashFilter(hash,
+      new CryptoPP::Base64Encoder (
+         new CryptoPP::StringSink(digest))));
+
+    return digest;
+}
+
+
 #endif
 
 #define ENABLE_3D_PRINTING
@@ -399,6 +420,7 @@ MainWindow::MainWindow(const QStringList& filenames)
   connect(this->fileActionSaveACopy, SIGNAL(triggered()), this, SLOT(actionSaveACopy()));
   connect(this->fileActionSaveAll, SIGNAL(triggered()), tabManager, SLOT(saveAll()));
   connect(this->fileActionReload, SIGNAL(triggered()), this, SLOT(actionReload()));
+  connect(this->fileActionRevoke, SIGNAL(triggered()), this, SLOT(actionRevokeTrustedFiles()));
   connect(this->fileActionClose, SIGNAL(triggered()), tabManager, SLOT(closeCurrentTab()));
   connect(this->fileActionQuit, SIGNAL(triggered()), this, SLOT(quit()));
   connect(this->fileShowLibraryFolder, SIGNAL(triggered()), this, SLOT(actionShowLibraryFolder()));
@@ -1243,7 +1265,7 @@ void MainWindow::instantiateRoot()
 
     std::shared_ptr<const FileContext> file_context;
 #ifdef ENABLE_PYTHON
-    if (python_result_node != NULL && this->python_active) this->absolute_root_node = python_result_node;
+    if (python_result_node != NULL && python_active) this->absolute_root_node = python_result_node;
     else
 #endif
     this->absolute_root_node = this->root_file->instantiate(*builtin_context, &file_context);
@@ -1534,6 +1556,18 @@ void MainWindow::actionSaveAs()
   tabManager->saveAs(activeEditor);
 }
 
+void MainWindow::actionRevokeTrustedFiles()
+{
+  QSettingsCached settings;
+#ifdef ENABLE_PYTHON  
+  python_trusted = false;
+  trusted_edit_document_name="";
+#endif  
+  settings.remove("python_hash");
+  QMessageBox::information(this, _("Trusted Files"), "All trusted python files revoked", QMessageBox::Ok);
+
+}
+
 void MainWindow::actionSaveACopy()
 {
   tabManager->saveACopy(activeEditor);
@@ -1802,6 +1836,61 @@ bool MainWindow::fileChangedOnDisk()
 /*!
    Returns true if anything was compiled.
  */
+
+#ifdef ENABLE_PYTHON
+bool trust_python_file(const std::string &file,  const std::string &content) {
+  QSettingsCached settings;
+  char setting_key[256];
+  if(python_trusted) return true;
+
+  std::string act_hash, ref_hash;
+  snprintf(setting_key,sizeof(setting_key)-1,"python_hash/%s",file.c_str());
+  act_hash = SHA256HashString(content);
+
+  if(file == untrusted_edit_document_name) return false;
+  
+  if(file == trusted_edit_document_name) {
+    settings.setValue(setting_key,act_hash.c_str());
+    return true;
+  }
+
+  if(content.size() <= 1) { // 1st character already typed
+    trusted_edit_document_name=file;
+    return true;
+  }
+
+  if(settings.contains(setting_key)) {
+    QString str=settings.value(setting_key).toString();
+    QByteArray ba = str.toLocal8Bit();
+    ref_hash = std::string(ba.data());
+  }
+ 
+  if(act_hash == ref_hash) {
+	  trusted_edit_document_name=file;
+	  return true;
+  }
+
+  auto ret = QMessageBox::warning(NULL, file.c_str(),
+    _( "Python files can potentially contain harumful stuff.\n"
+    "Do you trust this file ?\n"), QMessageBox::Yes  | QMessageBox::YesAll | QMessageBox::No);
+  if (ret == QMessageBox::YesAll)  {
+    python_trusted = true;
+    return true;
+  }
+  if (ret == QMessageBox::Yes)  {
+    trusted_edit_document_name=file;
+    settings.setValue(setting_key,act_hash.c_str());
+    return true;
+  }
+
+  if (ret == QMessageBox::No) {
+    untrusted_edit_document_name=file;
+    return false;
+  }
+  return false;
+}
+#endif
+	
 void MainWindow::parseTopLevelDocument()
 {
   resetSuppressedMessages();
@@ -1816,23 +1905,23 @@ void MainWindow::parseTopLevelDocument()
   const char *fname = activeEditor->filepath.isEmpty() ? "" : fnameba;
   delete this->parsed_file;
 #ifdef ENABLE_PYTHON
-  this->python_active = 0;
+  python_active = false;
   if (fname != NULL) {
-    int len = strlen(fname);
-    if (len >= 3 && !strcmp(fname + len - 3, ".py")) {
+    if(boost::algorithm::ends_with(fname, ".py")) {
+	    std::string content = std::string(this->last_compiled_doc.toUtf8().constData());
       if (
-        Feature::ExperimentalPythonEngine.is_enabled() &&
-        python_unlocked == true) this->python_active = 1;
+        Feature::ExperimentalPythonEngine.is_enabled() 
+		&& trust_python_file(std::string(fname), content)) python_active = true;
       else LOG(message_group::Warning, Location::NONE, "", "Python is not enabled");
     }
   }
 
-  if (this->python_active) {
+  if (python_active) {
     auto fulltext_py =
       std::string(this->last_compiled_doc.toUtf8().constData());
 
-    char *error = evaluatePython(fulltext_py.c_str(),this->animateWidget->getAnim_tval());
-    if (error != NULL) LOG(message_group::Error, Location::NONE, "", error);
+    auto error = evaluatePython(fulltext_py,this->animateWidget->getAnim_tval());
+    if (error.size() > 0) LOG(message_group::Error, Location::NONE, "", error.c_str());
     fulltext = "\n";
   }
 #endif // ifdef ENABLE_PYTHON
@@ -2048,7 +2137,7 @@ void MainWindow::sendToOctoPrint()
   if (fileFormat == "OBJ") {
     exportFileFormat = FileFormat::OBJ;
   } else if (fileFormat == "OFF") {
-    exportFileFormat = FileFormat::OFF_FMT;
+    exportFileFormat = FileFormat::OFF;
   } else if (fileFormat == "ASCIISTL") {
     exportFileFormat = FileFormat::ASCIISTL;
   } else if (fileFormat == "AMF") {
@@ -2603,7 +2692,7 @@ void MainWindow::actionExportOBJ()
 
 void MainWindow::actionExportOFF()
 {
-  actionExport(FileFormat::OFF_FMT, "OFF", ".off", 3);
+  actionExport(FileFormat::OFF, "OFF", ".off", 3);
 }
 
 void MainWindow::actionExportWRL()
