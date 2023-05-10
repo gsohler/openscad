@@ -68,12 +68,16 @@ std::vector<libfive_tree> PyLibFiveObjectToTree(PyObject *obj)
   	libfive_tree_stubs.push_back(result[0]);
   } else if(PyTuple_Check(obj)){
 	  for(int i=0;i<PyTuple_Size(obj);i++) {
-		PyObject *obj=PyTuple_GetItem(obj,i);
-		std::vector<libfive_tree> sub = PyLibFiveObjectToTree(obj);
+		PyObject *x=PyTuple_GetItem(obj,i);
+		std::vector<libfive_tree> sub = PyLibFiveObjectToTree(x);
 		result.insert(result.end(), sub.begin(), sub.end());
 	  }
   } else if(PyList_Check(obj)){
-	  printf("List not supported\n");
+	  for(int i=0;i<PyList_Size(obj);i++) {
+		PyObject *x=PyList_GetItem(obj,i);
+		std::vector<libfive_tree> sub = PyLibFiveObjectToTree(x);
+		result.insert(result.end(), sub.begin(), sub.end());
+	  }
   } else {
 	  printf("Unknown type! %p %p\n",obj->ob_type, &PyFloat_Type);
   }

@@ -35,8 +35,8 @@ def lv_vec_unit(v):
 def lv_mirror(c,n1):
     n=lv_vec_unit(n1)
     e =lv_scalar(c,n)
-    d=lv.abs(e)-e
-    return c[0]+d*n[0],c[1]+d*n[1],c[2]+d*n[2]
+    x=n*(lv.abs(e)-e)
+    return c[0]+x[0],c[1]+x[1],c[2]+x[2]
 
 def lv_sphere(c,r):
     return lv.sqrt(c[0]*c[0]+c[1]*c[1]+c[2]*c[2])-r
