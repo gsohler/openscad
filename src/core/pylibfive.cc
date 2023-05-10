@@ -49,6 +49,10 @@ libfive_tree PyLibFiveObjectToTree(PyObject *obj)
   } else if(PyFloat_Check(obj)) { 
 	result=  libfive_tree_const(PyFloat_AsDouble(obj));
   	libfive_tree_stubs.push_back(result);
+  } else if(PyTuple_Check(obj)){
+	  printf("List not supported\n");
+  } else if(PyList_Check(obj)){
+	  printf("List not supported\n");
   } else {
 	  printf("Unknown type! %p %p\n",obj->ob_type, &PyFloat_Type);
   }
@@ -73,8 +77,7 @@ PyObject *python_lv_un_int(PyObject *self, PyObject *args, PyObject *kwargs,int 
   char *kwlist[] = {"arg",  NULL};
   PyObject *arg = NULL;
 
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O!", kwlist,
-                                   &PyLibFiveType, &arg)) return NULL;
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O", kwlist, &arg)) return NULL;
 
   libfive_tree tv = PyLibFiveObjectToTree(arg);
   libfive_tree res = libfive_tree_unary(op, tv);
@@ -154,6 +157,17 @@ PyObject *python_lv_atan(PyObject *self, PyObject *args, PyObject *kwargs) { ret
 PyObject *python_lv_exp(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_un_int(self, args, kwargs,Opcode::OP_EXP); }
 PyObject *python_lv_log(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_un_int(self, args, kwargs,Opcode::OP_LOG); }
 
+PyObject *python_lv_print(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+  char *kwlist[] = {"arg",  NULL};
+  PyObject *arg = NULL;
+
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O!", kwlist, &PyLibFiveType, &arg)) return NULL;
+  libfive_tree tv = PyLibFiveObjectToTree(arg);
+  printf("tree: %s\n",libfive_tree_print(tv));
+  return Py_None;
+}
+
 static PyMethodDef PyLibFiveFunctions[] = {
   {"x", (PyCFunction) python_lv_x, METH_VARARGS | METH_KEYWORDS, "Get X."},
   {"y", (PyCFunction) python_lv_y, METH_VARARGS | METH_KEYWORDS, "Get Y."},
@@ -169,8 +183,9 @@ static PyMethodDef PyLibFiveFunctions[] = {
   {"asin", (PyCFunction) python_lv_asin, METH_VARARGS | METH_KEYWORDS, "Asin"},
   {"acos", (PyCFunction) python_lv_acos, METH_VARARGS | METH_KEYWORDS, "Acos"},
   {"atan", (PyCFunction) python_lv_atan, METH_VARARGS | METH_KEYWORDS, "Atan"},
-  {"exp", (PyCFunction) python_lv_atan, METH_VARARGS | METH_KEYWORDS, "Exp"},
-  {"log", (PyCFunction) python_lv_atan, METH_VARARGS | METH_KEYWORDS, "Log"},
+  {"exp", (PyCFunction) python_lv_exp, METH_VARARGS | METH_KEYWORDS, "Exp"},
+  {"log", (PyCFunction) python_lv_log, METH_VARARGS | METH_KEYWORDS, "Log"},
+  {"print", (PyCFunction) python_lv_print, METH_VARARGS | METH_KEYWORDS, "Print"},
   {NULL, NULL, 0, NULL}
 };
 

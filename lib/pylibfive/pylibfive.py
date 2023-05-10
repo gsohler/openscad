@@ -2,18 +2,6 @@ import libfive as lv
 
 #http://www.gradientspace.com/tutorials/category/g3sharp
 
-class Coord:
-    def __init__(self):
-        self.pos = lv.x(),lv.y(),lv.z()
-
-    def trans(self, v):
-        self.pos = self.pos[0]-v[0] ,self.pos[1]-v[1],self.pos[2]-v[2]
-
-class Object:
-    def sphere(c,r):
-        return c.pos[0]*c.pos[0]+c.pos[1]*c.pos[1]+c.pos[2]*c.pos[2]-r*r
-
-
 def lv_coord():
         return lv.x(),lv.y(),lv.z()
 
@@ -25,6 +13,30 @@ def lv_lerp(a,b,t):
 
 def lv_trans(c,v):
     return c[0]-v[0] ,c[1]-v[1],c[2]-v[2]
+
+def lv_matrix_sub(c,p, n):
+    return (lv_clamp(c+p/2,0,p*n)%p)-p/2
+
+def lv_matrix(c,p, n):
+    return lv_matrix_sub(c[0],p[0],n[0]), lv_matrix_sub(c[1],p[1],n[1]), lv_matrix_sub(c[2],p[2],n[2])
+
+def lv_scalar(a,b):
+    return a[0]*b[0]+a[1]*b[1]+a[2]*b[2]
+
+def lv_len(n):
+    return lv.sqrt(n[0]*n[0]+n[1]*n[1]+n[2]*n[2])
+
+def lv_vec_scale(v,n):
+    return v[0]*n, v[1]*n, v[2]*n
+
+def lv_vec_unit(v):
+    return lv_vec_scale(v,1.0/lv_len(v))
+
+def lv_mirror(c,n1):
+    n=lv_vec_unit(n1)
+    e =lv_scalar(c,n)
+    d=lv.abs(e)-e
+    return c[0]+d*n[0],c[1]+d*n[1],c[2]+d*n[2]
 
 def lv_sphere(c,r):
     return lv.sqrt(c[0]*c[0]+c[1]*c[1]+c[2]*c[2])-r
