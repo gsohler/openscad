@@ -38,6 +38,15 @@ def lv_mirror(c,n1):
     x=n*(lv.abs(e)-e)
     return c[0]+x[0],c[1]+x[1],c[2]+x[2]
 
+def lv_cubemirror(c):
+    xa=lv.abs(c[0])
+    ya=lv.abs(c[1])
+    za=lv.abs(c[2])
+    xd=lv.max(lv.comp(xa,lv.max(ya,za)),0)
+    yd=lv.max(lv.comp(ya,lv.max(xa,za)),0)
+    zd= lv.max(lv.comp(za,lv.max(xa,ya)),0)
+    return xd*c[1]+yd*c[2]+zd*c[0],xd*c[2]+yd*c[0]+zd*c[1],xd*xa+yd*ya+zd*za
+
 def lv_sphere(c,r):
     return lv.sqrt(c[0]*c[0]+c[1]*c[1]+c[2]*c[2])-r
 

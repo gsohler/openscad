@@ -206,6 +206,8 @@ PyObject *python_lv_sqrt(PyObject *self, PyObject *args, PyObject *kwargs) { ret
 PyObject *python_lv_abs(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_un_int(self, args, kwargs,Opcode::OP_ABS); }
 PyObject *python_lv_max(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_bin_int(self, args, kwargs,Opcode::OP_MAX); }
 PyObject *python_lv_min(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_bin_int(self, args, kwargs,Opcode::OP_MIN); }
+PyObject *python_lv_pow(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_bin_int(self, args, kwargs,Opcode::OP_POW); }
+PyObject *python_lv_comp(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_bin_int(self, args, kwargs,Opcode::OP_COMPARE); }
 
 PyObject *python_lv_sin(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_un_int(self, args, kwargs,Opcode::OP_SIN); }
 PyObject *python_lv_cos(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_un_int(self, args, kwargs,Opcode::OP_COS); }
@@ -246,6 +248,8 @@ static PyMethodDef PyLibFiveFunctions[] = {
   {"atan", (PyCFunction) python_lv_atan, METH_VARARGS | METH_KEYWORDS, "Atan"},
   {"exp", (PyCFunction) python_lv_exp, METH_VARARGS | METH_KEYWORDS, "Exp"},
   {"log", (PyCFunction) python_lv_log, METH_VARARGS | METH_KEYWORDS, "Log"},
+  {"pow", (PyCFunction) python_lv_pow, METH_VARARGS | METH_KEYWORDS, "Power"},
+  {"comp", (PyCFunction) python_lv_comp, METH_VARARGS | METH_KEYWORDS, "Compare"},
   {"print", (PyCFunction) python_lv_print, METH_VARARGS | METH_KEYWORDS, "Print"},
   {NULL, NULL, 0, NULL}
 };
