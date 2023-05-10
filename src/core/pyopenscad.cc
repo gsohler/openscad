@@ -14,6 +14,7 @@ static PyObject *pythonInitDict=NULL;
 static PyObject *pythonMainModule = NULL ;
 bool python_active;
 bool python_trusted;
+#include "PlatformUtils.h"
 
 void PyOpenSCADObject_dealloc(PyOpenSCADObject *self)
 {
@@ -28,8 +29,13 @@ PyObject *PyOpenSCADObject_alloc(PyTypeObject *cls, Py_ssize_t nitems)
 
 static PyObject *PyOpenSCADObject_new(PyTypeObject *type, PyObject *args,  PyObject *kwds)
 {
+  PyObject * empty_tuple;
   PyOpenSCADObject *self;
-  self = (PyOpenSCADObject *)  type->tp_alloc(type, 0);
+  empty_tuple = PyTuple_New(0);
+  Py_XINCREF(empty_tuple);
+  self = (PyOpenSCADObject *) PyBaseObject_Type.tp_new(type, empty_tuple, 0);
+  Py_XDECREF(empty_tuple);
+
   self->node = NULL;
   self->dict = PyDict_New();
   Py_XINCREF(self->dict);
@@ -157,6 +163,8 @@ static PyMethodDef PyOpenSCADFunctions[] = {
   {"sphere", (PyCFunction) python_sphere, METH_VARARGS | METH_KEYWORDS, "Create Sphere."},
   {"polyhedron", (PyCFunction) python_polyhedron, METH_VARARGS | METH_KEYWORDS, "Create Polyhedron."},
   {"frep", (PyCFunction) python_frep, METH_VARARGS | METH_KEYWORDS, "Create F-Rep."},
+  {"ifrep", (PyCFunction) python_ifrep, METH_VARARGS | METH_KEYWORDS, "Create Inverse F-Rep."},
+
 
   {"translate", (PyCFunction) python_translate, METH_VARARGS | METH_KEYWORDS, "Move  Object."},
   {"rotate", (PyCFunction) python_rotate, METH_VARARGS | METH_KEYWORDS, "Rotate Object."},
@@ -281,8 +289,8 @@ PyTypeObject PyOpenSCADType = {
     0,                         			/* tp_getattro */
     0,                         			/* tp_setattro */
     0,                         			/* tp_as_buffer */
-    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,	/* tp_flags */
-    "PyOpenSCAD Object",          		/* tp_doc */
+    Py_TPFLAGS_DEFAULT|Py_TPFLAGS_HAVE_VERSION_TAG|Py_TPFLAGS_BASETYPE, 	/* tp_flags */
+    0,			          		/* tp_doc */
     0,                         			/* tp_traverse */
     0,                         			/* tp_clear */
     0,                         			/* tp_richcompare */
@@ -504,6 +512,7 @@ std::string evaluatePython(const std::string & code, double time)
   PyObject *pyExcType;
   PyObject *pyExcValue;
   PyObject *pyExcTraceback;
+  wchar_t libfivedir[256];
 
     if(pythonInitDict) {
       if (Py_FinalizeEx() < 0) {
@@ -517,7 +526,9 @@ std::string evaluatePython(const std::string & code, double time)
 	    PyImport_AppendInittab("libfive", &PyInit_libfive);
 	    PyConfig config;
             PyConfig_InitPythonConfig(&config);
-	    PyConfig_SetString(&config, &config.pythonpath_env, L"/home/gsohler/git/openscad/lib/pylibfive/");
+	    swprintf(libfivedir, 256, L"%s/../libraries/pylibfive/",PlatformUtils::applicationPath().c_str());
+
+	    PyConfig_SetString(&config, &config.pythonpath_env, libfivedir);
 	    // Py_Initialize();
             Py_InitializeFromConfig(&config);
             PyConfig_Clear(&config);

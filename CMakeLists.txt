@@ -45,6 +45,7 @@ option(USE_CCACHE "Use ccache to speed up compilation." ON)
 option(ENABLE_CAIRO "Enable support for cairo vector graphics library." ON)
 option(ENABLE_SPNAV "Enable support for libspnav input driver." ON)
 option(ENABLE_HIDAPI "Enable support for HIDAPI input driver." ON)
+option(ENABLE_MANIFOLD "Enable support for Manifold library for CSG." OFF)
 option(ENABLE_TBB "Enable support for oneAPI Threading Building Blocks." ON)
 option(ALLOW_BUNDLED_HIDAPI "Allow usage of bundled HIDAPI library (Windows only)." OFF)
 option(ENABLE_PYTHON "Enable experimental Python Interpreter" OFF)
@@ -1101,9 +1102,6 @@ if(OFFLINE_DOCS)
 endif()
 
 include(CPack)
-get_target_property(LINK_LIBS OpenSCAD LINK_LIBRARIES)
-LIST(REMOVE_ITEM LINK_LIBS /home/gsohler/openscad_deps/mxe/usr/x86_64-w64-mingw32.static.posix/lib/libdouble-conversion.a )
-set_property(TARGET OpenSCAD PROPERTY LINK_LIBRARIES  ${LINK_LIBS} )
 
 add_sanitizers(OpenSCAD)
 

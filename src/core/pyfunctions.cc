@@ -251,16 +251,47 @@ PyObject *python_frep(PyObject *self, PyObject *args, PyObject *kwargs)
 
   char *kwlist[] = {"exp","min","max","res", NULL};
 
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O!OO|d", kwlist,
-                                   &PyLibFiveType, &expression,
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OOO|d", kwlist,
+                                   &expression,
 				   &bmin, &bmax, &res
 				   )) return NULL;
 
   python_vectorval(bmin, &(node->x1), &(node->y1), &(node->z1));
   python_vectorval(bmax, &(node->x2), &(node->y2), &(node->z2));
   node->res = res;
-  node->expression = expression;
+
+  if(expression->ob_type == &PyLibFiveType) {
+  	node->expression = expression;
+  } else if(expression->ob_type == &PyFunction_Type) {
+  	node->expression = expression;
+	printf("pyton func\n");
+  } else {
+    PyErr_SetString(PyExc_TypeError, "Unknown frep expression type\n");
+    return NULL;
+  }
+
   return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
+}
+
+
+PyObject *python_ifrep(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+  DECLARE_INSTANCE
+  PyObject *object = NULL;
+
+  char *kwlist[] = {"obj"};
+  std::shared_ptr<AbstractNode> child;
+
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O!", kwlist,
+                                   &PyOpenSCADType, &object
+				   )) return NULL;
+
+  child = PyOpenSCADObjectToNodeMulti(object);
+  LeafNode *node = (LeafNode *)   child.get();
+  auto geom = node->createGeometry();
+  const PolySet *ps = dynamic_cast<const PolySet *>(geom);
+ 
+  return ifrep(ps);
 }
 
 
@@ -1055,11 +1086,9 @@ PyObject* python_path_extrude(PyObject *self, PyObject *args, PyObject *kwargs)
 	   for(int i=0;i<n;i++) {
 	  	PyObject *point=PyList_GetItem(path, i);
 		double x,y,z,w=0;
-	  	if(python_vectorval(point,&x,&y,&z)){
-	  		if(python_vectorval(point,&x,&y,&z,&w )){
-    				PyErr_SetString(PyExc_TypeError,"Cannot parse vector in path_extrude path\n");
-				return NULL;
-			}
+  		if(python_vectorval(point,&x,&y,&z,&w )){
+			PyErr_SetString(PyExc_TypeError,"Cannot parse vector in path_extrude path\n");
+			return NULL;
 		}
 		Vector4d pt3d(x,y,z,w);
 		if(i > 0 &&  node->path[i-1] == pt3d) continue; //  prevent double pts

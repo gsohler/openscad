@@ -1387,7 +1387,6 @@ if(APPLE)
     # Python not enabled for MAC yet
     cgalpngtest_python_primitives
     # Z issues specific to edge shader: https://github.com/openscad/openscad/issues/4595
-    # Z issues specific to edge shader
     openscad-viewoptions-edges_view-options-tests
     openscad-viewoptions-axes-scales-edges_view-options-tests
     # issue3158 test failing on macos, see: https://github.com/openscad/openscad/issues/4509
