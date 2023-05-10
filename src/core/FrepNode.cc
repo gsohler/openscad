@@ -52,7 +52,8 @@ const Geometry *FrepNode::createGeometry() const
 	PyObject *exp = this->expression;
 	if(exp == NULL || exp->ob_type != &PyLibFiveType) 
 		return p;
-	libfive_tree tree = PyLibFiveObjectToTree(exp);
+	std::vector<libfive_tree> tree = PyLibFiveObjectToTree(exp);
+	if(tree.size() != 1)   return p;
 //	printf("tree: %s\n",libfive_tree_print(tree)); // TODO free all tree
 
 	libfive_region3 reg;
@@ -63,7 +64,7 @@ const Geometry *FrepNode::createGeometry() const
 	reg.Z.lower = this->z1;
 	reg.Z.upper = this->z2;
 
-	libfive_mesh *mesh = libfive_tree_render_mesh(tree,  reg, this->res);
+	libfive_mesh *mesh = libfive_tree_render_mesh(tree[0],  reg, this->res);
 	libfive_tri t;
 	for(int i=0;i<mesh->tri_count;i++) 
 	{

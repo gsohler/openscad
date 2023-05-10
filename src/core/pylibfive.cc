@@ -26,31 +26,52 @@ static PyObject *PyLibFiveObject_new(PyTypeObject *type, PyObject *args,  PyObje
   return (PyObject *)self;
 }
 
-PyObject *PyLibFiveObjectFromTree(PyTypeObject *type, libfive_tree tree)
+PyObject *PyLibFiveObjectFromTree(PyTypeObject *type, const std::vector<libfive_tree> &tree)
 {
-  PyLibFiveObject *self;
-  self = (PyLibFiveObject *)  type->tp_alloc(type, 0);
-  if (self != NULL) {
-    self->tree = tree;
-    Py_XINCREF(self);
-    return (PyObject *)self;
-  }
-  return NULL;
+  if(tree.size() == 0) {
+    return Py_None;	  
+  } else if(tree.size() == 1) {
+    PyLibFiveObject *res;
+    res = (PyLibFiveObject *)  type->tp_alloc(type, 0);
+    if (res != NULL) {
+      res->tree = tree[0];
+      Py_XINCREF(res);
+      return (PyObject *)res;
+    }
+  } else {
+    PyObject  *res = PyTuple_New(tree.size());
+    for(int i=0;i<tree.size();i++) {
+      PyLibFiveObject *sub;
+      sub = (PyLibFiveObject *)  type->tp_alloc(type, 0);
+      if (sub != NULL) {
+        sub->tree = tree[i];
+        Py_XINCREF(sub);
+	PyTuple_SetItem(res,i,(PyObject *) sub);
+      }
+    }    
+    return res;
+  }	  
+
+  return Py_None;
 }
 
-libfive_tree PyLibFiveObjectToTree(PyObject *obj)
+std::vector<libfive_tree> PyLibFiveObjectToTree(PyObject *obj)
 {
-  libfive_tree result = NULL;
+  std::vector<libfive_tree> result;
   if(obj != NULL && obj->ob_type == &PyLibFiveType) {
-        result	= ((PyLibFiveObject *) obj)->tree;
+        result.push_back(((PyLibFiveObject *) obj)->tree);
   } else if(PyLong_Check(obj)) { 
-	result=  libfive_tree_const(PyLong_AsLong(obj));
-  	libfive_tree_stubs.push_back(result);
+	result.push_back(libfive_tree_const(PyLong_AsLong(obj)));
+  	libfive_tree_stubs.push_back(result[0]);
   } else if(PyFloat_Check(obj)) { 
-	result=  libfive_tree_const(PyFloat_AsDouble(obj));
-  	libfive_tree_stubs.push_back(result);
+	result.push_back(libfive_tree_const(PyFloat_AsDouble(obj)));
+  	libfive_tree_stubs.push_back(result[0]);
   } else if(PyTuple_Check(obj)){
-	  printf("List not supported\n");
+	  for(int i=0;i<PyTuple_Size(obj);i++) {
+		PyObject *obj=PyTuple_GetItem(obj,i);
+		std::vector<libfive_tree> sub = PyLibFiveObjectToTree(obj);
+		result.insert(result.end(), sub.begin(), sub.end());
+	  }
   } else if(PyList_Check(obj)){
 	  printf("List not supported\n");
   } else {
@@ -68,7 +89,9 @@ static int PyLibFiveInit(PyLibFiveObject *self, PyObject *arfs, PyObject *kwds)
 PyObject *python_lv_void_int(PyObject *self, PyObject *args, PyObject *kwargs,libfive_tree t)
 {
   libfive_tree_stubs.push_back(t);
-  return PyLibFiveObjectFromTree(&PyLibFiveType, t);
+  std::vector<libfive_tree> vec;
+  vec.push_back(t);
+  return PyLibFiveObjectFromTree(&PyLibFiveType, vec);
 }
 
 
@@ -79,9 +102,13 @@ PyObject *python_lv_un_int(PyObject *self, PyObject *args, PyObject *kwargs,int 
 
   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O", kwlist, &arg)) return NULL;
 
-  libfive_tree tv = PyLibFiveObjectToTree(arg);
-  libfive_tree res = libfive_tree_unary(op, tv);
-  libfive_tree_stubs.push_back(res);
+  std::vector<libfive_tree> tv = PyLibFiveObjectToTree(arg);
+  std::vector<libfive_tree> res;
+  for(int i=0;i<tv.size();i++) {
+    libfive_tree sub = libfive_tree_unary(op, tv[i]);
+    libfive_tree_stubs.push_back(sub);
+    res.push_back(sub);
+  }
   return PyLibFiveObjectFromTree(&PyLibFiveType, res);
 }
 
@@ -97,10 +124,22 @@ PyObject *python_lv_bin_int(PyObject *self, PyObject *args, PyObject *kwargs,int
                                    &arg2
 				   )) return NULL;
 
-  libfive_tree a1 = PyLibFiveObjectToTree(arg1);
-  libfive_tree a2 = PyLibFiveObjectToTree(arg2);
-  libfive_tree res = libfive_tree_binary(op, a1,a2);
-  libfive_tree_stubs.push_back(res);
+  std::vector<libfive_tree> a1 = PyLibFiveObjectToTree(arg1);
+  std::vector<libfive_tree> a2 = PyLibFiveObjectToTree(arg2);
+  std::vector<libfive_tree> res;
+  if(a1.size() == a2.size()) {
+    for(int i=0;i<a1.size();i++) {		 
+      res.push_back(libfive_tree_binary(op, a1[i],a2[i]));
+    }
+  }
+  else if(a2.size() == 1) {
+    for(int i=0;i<a1.size();i++) {		 
+      res.push_back(libfive_tree_binary(op, a1[i],a2[0]));
+    }
+  } else { 
+    printf("Cannot handle  bin %d binop %d \n",a1.size(), a2.size());
+    return Py_None;		    
+  }
 #else
   int i;
   PyObject *obj = NULL;
@@ -123,20 +162,36 @@ PyObject *python_lv_bin_int(PyObject *self, PyObject *args, PyObject *kwargs,int
 
 PyObject *python_lv_unop_int(PyObject *arg, int op)
 {
-  libfive_tree t = PyLibFiveObjectToTree(arg);
+  std::vector<libfive_tree> t = PyLibFiveObjectToTree(arg);
 
-  libfive_tree res = libfive_tree_unary(op, t);
-  libfive_tree_stubs.push_back(res);
+  std::vector<libfive_tree> res;
+  for(int i=0;i<t.size();i++) {
+    res.push_back(libfive_tree_unary(op, t[i]));
+  }  
   return PyLibFiveObjectFromTree(&PyLibFiveType, res);
 }
 
 PyObject *python_lv_binop_int(PyObject *arg1, PyObject *arg2, int op)
 {
-  libfive_tree t1 = PyLibFiveObjectToTree(arg1);
-  libfive_tree t2 = PyLibFiveObjectToTree(arg2);
+  std::vector<libfive_tree> t1 = PyLibFiveObjectToTree(arg1);
+  std::vector<libfive_tree> t2 = PyLibFiveObjectToTree(arg2);
 
-  libfive_tree res = libfive_tree_binary(op, t1, t2);
-  libfive_tree_stubs.push_back(res);
+  std::vector<libfive_tree> res ;
+  if(t1.size() == t2.size()) {
+    for(int i=0;i<t1.size();i++) {		 
+      res.push_back(libfive_tree_binary(op, t1[i],t2[i]));
+    }
+  }
+  else if(t2.size() == 1) {
+    for(int i=0;i<t1.size();i++) {		 
+      res.push_back(libfive_tree_binary(op, t1[i],t2[0]));
+    }
+  } else { 
+    printf("Cannot handle  bin %d binop %d \n",t1.size(), t2.size());
+    return Py_None;		    
+  }
+  libfive_tree_stubs.insert(libfive_tree_stubs.end(), res.begin(), res.end());
+
   return PyLibFiveObjectFromTree(&PyLibFiveType, res);
 }
 
@@ -163,8 +218,10 @@ PyObject *python_lv_print(PyObject *self, PyObject *args, PyObject *kwargs)
   PyObject *arg = NULL;
 
   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O!", kwlist, &PyLibFiveType, &arg)) return NULL;
-  libfive_tree tv = PyLibFiveObjectToTree(arg);
-  printf("tree: %s\n",libfive_tree_print(tv));
+  std::vector<libfive_tree> tv = PyLibFiveObjectToTree(arg);
+  for(int i=0;i<tv.size();i++){
+    printf("tree %d: %s\n",i,libfive_tree_print(tv[i]));
+  }
   return Py_None;
 }
 

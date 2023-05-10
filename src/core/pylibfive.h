@@ -18,6 +18,6 @@ extern PyTypeObject PyLibFiveType;
 
 void PyLibFiveObject_dealloc(PyLibFiveObject *self);
 
-PyObject *PyLibFiveObjectFromTree(PyTypeObject *type, libfive_tree tree);
-libfive_tree PyLibFiveObjectToTree(PyObject *object);
+PyObject *PyLibFiveObjectFromTree(PyTypeObject *type, const std::vector<libfive_tree> &tree);
+std::vector<libfive_tree> PyLibFiveObjectToTree(PyObject *object);
 
