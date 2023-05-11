@@ -1,5 +1,5 @@
 import libfive as lv
-
+import math
 #http://www.gradientspace.com/tutorials/category/g3sharp
 
 def lv_coord():
@@ -44,20 +44,56 @@ def lv_vec_scale(v,n):
 def lv_vec_unit(v):
     return lv_vec_scale(v,1.0/lv_len(v))
 
+def lv_rotxy(p,ang):
+     s=math.cos(3.14*ang/180)
+     c=math.sin(3.14*ang/180)
+     return  p[1]*c-p[0]*s,p[0]*c+p[1]*s,p[2]
+
+def lv_rotxz(p,ang):
+     s=math.cos(3.14*ang/180)
+     c=math.sin(3.14*ang/180)
+     return  p[2]*c-p[0]*s,p[1],p[0]*c+p[2]*s
+
+def lv_rotyz(p,ang):
+     s=math.cos(3.14*ang/180)
+     c=math.sin(3.14*ang/180)
+     return  p[0],p[2]*c-p[1]*sp[1]*c+p[2]*s
+
 def lv_mirror(c,n1):
     n=lv_vec_unit(n1)
     e =lv_scalar(c,n)
     x=n*(lv.abs(e)-e)
     return c[0]+x[0],c[1]+x[1],c[2]+x[2]
 
-def lv_cubemirror(c):
-    xa=lv.abs(c[0])
-    ya=lv.abs(c[1])
-    za=lv.abs(c[2])
-    xd=lv.max(lv.comp(xa,lv.max(ya,za)),0)
-    yd=lv.max(lv.comp(ya,lv.max(xa,za)),0)
-    zd= lv.max(lv.comp(za,lv.max(xa,ya)),0)
-    return xd*c[1]+yd*c[2]+zd*c[0],xd*c[2]+yd*c[0]+zd*c[1],xd*xa+yd*ya+zd*za
+def lv_cubemiror(c, func):
+    c1=c[0],c[1],lv.abs(c[2])
+    c2=c[1],c[2],lv.abs(c[0])
+    c3=c[2],c[0],lv.abs(c[1])
+    return lv.min(lv.min(func(c1),func(c2)),func(c3))
+
+def lv_dodmirror(c, func):
+    c1=c
+    c1x=c1[0],c1[1],lv.abs(c1[2])
+    
+    c2=lv_rotxz(lv_rotxy(c,0),63.44)
+    c2x=c2[0],c2[1],lv.abs(c2[2])
+    
+    c3=lv_rotxz(lv_rotxy(c,72),63.44)
+    c3x=c3[0],c3[1],lv.abs(c3[2])
+
+    c4=lv_rotxz(lv_rotxy(c,144),63.44)
+    c4x=c4[0],c4[1],lv.abs(c4[2])
+
+    c5=lv_rotxz(lv_rotxy(c,-72),63.44)
+    c5x=c5[0],c5[1],lv.abs(c5[2])
+
+    c6=lv_rotxz(lv_rotxy(c,-144),63.44)
+    c6x=c6[0],c6[1],lv.abs(c6[2])
+    
+    s1=lv.min(func(c1x),func(c2x))
+    s2=lv.min(func(c3x),func(c4x))
+    s3=lv.min(func(c5x),func(c6x))
+    return lv.min(lv.min(s1,s2),s3)
 
 def lv_sphere(c,r):
     return lv_length(c)-r 
