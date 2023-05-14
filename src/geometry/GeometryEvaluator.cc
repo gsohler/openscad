@@ -13,6 +13,7 @@
 #include "roof_ss.h"
 #include "roof_vd.h"
 #include "RotateExtrudeNode.h"
+#include "PullNode.h"
 #include "CgalAdvNode.h"
 #include "ProjectionNode.h"
 #include "CsgOpNode.h"
@@ -2510,6 +2511,127 @@ Response GeometryEvaluator::visit(State& state, const RotateExtrudeNode& node)
   return Response::ContinueTraversal;
 }
 
+static int pullObject_calccut(const PullNode &node, Vector3d p1, Vector3d p2,Vector3d &r)
+{
+	Vector3d dir=p2-p1;
+	Vector3d res;
+	Vector3d v1, v2;
+	Vector3d z(0,0,1);
+	v1=node.dir.cross(dir);
+	v2=node.dir.cross(v1);
+	if(linsystem(dir,v1,v2,node.anchor-p1,res)) return 1;
+
+	if(res[0] < 0 || res[0] > 1) return 1;
+	r =p1+dir*res[0];
+	return 0;
+}
+static void pullObject_addtri(PolySet *ps,Vector3d a, Vector3d b, Vector3d c)
+{
+	ps->append_poly();
+	ps->insert_vertex(a[0], a[1], a[2]);
+	ps->insert_vertex(b[0], b[1], b[2]);
+	ps->insert_vertex(c[0], c[1], c[2]);
+}
+
+static PolySet *pullObject(const PullNode& node, const PolySet *ps)
+{
+  PolySet *newps = new PolySet(3);
+  newps->setConvexity(3);
+  PolySet *ps_tess=new PolySet(3);
+ 
+  PolySetUtils::tessellate_faces(*ps, *ps_tess);
+  for(int i=0;i<ps_tess->polygons.size();i++) {
+	  Polygon pol = ps_tess->polygons[i];
+
+	  //count upper points
+	  int upper=0;
+	  int lowind=0;
+	  int highind=0;
+
+	  for(int j=0;j<3;j++) { 
+		Vector3d pt=pol[j];
+		float dist=(pt-node.anchor).dot(node.dir);
+		if(dist > 0) { upper++; highind += j; } else {lowind += j; }
+	  }
+	  switch(upper)
+	  {
+		  case 0:
+	  		newps->append_poly();
+			for(int j=0;j<3;j++) { 
+				Vector3d pt=pol[j];
+			        newps->insert_vertex(pt[0],pt[1], pt[2]);
+			}
+			break;
+		  case 1:
+			{
+				std::vector<Vector3d> pol1;
+				pol1.push_back(pol[(highind+1)%3]);
+				pol1.push_back(pol[(highind+2)%3]);
+				pol1.push_back(pol[highind]);
+				// pol1[2] ist oben 
+				//
+				Vector3d p02, p12;
+				if(pullObject_calccut(node, pol1[0],pol1[2],p02)) break;
+				if(pullObject_calccut(node, pol1[1],pol1[2],p12)) break;
+
+				pullObject_addtri(newps, pol1[0],pol1[1], p12);
+				pullObject_addtri(newps, pol1[0], p12,p02);
+
+				pullObject_addtri(newps, p02,p12,p12+node.dir);
+				pullObject_addtri(newps, p02,p12+node.dir,p02+node.dir);
+
+				pullObject_addtri(newps, p02+node.dir,p12+node.dir,pol1[2]+node.dir);
+			}
+		  case 2: 
+			{
+				std::vector<Vector3d> pol1;
+				pol1.push_back(pol[(lowind+1)%3]);
+				pol1.push_back(pol[(lowind+2)%3]);
+				pol1.push_back(pol[lowind]);
+				// pol1[2] ist unten 
+				//
+				Vector3d p02, p12;
+				if(pullObject_calccut(node, pol1[0],pol1[2],p02)) break;
+				if(pullObject_calccut(node, pol1[1],pol1[2],p12)) break;
+
+				pullObject_addtri(newps, pol1[2],p02, p12);
+
+				pullObject_addtri(newps, p12, p02, p02+node.dir);
+				pullObject_addtri(newps, p12, p02+node.dir,p12+node.dir) ;
+
+				pullObject_addtri(newps, p12+node.dir,p02+node.dir,pol1[0]+node.dir);
+				pullObject_addtri(newps, p12+node.dir,pol1[0]+node.dir,pol1[1]+node.dir);
+			}
+			break;
+		  case 3:
+	  		newps->append_poly();
+			for(int j=0;j<3;j++) { 
+				Vector3d pt=pol[j]+node.dir;
+			        newps->insert_vertex(pt[0],pt[1], pt[2]);
+			}
+			break;
+	  }
+  }
+
+
+  return newps;
+}
+
+Response GeometryEvaluator::visit(State& state, const PullNode& node)
+{
+  std::shared_ptr<const Geometry> newgeom;
+  shared_ptr<const Geometry> geom = applyToChildren3D(node, OpenSCADOperator::UNION).constptr();
+  if (geom) {
+    if(std::shared_ptr<const PolySet> ps = dynamic_pointer_cast<const PolySet>(geom)) {
+      Geometry *ps_pulled =  pullObject(node,ps.get());
+      newgeom.reset(ps_pulled);
+      addToParent(state, node, newgeom);
+      node.progress_report();
+    }
+  }
+  return Response::ContinueTraversal;
+}
+
 /*!
    FIXME: Not in use
  */
@@ -2733,3 +2855,4 @@ Response GeometryEvaluator::visit(State& state, const RoofNode& node)
   }
   return Response::ContinueTraversal;
 }
+

@@ -38,6 +38,7 @@
 #include "LinearExtrudeNode.h"
 #include "PathExtrudeNode.h"
 #include "FrepNode.h"
+#include "PullNode.h"
 #include "CgalAdvNode.h"
 #include "CsgOpNode.h"
 #include "ColorNode.h"
@@ -708,11 +709,47 @@ PyObject *python_multmatrix_oo(PyObject *self, PyObject *args, PyObject *kwargs)
   return result;
 }
 
+PyObject *python_pull(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+  DECLARE_INSTANCE
+  std::shared_ptr<AbstractNode> child;
 
+  auto node = std::make_shared<PullNode>(instance);
 
+  char *kwlist[] = {"obj", "src", "dst",NULL};
+  PyObject *obj = NULL;
+  PyObject *anchor = NULL;
+  PyObject *dir = NULL;
+  double x = 0, y = 0, z = 0;
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OOO|", kwlist,
+                                   &obj,
+                                   &anchor,
+				   &dir
+                                   )) {
+    PyErr_SetString(PyExc_TypeError, "error duing parsing\n");
+    return NULL;
+  }
+  child = PyOpenSCADObjectToNodeMulti(obj);
+  if (child == NULL) {
+    PyErr_SetString(PyExc_TypeError, "Invalid type for  Object in translate\n");
+    return NULL;
+  }
 
+  if (python_vectorval(anchor, &x, &y, &z)) {
+    PyErr_SetString(PyExc_TypeError, "Invalid vector specifiaction in anchor\n");
+    return NULL;
+  }
+  node->anchor = Vector3d(x,y,z);
 
+  if (python_vectorval(dir, &x, &y, &z)) {
+    PyErr_SetString(PyExc_TypeError, "Invalid vector specifiaction in dir\n");
+    return NULL;
+  }
+  node->dir = Vector3d(x,y,z);
 
+  node->children.push_back(child);
+  return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
+}
 
 
 PyObject *python_output(PyObject *self, PyObject *args, PyObject *kwargs)
