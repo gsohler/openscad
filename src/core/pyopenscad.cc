@@ -193,6 +193,7 @@ static PyMethodDef PyOpenSCADFunctions[] = {
   {"osimport", (PyCFunction) python_import, METH_VARARGS | METH_KEYWORDS, "Import Object."},
   {"color", (PyCFunction) python_color, METH_VARARGS | METH_KEYWORDS, "Import Object."},
   {"mesh", (PyCFunction) python_mesh, METH_VARARGS | METH_KEYWORDS, "exports mesh."},
+  {"oversample", (PyCFunction) python_oversample, METH_VARARGS | METH_KEYWORDS, "oversample."},
 
   {"output", (PyCFunction) python_output, METH_VARARGS | METH_KEYWORDS, "Output the result."},
   {"version", (PyCFunction) python_version, METH_VARARGS | METH_KEYWORDS, "Output openscad Version."},
@@ -254,6 +255,7 @@ static PyMethodDef PyOpenSCADMethods[] = {
   {"output", (PyCFunction) python_output_oo, METH_VARARGS | METH_KEYWORDS, "Output the result."},
   {"color", (PyCFunction) python_color_oo, METH_VARARGS | METH_KEYWORDS, "Output the result."},
   {"mesh", (PyCFunction) python_mesh_oo, METH_VARARGS | METH_KEYWORDS, "Exports Mesh."},
+  {"oversample", (PyCFunction) python_oversample_oo, METH_VARARGS | METH_KEYWORDS, "Oversample."},
   {NULL, NULL, 0, NULL}
 };
 

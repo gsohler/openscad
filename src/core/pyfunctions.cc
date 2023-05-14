@@ -47,6 +47,7 @@
 #include "TextNode.h"
 #include "OffsetNode.h"
 #include <hash.h>
+#include <PolySetUtils.h>
 #include "ProjectionNode.h"
 #include "ImportNode.h"
 
@@ -184,7 +185,6 @@ PyObject *python_polyhedron(PyObject *self, PyObject *args, PyObject *kwargs)
   DECLARE_INSTANCE
   int i, j, pointIndex;
   auto node = std::make_shared<PolyhedronNode>(instance);
-
   char *kwlist[] = {"points", "faces", "convexity", "triangles", NULL};
   PyObject *points = NULL;
   PyObject *faces = NULL;
@@ -199,8 +199,10 @@ PyObject *python_polyhedron(PyObject *self, PyObject *args, PyObject *kwargs)
                                    &PyList_Type, &faces,
                                    &convexity,
                                    &PyList_Type, &triangles
-                                   )) PyErr_SetString(PyExc_TypeError, "error duing parsing\n");
-  return NULL;
+                                   )) {
+	  PyErr_SetString(PyExc_TypeError, "error duing parsing\n");
+	  return NULL;
+  } 
 
   if (points != NULL && PyList_Check(points)) {
     for (i = 0; i < PyList_Size(points); i++) {
@@ -915,6 +917,47 @@ PyObject *python_mesh_oo(PyObject *self, PyObject *args, PyObject *kwargs)
   PyObject *result = python_mesh(self, new_args, kwargs);
   return result;
 }
+
+
+PyObject *python_oversample(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+  DECLARE_INSTANCE
+
+  std::shared_ptr<AbstractNode> abstchild;
+  char *kwlist[] = {"obj", NULL};
+  PyObject *obj = NULL;
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O", kwlist, &obj)) {
+    PyErr_SetString(PyExc_TypeError, "error duing parsing\n");
+    return NULL;
+  }
+  abstchild = PyOpenSCADObjectToNodeMulti(obj);
+  if (abstchild == NULL) {
+    PyErr_SetString(PyExc_TypeError, "Invalid type for  Object in oversample \n");
+    return NULL;
+  }
+  const LeafNode *leafchild = dynamic_cast<const LeafNode *>(abstchild.get());
+  if(leafchild == NULL) {
+    PyErr_SetString(PyExc_TypeError, "cannot extract geometry\n");
+    return Py_None;
+  }
+
+  auto geom = leafchild->createGeometry();
+  const PolySet *ps = dynamic_cast<const PolySet *>(geom);
+
+  // tesselate object
+  PolySet *ps_tess = new PolySet(3,true);
+  PolySetUtils::tessellate_faces(*ps, *ps_tess);
+
+  return Py_None;
+}
+
+PyObject *python_oversample_oo(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+  PyObject *new_args = python_oo_args(self, args);
+  PyObject *result = python_oversample(self, new_args, kwargs);
+  return result;
+}
+
 
 PyObject *python_rotate_extrude(PyObject *self, PyObject *args, PyObject *kwargs)
 {

@@ -71,6 +71,8 @@ PyObject *python_color(PyObject *self, PyObject *args, PyObject *kwargs);
 PyObject *python_color_oo(PyObject *self, PyObject *args, PyObject *kwargs);
 PyObject *python_mesh(PyObject *self, PyObject *args, PyObject *kwargs);
 PyObject *python_mesh_oo(PyObject *self, PyObject *args, PyObject *kwargs);
+PyObject *python_oversample(PyObject *self, PyObject *args, PyObject *kwargs);
+PyObject *python_oversample_oo(PyObject *self, PyObject *args, PyObject *kwargs);
 
 PyObject *python_linear_extrude(PyObject *self, PyObject *args, PyObject *kwargs);
 PyObject *python_linear_extrude_oo(PyObject *self, PyObject *args, PyObject *kwargs);
