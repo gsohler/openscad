@@ -46,6 +46,7 @@
 #include "SurfaceNode.h"
 #include "TextNode.h"
 #include "OffsetNode.h"
+#include <hash.h>
 #include "ProjectionNode.h"
 #include "ImportNode.h"
 
@@ -831,7 +832,89 @@ PyObject *python_color_oo(PyObject *self, PyObject *args, PyObject *kwargs)
   return result;
 }
 
+PyObject *python_mesh(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+  DECLARE_INSTANCE
 
+  std::shared_ptr<AbstractNode> abstchild;
+  char *kwlist[] = {"obj", NULL};
+  PyObject *obj = NULL;
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O", kwlist, &obj)) {
+    PyErr_SetString(PyExc_TypeError, "error duing parsing\n");
+    return NULL;
+  }
+  abstchild = PyOpenSCADObjectToNodeMulti(obj);
+  if (abstchild == NULL) {
+    PyErr_SetString(PyExc_TypeError, "Invalid type for  Object in mesh \n");
+    return NULL;
+  }
+  const LeafNode *leafchild = dynamic_cast<const LeafNode *>(abstchild.get());
+  if(leafchild == NULL) {
+    PyErr_SetString(PyExc_TypeError, "cannot extract geometry\n");
+    return Py_None;
+  }
+
+  auto geom = leafchild->createGeometry();
+  const PolySet *ps = dynamic_cast<const PolySet *>(geom);
+
+  // create indexed point list
+  std::unordered_map<Vector3d, int, boost::hash<Vector3d> > pointIntMap;
+  std::vector<Vector3d> pointList; // list of all the points in the object
+  std::vector<Vector3d> pointListNew; // list of all the points in the object
+  std::vector<intList> polygons; // list polygons represented by indexes
+  std::vector<intList>  pointToFaceInds; //  mapping pt_ind -> list of polygon inds which use it
+  intList emptyList;
+  for(int i=0;i<ps->polygons.size();i++) {
+    Polygon pol = ps->polygons[i];
+    intList polygon;
+    for(int j=0;j<pol.size(); j++) {
+      int ptind=0;
+      Vector3d  pt=pol[j];
+      if(!pointIntMap.count(pt)) {
+        pointList.push_back(pt);
+        pointToFaceInds.push_back(emptyList);
+        ptind=pointList.size()-1;
+        pointIntMap[pt]=ptind;
+      } else ptind=pointIntMap[pt];
+      polygon.push_back(ptind);
+    }
+    polygons.push_back(polygon);
+  }
+
+  // Now create Python Point array
+  PyObject *ptarr = PyList_New(pointList.size());  
+  for(int i=0;i<pointList.size();i++) {
+    PyObject *coord = PyList_New(3);
+    for(int j=0;j<3;j++) 
+        PyList_SetItem(coord, j, PyFloat_FromDouble(pointList[i][j]));
+    PyList_SetItem(ptarr, i, coord);
+    Py_XINCREF(coord);
+  }
+  Py_XINCREF(ptarr);
+  // Now create Python Point array
+  PyObject *polarr = PyList_New(polygons.size());  
+  for(int i=0;i<polygons.size();i++) {
+    PyObject *face = PyList_New(polygons[i].size());
+    for(int j=0;j<polygons[i].size();j++) 
+        PyList_SetItem(face, j, PyLong_FromLong(polygons[i][j]));
+    PyList_SetItem(polarr, i, face);
+    Py_XINCREF(face);
+  }
+  Py_XINCREF(polarr);
+
+  PyObject *result = PyTuple_New(2);
+  PyTuple_SetItem(result, 0, ptarr);
+  PyTuple_SetItem(result, 1, polarr);
+
+  return result;
+}
+
+PyObject *python_mesh_oo(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+  PyObject *new_args = python_oo_args(self, args);
+  PyObject *result = python_mesh(self, new_args, kwargs);
+  return result;
+}
 
 PyObject *python_rotate_extrude(PyObject *self, PyObject *args, PyObject *kwargs)
 {
