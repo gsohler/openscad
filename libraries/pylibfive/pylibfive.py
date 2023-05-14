@@ -71,29 +71,24 @@ def lv_cubemiror(c, func):
     c3=c[2],c[0],lv.abs(c[1])
     return lv.min(lv.min(func(c1),func(c2)),func(c3))
 
+def lv_octmirror(c,func):
+    r = None
+    for j in range(2):
+        for i in range(4):
+            rx=func(lv_rotxz(lv_rotxy(c,i*90),54+72*j))
+            if r == None:
+                r=rx
+            else:
+                r=lv.min(r,rx)
+    return r
+
 def lv_dodmirror(c, func):
-    c1=c
-    c1x=c1[0],c1[1],lv.abs(c1[2])
-    
-    c2=lv_rotxz(lv_rotxy(c,0),63.44)
-    c2x=c2[0],c2[1],lv.abs(c2[2])
-    
-    c3=lv_rotxz(lv_rotxy(c,72),63.44)
-    c3x=c3[0],c3[1],lv.abs(c3[2])
-
-    c4=lv_rotxz(lv_rotxy(c,144),63.44)
-    c4x=c4[0],c4[1],lv.abs(c4[2])
-
-    c5=lv_rotxz(lv_rotxy(c,-72),63.44)
-    c5x=c5[0],c5[1],lv.abs(c5[2])
-
-    c6=lv_rotxz(lv_rotxy(c,-144),63.44)
-    c6x=c6[0],c6[1],lv.abs(c6[2])
-    
-    s1=lv.min(func(c1x),func(c2x))
-    s2=lv.min(func(c3x),func(c4x))
-    s3=lv.min(func(c5x),func(c6x))
-    return lv.min(lv.min(s1,s2),s3)
+   r=func([c[0],c[1],lv.abs(c[2])])
+   for w in range(5):
+       cs=lv_rotxz(lv_rotxy(c,w*72),63.44)
+       csx=cs[0],cs[1],lv.abs(cs[2])
+       r=lv.min(r,func(csx))
+   return r
 
 def lv_sphere(c,r):
     return lv_length(c)-r 
