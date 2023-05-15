@@ -40,6 +40,27 @@
 #include <PolySetUtils.h>
 #include <Tree.h>
 #include <GeometryEvaluator.h>
+#include <boost/functional/hash.hpp>
+#include <hash.h>
+typedef std::vector<int> intList;
+
+void ov_add_poly_round(Vector3d &p)
+{
+	p.normalize();
+}
+void ov_add_poly(PolySet *ps, Vector3d p1, Vector3d p2, Vector3d p3, int round)
+{
+  ps->append_poly();
+  if(round)
+  {
+    ov_add_poly_round(p1);
+    ov_add_poly_round(p2);
+    ov_add_poly_round(p3);
+  }
+  ps->append_vertex(p1[0],p1[1],p1[2]);
+  ps->append_vertex(p2[0],p2[1],p2[2]);
+  ps->append_vertex(p3[0],p3[1],p3[2]);
+}
 
 const Geometry *OversampleNode::createGeometry() const
 {
@@ -52,6 +73,57 @@ const Geometry *OversampleNode::createGeometry() const
    std::shared_ptr<const PolySet> ps = dynamic_pointer_cast<const PolySet>(geom);
   // tesselate object
    PolySetUtils::tessellate_faces(*ps, *ps_tess);
+  }
+  std::vector<Vector3d> pt_dir;
+  if(this->round == 1) {
+    printf("round\n");	  
+    // create indexed point list
+    std::unordered_map<Vector3d, int, boost::hash<Vector3d> > pointIntMap;
+    std::vector<Vector3d> pointList; // list of all the points in the object
+    std::vector<Vector3d> pointListNew; // list of all the points in the object
+    std::vector<intList> polygons; // list polygons represented by indexes
+    std::vector<intList>  pointToFaceInds; //  mapping pt_ind -> list of polygon inds which use it
+    std::vector<intList>  pointToFacePoss; //  mapping pt_ind -> list of polygon inds which use it
+    intList emptyList;
+    for(int i=0;i<ps_tess->polygons.size();i++) {
+      Polygon pol = ps_tess->polygons[i];
+      intList polygon;
+      for(int j=0;j<pol.size(); j++) {
+        int ptind=0;
+        Vector3d  pt=pol[j];
+        pt[0]=(int)(pt[0]*1000+0.5)/1000.0;
+        pt[1]=(int)(pt[1]*1000+0.5)/1000.0;
+        pt[2]=(int)(pt[2]*1000+0.5)/1000.0;
+        if(!pointIntMap.count(pt)) {
+          pointList.push_back(pt);
+          pointToFaceInds.push_back(emptyList);
+          pointToFacePoss.push_back(emptyList);
+          ptind=pointList.size()-1;
+          pointIntMap[pt]=ptind;
+        } else ptind=pointIntMap[pt];
+        polygon.push_back(ptind);
+	pointToFaceInds[ptind].push_back(i);
+	pointToFacePoss[ptind].push_back(j);
+      }
+      polygons.push_back(polygon);
+    }
+    // for each vertex, calculate the dir
+    for(int i=0;i<pointList.size();i++) {
+      printf("i=%d\n",i);
+      Vector3d dir(0,0,0);
+      for(int j=0;j<pointToFaceInds[i].size();j++) {
+        int polind=pointToFaceInds[i][j];
+        int polptind=pointToFacePoss[i][j];
+        int n=polygons[polind].size();
+        int othptind=polygons[polind][(polptind+1)%n];
+        Vector3d diff=(pointList[i] - pointList[othptind]).normalized();
+        dir=dir+diff;
+      }
+      dir.normalize();
+      printf("x %f y %f z %f\n",dir[0],dir[1],dir[2]);
+      pt_dir.push_back(dir);
+    }
+
   }
   PolySet *ps_ov = new PolySet(3,true);
   for(int i=0;i<ps_tess->polygons.size();i++)
@@ -67,21 +139,16 @@ const Geometry *OversampleNode::createGeometry() const
       botcur=p1 + p31*j;
       topcur=p1 + p31*(j+1);
 
+
       for(int k=0;k<this->n-j;k++) {
         if(k != 0) {
           toplast=topcur;
           topcur=topcur+p21;	
-          ps_ov->append_poly();
-          ps_ov->append_vertex(botcur[0],botcur[1],botcur[2]);
-          ps_ov->append_vertex(topcur[0],topcur[1],topcur[2]);
-          ps_ov->append_vertex(toplast[0],toplast[1],toplast[2]);
+	  ov_add_poly(ps_ov,botcur, topcur, toplast,round);
 	}
 	botlast=botcur;
 	botcur=botlast+p21;
-        ps_ov->append_poly();
-        ps_ov->append_vertex(botlast[0],botlast[1],botlast[2]);
-        ps_ov->append_vertex(botcur[0],botcur[1],botcur[2]);
-        ps_ov->append_vertex(topcur[0],topcur[1],topcur[2]);
+	ov_add_poly(ps_ov,botlast, botcur, topcur,round);
       }	      
     }				 
 

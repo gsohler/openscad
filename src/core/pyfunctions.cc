@@ -964,9 +964,10 @@ PyObject *python_oversample(PyObject *self, PyObject *args, PyObject *kwargs)
   int n=2;
   auto node = std::make_shared<OversampleNode>(instance);
   std::shared_ptr<AbstractNode> child;
-  char *kwlist[] = {"obj", "n",NULL};
+  char *kwlist[] = {"obj", "n","round",NULL};
   PyObject *obj = NULL;
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "Oi", kwlist, &obj,&n)) {
+  PyObject *round= NULL;
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "Oi|O", kwlist, &obj,&n,&round)) {
     PyErr_SetString(PyExc_TypeError, "error duing parsing\n");
     return NULL;
   }
@@ -978,6 +979,7 @@ PyObject *python_oversample(PyObject *self, PyObject *args, PyObject *kwargs)
 
   node->children.push_back(child);
   node->n = n;
+  if(round == Py_True) node->round=1;
 
   return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
 }
