@@ -52,6 +52,8 @@
 #include <PolySetUtils.h>
 #include "ProjectionNode.h"
 #include "ImportNode.h"
+#include <Tree.h>
+#include <GeometryEvaluator.h>
 
 #include "degree_trig.h"
 #include "printutils.h"
@@ -876,26 +878,22 @@ PyObject *python_mesh(PyObject *self, PyObject *args, PyObject *kwargs)
 {
   DECLARE_INSTANCE
 
-  std::shared_ptr<AbstractNode> abstchild;
   char *kwlist[] = {"obj", NULL};
   PyObject *obj = NULL;
   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O", kwlist, &obj)) {
     PyErr_SetString(PyExc_TypeError, "error duing parsing\n");
     return NULL;
   }
-  abstchild = PyOpenSCADObjectToNodeMulti(obj);
-  if (abstchild == NULL) {
+  std::shared_ptr<AbstractNode> child = PyOpenSCADObjectToNodeMulti(obj);
+  if (child == NULL) {
     PyErr_SetString(PyExc_TypeError, "Invalid type for  Object in mesh \n");
     return NULL;
   }
-  const LeafNode *leafchild = dynamic_cast<const LeafNode *>(abstchild.get());
-  if(leafchild == NULL) {
-    PyErr_SetString(PyExc_TypeError, "cannot extract geometry\n");
-    return Py_None;
-  }
 
-  auto geom = leafchild->createGeometry();
-  const PolySet *ps = dynamic_cast<const PolySet *>(geom);
+  Tree tree(child, "");
+  GeometryEvaluator geomevaluator(tree);
+  shared_ptr<const Geometry> geom = geomevaluator.evaluateGeometry(*tree.root(), true);
+  std::shared_ptr<const PolySet> ps = dynamic_pointer_cast<const PolySet>(geom);
 
   // create indexed point list
   std::unordered_map<Vector3d, int, boost::hash<Vector3d> > pointIntMap;

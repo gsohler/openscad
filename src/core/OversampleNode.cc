@@ -38,18 +38,20 @@
 #include <sstream>
 
 #include <PolySetUtils.h>
+#include <Tree.h>
+#include <GeometryEvaluator.h>
 
 const Geometry *OversampleNode::createGeometry() const
 {
-  // tesselate object
   PolySet *ps_tess = new PolySet(3,true);
   if(this->children.size() > 0) {
-    std::shared_ptr<AbstractNode> child=this->children[0];
-    LeafNode *node = (LeafNode *)   child.get();
-    const Geometry *geom = node->createGeometry();
-    if (const auto *ps = dynamic_cast<const PolySet *>(geom)) {
-      PolySetUtils::tessellate_faces(*ps, *ps_tess);
-    }
+   std::shared_ptr<AbstractNode> child=this->children[0];
+   Tree tree(child, "");
+   GeometryEvaluator geomevaluator(tree);
+   shared_ptr<const Geometry> geom = geomevaluator.evaluateGeometry(*tree.root(), true);
+   std::shared_ptr<const PolySet> ps = dynamic_pointer_cast<const PolySet>(geom);
+  // tesselate object
+   PolySetUtils::tessellate_faces(*ps, *ps_tess);
   }
   PolySet *ps_ov = new PolySet(3,true);
   for(int i=0;i<ps_tess->polygons.size();i++)
