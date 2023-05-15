@@ -55,7 +55,34 @@ const Geometry *OversampleNode::createGeometry() const
   for(int i=0;i<ps_tess->polygons.size();i++)
   {
     Polygon &pol = ps_tess->polygons[i];
-    ps_ov->polygons.push_back(pol);
+    Vector3d p1=pol[0];
+    Vector3d p2=pol[1];
+    Vector3d p3=pol[2];
+    Vector3d p21=(p2-p1)/this->n;
+    Vector3d p31=(p3-p1)/this->n;
+    Vector3d botlast,botcur, toplast, topcur;
+    for(int j=0;j<this->n;j++) {
+      botcur=p1 + p31*j;
+      topcur=p1 + p31*(j+1);
+
+      for(int k=0;k<this->n-j;k++) {
+        if(k != 0) {
+          toplast=topcur;
+          topcur=topcur+p21;	
+          ps_ov->append_poly();
+          ps_ov->append_vertex(botcur[0],botcur[1],botcur[2]);
+          ps_ov->append_vertex(topcur[0],topcur[1],topcur[2]);
+          ps_ov->append_vertex(toplast[0],toplast[1],toplast[2]);
+	}
+	botlast=botcur;
+	botcur=botlast+p21;
+        ps_ov->append_poly();
+        ps_ov->append_vertex(botlast[0],botlast[1],botlast[2]);
+        ps_ov->append_vertex(botcur[0],botcur[1],botcur[2]);
+        ps_ov->append_vertex(topcur[0],topcur[1],topcur[2]);
+      }	      
+    }				 
+
   }
   return ps_ov;
 }

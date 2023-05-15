@@ -910,6 +910,9 @@ PyObject *python_mesh(PyObject *self, PyObject *args, PyObject *kwargs)
     for(int j=0;j<pol.size(); j++) {
       int ptind=0;
       Vector3d  pt=pol[j];
+      pt[0]=(int)(pt[0]*1000+0.5)/1000.0;
+      pt[1]=(int)(pt[1]*1000+0.5)/1000.0;
+      pt[2]=(int)(pt[2]*1000+0.5)/1000.0;
       if(!pointIntMap.count(pt)) {
         pointList.push_back(pt);
         pointToFaceInds.push_back(emptyList);
