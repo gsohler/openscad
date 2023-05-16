@@ -44,12 +44,17 @@
 #include <hash.h>
 typedef std::vector<int> intList;
 
+std::unordered_map<Vector3d, Vector3d, boost::hash<Vector3d> > weldMap; // TODO nicht global
+
 void ov_add_poly_round(PolySet *ps, Vector3d p,const Vector3d & center,  double r, int round, int orgpt)
 {
   if(round && !orgpt) {
     Vector3d diff=p-center;
     diff.normalize();
-    p=center+diff*r;
+    Vector3d pnew=center+diff*r;
+    if(weldMap.count(p) == 0) weldMap[p] = pnew;
+    else weldMap[p]=(weldMap[p]+pnew)/2.0;
+	
   }
   ps->append_vertex(p[0],p[1],p[2]);
 }
@@ -72,7 +77,6 @@ const Geometry *OversampleNode::createGeometry() const
   }
   std::vector<Vector3d> pt_dir;
   std::unordered_map<Vector3d, int, boost::hash<Vector3d> > pointIntMap;
-  printf("a\n");
   if(this->round == 1) {
     // create indexed point list
     std::vector<Vector3d> pointList; // list of all the points in the object
@@ -132,7 +136,7 @@ const Geometry *OversampleNode::createGeometry() const
     double r=1.0;
     Vector3d center(0,0,0);
     if(this->round ==1) {
-      Vector3d gravity=(p1+p2+p3)/3.0; // schwerpunkt im dreieck ausrechnen
+      Vector3d gravity=(p1+p2+p3)/3.0; // schwerpunkt im dreieck ausrechnen // TODO umkreismittelpunkt
       Vector3d cutmean(0,0,0);				 
       int results=0;
       for(int j=0;j<3;j++) { // for all 3 edges
@@ -148,13 +152,15 @@ const Geometry *OversampleNode::createGeometry() const
       cutmean = cutmean *(1.0/results);
       Vector3d facen=(p2-p1).cross(p3-p1).normalized();
       double dist=(gravity-cutmean).dot(facen);
-      center = gravity - dist*facen;
+      center = gravity - dist*facen*3; // TODO 5 weg
       r=(center-p1).norm();
       // distance to face
 //      center=cutmean;
     }  
   // mitteln
   // TODO alle fehlerfaelle finden
+  // TODO naehte veswchweissen, 
+  // TODO overround
     for(int j=0;j<this->n;j++) {
       botcur=p1 + p31*j;
       topcur=p1 + p31*(j+1);
@@ -178,6 +184,15 @@ const Geometry *OversampleNode::createGeometry() const
       }	      
     }				 
 
+  }
+  for(int i=0;i<ps_ov->polygons.size();i++) {
+    for(int j=0;j<ps_ov->polygons[i].size();j++)
+    {
+       Vector3d  pt=ps_ov->polygons[i][j];	    
+       if(weldMap.count(pt) > 0) {
+	       ps_ov->polygons[i][j]=weldMap[pt];
+       }
+    }
   }
   return ps_ov;
 }
