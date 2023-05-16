@@ -44,25 +44,32 @@
 #include <hash.h>
 typedef std::vector<int> intList;
 
-std::unordered_map<Vector3d, Vector3d, boost::hash<Vector3d> > weldMap; // TODO nicht global
-
-void ov_add_poly_round(PolySet *ps, Vector3d p,const Vector3d & center,  double r, int round, int orgpt)
-{
-  if(round && !orgpt) {
-    Vector3d diff=p-center;
-    diff.normalize();
-    Vector3d pnew=center+diff*r;
-    if(weldMap.count(p) == 0) weldMap[p] = pnew;
-    else weldMap[p]=(weldMap[p]+pnew)/2.0;
-	
-  }
-  ps->append_vertex(p[0],p[1],p[2]);
-}
-
 double roundCoord(double c) {
 	if(c > 0) return (int)(c*1000+0.5)/1000.0;
 	else  return (int)(c*1000-0.5)/1000.0;
 }
+
+
+void ov_add_poly_round(PolySet *ps, std::unordered_map<Vector3d, Vector3d, boost::hash<Vector3d> > &weldMap, Vector3d p,const Vector3d & center,  double r, int round, int orgpt)
+{
+	orgpt=0;
+  if(round && !orgpt) {
+    p[0]=roundCoord(p[0]);
+    p[1]=roundCoord(p[1]);
+    p[2]=roundCoord(p[2]);
+
+    Vector3d diff=p-center;
+    diff.normalize();
+    Vector3d pnew=center+diff*r;
+    if(weldMap.count(p) == 0){
+      weldMap[p] = pnew;
+    } else {
+      weldMap[p]=(weldMap[p]+pnew)/2.0;
+    }      
+  }
+  ps->append_vertex(p[0],p[1],p[2]);
+}
+
 const Geometry *OversampleNode::createGeometry() const
 {
   PolySet *ps_tess = new PolySet(3,true);
@@ -77,6 +84,7 @@ const Geometry *OversampleNode::createGeometry() const
   }
   std::vector<Vector3d> pt_dir;
   std::unordered_map<Vector3d, int, boost::hash<Vector3d> > pointIntMap;
+  std::unordered_map<Vector3d, Vector3d, boost::hash<Vector3d> > weldMap; 
   if(this->round == 1) {
     // create indexed point list
     std::vector<Vector3d> pointList; // list of all the points in the object
@@ -136,7 +144,17 @@ const Geometry *OversampleNode::createGeometry() const
     double r=1.0;
     Vector3d center(0,0,0);
     if(this->round ==1) {
-      Vector3d gravity=(p1+p2+p3)/3.0; // schwerpunkt im dreieck ausrechnen // TODO umkreismittelpunkt
+      // umkreismittelpunkt berechnen
+      Vector3d d21=(p2-p1).normalized();
+      Vector3d d31=(p3-p1).normalized();
+      Vector3d d32=(p3-p2).normalized();
+      Vector3d r1=d21+d31;
+      Vector3d r2=d32-d21;
+      Vector3d n=d21.cross(d31);
+      Vector3d fn=r2.cross(n);
+      Vector3d gravity;
+      cut_face_line(p2,fn,p1,r1, gravity,NULL);
+				       //
       Vector3d cutmean(0,0,0);				 
       int results=0;
       for(int j=0;j<3;j++) { // for all 3 edges
@@ -152,15 +170,11 @@ const Geometry *OversampleNode::createGeometry() const
       cutmean = cutmean *(1.0/results);
       Vector3d facen=(p2-p1).cross(p3-p1).normalized();
       double dist=(gravity-cutmean).dot(facen);
-      center = gravity - dist*facen*3; // TODO 5 weg
-      r=(center-p1).norm();
-      // distance to face
-//      center=cutmean;
+      center = gravity - dist*facen;
+      r=(center-p1).norm(); // TODO hier faktor overround
+			      //
     }  
-  // mitteln
   // TODO alle fehlerfaelle finden
-  // TODO naehte veswchweissen, 
-  // TODO overround
     for(int j=0;j<this->n;j++) {
       botcur=p1 + p31*j;
       topcur=p1 + p31*(j+1);
@@ -171,16 +185,16 @@ const Geometry *OversampleNode::createGeometry() const
           toplast=topcur;
           topcur=topcur+p21;	
           ps_ov->append_poly();
-          ov_add_poly_round(ps_ov, botcur,center, r, round, 0 );
-          ov_add_poly_round(ps_ov, topcur,center, r, round , 0);
-          ov_add_poly_round(ps_ov, toplast,center, r, round , 0);
+          ov_add_poly_round(ps_ov, weldMap, botcur,center, r, round, 0 );
+          ov_add_poly_round(ps_ov, weldMap, topcur,center, r, round , 0);
+          ov_add_poly_round(ps_ov, weldMap, toplast,center, r, round , 0);
 	}
 	botlast=botcur;
 	botcur=botlast+p21;
         ps_ov->append_poly();
-        ov_add_poly_round(ps_ov, botlast,center, r, round, j == 0 && k == 0 );
-        ov_add_poly_round(ps_ov, botcur,center, r, round, j == 0 && k == this->n-1 );
-        ov_add_poly_round(ps_ov, topcur,center, r, round, j == this->n-1 );
+        ov_add_poly_round(ps_ov, weldMap, botlast,center, r, round, j == 0 && k == 0 );
+        ov_add_poly_round(ps_ov, weldMap, botcur,center, r, round, j == 0 && k == this->n-1 );
+        ov_add_poly_round(ps_ov, weldMap, topcur,center, r, round, j == this->n-1 );
       }	      
     }				 
 
