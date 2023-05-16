@@ -979,6 +979,7 @@ PyObject *python_oversample(PyObject *self, PyObject *args, PyObject *kwargs)
 
   node->children.push_back(child);
   node->n = n;
+  node->round=0;
   if(round == Py_True) node->round=1;
 
   return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);

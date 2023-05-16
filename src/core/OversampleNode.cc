@@ -44,24 +44,20 @@
 #include <hash.h>
 typedef std::vector<int> intList;
 
-void ov_add_poly_round(Vector3d &p)
+void ov_add_poly_round(PolySet *ps, Vector3d p,const Vector3d & center,  double r, int round, int orgpt)
 {
-	p.normalize();
-}
-void ov_add_poly(PolySet *ps, Vector3d p1, Vector3d p2, Vector3d p3, int round)
-{
-  ps->append_poly();
-  if(round)
-  {
-    ov_add_poly_round(p1);
-    ov_add_poly_round(p2);
-    ov_add_poly_round(p3);
+  if(round && !orgpt) {
+    Vector3d diff=p-center;
+    diff.normalize();
+    p=center+diff*r;
   }
-  ps->append_vertex(p1[0],p1[1],p1[2]);
-  ps->append_vertex(p2[0],p2[1],p2[2]);
-  ps->append_vertex(p3[0],p3[1],p3[2]);
+  ps->append_vertex(p[0],p[1],p[2]);
 }
 
+double roundCoord(double c) {
+	if(c > 0) return (int)(c*1000+0.5)/1000.0;
+	else  return (int)(c*1000-0.5)/1000.0;
+}
 const Geometry *OversampleNode::createGeometry() const
 {
   PolySet *ps_tess = new PolySet(3,true);
@@ -75,10 +71,10 @@ const Geometry *OversampleNode::createGeometry() const
    PolySetUtils::tessellate_faces(*ps, *ps_tess);
   }
   std::vector<Vector3d> pt_dir;
+  std::unordered_map<Vector3d, int, boost::hash<Vector3d> > pointIntMap;
+  printf("a\n");
   if(this->round == 1) {
-    printf("round\n");	  
     // create indexed point list
-    std::unordered_map<Vector3d, int, boost::hash<Vector3d> > pointIntMap;
     std::vector<Vector3d> pointList; // list of all the points in the object
     std::vector<Vector3d> pointListNew; // list of all the points in the object
     std::vector<intList> polygons; // list polygons represented by indexes
@@ -91,9 +87,9 @@ const Geometry *OversampleNode::createGeometry() const
       for(int j=0;j<pol.size(); j++) {
         int ptind=0;
         Vector3d  pt=pol[j];
-        pt[0]=(int)(pt[0]*1000+0.5)/1000.0;
-        pt[1]=(int)(pt[1]*1000+0.5)/1000.0;
-        pt[2]=(int)(pt[2]*1000+0.5)/1000.0;
+        pt[0]=roundCoord(pt[0]);
+        pt[1]=roundCoord(pt[1]);
+        pt[2]=roundCoord(pt[2]);
         if(!pointIntMap.count(pt)) {
           pointList.push_back(pt);
           pointToFaceInds.push_back(emptyList);
@@ -109,7 +105,6 @@ const Geometry *OversampleNode::createGeometry() const
     }
     // for each vertex, calculate the dir
     for(int i=0;i<pointList.size();i++) {
-      printf("i=%d\n",i);
       Vector3d dir(0,0,0);
       for(int j=0;j<pointToFaceInds[i].size();j++) {
         int polind=pointToFaceInds[i][j];
@@ -120,7 +115,6 @@ const Geometry *OversampleNode::createGeometry() const
         dir=dir+diff;
       }
       dir.normalize();
-      printf("x %f y %f z %f\n",dir[0],dir[1],dir[2]);
       pt_dir.push_back(dir);
     }
 
@@ -135,6 +129,32 @@ const Geometry *OversampleNode::createGeometry() const
     Vector3d p21=(p2-p1)/this->n;
     Vector3d p31=(p3-p1)/this->n;
     Vector3d botlast,botcur, toplast, topcur;
+    double r=1.0;
+    Vector3d center(0,0,0);
+    if(this->round ==1) {
+      Vector3d gravity=(p1+p2+p3)/3.0; // schwerpunkt im dreieck ausrechnen
+      Vector3d cutmean(0,0,0);				 
+      int results=0;
+      for(int j=0;j<3;j++) { // for all 3 edges
+        Vector3d vec=pol[j]-gravity; // ebene vec, pol[j]
+        Vector3d cut;
+        int ptind=pointIntMap[pol[j]]; 
+        if(!cut_face_line(gravity, vec, pol[j],pt_dir[ptind],cut,NULL)) {
+         cutmean = cutmean + cut;	      
+         results++;
+
+        }
+      }	    
+      cutmean = cutmean *(1.0/results);
+      Vector3d facen=(p2-p1).cross(p3-p1).normalized();
+      double dist=(gravity-cutmean).dot(facen);
+      center = gravity - dist*facen;
+      r=(center-p1).norm();
+      // distance to face
+//      center=cutmean;
+    }  
+  // mitteln
+  // TODO alle fehlerfaelle finden
     for(int j=0;j<this->n;j++) {
       botcur=p1 + p31*j;
       topcur=p1 + p31*(j+1);
@@ -144,11 +164,17 @@ const Geometry *OversampleNode::createGeometry() const
         if(k != 0) {
           toplast=topcur;
           topcur=topcur+p21;	
-	  ov_add_poly(ps_ov,botcur, topcur, toplast,round);
+          ps_ov->append_poly();
+          ov_add_poly_round(ps_ov, botcur,center, r, round, 0 );
+          ov_add_poly_round(ps_ov, topcur,center, r, round , 0);
+          ov_add_poly_round(ps_ov, toplast,center, r, round , 0);
 	}
 	botlast=botcur;
 	botcur=botlast+p21;
-	ov_add_poly(ps_ov,botlast, botcur, topcur,round);
+        ps_ov->append_poly();
+        ov_add_poly_round(ps_ov, botlast,center, r, round, j == 0 && k == 0 );
+        ov_add_poly_round(ps_ov, botcur,center, r, round, j == 0 && k == this->n-1 );
+        ov_add_poly_round(ps_ov, topcur,center, r, round, j == this->n-1 );
       }	      
     }				 
 

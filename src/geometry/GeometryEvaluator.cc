@@ -123,7 +123,7 @@ GeometryEvaluator::ResultObject GeometryEvaluator::applyToChildren(const Abstrac
   return {};
 }
 
-static int linsystem( Vector3d v1,Vector3d v2,Vector3d v3,Vector3d pt,Vector3d &res,double *detptr=NULL)
+int linsystem( Vector3d v1,Vector3d v2,Vector3d v3,Vector3d pt,Vector3d &res,double *detptr)
 {
         float det,ad11,ad12,ad13,ad21,ad22,ad23,ad31,ad32,ad33;
         det=v1[0]*(v2[1]*v3[2]-v3[1]*v2[2])-v1[1]*(v2[0]*v3[2]-v3[0]*v2[2])+v1[2]*(v2[0]*v3[1]-v3[0]*v2[1]);
@@ -147,7 +147,7 @@ static int linsystem( Vector3d v1,Vector3d v2,Vector3d v3,Vector3d pt,Vector3d &
         return 0;
 }
 
-static int cut_face_face_face(Vector3d p1, Vector3d n1, Vector3d p2,Vector3d n2, Vector3d p3, Vector3d n3, Vector3d &res,double *detptr=NULL)
+int cut_face_face_face(Vector3d p1, Vector3d n1, Vector3d p2,Vector3d n2, Vector3d p3, Vector3d n3, Vector3d &res,double *detptr)
 {
         //   vec1     vec2     vec3
         // x*dirx + y*diry + z*dirz =( posx*dirx + posy*diry + posz*dirz )
@@ -162,6 +162,17 @@ static int cut_face_face_face(Vector3d p1, Vector3d n1, Vector3d p2,Vector3d n2,
         sum[2]=p3.dot(n3);
         return linsystem( vec1,vec2,vec3,sum,res,detptr);
 }
+
+int cut_face_line(Vector3d fp, Vector3d fn, Vector3d lp, Vector3d ld, Vector3d &res, double *detptr)
+{
+	Vector3d c1 = fn.cross(ld);
+	Vector3d c2 = fn.cross(c1);
+	Vector3d diff=fp-lp;
+        if(linsystem(ld, c1, c2, diff,res,detptr)) return 1;
+	res=lp+ld*res[0];
+	return 0;
+}
+
 typedef std::vector<int> intList;
 typedef std::vector<intList> intListList;
 
