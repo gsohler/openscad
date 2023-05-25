@@ -52,7 +52,6 @@ double roundCoord(double c) {
 
 void ov_add_poly_round(PolySet *ps, std::unordered_map<Vector3d, Vector3d, boost::hash<Vector3d> > &weldMap, Vector3d p,const Vector3d & center,  double r, int round, int orgpt)
 {
-	orgpt=0;
   if(round && !orgpt) {
     p[0]=roundCoord(p[0]);
     p[1]=roundCoord(p[1]);
@@ -163,12 +162,11 @@ const Geometry *OversampleNode::createGeometry() const
         }
       }	    
       if(results > 0) {
-	      center = cutmean *(1.0/results);
+	center = cutmean *(1.0/results);
+	r=(center-p1).norm(); // TODO hier faktor overround
       }  else round1=0;
-      r=(center-p1).norm(); // TODO hier faktor overround
 			      //
     }  
-  // TODO alle fehlerfaelle finden
     for(int j=0;j<this->n;j++) {
       botcur=p1 + p31*j;
       topcur=p1 + p31*(j+1);
