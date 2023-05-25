@@ -122,9 +122,14 @@ const Geometry *OversampleNode::createGeometry() const
         int polind=pointToFaceInds[i][j];
         int polptind=pointToFacePoss[i][j];
         int n=polygons[polind].size();
-        int othptind=polygons[polind][(polptind+1)%n];
-        Vector3d diff=(pointList[i] - pointList[othptind]).normalized();
-        dir=dir+diff;
+	Vector3d p0=pointList[polygons[polind][(polptind+n-1)%n]];
+	Vector3d p1=pointList[polygons[polind][polptind]];
+	Vector3d p2=pointList[polygons[polind][(polptind+1)%n]];
+	Vector3d d1=p1-p0;
+	Vector3d d2=p1-p2;
+	Vector3d norm =d2.cross(d1).normalized();
+	double ang=acos(d1.dot(d2)/(d1.norm()*d2.norm()));
+	dir=dir + norm*ang;
       }
       dir.normalize();
       pt_dir.push_back(dir);
@@ -143,34 +148,23 @@ const Geometry *OversampleNode::createGeometry() const
     Vector3d botlast,botcur, toplast, topcur;
     double r=1.0;
     Vector3d center(0,0,0);
-    if(this->round ==1) {
-      // umkreismittelpunkt berechnen
-      Vector3d d21=(p2-p1).normalized();
-      Vector3d d31=(p3-p1).normalized();
-      Vector3d d32=(p3-p2).normalized();
-      Vector3d r1=d21+d31;
-      Vector3d r2=d32-d21;
-      Vector3d n=d21.cross(d31);
-      Vector3d fn=r2.cross(n);
-      Vector3d gravity;
-      cut_face_line(p2,fn,p1,r1, gravity,NULL);
-				       //
+    int round1=this->round;
+    if(round1) {
       Vector3d cutmean(0,0,0);				 
       int results=0;
       for(int j=0;j<3;j++) { // for all 3 edges
-        Vector3d vec=pol[j]-gravity; // ebene vec, pol[j]
-        Vector3d cut;
-        int ptind=pointIntMap[pol[j]]; 
-        if(!cut_face_line(gravity, vec, pol[j],pt_dir[ptind],cut,NULL)) {
+	Vector3d dir1 = pol[(j+2)%3] - pol[(j+1)%3] ;
+	Vector3d dir2 = pt_dir[pointIntMap[pol[(j+1)%3]]];
+	Vector3d cut;
+        if(!cut_face_line(pol[(j+1)%3],dir1.cross(dir2), pol[j],pt_dir[pointIntMap[pol[j]]],cut,NULL)) {
          cutmean = cutmean + cut;	      
          results++;
 
         }
       }	    
-      cutmean = cutmean *(1.0/results);
-      Vector3d facen=(p2-p1).cross(p3-p1).normalized();
-      double dist=(gravity-cutmean).dot(facen);
-      center = gravity - dist*facen;
+      if(results > 0) {
+	      center = cutmean *(1.0/results);
+      }  else round1=0;
       r=(center-p1).norm(); // TODO hier faktor overround
 			      //
     }  
@@ -185,16 +179,16 @@ const Geometry *OversampleNode::createGeometry() const
           toplast=topcur;
           topcur=topcur+p21;	
           ps_ov->append_poly();
-          ov_add_poly_round(ps_ov, weldMap, botcur,center, r, round, 0 );
-          ov_add_poly_round(ps_ov, weldMap, topcur,center, r, round , 0);
-          ov_add_poly_round(ps_ov, weldMap, toplast,center, r, round , 0);
+          ov_add_poly_round(ps_ov, weldMap, botcur,center, r, round1, 0 );
+          ov_add_poly_round(ps_ov, weldMap, topcur,center, r, round1 , 0);
+          ov_add_poly_round(ps_ov, weldMap, toplast,center, r, round1 , 0);
 	}
 	botlast=botcur;
 	botcur=botlast+p21;
         ps_ov->append_poly();
-        ov_add_poly_round(ps_ov, weldMap, botlast,center, r, round, j == 0 && k == 0 );
-        ov_add_poly_round(ps_ov, weldMap, botcur,center, r, round, j == 0 && k == this->n-1 );
-        ov_add_poly_round(ps_ov, weldMap, topcur,center, r, round, j == this->n-1 );
+        ov_add_poly_round(ps_ov, weldMap, botlast,center, r, round1, j == 0 && k == 0 );
+        ov_add_poly_round(ps_ov, weldMap, botcur,center, r, round1, j == 0 && k == this->n-1 );
+        ov_add_poly_round(ps_ov, weldMap, topcur,center, r, round1, j == this->n-1 );
       }	      
     }				 
 
