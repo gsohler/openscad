@@ -176,14 +176,14 @@ const Geometry *OversampleNode::createGeometry() const
         if(k != 0) {
           toplast=topcur;
           topcur=topcur+p21;	
-          ps_ov->append_poly();
+          ps_ov->append_poly(3);
           ov_add_poly_round(ps_ov, weldMap, botcur,center, r, round1, 0 );
           ov_add_poly_round(ps_ov, weldMap, topcur,center, r, round1 , 0);
           ov_add_poly_round(ps_ov, weldMap, toplast,center, r, round1 , 0);
 	}
 	botlast=botcur;
 	botcur=botlast+p21;
-        ps_ov->append_poly();
+        ps_ov->append_poly(3);
         ov_add_poly_round(ps_ov, weldMap, botlast,center, r, round1, j == 0 && k == 0 );
         ov_add_poly_round(ps_ov, weldMap, botcur,center, r, round1, j == 0 && k == this->n-1 );
         ov_add_poly_round(ps_ov, weldMap, topcur,center, r, round1, j == this->n-1 );

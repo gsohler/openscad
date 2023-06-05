@@ -87,7 +87,7 @@ const Geometry *FrepNode::createGeometry() const
 			// TODO libfive trees mergen
 			for (const auto& t : mesh->branes)
 			{
-				p->append_poly(); 
+				p->append_poly(3); 
 				p->append_vertex(mesh->verts[t[0]].x(), mesh->verts[t[0]].y(), mesh->verts[t[0]].z() );
 				p->append_vertex(mesh->verts[t[1]].x(), mesh->verts[t[1]].y(), mesh->verts[t[1]].z() );
 				p->append_vertex(mesh->verts[t[2]].x(), mesh->verts[t[2]].y(), mesh->verts[t[2]].z() );

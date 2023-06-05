@@ -1948,12 +1948,12 @@ static Geometry *extrudePolygon(const LinearExtrudeNode& node, const Polygon2d& 
 		if(lowerFace.vertices.size() == upperFace.vertices.size()) {
 			unsigned int n=lowerFace.vertices.size();
 			for(unsigned int j=0;j<n;j++) {
-				ps->append_poly();
+				ps->append_poly(3);
 				append_linear_vertex(ps,&lowerFace,(j+0)%n, lower_h);
 				append_linear_vertex(ps,&lowerFace,(j+1)%n, lower_h);
 				append_linear_vertex(ps,&upperFace,(j+1)%n, upper_h);
 
-				ps->append_poly();
+				ps->append_poly(3);
 				append_linear_vertex(ps,&lowerFace,(j+0)%n, lower_h);
 				append_linear_vertex(ps,&upperFace,(j+1)%n, upper_h);
 				append_linear_vertex(ps,&upperFace,(j+0)%n, upper_h);
@@ -2179,11 +2179,11 @@ static Geometry *extrudePolygon(const PathExtrudeNode& node, const Polygon2d& po
 		}
 		
 		for(unsigned int j=0;j<n;j++) {
-			ps->append_poly();
+			ps->append_poly(3);
 			ps->append_vertex( lastProfile[(j+0)%n][0], lastProfile[(j+0)%n][1], lastProfile[(j+0)%n][2]);
 			ps->append_vertex( lastProfile[(j+1)%n][0], lastProfile[(j+1)%n][1], lastProfile[(j+1)%n][2]);
 			ps->append_vertex(  curProfile[(j+1)%n][0],  curProfile[(j+1)%n][1],  curProfile[(j+1)%n][2]);
-			ps->append_poly();
+			ps->append_poly(3);
 			ps->append_vertex( lastProfile[(j+0)%n][0], lastProfile[(j+0)%n][1], lastProfile[(j+0)%n][2]);
 			ps->append_vertex(  curProfile[(j+1)%n][0],  curProfile[(j+1)%n][1],  curProfile[(j+1)%n][2]);
 			ps->append_vertex(  curProfile[(j+0)%n][0],  curProfile[(j+0)%n][1],  curProfile[(j+0)%n][2]);
@@ -2398,11 +2398,11 @@ static Geometry *rotatePolygon(const RotateExtrudeNode& node, const Polygon2d& p
 		if(lastFace.vertices.size() == curFace.vertices.size()) {
 			unsigned int n=lastFace.vertices.size();
 			for(unsigned int j=0;j<n;j++) {
-				ps->append_poly();
+				ps->append_poly(3);
 				append_rotary_vertex(ps,&lastFace,(j+0)%n, last_ang);
 				append_rotary_vertex(ps,&lastFace,(j+1)%n, last_ang);
 				append_rotary_vertex(ps,&curFace,(j+1)%n, cur_ang);
-				ps->append_poly();
+				ps->append_poly(3);
 				append_rotary_vertex(ps,&lastFace,(j+0)%n, last_ang);
 				append_rotary_vertex(ps,&curFace,(j+1)%n, cur_ang);
 				append_rotary_vertex(ps,&curFace,(j+0)%n, cur_ang);
@@ -2538,7 +2538,7 @@ static int pullObject_calccut(const PullNode &node, Vector3d p1, Vector3d p2,Vec
 }
 static void pullObject_addtri(PolySet *ps,Vector3d a, Vector3d b, Vector3d c)
 {
-	ps->append_poly();
+	ps->append_poly(3);
 	ps->insert_vertex(a[0], a[1], a[2]);
 	ps->insert_vertex(b[0], b[1], b[2]);
 	ps->insert_vertex(c[0], c[1], c[2]);
@@ -2567,7 +2567,7 @@ static PolySet *pullObject(const PullNode& node, const PolySet *ps)
 	  switch(upper)
 	  {
 		  case 0:
-	  		newps->append_poly();
+	  		newps->append_poly(3);
 			for(int j=0;j<3;j++) { 
 				Vector3d pt=pol[j];
 			        newps->insert_vertex(pt[0],pt[1], pt[2]);
@@ -2615,7 +2615,7 @@ static PolySet *pullObject(const PullNode& node, const PolySet *ps)
 			}
 			break;
 		  case 3:
-	  		newps->append_poly();
+	  		newps->append_poly(3);
 			for(int j=0;j<3;j++) { 
 				Vector3d pt=pol[j]+node.dir;
 			        newps->insert_vertex(pt[0],pt[1], pt[2]);
