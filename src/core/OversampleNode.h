@@ -12,11 +12,12 @@ public:
   std::string toString() const override
   {
     std::ostringstream stream;
-    stream << "oversample( " << n << ")";
+    stream << "oversample( n = " << n << ", round = " << round << ")";
     return  stream.str();
   }
   std::string name() const override { return "oversample"; }
   const Geometry *createGeometry() const override;
   int n;
+  int round;
 };
 
