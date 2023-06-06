@@ -110,7 +110,7 @@ std::shared_ptr<AbstractNode> PyOpenSCADObjectToNodeMulti(PyObject *objs)
     }
     result=node;
   } else result=NULL;
-  Py_XDECREF(objs);
+//  Py_XDECREF(objs);
   return result;
 }
 
