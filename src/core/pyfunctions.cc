@@ -48,6 +48,7 @@
 #include "SurfaceNode.h"
 #include "TextNode.h"
 #include "OffsetNode.h"
+#include "TextureNode.h"
 #include <hash.h>
 #include <PolySetUtils.h>
 #include "ProjectionNode.h"
@@ -849,14 +850,15 @@ PyObject *python_color(PyObject *self, PyObject *args, PyObject *kwargs)
 
   auto node = std::make_shared<ColorNode>(instance);
 
-  char *kwlist[] = {"obj", "c", "alpha", NULL};
+  char *kwlist[] = {"obj", "c", "alpha", "texture",NULL};
   PyObject *obj = NULL;
   char *colorname = NULL;
   double alpha = 1.0;
   double x = 0, y = 0, z = 0;
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|sd", kwlist,
+  int textureind=-1;
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|sdi", kwlist,
                                    &obj,
-                                   &colorname, &alpha
+                                   &colorname, &alpha, &textureind
                                    )) {
     PyErr_SetString(PyExc_TypeError, "error duing parsing color");
     return NULL;
@@ -878,6 +880,7 @@ PyObject *python_color(PyObject *self, PyObject *args, PyObject *kwargs)
      }
      } else if (parameters["c"].type() == Value::Type::STRING) {
    */
+if(colorname != NULL) {
   boost::algorithm::to_lower(colorname);
   if (webcolors.find(colorname) != webcolors.end()) {
     node->color = webcolors.at(colorname);
@@ -893,7 +896,14 @@ PyObject *python_color(PyObject *self, PyObject *args, PyObject *kwargs)
       return NULL;
     }
   }
+}
   node->color[3] = alpha;
+  node->textureind=textureind;
+  if(textureind != -1 && colorname == NULL) {
+	node->color[0]=0.5;
+	node->color[1]=0.5;
+	node->color[2]=0.5;
+}
   node->children.push_back(child);
   return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
 }
@@ -1785,6 +1795,25 @@ PyObject *python_text(PyObject *self, PyObject *args, PyObject *kwargs)
  */
 
   return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
+}
+
+PyObject *python_texture(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+  DECLARE_INSTANCE
+
+  char *kwlist[] = {"file", "uv", NULL};
+  PyObject *obj = NULL;
+  char *texturename = NULL;
+  double uv=10.0;
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s|f", kwlist,
+                                   &texturename,&uv
+                                   )) {
+    PyErr_SetString(PyExc_TypeError, "error duing parsing texture");
+    return NULL;
+  }
+  TextureUV txt(texturename, uv);
+  textures.push_back(txt);
+  return Py_None;
 }
 
 

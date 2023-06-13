@@ -69,6 +69,7 @@ PyObject *python_roof(PyObject *self, PyObject *args, PyObject *kwargs);
 PyObject *python_roof_oo(PyObject *self, PyObject *args, PyObject *kwargs);
 PyObject *python_color(PyObject *self, PyObject *args, PyObject *kwargs);
 PyObject *python_color_oo(PyObject *self, PyObject *args, PyObject *kwargs);
+PyObject *python_texture(PyObject *self, PyObject *args, PyObject *kwargs);
 PyObject *python_mesh(PyObject *self, PyObject *args, PyObject *kwargs);
 PyObject *python_mesh_oo(PyObject *self, PyObject *args, PyObject *kwargs);
 PyObject *python_oversample(PyObject *self, PyObject *args, PyObject *kwargs);
