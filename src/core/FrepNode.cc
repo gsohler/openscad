@@ -363,7 +363,7 @@ int generateProgram(intList &table, std::vector<CutProgram> &program,std::vector
 
 int generateProgramFlat(intList &table, std::vector<CutProgram> &program, std::vector<CutFace> &edgeFaces, const std::vector<intList> &faces, std::vector<ProgramState> &stack) 
 {
-	printf("fglat\n");
+	printf("flat\n");
 	while(1)
 	{
 		if(stack.size() == 0) return 0;
@@ -383,10 +383,12 @@ double evaluateProgram(std::vector<CutProgram> &program,int ind,std::vector<CutF
 {
 	double e;
 	int nextind;
+	printf("EvaluateProgram %g/%g/%g startind=%d\n",x,y,z,startind);
 	while(1) {
 		CutProgram &prg = program[ind];
 		e=prg.a*x+prg.b*y+prg.c*z+prg.d;
 		if(e >= 0) nextind=prg.posbranch; else nextind=prg.negbranch;
+		printf("nextind=%d\n",nextind);
 		if(nextind < 0) {
 			CutFace cf = normFaces[~nextind];
 			double d=cf.a*x+cf.b*y+cf.c*z+cf.d;
