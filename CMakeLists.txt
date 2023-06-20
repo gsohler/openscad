@@ -632,6 +632,7 @@ set(CORE_SOURCES
   src/core/Expression.cc
   src/core/builtin_functions.cc
   src/core/function.cc
+  src/core/FunctionType.cc
   src/core/ImportNode.cc
   src/core/LinearExtrudeNode.cc
   src/core/PathExtrudeNode.cc
@@ -655,6 +656,7 @@ set(CORE_SOURCES
   src/core/SurfaceNode.cc
   src/core/TextNode.cc
   src/core/TransformNode.cc
+  src/core/UndefType.cc
   src/core/Value.cc
   src/core/Assignment.cc
   src/core/AST.cc
@@ -746,7 +748,6 @@ set(CORE_SOURCES
   ${BISON_openscad_parser_OUTPUTS}
   ${FLEX_comment_lexer_OUTPUTS}
   ${BISON_comment_parser_OUTPUTS})
-
 if(ENABLE_PYTHON)
 	list(APPEND CORE_SOURCES
 		    src/core/pyopenscad.cc

@@ -383,7 +383,7 @@ double evaluateProgram(std::vector<CutProgram> &program,int ind,std::vector<CutF
 {
 	double e;
 	int nextind;
-	printf("EvaluateProgram %g/%g/%g startind=%d\n",x,y,z,startind);
+	printf("EvaluateProgram %g/%g/%g startind=%d\n",x,y,z,ind);
 	while(1) {
 		CutProgram &prg = program[ind];
 		e=prg.a*x+prg.b*y+prg.c*z+prg.d;
