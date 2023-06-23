@@ -54,6 +54,7 @@
 
 using namespace libfive;
 
+#define FAKE 
 const Geometry *FrepNode::createGeometry() const
 {
 	auto p = new PolySet(3, true);
@@ -71,28 +72,76 @@ const Geometry *FrepNode::createGeometry() const
 
 	if(exp->ob_type == &PyLibFiveType) {
 		std::vector<Tree *> tree = PyLibFiveObjectToTree(exp);
-/*		
-		if(tree.size() != 1)   return p;
-		libfive_region3 reg;
-		reg.X.lower = this->x1; 
-		reg.X.upper = this->x2;
-		reg.Y.lower = this->y1;
-		reg.Y.upper = this->y2;
-		reg.Z.lower = this->z1;
-		reg.Z.upper = this->z2;
-*/
+		// TODO fidget rein
+#ifdef FAKE
+	p->append_poly(3);
+	p->append_vertex(-0.500000, -0.500000, -0.500000);
+	p->append_vertex(-0.500000, -0.500000, 3.500000);
+	p->append_vertex(-0.500000, 3.500000, 3.500000);
+	p->append_poly(3);
+	p->append_vertex(-0.500000, -0.500000, -0.500000);
+	p->append_vertex(-0.500000, 3.500000, 3.500000);
+	p->append_vertex(-0.500000, 3.500000, -0.500000);
+	p->append_poly(3);
+	p->append_vertex(3.500000, -0.500000, -0.500000);
+	p->append_vertex(3.500000, 3.500000, -0.500000);
+	p->append_vertex(3.500000, 3.500000, 3.500000);
+	p->append_poly(3);
+	p->append_vertex(3.500000, -0.500000, -0.500000);
+	p->append_vertex(3.500000, 3.500000, 3.500000);
+	p->append_vertex(3.500000, -0.500000, 3.500000);
+	p->append_poly(3);
+	p->append_vertex(-0.500000, -0.500000, -0.500000);
+	p->append_vertex(3.500000, -0.500000, -0.500000);
+	p->append_vertex(3.500000, -0.500000, 3.500000);
+	p->append_poly(3);
+	p->append_vertex(-0.500000, -0.500000, -0.500000);
+	p->append_vertex(3.500000, -0.500000, 3.500000);
+	p->append_vertex(-0.500000, -0.500000, 3.500000);
+	p->append_poly(3);
+	p->append_vertex(-0.500000, 3.500000, -0.500000);
+	p->append_vertex(-0.500000, 3.500000, 3.500000);
+	p->append_vertex(3.500000, 3.500000, 3.500000);
+	p->append_poly(3);
+	p->append_vertex(-0.500000, 3.500000, -0.500000);
+	p->append_vertex(3.500000, 3.500000, 3.500000);
+	p->append_vertex(3.500000, 3.500000, -0.500000);
+	p->append_poly(3);
+	p->append_vertex(-0.500000, -0.500000, -0.500000);
+	p->append_vertex(-0.500000, 3.500000, -0.500000);
+	p->append_vertex(3.500000, 3.500000, -0.500000);
+	p->append_poly(3);
+	p->append_vertex(-0.500000, -0.500000, -0.500000);
+	p->append_vertex(3.500000, 3.500000, -0.500000);
+	p->append_vertex(3.500000, -0.500000, -0.500000);
+	p->append_poly(3);
+	p->append_vertex(-0.500000, -0.500000, 3.500000);
+	p->append_vertex(3.500000, -0.500000, 3.500000);
+	p->append_vertex(3.500000, 3.500000, 3.500000);
+	p->append_poly(3);
+	p->append_vertex(-0.500000, -0.500000, 3.500000);
+	p->append_vertex(3.500000, 3.500000, 3.500000);
+	p->append_vertex(-0.500000, 3.500000, 3.500000);
+#else		
+		printf("render start\n");
                 mesh = Mesh::render(*tree[0], reg ,settings);
+		printf("render end %d\n",mesh->branes.size());
 		if(mesh != NULL) {
 			libfive_tri t;
 			// TODO libfive trees mergen
 			for (const auto& t : mesh->branes)
 			{
 				p->append_poly(3); 
-				p->append_vertex(mesh->verts[t[0]].x(), mesh->verts[t[0]].y(), mesh->verts[t[0]].z() );
-				p->append_vertex(mesh->verts[t[1]].x(), mesh->verts[t[1]].y(), mesh->verts[t[1]].z() );
-				p->append_vertex(mesh->verts[t[2]].x(), mesh->verts[t[2]].y(), mesh->verts[t[2]].z() );
+//				printf("p->append_poly(3);\n"); 
+				for(int i=0;i<3;i++)
+				{
+					p->append_vertex(mesh->verts[t[i]].x(), mesh->verts[t[i]].y(), mesh->verts[t[i]].z() );
+//					printf("p->append_vertex(%f, %f, %f);\n",mesh->verts[t[i]].x(), mesh->verts[t[i]].y(), mesh->verts[t[i]].z() );
+				}
 			}
 		}
+		printf("convert end\n");
+#endif		
 	} else if(exp->ob_type == &PyFunction_Type) {
 		printf("Python Function!\n");
 		mesh = NULL;
@@ -383,12 +432,10 @@ double evaluateProgram(std::vector<CutProgram> &program,int ind,std::vector<CutF
 {
 	double e;
 	int nextind;
-	printf("EvaluateProgram %g/%g/%g startind=%d\n",x,y,z,ind);
 	while(1) {
 		CutProgram &prg = program[ind];
 		e=prg.a*x+prg.b*y+prg.c*z+prg.d;
 		if(e >= 0) nextind=prg.posbranch; else nextind=prg.negbranch;
-		printf("nextind=%d\n",nextind);
 		if(nextind < 0) {
 			CutFace cf = normFaces[~nextind];
 			double d=cf.a*x+cf.b*y+cf.c*z+cf.d;
