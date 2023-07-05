@@ -53,11 +53,59 @@ find_package(PythonInterp 3.4 REQUIRED)
 
 # Image comparison - expected test image vs actual generated image
 
-# Imagemagick
-find_package(ImageMagick COMPONENTS convert)
-if (ImageMagick_convert_FOUND)
-  message(STATUS "ImageMagick convert executable found: " ${ImageMagick_convert_EXECUTABLE})
-  set(IMAGE_COMPARE_EXE ${ImageMagick_convert_EXECUTABLE})
+if(USE_IMAGE_COMPARE_PY)
+  set(VENV_DIR "${CCBD}/venv")
+  message(STATUS "Preparing image_compare.py for test suite image comparison")
+  if(WIN32)
+    set(IMAGE_COMPARE_EXE "${VENV_DIR}/Scripts/python.exe")
+  else()
+    set(IMAGE_COMPARE_EXE "${VENV_DIR}/bin/python")
+  endif()
+  if(EXISTS "${IMAGE_COMPARE_EXE}")
+    message(STATUS "venv found, testing libraries")
+    execute_process(
+      COMMAND "${IMAGE_COMPARE_EXE}" "${CCSD}/image_compare.py" "--status"
+      WORKING_DIRECTORY "${CCSD}" ERROR_QUIET RESULT_VARIABLE ret)
+    if(ret AND NOT ret EQUAL 0)
+      message(STATUS "venv libraries incomplete")
+      set(BUILD_VENV TRUE)
+    else()
+      message(STATUS "venv libraries complete")
+      set(BUILD_VENV FALSE)
+    endif()
+  else()
+    message(STATUS "venv not found")
+    set(BUILD_VENV TRUE)
+  endif()
+  if(BUILD_VENV)
+    message(STATUS "Setting up testing venv for image comparison")
+    find_package(Python3 COMPONENTS Interpreter)
+    execute_process(
+      COMMAND "${Python3_EXECUTABLE}" "-m" "venv" "venv" "--without-pip"
+      WORKING_DIRECTORY "${CCBD}")
+    execute_process(
+      COMMAND "${IMAGE_COMPARE_EXE}" "-m" "ensurepip"
+      WORKING_DIRECTORY "${CCBD}")
+    # Tying Pillow to 9.5.0 as we're unable to download wheels for Pillow 10 under Windows.
+    # This may be a temporary issue and we should be able to revert this once wheels
+    # are generally available.
+    execute_process(
+      COMMAND "${IMAGE_COMPARE_EXE}" "-m" "pip" "install" "numpy" "Pillow==9.5.0"
+      WORKING_DIRECTORY "${CCBD}")
+  endif()
+  set(COMPARATOR "--comparator=image_compare")
+  if(BUILD_VENV)
+    execute_process(
+      COMMAND "${IMAGE_COMPARE_EXE}" "${CCSD}/image_compare.py" "--status"
+      WORKING_DIRECTORY "${CCSD}" RESULT_VARIABLE ret)
+    if(ret AND NOT ret EQUAL 0)
+      message(WARNING "Failed to setup the test suite venv for ${IMAGE_COMPARE_EXE}  See doc/testing.txt for dependency information.")
+    else()
+      message(STATUS "venv setup for ${IMAGE_COMPARE_EXE}")
+    endif()
+  else()
+    message(STATUS "venv already setup for ${IMAGE_COMPARE_EXE}")
+  endif()
 else()
   message(STATUS "Couldn't find imagemagick 'convert' program")
   set(DIFFPNG 1)
