@@ -13,7 +13,6 @@ do_enable_python() {
 	echo "do_enable_python()"
 	PYTHON_DEFINE="-DENABLE_PYTHON=ON"
 }
-
 do_build() {
 	echo "do_build()"
 
