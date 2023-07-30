@@ -117,7 +117,7 @@ const boost::property_tree::ptree& EditorColorScheme::propertyTree() const
   return pt;
 }
 
-ScintillaEditor::ScintillaEditor(QWidget *parent) : EditorInterface(parent)
+ScintillaEditor::ScintillaEditor(QWidget *parent, MainWindow &mainWindow) : EditorInterface(parent), mainWindow(mainWindow)
 {
   api = nullptr;
   lexer = nullptr;
