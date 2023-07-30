@@ -73,6 +73,7 @@ void SourceFile::registerUse(const std::string& path, const Location& loc)
       if(!is_cmdline_mode()) { 
         std::ifstream fh(path, std::ios::in | std::ios::binary);
         std::string content{std::istreambuf_iterator<char>(fh), std::istreambuf_iterator<char>()};
+	if(python_trusted) trusted=true;
         if(trust_python_file(path, content)) trusted=true;
         fh.close();
       }	else trusted =  python_trusted;

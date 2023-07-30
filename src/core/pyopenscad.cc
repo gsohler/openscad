@@ -1,7 +1,28 @@
-// Author: Sohler Guenther
-// Date: 2023-01-01
-// Purpose: Extend openscad with an python interpreter
-
+/*
+ *  OpenSCAD (www.openscad.org)
+ *  Copyright (C) 2009-2011 Clifford Wolf <clifford@clifford.at> and
+ *                          Marius Kintel <marius@kintel.net>
+ *
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; either version 2 of the License, or
+ *  (at your option) any later version.
+ *
+ *  As a special exception, you have permission to link this program
+ *  with the CGAL library and distribute executables, as long as you
+ *  follow the requirements of the GNU GPL in regard to all of the
+ *  software in the executable aside from CGAL.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program; if not, write to the Free Software
+ *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
+ */
 #include <Python.h>
 #include "pyopenscad.h"
 #include "CsgOpNode.h"
@@ -160,129 +181,6 @@ static int PyOpenSCADInit(PyOpenSCADObject *self, PyObject *arfs, PyObject *kwds
   return 0;
 }
 
-static PyMethodDef PyOpenSCADFunctions[] = {
-  {"square", (PyCFunction) python_square, METH_VARARGS | METH_KEYWORDS, "Create Square."},
-  {"circle", (PyCFunction) python_circle, METH_VARARGS | METH_KEYWORDS, "Create Circle."},
-  {"polygon", (PyCFunction) python_polygon, METH_VARARGS | METH_KEYWORDS, "Create Polygon."},
-  {"text", (PyCFunction) python_text, METH_VARARGS | METH_KEYWORDS, "Create Text."},
-  {"textmetrics", (PyCFunction) python_textmetrics, METH_VARARGS | METH_KEYWORDS, "Get textmetrics."},
-
-  {"cube", (PyCFunction) python_cube, METH_VARARGS | METH_KEYWORDS, "Create Cube."},
-  {"cylinder", (PyCFunction) python_cylinder, METH_VARARGS | METH_KEYWORDS, "Create Cylinder."},
-  {"sphere", (PyCFunction) python_sphere, METH_VARARGS | METH_KEYWORDS, "Create Sphere."},
-  {"polyhedron", (PyCFunction) python_polyhedron, METH_VARARGS | METH_KEYWORDS, "Create Polyhedron."},
-  {"frep", (PyCFunction) python_frep, METH_VARARGS | METH_KEYWORDS, "Create F-Rep."},
-  {"ifrep", (PyCFunction) python_ifrep, METH_VARARGS | METH_KEYWORDS, "Create Inverse F-Rep."},
-
-
-  {"translate", (PyCFunction) python_translate, METH_VARARGS | METH_KEYWORDS, "Move  Object."},
-  {"rotate", (PyCFunction) python_rotate, METH_VARARGS | METH_KEYWORDS, "Rotate Object."},
-  {"scale", (PyCFunction) python_scale, METH_VARARGS | METH_KEYWORDS, "Scale Object."},
-  {"mirror", (PyCFunction) python_mirror, METH_VARARGS | METH_KEYWORDS, "Mirror Object."},
-  {"multmatrix", (PyCFunction) python_multmatrix, METH_VARARGS | METH_KEYWORDS, "Multmatrix Object."},
-  {"offset", (PyCFunction) python_offset, METH_VARARGS | METH_KEYWORDS, "Offset Object."},
-  {"roof", (PyCFunction) python_roof, METH_VARARGS | METH_KEYWORDS, "Roof Object."},
-  {"pull", (PyCFunction) python_pull, METH_VARARGS | METH_KEYWORDS, "Pull apart Object."},
-
-  {"linear_extrude", (PyCFunction) python_linear_extrude, METH_VARARGS | METH_KEYWORDS, "Linear_extrude Object."},
-  {"rotate_extrude", (PyCFunction) python_rotate_extrude, METH_VARARGS | METH_KEYWORDS, "Rotate_extrude Object."},
-  {"path_extrude", (PyCFunction) python_path_extrude, METH_VARARGS | METH_KEYWORDS, "Path_extrude Object."},
-
-  {"union", (PyCFunction) python_union, METH_VARARGS | METH_KEYWORDS, "Union Object."},
-  {"difference", (PyCFunction) python_difference, METH_VARARGS | METH_KEYWORDS, "Difference Object."},
-  {"intersection", (PyCFunction) python_intersection, METH_VARARGS | METH_KEYWORDS, "Intersection Object."},
-  {"hull", (PyCFunction) python_hull, METH_VARARGS | METH_KEYWORDS, "Hull Object."},
-  {"minkowski", (PyCFunction) python_minkowski, METH_VARARGS | METH_KEYWORDS, "Minkowski Object."},
-  {"fill", (PyCFunction) python_fill, METH_VARARGS | METH_KEYWORDS, "Fill Object."},
-  {"resize", (PyCFunction) python_resize, METH_VARARGS | METH_KEYWORDS, "Resize Object."},
-  {"render", (PyCFunction) python_render, METH_VARARGS | METH_KEYWORDS, "Intersection Object."},
-  {"group", (PyCFunction) python_group, METH_VARARGS | METH_KEYWORDS, "Intersection Object."},
-
-  {"projection", (PyCFunction) python_projection, METH_VARARGS | METH_KEYWORDS, "Projection Object."},
-  {"surface", (PyCFunction) python_surface, METH_VARARGS | METH_KEYWORDS, "Surface Object."},
-  {"osimport", (PyCFunction) python_import, METH_VARARGS | METH_KEYWORDS, "Import Object."},
-  {"color", (PyCFunction) python_color, METH_VARARGS | METH_KEYWORDS, "Color Object."},
-  {"texture", (PyCFunction) python_texture, METH_VARARGS | METH_KEYWORDS, "Include a texture."},
-  {"mesh", (PyCFunction) python_mesh, METH_VARARGS | METH_KEYWORDS, "exports mesh."},
-  {"oversample", (PyCFunction) python_oversample, METH_VARARGS | METH_KEYWORDS, "oversample."},
-
-  {"output", (PyCFunction) python_output, METH_VARARGS | METH_KEYWORDS, "Output the result."},
-  {"version", (PyCFunction) python_version, METH_VARARGS | METH_KEYWORDS, "Output openscad Version."},
-  {"version_num", (PyCFunction) python_version_num, METH_VARARGS | METH_KEYWORDS, "Output openscad Version."},
-  {NULL, NULL, 0, NULL}
-};
-// TODO missing 
-//  dxf_dim 
-//  dxf_cross 
-//  intersection_for 
-//  dxf_linear_extrude 
-//  dxf_rotate_extrude 
-//  fontmetrics 
-
-PyObject *python_oo_args(PyObject *self, PyObject *args)
-{
-  int i;
-  PyObject *item;
-  int n = PyTuple_Size(args);
-  PyObject *new_args = PyTuple_New(n + 1);
-//	Py_INCREF(new_args); // dont decref either,  dont know why its not working
-
-  Py_INCREF(self);
-  int ret = PyTuple_SetItem(new_args, 0, self);
-  item = PyTuple_GetItem(new_args, 0);
-
-  for (i = 0; i < PyTuple_Size(args); i++) {
-    item = PyTuple_GetItem(args, i);
-    Py_INCREF(item);
-    PyTuple_SetItem(new_args, i + 1, item);
-  }
-  return new_args;
-}
-
-void get_fnas(double& fn, double& fa, double& fs) {
-  PyObject *mainModule = PyImport_AddModule("__main__");
-  if (mainModule == NULL) return;
-  PyObject *varFn = PyObject_GetAttrString(mainModule, "fn");
-  PyObject *varFa = PyObject_GetAttrString(mainModule, "fa");
-  PyObject *varFs = PyObject_GetAttrString(mainModule, "fs");
-  if (varFn != NULL) fn = PyFloat_AsDouble(varFn);
-  if (varFa != NULL) fa = PyFloat_AsDouble(varFa);
-  if (varFs != NULL) fs = PyFloat_AsDouble(varFs);
-}
-
-static PyMethodDef PyOpenSCADMethods[] = {
-  {"translate", (PyCFunction) python_translate_oo, METH_VARARGS | METH_KEYWORDS, "Move  Object."},
-  {"rotate", (PyCFunction) python_rotate_oo, METH_VARARGS | METH_KEYWORDS, "Rotate Object."},
-  {"scale", (PyCFunction) python_scale_oo, METH_VARARGS | METH_KEYWORDS, "Scale Object."},
-  {"union", (PyCFunction) python_union_oo, METH_VARARGS | METH_KEYWORDS, "Union Object."},
-  {"difference", (PyCFunction) python_difference_oo, METH_VARARGS | METH_KEYWORDS, "Difference Object."},
-  {"intersection", (PyCFunction) python_intersection_oo, METH_VARARGS | METH_KEYWORDS, "Intersection Object."},
-  {"mirror", (PyCFunction) python_mirror_oo, METH_VARARGS | METH_KEYWORDS, "Mirror Object."},
-  {"multmatrix", (PyCFunction) python_multmatrix_oo, METH_VARARGS | METH_KEYWORDS, "Multmatrix Object."},
-  {"linear_extrude", (PyCFunction) python_linear_extrude_oo, METH_VARARGS | METH_KEYWORDS, "Linear_extrude Object."},
-  {"rotate_extrude", (PyCFunction) python_rotate_extrude_oo, METH_VARARGS | METH_KEYWORDS, "Rotate_extrude Object."},
-  {"offset", (PyCFunction) python_offset_oo, METH_VARARGS | METH_KEYWORDS, "Offset Object."},
-  {"roof", (PyCFunction) python_roof_oo, METH_VARARGS | METH_KEYWORDS, "Roof Object."},
-  {"output", (PyCFunction) python_output_oo, METH_VARARGS | METH_KEYWORDS, "Output the result."},
-  {"color", (PyCFunction) python_color_oo, METH_VARARGS | METH_KEYWORDS, "Output the result."},
-  {"mesh", (PyCFunction) python_mesh_oo, METH_VARARGS | METH_KEYWORDS, "Exports Mesh."},
-  {"oversample", (PyCFunction) python_oversample_oo, METH_VARARGS | METH_KEYWORDS, "Oversample."},
-  {NULL, NULL, 0, NULL}
-};
-
-PyNumberMethods PyOpenSCADNumbers =
-{
-  &python_nb_add,
-  &python_nb_substract,
-  &python_nb_multiply
-};
-
-PyMappingMethods PyOpenSCADMapping =
-{
-  0,
-  python__getitem__,
-  python__setitem__
-};
 
 PyTypeObject PyOpenSCADType = {
     PyVarObject_HEAD_INIT(NULL, 0)
@@ -610,4 +508,36 @@ sys.stderr = stderr_bak\n\
     if(pyExcValue != NULL) Py_XDECREF(pyExcValue);
     return error;
 }
+
+void get_fnas(double& fn, double& fa, double& fs) {
+  PyObject *mainModule = PyImport_AddModule("__main__");
+  if (mainModule == NULL) return;
+  PyObject *varFn = PyObject_GetAttrString(mainModule, "fn");
+  PyObject *varFa = PyObject_GetAttrString(mainModule, "fa");
+  PyObject *varFs = PyObject_GetAttrString(mainModule, "fs");
+  if (varFn != NULL) fn = PyFloat_AsDouble(varFn);
+  if (varFa != NULL) fa = PyFloat_AsDouble(varFa);
+  if (varFs != NULL) fs = PyFloat_AsDouble(varFs);
+}
+
+PyObject *python_oo_args(PyObject *self, PyObject *args)
+{
+  int i;
+  PyObject *item;
+  int n = PyTuple_Size(args);
+  PyObject *new_args = PyTuple_New(n + 1);
+//	Py_INCREF(new_args); // dont decref either,  dont know why its not working
+
+  Py_INCREF(self);
+  int ret = PyTuple_SetItem(new_args, 0, self);
+  item = PyTuple_GetItem(new_args, 0);
+
+  for (i = 0; i < PyTuple_Size(args); i++) {
+    item = PyTuple_GetItem(args, i);
+    Py_INCREF(item);
+    PyTuple_SetItem(new_args, i + 1, item);
+  }
+  return new_args;
+}
+
 

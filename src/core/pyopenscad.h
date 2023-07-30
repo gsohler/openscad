@@ -37,87 +37,18 @@ int python_more_obj(std::vector<std::shared_ptr<AbstractNode>>& children, PyObje
 Outline2d python_getprofile(PyObject *cbfunc, double arg);
 double python_doublefunc(PyObject *cbfunc, double arg);
 std::shared_ptr<AbstractNode> python_modulefunc(const ModuleInstantiation *module);
+
 Value python_functionfunc(const FunctionCall *call);
-
-PyObject *python_square(PyObject *self, PyObject *args, PyObject *kwargs);
-PyObject *python_circle(PyObject *self, PyObject *args, PyObject *kwargs);
-PyObject *python_polygon(PyObject *self, PyObject *args, PyObject *kwargs);
-PyObject *python_text(PyObject *self, PyObject *args, PyObject *kwargs);
-PyObject *python_textmetrics(PyObject *self, PyObject *args, PyObject *kwargs);
-
-PyObject *python_cube(PyObject *self, PyObject *args, PyObject *kwargs);
-PyObject *python_cylinder(PyObject *self, PyObject *args, PyObject *kwargs);
-PyObject *python_sphere(PyObject *self, PyObject *args, PyObject *kwargs);
-PyObject *python_polyhedron(PyObject *self, PyObject *args, PyObject *kwargs);
-PyObject *python_text(PyObject *self, PyObject *args, PyObject *kwargs);
-PyObject *python_frep(PyObject *self, PyObject *args, PyObject *kwargs);
-PyObject *python_ifrep(PyObject *self, PyObject *args, PyObject *kwargs);
-
-PyObject *python_translate(PyObject *self, PyObject *args, PyObject *kwargs);
-PyObject *python_translate_oo(PyObject *self, PyObject *args, PyObject *kwargs);
-PyObject *python_rotate(PyObject *self, PyObject *args, PyObject *kwargs);
-PyObject *python_rotate_oo(PyObject *self, PyObject *args, PyObject *kwargs);
-PyObject *python_scale(PyObject *self, PyObject *args, PyObject *kwargs);
-PyObject *python_scale_oo(PyObject *self, PyObject *args, PyObject *kwargs);
-PyObject *python_mirror(PyObject *self, PyObject *args, PyObject *kwargs);
-PyObject *python_mirror_oo(PyObject *self, PyObject *args, PyObject *kwargs);
-PyObject *python_multmatrix(PyObject *self, PyObject *args, PyObject *kwargs);
-PyObject *python_multmatrix_oo(PyObject *self, PyObject *args, PyObject *kwargs);
-PyObject *python_offset(PyObject *self, PyObject *args, PyObject *kwargs);
-PyObject *python_offset_oo(PyObject *self, PyObject *args, PyObject *kwargs);
-PyObject *python_roof(PyObject *self, PyObject *args, PyObject *kwargs);
-PyObject *python_roof_oo(PyObject *self, PyObject *args, PyObject *kwargs);
-PyObject *python_color(PyObject *self, PyObject *args, PyObject *kwargs);
-PyObject *python_color_oo(PyObject *self, PyObject *args, PyObject *kwargs);
-PyObject *python_texture(PyObject *self, PyObject *args, PyObject *kwargs);
-PyObject *python_mesh(PyObject *self, PyObject *args, PyObject *kwargs);
-PyObject *python_mesh_oo(PyObject *self, PyObject *args, PyObject *kwargs);
-PyObject *python_oversample(PyObject *self, PyObject *args, PyObject *kwargs);
-PyObject *python_oversample_oo(PyObject *self, PyObject *args, PyObject *kwargs);
-PyObject *python_pull(PyObject *self, PyObject *args, PyObject *kwargs);
-
-PyObject *python_linear_extrude(PyObject *self, PyObject *args, PyObject *kwargs);
-PyObject *python_linear_extrude_oo(PyObject *self, PyObject *args, PyObject *kwargs);
-PyObject* python_path_extrude(PyObject *self, PyObject *args, PyObject *kwargs);
-PyObject* python_path_extrude_oo(PyObject *self, PyObject *args, PyObject *kwargs);
-PyObject *python_rotate_extrude(PyObject *self, PyObject *args, PyObject *kwargs);
-PyObject *python_rotate_extrude_oo(PyObject *self, PyObject *args, PyObject *kwargs);
-
-PyObject *python_union(PyObject *self, PyObject *args, PyObject *kwargs);
-PyObject *python_union_oo(PyObject *self, PyObject *args, PyObject *kwargs);
-PyObject *python_difference(PyObject *self, PyObject *args, PyObject *kwargs);
-PyObject *python_difference_oo(PyObject *self, PyObject *args, PyObject *kwargs);
-PyObject *python_intersection(PyObject *self, PyObject *args, PyObject *kwargs);
-PyObject *python_intersection_oo(PyObject *self, PyObject *args, PyObject *kwargs);
-PyObject *python_hull(PyObject *self, PyObject *args, PyObject *kwargs);
-PyObject *python_minkowski(PyObject *self, PyObject *args, PyObject *kwargs);
-PyObject *python_fill(PyObject *self, PyObject *args, PyObject *kwargs);
-PyObject *python_resize(PyObject *self, PyObject *args, PyObject *kwargs);
-PyObject *python_render(PyObject *self, PyObject *args, PyObject *kwargs);
-PyObject *python_group(PyObject *self, PyObject *args, PyObject *kwargs);
-
-PyObject *python_projection(PyObject *self, PyObject *args, PyObject *kwargs);
-PyObject *python_surface(PyObject *self, PyObject *args, PyObject *kwargs);
-PyObject *python_import(PyObject *self, PyObject *args, PyObject *kwargs);
-
-PyObject *python_version(PyObject *self, PyObject *args, PyObject *kwargs);
-PyObject *python_version_num(PyObject *self, PyObject *args, PyObject *kwargs);
-
-PyObject *python_output(PyObject *self, PyObject *args, PyObject *kwargs);
-PyObject *python_output_oo(PyObject *self, PyObject *args, PyObject *kwargs);
-
-PyObject *python__getitem__(PyObject *dict, PyObject *key);
-int       python__setitem__(PyObject *dict, PyObject *key, PyObject *v);
-PyObject *python_nb_add(PyObject *arg1, PyObject *arg2);
-PyObject *python_nb_substract(PyObject *arg1, PyObject *arg2);
-PyObject *python_nb_multiply(PyObject *arg1, PyObject *arg2);
-
-
-PyObject *python_oo_args(PyObject *self, PyObject *args);
 int python_vectorval(PyObject *vec, double *x, double *y, double *z, double *w=NULL);
 int python_numberval(PyObject *number, double *result);
-
 void get_fnas(double& fn, double& fa, double& fs);
+
+PyObject *python_oo_args(PyObject *self, PyObject *args);
+
+extern PyNumberMethods PyOpenSCADNumbers;
+extern PyMappingMethods PyOpenSCADMapping;
+extern PyMethodDef PyOpenSCADFunctions[];
+extern PyMethodDef PyOpenSCADMethods[];
 
 std::string evaluatePython(const std::string &code, double time);
 

@@ -27,7 +27,6 @@ public:
   static const Feature ExperimentalVxORenderersPrealloc;
   static const Feature ExperimentalTextMetricsFunctions;
   static const Feature ExperimentalImportFunction;
-  static const Feature ExperimentalSortStl;
 #ifdef ENABLE_PYTHON
   static const Feature ExperimentalPythonEngine;
 #endif

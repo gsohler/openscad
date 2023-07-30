@@ -6,7 +6,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <limits>
-#include <iostream>
+#include <ostream>
 #include <memory>
 #include <type_traits>
 #include <variant>

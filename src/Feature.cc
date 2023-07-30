@@ -44,7 +44,6 @@ const Feature Feature::ExperimentalVxORenderersDirect("vertex-object-renderers-d
 const Feature Feature::ExperimentalVxORenderersPrealloc("vertex-object-renderers-prealloc", "Enable preallocating buffers in vertex object renderers");
 const Feature Feature::ExperimentalTextMetricsFunctions("textmetrics", "Enable the <code>textmetrics()</code> and <code>fontmetrics()</code> functions.");
 const Feature Feature::ExperimentalImportFunction("import-function", "Enable import function returning data instead of geometry.");
-const Feature Feature::ExperimentalSortStl("sort-stl", "Sort the STL output for predictable, diffable results.");
 #ifdef ENABLE_PYTHON
 const Feature Feature::ExperimentalPythonEngine("python-engine", "Enable experimental Python Engine (implies risk of malicious scripts downloaded).");
 #endif
