@@ -873,12 +873,18 @@ void ScintillaEditor::unindentSelection()
 
 void ScintillaEditor::commentSelection()
 {
+  auto commentString = "//";
+  #ifdef ENABLE_PYTHON
+  if (mainWindow.python_active) {
+    commentString = "#";
+  }
+  #endif
   auto hasSelection = qsci->hasSelectedText();
 
   int lineFrom, lineTo;
   getRange(&lineFrom, &lineTo);
   for (int line = lineFrom; line <= lineTo; ++line) {
-    qsci->insertAt("//", line, 0);
+    qsci->insertAt(commentString, line, 0);
   }
 
   if (hasSelection) {
@@ -888,13 +894,19 @@ void ScintillaEditor::commentSelection()
 
 void ScintillaEditor::uncommentSelection()
 {
+  auto commentString = "//";
+  #ifdef ENABLE_PYTHON
+  if (mainWindow.python_active) {
+    commentString = "#";
+  }
+  #endif
   auto hasSelection = qsci->hasSelectedText();
 
   int lineFrom, lineTo;
   getRange(&lineFrom, &lineTo);
   for (int line = lineFrom; line <= lineTo; ++line) {
     QString lineText = qsci->text(line);
-    if (lineText.startsWith("//")) {
+    if (lineText.startsWith(commentString)) {
       qsci->setSelection(line, 0, line, 2);
       qsci->removeSelectedText();
     }
