@@ -2461,7 +2461,7 @@ static Geometry *rotatePolygon(const RotateExtrudeNode& node, const Polygon2d& p
     std::vector<Vector3d> rings[2];
     rings[0].resize(o.vertices.size());
     rings[1].resize(o.vertices.size());
-// TODO add twist
+
     fill_ring(rings[0], o, (node.angle == 360) ? -90 : 90, flip_faces); // first ring
     for (unsigned int j = 0; j < fragments; ++j) {
       double a;
@@ -2866,4 +2866,3 @@ Response GeometryEvaluator::visit(State& state, const RoofNode& node)
   }
   return Response::ContinueTraversal;
 }
-

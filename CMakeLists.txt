@@ -369,14 +369,14 @@ if(ENABLE_PYTHON)
     target_include_directories(OpenSCAD PRIVATE "/home/gsohler/openscad_deps/mxe/usr/x86_64-w64-mingw32.static.posix/include/python3.10")
     target_link_libraries(OpenSCAD PRIVATE  "${CMAKE_SOURCE_DIR}/libpython3.10.dll.a")
   else()
-     find_package (Python REQUIRED COMPONENTS Interpreter Development)
-    target_include_directories(OpenSCAD PRIVATE ${Python_INCLUDE_DIRS})
-    target_link_libraries(OpenSCAD PRIVATE ${Python_LIBRARIES})
-    target_link_libraries(OpenSCAD PRIVATE  "${CMAKE_CURRENT_SOURCE_DIR}/submodules/cryptopp/libcryptopp.a")
+  find_package(Python REQUIRED COMPONENTS Interpreter Development)
+  find_package(CryptoPP REQUIRED)
+  message(STATUS "Python enabled, using Crypto++ ${PC_CRYPTOPP_VERSION}")
+  target_include_directories(OpenSCAD PRIVATE ${Python_INCLUDE_DIRS})
+  target_include_directories(OpenSCAD PRIVATE ${CRYPTOPP_INCLUDE_DIRS})
+  target_link_libraries(OpenSCAD PRIVATE ${Python_LIBRARIES})
+  target_link_libraries(OpenSCAD PRIVATE ${CRYPTOPP_LIBRARIES})
   endif()
-  target_include_directories(OpenSCAD PRIVATE "./submodules/cryptopp/")
-  add_custom_command(OUTPUT "${CMAKE_CURRENT_SOURCE_DIR}/submodules/cryptopp/libcryptopp.a" COMMAND make WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/submodules/cryptopp)
-  set_property(SOURCE "src/core/pyopenscad.cc" APPEND PROPERTY OBJECT_DEPENDS  "${CMAKE_CURRENT_SOURCE_DIR}/submodules/cryptopp/libcryptopp.a")
 endif()
 
 if(ENABLE_HIDAPI)
@@ -434,7 +434,6 @@ message(STATUS "Flex: ${FLEX_VERSION}")
 
 find_package(BISON REQUIRED QUIET)
 message(STATUS "Bison: ${BISON_VERSION}")
-
 find_package(JPEG REQUIRED QUIET)
 target_include_directories(OpenSCAD SYSTEM PRIVATE ${JPEG_INCLUDE_DIRS})
 target_link_libraries(OpenSCAD PRIVATE ${JPEG_LIBRARIES})
@@ -845,13 +844,11 @@ if(EXPERIMENTAL)
   target_compile_definitions(OpenSCAD PRIVATE ENABLE_MANIFOLD)
   list(APPEND Sources ${MANIFOLD_SOURCES})
 endif()
-
 add_subdirectory(submodules/libfive EXCLUDE_FROM_ALL)
 target_link_libraries(OpenSCAD PRIVATE libfive)
 target_compile_definitions(OpenSCAD PRIVATE BUILD_STUDIO_APP OFF)
 target_compile_definitions(OpenSCAD PRIVATE BUILD_GUILE_BINDINGS OFF)
 target_compile_definitions(OpenSCAD PRIVATE BUILD_PYTHON_BINDINGS OFF)
-
 
 #
 # Offscreen OpenGL context source code

@@ -65,7 +65,6 @@ static PyObject *PyOpenSCADObject_new(PyTypeObject *type, PyObject *args,  PyObj
   Py_XINCREF(empty_tuple);
   self = (PyOpenSCADObject *) PyBaseObject_Type.tp_new(type, empty_tuple, 0);
   Py_XDECREF(empty_tuple);
-
   self->node = NULL;
   self->dict = PyDict_New();
   Py_XINCREF(self->dict);
@@ -415,7 +414,6 @@ Value python_functionfunc(const FunctionCall *call )
 }
 
 extern PyObject *PyInit_libfive(void);
-
 PyMODINIT_FUNC PyInit_PyLibFive(void);
 
 std::string evaluatePython(const std::string & code, double time)
@@ -465,7 +463,6 @@ sys.stderr = stderr_bak\n\
 	    // Py_Initialize();
             Py_InitializeFromConfig(&config);
             PyConfig_Clear(&config);
-
 	    pythonMainModule =  PyImport_AddModule("__main__");
 	    pythonInitDict = PyModule_GetDict(pythonMainModule);
 	    PyInit_PyOpenSCAD();
