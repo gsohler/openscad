@@ -1083,7 +1083,7 @@ PyObject *python_rotate_extrude(PyObject *self, PyObject *args, PyObject *kwargs
 
   get_fnas(fn,fa,fs);
 
-  char * kwlist[] = {"obj", "layer", "convexity", "scale", "angle", "twist", "origin", "fn", "fa", "fs", NULL};
+  char *kwlist[] = {"obj", "layer", "convexity", "scale", "angle", "twist", "origin", "fn", "fa", "fs", NULL};
 
    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|siddOOddd", kwlist, 
                           &obj,
@@ -1103,17 +1103,17 @@ PyObject *python_rotate_extrude(PyObject *self, PyObject *args, PyObject *kwargs
   node->profile_func = NULL;
   node->twist_func = NULL;
   if(obj->ob_type == &PyFunction_Type) {
-	Py_XINCREF(obj); // TODO there to decref it ?
-	node->profile_func = obj;
-  	auto dummy_node = std::make_shared<SquareNode>(instance);
-	node->children.push_back(dummy_node);
+    Py_XINCREF(obj); // TODO there to decref it ?
+    node->profile_func = obj;
+    auto dummy_node = std::make_shared<SquareNode>(instance);
+    node->children.push_back(dummy_node);
   } else {
-  	child = PyOpenSCADObjectToNodeMulti(obj);
-	if(child == NULL) {
-        	PyErr_SetString(PyExc_TypeError,"Invalid type for  Object in rotate_extrude\n");
-	   	return NULL;
-  	}
-  	node->children.push_back(child);
+    child = PyOpenSCADObjectToNodeMulti(obj);
+    if(child == NULL) {
+      PyErr_SetString(PyExc_TypeError,"Invalid type for  Object in rotate_extrude\n");
+      return NULL;
+    }
+    node->children.push_back(child);
   }
 
   get_fnas(node->fn, node->fa, node->fs);
@@ -1121,7 +1121,7 @@ PyObject *python_rotate_extrude(PyObject *self, PyObject *args, PyObject *kwargs
   if (!isnan(fa)) node->fa = fa;
   if (!isnan(fs)) node->fs = fs;
 
-  if(layer != NULL) node->layername = layer;
+  if (layer != NULL) node->layername = layer;
   node->convexity = convexity;
   node->scale = scale;
   node->angle = angle;
@@ -1176,20 +1176,20 @@ PyObject *python_linear_extrude(PyObject *self, PyObject *args, PyObject *kwargs
 
   char * kwlist[] ={"obj","height","layer","convexity","origin","scale","center","slices","segments","twist","fn","fa","fs",NULL};
   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|dsiOOOiiOddd", kwlist, 
-                          &obj,
-                          &height,
-			  &layer,
-			  &convexity,
-			  &origin,
-			  &scale,
-			  &center,
-			  &slices,
-			  &segments,
-			  &twist,
-			  &fn,&fs,&fs
-                          )) {
-        PyErr_SetString(PyExc_TypeError,"error duing parsing\n");
-        return NULL;
+                                   &obj,
+                                   &height,
+                                   &layer,
+                                   &convexity,
+                                   &origin,
+                                   &scale,
+                                   &center,
+                                   &slices,
+                                   &segments,
+                                   &twist,
+                                   &fn, &fs, &fs
+                                   )) {
+    PyErr_SetString(PyExc_TypeError,"error duing parsing\n");
+    return NULL;
   }
 
   node->profile_func = NULL;
@@ -2103,7 +2103,7 @@ PyObject *do_import_python(PyObject *self, PyObject *args, PyObject *kwargs, Imp
     std::string extraw = fs::path(filename).extension().generic_string();
     std::string ext = boost::algorithm::to_lower_copy(extraw);
     if (ext == ".stl") actualtype = ImportType::STL;
-    else if (ext == ".off") actualtype = ImportType::OFF_FMT;
+    else if (ext == ".off") actualtype = ImportType::OFF;
     else if (ext == ".dxf") actualtype = ImportType::DXF;
     else if (ext == ".nef3") actualtype = ImportType::NEF3;
     else if (ext == ".3mf") actualtype = ImportType::_3MF;

@@ -10,7 +10,7 @@ enum class ImportType {
   AMF,
   _3MF,
   STL,
-  OFF_FMT,
+  OFF,
   SVG,
   DXF,
   NEF3,

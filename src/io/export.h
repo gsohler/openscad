@@ -17,7 +17,7 @@ enum class FileFormat {
   ASCIISTL,
   STL,
   OBJ,
-  OFF_FMT,
+  OFF,
   WRL,
   AMF,
   _3MF,
@@ -120,7 +120,7 @@ struct ExportFileFormatOptions {
     {"binstl", FileFormat::STL},
     {"stl", FileFormat::ASCIISTL}, // Deprecated.  Later to FileFormat::STL
     {"obj", FileFormat::OBJ},
-    {"off", FileFormat::OFF_FMT},
+    {"off", FileFormat::OFF},
     {"wrl", FileFormat::WRL},
     {"amf", FileFormat::AMF},
     {"3mf", FileFormat::_3MF},

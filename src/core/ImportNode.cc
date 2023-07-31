@@ -85,7 +85,7 @@ static std::shared_ptr<AbstractNode> do_import(const ModuleInstantiation *inst, 
     std::string extraw = fs::path(filename).extension().generic_string();
     std::string ext = boost::algorithm::to_lower_copy(extraw);
     if (ext == ".stl") actualtype = ImportType::STL;
-    else if (ext == ".off") actualtype = ImportType::OFF_FMT;
+    else if (ext == ".off") actualtype = ImportType::OFF;
     else if (ext == ".dxf") actualtype = ImportType::DXF;
     else if (ext == ".nef3") actualtype = ImportType::NEF3;
     else if (ext == ".3mf") actualtype = ImportType::_3MF;
@@ -161,7 +161,7 @@ static std::shared_ptr<AbstractNode> builtin_import_stl(const ModuleInstantiatio
 { return do_import(inst, std::move(arguments), children, ImportType::STL); }
 
 static std::shared_ptr<AbstractNode> builtin_import_off(const ModuleInstantiation *inst, Arguments arguments, const Children& children)
-{ return do_import(inst, std::move(arguments), children, ImportType::OFF_FMT); }
+{ return do_import(inst, std::move(arguments), children, ImportType::OFF); }
 
 static std::shared_ptr<AbstractNode> builtin_import_dxf(const ModuleInstantiation *inst, Arguments arguments, const Children& children)
 { return do_import(inst, std::move(arguments), children, ImportType::DXF); }
@@ -189,7 +189,7 @@ const Geometry *ImportNode::createGeometry() const
     g = import_3mf(this->filename, loc);
     break;
   }
-  case ImportType::OFF_FMT: {
+  case ImportType::OFF: {
     g = import_off(this->filename, loc);
     break;
   }

@@ -845,9 +845,9 @@ if(EXPERIMENTAL)
 endif()
 add_subdirectory(submodules/libfive EXCLUDE_FROM_ALL)
 target_link_libraries(OpenSCAD PRIVATE libfive)
-target_compile_definitions(OpenSCAD PRIVATE BUILD_STUDIO_APP OFF)
-target_compile_definitions(OpenSCAD PRIVATE BUILD_GUILE_BINDINGS OFF)
-target_compile_definitions(OpenSCAD PRIVATE BUILD_PYTHON_BINDINGS OFF)
+target_compile_definitions(OpenSCAD PRIVATE BUILD_STUDIO_APP=OFF)
+target_compile_definitions(OpenSCAD PRIVATE BUILD_GUILE_BINDINGS=OFF)
+target_compile_definitions(OpenSCAD PRIVATE BUILD_PYTHON_BINDINGS=OFF)
 
 #
 # Offscreen OpenGL context source code

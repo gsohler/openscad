@@ -30,14 +30,6 @@
 #include "Expression.h"
 #include "PlatformUtils.h"
 
-#ifdef ENABLE_PYTHON_STATIC
-extern "C" {
-	float __flt_rounds(float f) {
-		return f;
-	}
-}	
-#endif
-
 // https://docs.python.org/3.10/extending/newtypes.html 
 
 static PyObject *pythonInitDict=NULL;
@@ -460,7 +452,6 @@ sys.stderr = stderr_bak\n\
 	    swprintf(libfivedir, 256, L"%s/../libraries/pylibfive/",PlatformUtils::applicationPath().c_str());
 
 	    PyConfig_SetString(&config, &config.pythonpath_env, libfivedir);
-	    // Py_Initialize();
             Py_InitializeFromConfig(&config);
             PyConfig_Clear(&config);
 	    pythonMainModule =  PyImport_AddModule("__main__");
