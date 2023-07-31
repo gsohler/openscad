@@ -184,7 +184,6 @@ if [ ! $NUMCPU ]; then
 fi
 echo "  NUMCPU: $NUMCPU"
 
-
 cd $DEPLOYDIR
 CMAKE_CONFIG="${CMAKE_CONFIG}\
  -DCMAKE_BUILD_TYPE=${BUILD_TYPE}\
@@ -232,7 +231,7 @@ case $OS in
         else
 	    cd $DEPLOYDIR
 	    pwd
-            make $TARGET -j$NUMCPU 
+            make $TARGET -j$NUMCPU
 	    cd $OPENSCADDIR
         fi
     ;;

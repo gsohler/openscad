@@ -6,7 +6,7 @@
 	url = https://github.com/microsoft/mimalloc.git
 [submodule "submodules/manifold"]
 	path = submodules/manifold
-	url = https://github.com/elalish/manifold.git
+	url = https://github.com/elalish/manifold
 [submodule "submodules/libfive"]
 	path = submodules/libfive
 	url = https://github.com/libfive/libfive.git

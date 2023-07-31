@@ -17,9 +17,6 @@ File /r /x mingw-cross-env locale
 File /r /x mingw-cross-env color-schemes
 File /r /x mingw-cross-env shaders
 File /r /x mingw-cross-env templates
-File python_compile/lib/libpython3.10.dll
-File python_compile/lib/libgcc_s_seh-1.dll
-File python_compile/lib/libwinpthread-1.dll
 ${registerExtension} "$INSTDIR\openscad.exe" ".scad" "OpenSCAD_File"
 SetShellVarContext all
 CreateShortCut $SMPROGRAMS\OpenSCAD.lnk $INSTDIR\openscad.exe
