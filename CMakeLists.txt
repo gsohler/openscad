@@ -775,7 +775,7 @@ set(CORE_SOURCES
   ${BISON_comment_parser_OUTPUTS})
 if(ENABLE_PYTHON)
 	list(APPEND CORE_SOURCES
-		    src/core/pyopenscad.cc
+		    src/core/pyopenscad.cc 
 		    src/core/pylibfive.cc
 		    src/core/pyfunctions.cc)
 	target_compile_definitions(OpenSCAD PRIVATE ENABLE_PYTHON)
