@@ -2172,6 +2172,8 @@ PyMethodDef PyOpenSCADFunctions[] = {
   {"cylinder", (PyCFunction) python_cylinder, METH_VARARGS | METH_KEYWORDS, "Create Cylinder."},
   {"sphere", (PyCFunction) python_sphere, METH_VARARGS | METH_KEYWORDS, "Create Sphere."},
   {"polyhedron", (PyCFunction) python_polyhedron, METH_VARARGS | METH_KEYWORDS, "Create Polyhedron."},
+  {"frep", (PyCFunction) python_frep, METH_VARARGS | METH_KEYWORDS, "Create F-Rep."},
+  {"ifrep", (PyCFunction) python_ifrep, METH_VARARGS | METH_KEYWORDS, "Create Inverse F-Rep."},
 
   {"translate", (PyCFunction) python_translate, METH_VARARGS | METH_KEYWORDS, "Move  Object."},
   {"rotate", (PyCFunction) python_rotate, METH_VARARGS | METH_KEYWORDS, "Rotate Object."},
@@ -2180,9 +2182,11 @@ PyMethodDef PyOpenSCADFunctions[] = {
   {"multmatrix", (PyCFunction) python_multmatrix, METH_VARARGS | METH_KEYWORDS, "Multmatrix Object."},
   {"offset", (PyCFunction) python_offset, METH_VARARGS | METH_KEYWORDS, "Offset Object."},
   {"roof", (PyCFunction) python_roof, METH_VARARGS | METH_KEYWORDS, "Roof Object."},
+  {"pull", (PyCFunction) python_pull, METH_VARARGS | METH_KEYWORDS, "Pull apart Object."},
 
   {"linear_extrude", (PyCFunction) python_linear_extrude, METH_VARARGS | METH_KEYWORDS, "Linear_extrude Object."},
   {"rotate_extrude", (PyCFunction) python_rotate_extrude, METH_VARARGS | METH_KEYWORDS, "Rotate_extrude Object."},
+  {"path_extrude", (PyCFunction) python_path_extrude, METH_VARARGS | METH_KEYWORDS, "Path_extrude Object."},
 
   {"union", (PyCFunction) python_union, METH_VARARGS | METH_KEYWORDS, "Union Object."},
   {"difference", (PyCFunction) python_difference, METH_VARARGS | METH_KEYWORDS, "Difference Object."},
@@ -2197,7 +2201,10 @@ PyMethodDef PyOpenSCADFunctions[] = {
   {"projection", (PyCFunction) python_projection, METH_VARARGS | METH_KEYWORDS, "Projection Object."},
   {"surface", (PyCFunction) python_surface, METH_VARARGS | METH_KEYWORDS, "Surface Object."},
   {"osimport", (PyCFunction) python_import, METH_VARARGS | METH_KEYWORDS, "Import Object."},
-  {"color", (PyCFunction) python_color, METH_VARARGS | METH_KEYWORDS, "Import Object."},
+  {"color", (PyCFunction) python_color, METH_VARARGS | METH_KEYWORDS, "Color Object."},
+  {"texture", (PyCFunction) python_texture, METH_VARARGS | METH_KEYWORDS, "Include a texture."},
+  {"mesh", (PyCFunction) python_mesh, METH_VARARGS | METH_KEYWORDS, "exports mesh."},
+  {"oversample", (PyCFunction) python_oversample, METH_VARARGS | METH_KEYWORDS, "oversample."},
 
   {"output", (PyCFunction) python_output, METH_VARARGS | METH_KEYWORDS, "Output the result."},
   {"version", (PyCFunction) python_version, METH_VARARGS | METH_KEYWORDS, "Output openscad Version."},
@@ -2220,6 +2227,8 @@ PyMethodDef PyOpenSCADMethods[] = {
   {"roof", (PyCFunction) python_roof_oo, METH_VARARGS | METH_KEYWORDS, "Roof Object."},
   {"output", (PyCFunction) python_output_oo, METH_VARARGS | METH_KEYWORDS, "Output the result."},
   {"color", (PyCFunction) python_color_oo, METH_VARARGS | METH_KEYWORDS, "Output the result."},
+  {"mesh", (PyCFunction) python_mesh_oo, METH_VARARGS | METH_KEYWORDS, "Exports Mesh."},
+  {"oversample", (PyCFunction) python_oversample_oo, METH_VARARGS | METH_KEYWORDS, "Oversample."},
   {NULL, NULL, 0, NULL}
 };
 
