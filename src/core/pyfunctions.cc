@@ -981,7 +981,7 @@ PyObject *python_color(PyObject *self, PyObject *args, PyObject *kwargs)
   }
   child = PyOpenSCADObjectToNodeMulti(obj);
   if (child == NULL) {
-    PyErr_SetString(PyExc_TypeError, "Invalid type for  Object in color");
+    PyErr_SetString(PyExc_TypeError, "Invalid type for Object in color");
     return NULL;
   }
 

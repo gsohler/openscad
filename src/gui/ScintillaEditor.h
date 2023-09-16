@@ -11,8 +11,10 @@
 #include <QVBoxLayout>
 #include <QVBoxLayout>
 #include <Qsci/qsciscintilla.h>
+#include <Qsci/qscilexerpython.h>
 
 #include "Editor.h"
+#include "MainWindow.h"
 #include "memory.h"
 #include "ScadApi.h"
 #include "MainWindow.h"
@@ -146,6 +148,9 @@ private slots:
   void fireModificationChanged();
   void onIndicatorClicked(int line, int col, Qt::KeyboardModifiers state);
   void onIndicatorReleased(int line, int col, Qt::KeyboardModifiers state);
+#ifdef ENABLE_PYTHON
+  void onPythonActiveChanged(bool pythonActive);
+#endif
 
 public:
   void public_applySettings();
@@ -167,6 +172,9 @@ private:
   ScadLexer2 *lexer;
 #else
   ScadLexer *lexer;
+#endif
+#ifdef ENABLE_PYTHON
+  QsciLexerPython *pythonLexer = new QsciLexerPython();
 #endif
   QFont currentFont;
   ScadApi *api;

@@ -90,6 +90,10 @@ void TabManager::tabSwitched(int x)
       button->setVisible(idx == x);
     }
   }
+
+#ifdef ENABLE_PYTHON
+  par->recomputePythonActive();
+#endif
 }
 
 void TabManager::middleMouseClicked(int x)
@@ -739,7 +743,9 @@ bool TabManager::saveACopy(EditorInterface *edt)
 
   const auto dir = edt->filepath.isEmpty() ? _("Untitled.scad") : edt->filepath;
 #ifdef ENABLE_PYTHON
-  auto filename = QFileDialog::getSaveFileName(par, _("Save a Copy"), dir, QString(_("OpenSCAD Designs (*.scad *.csg)"))+";;"+QString(_("Python OpenSCAD Designs (*.py)")));
+  QString selectedFilter;
+  QString pythonFilter = _("Python OpenSCAD Designs (*.py)");
+  auto filename = QFileDialog::getSaveFileName(par, _("Save a Copy"), dir, QString("%1;;%2").arg(_("OpenSCAD Designs (*.scad *.csg)"), pythonFilter), &selectedFilter);
 #else
   auto filename = QFileDialog::getSaveFileName(par, _("Save a Copy"), dir, _("OpenSCAD Designs (*.scad)"));
 #endif
@@ -748,7 +754,17 @@ bool TabManager::saveACopy(EditorInterface *edt)
   }
 
   if (QFileInfo(filename).suffix().isEmpty()) {
+    #ifdef ENABLE_PYTHON
+    // Check if the user selected the Python filter
+    if (selectedFilter == pythonFilter) {
+        filename.append(".py");
+    } else {
+        // For other cases, use .scad as the default extension
+        filename.append(".scad");
+    }
+    #else
     filename.append(".scad");
+    #endif
   }
 
   return save(edt, filename);

@@ -43,6 +43,9 @@
 #include <QTextEdit>
 #include <QVBoxLayout>
 #include <QErrorMessage>
+#ifdef USE_GLAD
+#include <QOpenGLContext>
+#endif
 #include "OpenCSGWarningDialog.h"
 
 #include <cstdio>
@@ -358,7 +361,9 @@ void QGLView::wheelEvent(QWheelEvent *event)
 {
   const auto pos = Q_WHEEL_EVENT_POSITION(event);
   const int v = event->angleDelta().y();
-  if (this->mouseCentricZoom) {
+  if (QApplication::keyboardModifiers() & Qt::ShiftModifier) {
+    zoomFov (v);
+  } else if (this->mouseCentricZoom) {
     zoomCursor(pos.x(), pos.y(), v);
   } else {
     zoom(v, true);
@@ -378,6 +383,13 @@ void QGLView::ZoomOut()
 void QGLView::zoom(double v, bool relative)
 {
   this->cam.zoom(v, relative);
+  update();
+  emit cameraChanged();
+}
+
+void QGLView::zoomFov(double v)
+{
+  this->cam.setVpf( this->cam.fovValue () * pow(0.9, v / 120.0));
   update();
   emit cameraChanged();
 }
