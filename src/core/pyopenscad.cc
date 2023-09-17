@@ -29,6 +29,7 @@
 #include "Value.h"
 #include "Expression.h"
 #include "PlatformUtils.h"
+#include <Context.h>
 
 static PyObject *PyInit_openscad(void);
 
@@ -295,7 +296,7 @@ double python_doublefunc(PyObject *cbfunc, double arg)
  * Try to call a python function by name using OpenSCAD module childs and OpenSCAD function arguments: argument order is childs, arguments
  */
 
-PyObject *python_callfunction(const std::string &name, const std::vector<std::shared_ptr<Assignment> > &op_args, const char *&errorstr)
+PyObject *python_callfunction(const std::shared_ptr<const Context> &cxt , const std::string &name, const std::vector<std::shared_ptr<Assignment> > &op_args, const char *&errorstr)
 {
 	PyObject *pFunc = NULL;
 	if(!pythonMainModule){
@@ -328,7 +329,7 @@ PyObject *python_callfunction(const std::string &name, const std::vector<std::sh
 	{
 		Assignment *op_arg=op_args[i].get();
 		shared_ptr<Expression> expr=op_arg->getExpr();
-		Value val = expr.get()->evaluate(NULL);
+		Value val = expr.get()->evaluate(cxt);
 		switch(val.type())
 		{
 			case Value::Type::NUMBER:
@@ -367,21 +368,23 @@ PyObject *python_callfunction(const std::string &name, const std::vector<std::sh
  * Actually trying use python to evaluate a OpenSCAD Module
  */
 
-std::shared_ptr<AbstractNode> python_modulefunc(const ModuleInstantiation *op_module)
+std::shared_ptr<AbstractNode> python_modulefunc(const ModuleInstantiation *op_module,const std::shared_ptr<const Context> &cxt, int *modulefound)
 {
+	*modulefound=0;
 	std::shared_ptr<AbstractNode> result=NULL;
 	const char *errorstr = NULL;
 	do {
-		PyObject *funcresult = python_callfunction(op_module->name(),op_module->arguments, errorstr);
+		PyObject *funcresult = python_callfunction(cxt,op_module->name(),op_module->arguments, errorstr);
 		if (errorstr != NULL){
 			PyErr_SetString(PyExc_TypeError, errorstr);
 			return NULL;
 		}
+		*modulefound=1;
 		if(funcresult == NULL) return NULL;
 
 		if(funcresult->ob_type == &PyOpenSCADType) result=PyOpenSCADObjectToNode(funcresult);
 		else {
-			PyErr_SetString(PyExc_TypeError, "Python function result is  not a solid\n");
+			LOG(message_group::Warning, Location::NONE, cxt->documentRoot(), "Python function result is not a solid.");
 			break;
 		}
 	} while(0);
@@ -418,10 +421,11 @@ Value python_convertresult(PyObject *arg)
  * Actually trying use python to evaluate a OpenSCAD Function
  */
 
-Value python_functionfunc(const FunctionCall *call )
+Value python_functionfunc(const FunctionCall *call,const std::shared_ptr<const Context> &cxt  )
 {
+	printf("python_functionfunc\n");
 	const char *errorstr = NULL;
-	PyObject *funcresult = python_callfunction(call->name, call->arguments, errorstr);
+	PyObject *funcresult = python_callfunction(cxt,call->name, call->arguments, errorstr);
 	if (errorstr != NULL)
 	{
 		PyErr_SetString(PyExc_TypeError, errorstr);
