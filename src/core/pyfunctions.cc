@@ -338,6 +338,7 @@ PyObject *python_polyhedron(PyObject *self, PyObject *args, PyObject *kwargs)
   return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
 }
 
+#ifdef ENABLE_LIBFIVE
 PyObject *python_frep(PyObject *self, PyObject *args, PyObject *kwargs)
 {
   DECLARE_INSTANCE
@@ -390,7 +391,7 @@ PyObject *python_ifrep(PyObject *self, PyObject *args, PyObject *kwargs)
   return ifrep(ps);
 }
 
-
+#endif
 
 PyObject *python_square(PyObject *self, PyObject *args, PyObject *kwargs)
 {
@@ -2281,8 +2282,10 @@ PyMethodDef PyOpenSCADFunctions[] = {
   {"cylinder", (PyCFunction) python_cylinder, METH_VARARGS | METH_KEYWORDS, "Create Cylinder."},
   {"sphere", (PyCFunction) python_sphere, METH_VARARGS | METH_KEYWORDS, "Create Sphere."},
   {"polyhedron", (PyCFunction) python_polyhedron, METH_VARARGS | METH_KEYWORDS, "Create Polyhedron."},
+#ifdef ENABLE_LIBFIVE  
   {"frep", (PyCFunction) python_frep, METH_VARARGS | METH_KEYWORDS, "Create F-Rep."},
   {"ifrep", (PyCFunction) python_ifrep, METH_VARARGS | METH_KEYWORDS, "Create Inverse F-Rep."},
+#endif  
 
   {"translate", (PyCFunction) python_translate, METH_VARARGS | METH_KEYWORDS, "Move  Object."},
   {"rotate", (PyCFunction) python_rotate, METH_VARARGS | METH_KEYWORDS, "Rotate Object."},

@@ -436,8 +436,10 @@ Value python_functionfunc(const FunctionCall *call,const std::shared_ptr<const C
 	return  python_convertresult(funcresult);
 }
 
+#ifdef ENABLE_LIBFIVE
 extern PyObject *PyInit_libfive(void);
 PyMODINIT_FUNC PyInit_PyLibFive(void);
+#endif
 /*
  * Main python evaluation entry
  */
@@ -470,7 +472,6 @@ sys.stderr = catcher_err\n\
 sys.stdout = stdout_bak\n\
 sys.stderr = stderr_bak\n\
 ";
-  wchar_t libfivedir[256];
 
     if(pythonInitDict) { /* If already initialized, undo to reinitialize after */
       if (Py_FinalizeEx() < 0) {
@@ -481,7 +482,9 @@ sys.stderr = stderr_bak\n\
     if(!pythonInitDict) {
 	    char run_str[80];
 	    PyImport_AppendInittab("openscad", &PyInit_openscad);
+#ifdef ENABLE_LIBFIVE	    
 	    PyImport_AppendInittab("libfive", &PyInit_libfive);
+#endif	    
 	    PyConfig config;
             PyConfig_InitPythonConfig(&config);
 	    char libdir[256];
@@ -494,7 +497,9 @@ sys.stderr = stderr_bak\n\
 	    pythonMainModule =  PyImport_AddModule("__main__");
 	    pythonInitDict = PyModule_GetDict(pythonMainModule);
 	    PyInit_PyOpenSCAD();
+#ifdef ENABLE_LIBFIVE	    
 	    PyInit_PyLibFive();
+#endif	    
 	    sprintf(run_str,"from openscad import *\nfa=12.0\nfn=0.0\nfs=2.0\nt=%g",time);
 	    PyRun_String(run_str, Py_file_input, pythonInitDict, pythonInitDict);
     }

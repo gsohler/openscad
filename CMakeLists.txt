@@ -50,6 +50,7 @@ option(ENABLE_HIDAPI "Enable support for HIDAPI input driver." ON)
 option(ENABLE_TBB "Enable support for oneAPI Threading Building Blocks." ON)
 option(ALLOW_BUNDLED_HIDAPI "Allow usage of bundled HIDAPI library (Windows only)." OFF)
 option(ENABLE_PYTHON "Enable experimental Python Interpreter" OFF)
+option(ENABLE_LIBFIVE "Enable libfive Library" OFF)
 include(CMakeDependentOption)
 cmake_dependent_option(APPLE_UNIX "Build OpenSCAD in Unix mode in MacOS X instead of an Apple Bundle" OFF "APPLE" OFF)
 cmake_dependent_option(ENABLE_QTDBUS "Enable DBus input driver for Qt5." ON "NOT HEADLESS" OFF)
@@ -363,18 +364,35 @@ target_include_directories(OpenSCAD SYSTEM PRIVATE ${LIBXML2_INCLUDE_DIR})
 target_link_libraries(OpenSCAD PRIVATE ${LIBXML2_LIBRARIES})
 
 if(ENABLE_PYTHON)
-  message(STATUS "Python enabled" )
-  if(MXECROSS)
-    target_include_directories(OpenSCAD PRIVATE "/home/gsohler/openscad_deps/mxe/usr/x86_64-w64-mingw32.static.posix/include/python3.10")
-    target_link_libraries(OpenSCAD PRIVATE  "${CMAKE_SOURCE_DIR}/libpython3.10.dll.a")
-  else()
-  find_package(Python REQUIRED COMPONENTS Interpreter Development)
   find_package(CryptoPP REQUIRED)
-  message(STATUS "Python enabled, using Crypto++ ${PC_CryptoPP_VERSION}")
-  target_include_directories(OpenSCAD PRIVATE ${Python_INCLUDE_DIRS})
   target_include_directories(OpenSCAD PRIVATE ${CryptoPP_INCLUDE_DIRS})
-  target_link_libraries(OpenSCAD PRIVATE ${Python_LIBRARIES})
-  target_link_libraries(OpenSCAD PRIVATE ${CRYPTOPP_LIBRARIES})
+  target_link_libraries(OpenSCAD PRIVATE ${CryptoPP_LIBRARIES})
+  message(STATUS "Python enabled, using Crypto++ ${PC_CryptoPP_VERSION}")
+  if(MXECROSS)
+    SET(PYTHON_DEVPATH "${CMAKE_CURRENT_SOURCE_DIR}/python")
+    SET(PYTHON_PACKAGEFOLDER "https://mirror.msys2.org/mingw/mingw64")
+    SET(PYTHON_PACKAGEFILE "mingw-w64-x86_64-python-3.11.5-2-any.pkg.tar.zst")
+    SET(PYTHON_VERSION "python3.11")
+    SET(PYTHON_ARCHIVE "${PYTHON_DEVPATH}/mingw64/lib/lib${PYTHON_VERSION}.dll.a")
+    add_custom_command(
+      OUTPUT ${PYTHON_ARCHIVE}
+      COMMAND mkdir -p python && cd python && wget ${PYTHON_PACKAGEFOLDER}/${PYTHON_PACKAGEFILE} && tar -I zstd -xf ${PYTHON_PACKAGEFILE}
+      WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    )
+    add_custom_target(python_lib DEPENDS ${PYTHON_ARCHIVE})
+    target_include_directories(OpenSCAD SYSTEM PRIVATE "${PYTHON_DEVPATH}/mingw64/include/${PYTHON_VERSION}")
+    target_link_libraries(OpenSCAD PRIVATE "${PYTHON_DEVPATH}/mingw64/lib/lib${PYTHON_VERSION}.dll.a")
+  else()	  
+    find_package(Python REQUIRED COMPONENTS Interpreter Development)
+    target_include_directories(OpenSCAD PRIVATE ${Python_INCLUDE_DIRS})
+    target_link_libraries(OpenSCAD PRIVATE ${Python_LIBRARIES})
+  endif()  
+  if(ENABLE_LIBFIVE)
+    add_subdirectory(submodules/libfive EXCLUDE_FROM_ALL)
+    target_link_libraries(OpenSCAD PRIVATE libfive)
+    target_compile_definitions(OpenSCAD PRIVATE BUILD_STUDIO_APP=OFF)
+    target_compile_definitions(OpenSCAD PRIVATE BUILD_GUILE_BINDINGS=OFF)
+    target_compile_definitions(OpenSCAD PRIVATE BUILD_PYTHON_BINDINGS=OFF)
   endif()
 endif()
 
@@ -666,7 +684,6 @@ set(CORE_SOURCES
   src/core/ImportNode.cc
   src/core/LinearExtrudeNode.cc
   src/core/PathExtrudeNode.cc
-  src/core/FrepNode.cc
   src/core/OversampleNode.cc
   src/core/LocalScope.cc
   src/core/ScopeContext.cc
@@ -781,9 +798,14 @@ set(CORE_SOURCES
 if(ENABLE_PYTHON)
 	list(APPEND CORE_SOURCES
 		    src/core/pyopenscad.cc 
-		    src/core/pylibfive.cc
 		    src/core/pyfunctions.cc)
 	target_compile_definitions(OpenSCAD PRIVATE ENABLE_PYTHON)
+	if(ENABLE_LIBFIVE)
+		list(APPEND CORE_SOURCES
+			src/core/pylibfive.cc 
+	  		src/core/FrepNode.cc)
+		target_compile_definitions(OpenSCAD PRIVATE ENABLE_LIBFIVE)
+	endif()
 endif()
 
 set(CGAL_SOURCES
@@ -848,11 +870,6 @@ if(EXPERIMENTAL)
   target_compile_definitions(OpenSCAD PRIVATE ENABLE_MANIFOLD)
   list(APPEND Sources ${MANIFOLD_SOURCES})
 endif()
-add_subdirectory(submodules/libfive EXCLUDE_FROM_ALL)
-target_link_libraries(OpenSCAD PRIVATE libfive)
-target_compile_definitions(OpenSCAD PRIVATE BUILD_STUDIO_APP=OFF)
-target_compile_definitions(OpenSCAD PRIVATE BUILD_GUILE_BINDINGS=OFF)
-target_compile_definitions(OpenSCAD PRIVATE BUILD_PYTHON_BINDINGS=OFF)
 
 #
 # Offscreen OpenGL context source code
@@ -1209,6 +1226,13 @@ configure_file("${CMAKE_CURRENT_SOURCE_DIR}/cmake/Modules/openscad_cpack.cmake.i
 # CPACK_PROJECT_CONFIG_FILE is for configuring CPack-generator specific settings
 set(CPACK_PROJECT_CONFIG_FILE "${CMAKE_BINARY_DIR}/openscad_cpack.cmake")
 set(CPACK_THREADS 0)
+
+if (MXECROSS)
+  get_target_property(TARGET_LIBRARIES OpenSCAD LINK_LIBRARIES)
+  LIST(FILTER TARGET_LIBRARIES EXCLUDE REGEX .*libdouble-conversion.a )
+  set_property(TARGET OpenSCAD PROPERTY LINK_LIBRARIES  ${TARGET_LIBRARIES} )
+  get_target_property(TARGET_LIBRARIES2 OpenSCAD LINK_LIBRARIES)
+endif()
 
 if(ENABLE_TESTS)
   enable_testing()
