@@ -30,14 +30,16 @@
 
 #include <Python.h>
 #include <pyopenscad.h>
+#ifdef ENABLE_LIBFIVE
 #include <pylibfive.h>
+#include "FrepNode.h"
+#endif
 
 #include "primitives.h"
 #include "TransformNode.h"
 #include "RotateExtrudeNode.h"
 #include "LinearExtrudeNode.h"
 #include "PathExtrudeNode.h"
-#include "FrepNode.h"
 #include "PullNode.h"
 #include "OversampleNode.h"
 #include "CgalAdvNode.h"
@@ -1031,6 +1033,8 @@ PyObject *python_color_oo(PyObject *self, PyObject *args, PyObject *kwargs)
   PyObject *result = python_color(self, new_args, kwargs);
   return result;
 }
+// TODO this is wrong
+#ifdef ENABLE_LIBFIVE
 
 PyObject *python_mesh(PyObject *self, PyObject *args, PyObject *kwargs)
 {
@@ -1115,6 +1119,8 @@ PyObject *python_mesh_oo(PyObject *self, PyObject *args, PyObject *kwargs)
   return result;
 }
 
+
+#endif
 
 PyObject *python_oversample(PyObject *self, PyObject *args, PyObject *kwargs)
 {
@@ -2315,7 +2321,9 @@ PyMethodDef PyOpenSCADFunctions[] = {
   {"osimport", (PyCFunction) python_import, METH_VARARGS | METH_KEYWORDS, "Import Object."},
   {"color", (PyCFunction) python_color, METH_VARARGS | METH_KEYWORDS, "Color Object."},
   {"texture", (PyCFunction) python_texture, METH_VARARGS | METH_KEYWORDS, "Include a texture."},
+#ifdef ENABLE_LIBFIVE  
   {"mesh", (PyCFunction) python_mesh, METH_VARARGS | METH_KEYWORDS, "exports mesh."},
+#endif  
   {"oversample", (PyCFunction) python_oversample, METH_VARARGS | METH_KEYWORDS, "oversample."},
 
   {"output", (PyCFunction) python_output, METH_VARARGS | METH_KEYWORDS, "Output the result."},
@@ -2341,7 +2349,9 @@ PyMethodDef PyOpenSCADMethods[] = {
   {"roof", (PyCFunction) python_roof_oo, METH_VARARGS | METH_KEYWORDS, "Roof Object."},
   {"output", (PyCFunction) python_output_oo, METH_VARARGS | METH_KEYWORDS, "Output the result."},
   {"color", (PyCFunction) python_color_oo, METH_VARARGS | METH_KEYWORDS, "Output the result."},
+#ifdef ENABLE_LIBFIVE  
   {"mesh", (PyCFunction) python_mesh_oo, METH_VARARGS | METH_KEYWORDS, "Exports Mesh."},
+#endif  
   {"oversample", (PyCFunction) python_oversample_oo, METH_VARARGS | METH_KEYWORDS, "Oversample."},
   {NULL, NULL, 0, NULL}
 };
