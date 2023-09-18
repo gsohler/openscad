@@ -1033,8 +1033,7 @@ PyObject *python_color_oo(PyObject *self, PyObject *args, PyObject *kwargs)
   PyObject *result = python_color(self, new_args, kwargs);
   return result;
 }
-// TODO this is wrong
-#ifdef ENABLE_LIBFIVE
+typedef std::vector<int> intList;
 
 PyObject *python_mesh(PyObject *self, PyObject *args, PyObject *kwargs)
 {
@@ -1058,7 +1057,7 @@ PyObject *python_mesh(PyObject *self, PyObject *args, PyObject *kwargs)
   std::shared_ptr<const PolySet> ps = dynamic_pointer_cast<const PolySet>(geom);
 
   // create indexed point list
-  std::unordered_map<Vector3d, int, boost::hash<Vector3d> > pointIntMap;
+  std::unordered_map<Vector3d, int > pointIntMap;
   std::vector<Vector3d> pointList; // list of all the points in the object
   std::vector<Vector3d> pointListNew; // list of all the points in the object
   std::vector<intList> polygons; // list polygons represented by indexes
@@ -1120,7 +1119,6 @@ PyObject *python_mesh_oo(PyObject *self, PyObject *args, PyObject *kwargs)
 }
 
 
-#endif
 
 PyObject *python_oversample(PyObject *self, PyObject *args, PyObject *kwargs)
 {
@@ -2321,9 +2319,7 @@ PyMethodDef PyOpenSCADFunctions[] = {
   {"osimport", (PyCFunction) python_import, METH_VARARGS | METH_KEYWORDS, "Import Object."},
   {"color", (PyCFunction) python_color, METH_VARARGS | METH_KEYWORDS, "Color Object."},
   {"texture", (PyCFunction) python_texture, METH_VARARGS | METH_KEYWORDS, "Include a texture."},
-#ifdef ENABLE_LIBFIVE  
   {"mesh", (PyCFunction) python_mesh, METH_VARARGS | METH_KEYWORDS, "exports mesh."},
-#endif  
   {"oversample", (PyCFunction) python_oversample, METH_VARARGS | METH_KEYWORDS, "oversample."},
 
   {"output", (PyCFunction) python_output, METH_VARARGS | METH_KEYWORDS, "Output the result."},
@@ -2349,9 +2345,7 @@ PyMethodDef PyOpenSCADMethods[] = {
   {"roof", (PyCFunction) python_roof_oo, METH_VARARGS | METH_KEYWORDS, "Roof Object."},
   {"output", (PyCFunction) python_output_oo, METH_VARARGS | METH_KEYWORDS, "Output the result."},
   {"color", (PyCFunction) python_color_oo, METH_VARARGS | METH_KEYWORDS, "Output the result."},
-#ifdef ENABLE_LIBFIVE  
   {"mesh", (PyCFunction) python_mesh_oo, METH_VARARGS | METH_KEYWORDS, "Exports Mesh."},
-#endif  
   {"oversample", (PyCFunction) python_oversample_oo, METH_VARARGS | METH_KEYWORDS, "Oversample."},
   {NULL, NULL, 0, NULL}
 };
