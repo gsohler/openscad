@@ -384,8 +384,9 @@ std::shared_ptr<AbstractNode> python_modulefunc(const ModuleInstantiation *op_mo
 
 		if(funcresult->ob_type == &PyOpenSCADType) result=PyOpenSCADObjectToNode(funcresult);
 		else {
-			LOG(message_group::Warning, Location::NONE, cxt->documentRoot(), "Python function result is not a solid.");
-			break;
+			// ignore wrong type. just output valid empty geometry
+//			LOG(message_group::Warning, Location::NONE, cxt->documentRoot(), "Python function result is not a solid.");
+//			break;
 		}
 	} while(0);
 	return result;
