@@ -54,7 +54,6 @@
 
 using namespace libfive;
 
-#define FAKE 
 const Geometry *FrepNode::createGeometry() const
 {
 	auto p = new PolySet(3, true);
@@ -123,9 +122,7 @@ const Geometry *FrepNode::createGeometry() const
 	p->append_vertex(3.500000, 3.500000, 3.500000);
 	p->append_vertex(-0.500000, 3.500000, 3.500000);
 #else		
-		printf("render start\n");
                 mesh = Mesh::render(*tree[0], reg ,settings);
-		printf("render end %d\n",mesh->branes.size());
 		if(mesh != NULL) {
 			libfive_tri t;
 			// TODO libfive trees mergen
@@ -140,7 +137,6 @@ const Geometry *FrepNode::createGeometry() const
 				}
 			}
 		}
-		printf("convert end\n");
 #endif		
 	} else if(exp->ob_type == &PyFunction_Type) {
 		printf("Python Function!\n");

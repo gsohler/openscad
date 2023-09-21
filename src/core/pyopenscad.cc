@@ -490,8 +490,8 @@ sys.stderr = stderr_bak\n\
 	    char libdir[256];
 	    snprintf(libdir, 256, "%s/../libraries/python/",PlatformUtils::applicationPath().c_str()); /* add libraries/python to python search path */
 	    PyConfig_SetBytesString(&config, &config.pythonpath_env, libdir);
-	    Py_Initialize();
-            //Py_InitializeFromConfig(&config);
+//	    Py_Initialize();
+            Py_InitializeFromConfig(&config);
             PyConfig_Clear(&config);
 
 	    pythonMainModule =  PyImport_AddModule("__main__");
