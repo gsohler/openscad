@@ -35,8 +35,8 @@ static PyObject *PyInit_openscad(void);
 
 // https://docs.python.org/3.10/extending/newtypes.html 
 
-static PyObject *pythonInitDict=NULL;
-static PyObject *pythonMainModule = NULL ;
+PyObject *pythonInitDict=NULL;
+PyObject *pythonMainModule = NULL ;
 bool python_active;
 bool python_trusted;
 #include "PlatformUtils.h"
@@ -424,7 +424,6 @@ Value python_convertresult(PyObject *arg)
 
 Value python_functionfunc(const FunctionCall *call,const std::shared_ptr<const Context> &cxt  )
 {
-	printf("python_functionfunc\n");
 	const char *errorstr = NULL;
 	PyObject *funcresult = python_callfunction(cxt,call->name, call->arguments, errorstr);
 	if (errorstr != NULL)
@@ -444,6 +443,45 @@ PyMODINIT_FUNC PyInit_PyLibFive(void);
 /*
  * Main python evaluation entry
  */
+
+void initPython(void)
+{
+    if(pythonInitDict) { /* If already initialized, undo to reinitialize after */
+      finishPython();
+    }
+    if(!pythonInitDict) {
+	    char run_str[80];
+	    PyImport_AppendInittab("openscad", &PyInit_openscad);
+#ifdef ENABLE_LIBFIVE	    
+	    PyImport_AppendInittab("libfive", &PyInit_libfive);
+#endif	    
+	    PyConfig config;
+            PyConfig_InitPythonConfig(&config);
+	    char libdir[256];
+	    snprintf(libdir, 256, "%s/../libraries/python/",PlatformUtils::applicationPath().c_str()); /* add libraries/python to python search path */
+	    PyConfig_SetBytesString(&config, &config.pythonpath_env, libdir);
+//	    Py_Initialize();
+            Py_InitializeFromConfig(&config);
+            PyConfig_Clear(&config);
+
+	    pythonMainModule =  PyImport_AddModule("__main__");
+	    pythonInitDict = PyModule_GetDict(pythonMainModule);
+	    PyInit_PyOpenSCAD();
+#ifdef ENABLE_LIBFIVE	    
+	    PyInit_PyLibFive();
+#endif	    
+	    sprintf(run_str,"from openscad import *\nfa=12.0\nfn=0.0\nfs=2.0\nt=%g",time);
+	    PyRun_String(run_str, Py_file_input, pythonInitDict, pythonInitDict);
+    }
+}
+
+void finishPython(void)
+{
+      if (Py_FinalizeEx() < 0) {
+        exit(120);
+      }
+      pythonInitDict=NULL;
+}
 
 std::string evaluatePython(const std::string & code, double time,AssignmentList &assignments)
 {
@@ -474,36 +512,6 @@ sys.stdout = stdout_bak\n\
 sys.stderr = stderr_bak\n\
 ";
 
-    if(pythonInitDict) { /* If already initialized, undo to reinitialize after */
-      if (Py_FinalizeEx() < 0) {
-        exit(120);
-      }
-      pythonInitDict=NULL;
-    }
-    if(!pythonInitDict) {
-	    char run_str[80];
-	    PyImport_AppendInittab("openscad", &PyInit_openscad);
-#ifdef ENABLE_LIBFIVE	    
-	    PyImport_AppendInittab("libfive", &PyInit_libfive);
-#endif	    
-	    PyConfig config;
-            PyConfig_InitPythonConfig(&config);
-	    char libdir[256];
-	    snprintf(libdir, 256, "%s/../libraries/python/",PlatformUtils::applicationPath().c_str()); /* add libraries/python to python search path */
-	    PyConfig_SetBytesString(&config, &config.pythonpath_env, libdir);
-//	    Py_Initialize();
-            Py_InitializeFromConfig(&config);
-            PyConfig_Clear(&config);
-
-	    pythonMainModule =  PyImport_AddModule("__main__");
-	    pythonInitDict = PyModule_GetDict(pythonMainModule);
-	    PyInit_PyOpenSCAD();
-#ifdef ENABLE_LIBFIVE	    
-	    PyInit_PyLibFive();
-#endif	    
-	    sprintf(run_str,"from openscad import *\nfa=12.0\nfn=0.0\nfs=2.0\nt=%g",time);
-	    PyRun_String(run_str, Py_file_input, pythonInitDict, pythonInitDict);
-    }
     PyRun_SimpleString(python_init_code);
     PyObject *result = PyRun_String(code.c_str(), Py_file_input, pythonInitDict, pythonInitDict); /* actual code is run here */
 

@@ -99,6 +99,8 @@
 
 #ifdef ENABLE_PYTHON
 extern std::shared_ptr<AbstractNode> python_result_node;
+void initPython(void);
+void finishPython(void);
 std::string evaluatePython(const std::string &code, double time,AssignmentList &assignments);
 extern bool python_trusted;
 
@@ -1986,6 +1988,7 @@ void MainWindow::parseTopLevelDocument()
 
     }
 
+    initPython();
     auto error = evaluatePython(fulltext_py_eval,this->animateWidget->getAnim_tval(),root_file->scope.assignments);
     if (error.size() > 0) LOG(message_group::Error, Location::NONE, "", error.c_str());
 
@@ -2001,6 +2004,7 @@ void MainWindow::parseTopLevelDocument()
     } else {
       this->activeEditor->parameterWidget->setEnabled(false);
     }
+    finishPython();
 
   } else // python not enabled
 #endif // ifdef ENABLE_PYTHON
