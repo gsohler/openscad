@@ -548,12 +548,7 @@ sys.stderr = stderr_bak\n\
         found=true;
       }
       if(found == true) {
-        AnnotationList annotationList;
-        annotationList.push_back(Annotation("Parameter",std::make_shared<Literal>("Parameter")));
-        annotationList.push_back(Annotation("Description",std::make_shared<Literal>("Description")));
-        annotationList.push_back(Annotation("Group",std::make_shared<Literal>("Group")));
         auto assignment = std::make_shared<Assignment>(key_str,lit);
-        assignment->addAnnotations(&annotationList);
         assignments.push_back(assignment);
       }
     }

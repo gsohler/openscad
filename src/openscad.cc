@@ -429,7 +429,7 @@ int cmdline(const CommandLine& cmd)
   }
 
   // add parameter to AST
-  CommentParser::collectParameters(text.c_str(), root_file);
+  CommentParser::collectParameters(text.c_str(), root_file, '/');
   if (!cmd.parameterFile.empty() && !cmd.setName.empty()) {
     ParameterObjects parameters = ParameterObjects::fromSourceFile(root_file);
     ParameterSets sets;

@@ -5,6 +5,6 @@
 namespace CommentParser {
 
 shared_ptr<Expression> parser(const char *text);
-void collectParameters(const std::string& fulltext, SourceFile *root_file);
+void collectParameters(const std::string& fulltext, SourceFile *root_file,char comment_char);
 
 }

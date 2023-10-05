@@ -104,13 +104,11 @@ void finishPython(void);
 std::string evaluatePython(const std::string &code, double time,AssignmentList &assignments);
 extern bool python_trusted;
 
-//#include "cryptopp/sha.h"
-//#include "cryptopp/filters.h"
-//#include "cryptopp/base64.h"
+#include "cryptopp/sha.h"
+#include "cryptopp/filters.h"
+#include "cryptopp/base64.h"
 
 std::string SHA256HashString(std::string aString){
-    return "";
-/*    
     std::string digest;
     CryptoPP::SHA256 hash;
 
@@ -120,7 +118,6 @@ std::string SHA256HashString(std::string aString){
          new CryptoPP::StringSink(digest))));
 
     return digest;
-*/    
 }
 
 #endif
@@ -1937,13 +1934,32 @@ void MainWindow::parseTopLevelDocument()
   boost::regex ex_number( R"(^(\w+)\s*=\s*(-?[\d.]+))");
   boost::regex ex_string( R"(^(\w+)\s*=\s*\"([^\"]*)\")");
   if (this->python_active) {
-    // now replace all new variables
 
     this->parsed_file = nullptr; // because the parse() call can throw and we don't want a stale pointer!
     this->root_file = nullptr;  // ditto
     fs::path parser_sourcefile = fs::path(fname).generic_string();				
     this->root_file =new SourceFile(parser_sourcefile.parent_path().string(), parser_sourcefile.filename().string());
     this->parsed_file = this->root_file;
+
+    initPython();
+    this->activeEditor->resetHighlighting();
+    if (this->root_file != nullptr) {
+      //add parameters as annotation in AST
+      if(this->assignments_save.size() == 0) {
+        auto error = evaluatePython(fulltext_py,0,this->assignments_save); // add assignments
+        if (error.size() > 0) LOG(message_group::Error, Location::NONE, "", error.c_str());
+      }
+      this->root_file->scope.assignments = this->assignments_save;
+      CommentParser::collectParameters(fulltext_py, this->root_file, '#' );  // add annotations
+      this->activeEditor->parameterWidget->setParameters(this->root_file, "\n"); // set widgets values
+      this->activeEditor->parameterWidget->applyParameters(this->root_file); // use widget values
+      this->activeEditor->parameterWidget->setEnabled(true);
+      this->activeEditor->setIndicator(this->root_file->indicatorData);
+    } else {
+      this->activeEditor->parameterWidget->setEnabled(false);
+    }
+
+    // now replace all new variables
 
     std::istringstream iss(fulltext_py);
     boost::smatch results;
@@ -1952,7 +1968,7 @@ void MainWindow::parseTopLevelDocument()
       bool found=false;
 
       if (boost::regex_search(line, results, ex_number) && results.size() >= 3) {
-	for (auto par: this->assignments_last) {
+	for (auto par: this->root_file->scope.assignments) {
           const std::shared_ptr<Expression> &expr = par->getExpr();
           if (!expr->isLiteral()) continue; // Only consider literals
             if(par->getName() == results[1]) {
@@ -1967,7 +1983,7 @@ void MainWindow::parseTopLevelDocument()
         }
       }
       if (boost::regex_search(line, results, ex_string) && results.size() >= 3) {
-	for (auto par: this->assignments_last) {
+	for (auto par: this->root_file->scope.assignments) {
           const std::shared_ptr<Expression> &expr = par->getExpr();
           if (!expr->isLiteral()) continue; // Only consider literals
             if(par->getName() == results[1]) {
@@ -1988,22 +2004,8 @@ void MainWindow::parseTopLevelDocument()
 
     }
 
-    initPython();
-    auto error = evaluatePython(fulltext_py_eval,this->animateWidget->getAnim_tval(),root_file->scope.assignments);
+    auto error = evaluatePython(fulltext_py_eval,this->animateWidget->getAnim_tval(),this->assignments_save); // add assignments
     if (error.size() > 0) LOG(message_group::Error, Location::NONE, "", error.c_str());
-
-    this->activeEditor->resetHighlighting();
-    if (this->root_file != nullptr) {
-      //add parameters as annotation in AST
-//      CommentParser::collectParameters("\n", this->root_file);
-      this->activeEditor->parameterWidget->setParameters(this->root_file, "\n");
-      this->activeEditor->parameterWidget->applyParameters(this->root_file);
-      this->activeEditor->parameterWidget->setEnabled(true);
-      this->activeEditor->setIndicator(this->root_file->indicatorData);
-      this->assignments_last = root_file->scope.assignments;
-    } else {
-      this->activeEditor->parameterWidget->setEnabled(false);
-    }
     finishPython();
 
   } else // python not enabled
@@ -2016,7 +2018,7 @@ void MainWindow::parseTopLevelDocument()
   this->activeEditor->resetHighlighting();
   if (this->root_file != nullptr) {
     //add parameters as annotation in AST
-    CommentParser::collectParameters(fulltext, this->root_file);
+    CommentParser::collectParameters(fulltext, this->root_file, '/' );
     this->activeEditor->parameterWidget->setParameters(this->root_file, fulltext);
     this->activeEditor->parameterWidget->applyParameters(this->root_file);
     this->activeEditor->parameterWidget->setEnabled(true);
