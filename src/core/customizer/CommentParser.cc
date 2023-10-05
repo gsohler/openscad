@@ -15,6 +15,8 @@ struct GroupInfo {
 };
 
 // TODO reparse on save
+//  TODO checkbox, value list
+//
 using GroupList = std::vector<GroupInfo>;
 
 /*

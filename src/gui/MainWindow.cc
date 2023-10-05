@@ -1979,6 +1979,12 @@ void MainWindow::parseTopLevelDocument()
                 fulltext_py_eval.append(std::to_string(lit->toDouble()));
                 found=true;
 	      }
+	      if(lit->isBool()) {
+                fulltext_py_eval.append(results[1]);
+                fulltext_py_eval.append("=");
+                fulltext_py_eval.append(lit->toBool()?"True":"False");
+                found=true;
+	      }
           } 
         }
       }

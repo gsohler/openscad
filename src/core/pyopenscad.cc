@@ -533,7 +533,13 @@ sys.stderr = stderr_bak\n\
       // annotation "Parameter" missing
       std::shared_ptr<Literal> lit;
       bool found=false;
-      if(PyFloat_Check(value)) {
+      if(value == Py_True) {
+        lit = std::make_shared<Literal>(true,Location::NONE);
+        found=true;
+      } else if(value == Py_False) {
+        lit = std::make_shared<Literal>(false,Location::NONE);
+        found=true;
+      } else if(PyFloat_Check(value)) {
         lit  = std::make_shared<Literal>(PyFloat_AsDouble(value),Location::NONE);
         found=true;
       }
