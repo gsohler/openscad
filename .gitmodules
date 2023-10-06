@@ -15,9 +15,6 @@
 [submodule "sanitizers-cmake"]
 	path = submodules/sanitizers-cmake
 	url = https://github.com/arsenm/sanitizers-cmake.git
-[submodule "cryptopp"]
-	path = submodules/cryptopp
-	url = https://github.com/weidai11/cryptopp.git
 [submodule "OpenCSG"]
 	path = submodules/OpenCSG
 	url = https://github.com/openscad/OpenCSG.git
