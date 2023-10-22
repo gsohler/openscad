@@ -1950,11 +1950,10 @@ void MainWindow::parseTopLevelDocument()
     this->activeEditor->resetHighlighting();
     if (this->root_file != nullptr) {
       //add parameters as annotation in AST
-      if(this->assignments_save.size() == 0) {
-        auto error = evaluatePython(fulltext_py,0,this->assignments_save); // add assignments
+      if(this->root_file->scope.assignments.size() == 0) {
+        auto error = evaluatePython(fulltext_py,0,this->root_file->scope.assignments); // add assignments
         if (error.size() > 0) LOG(message_group::Error, Location::NONE, "", error.c_str());
       }
-      this->root_file->scope.assignments = this->assignments_save;
       CommentParser::collectParameters(fulltext_py, this->root_file, '#' );  // add annotations
       this->activeEditor->parameterWidget->setParameters(this->root_file, "\n"); // set widgets values
       this->activeEditor->parameterWidget->applyParameters(this->root_file); // use widget values
@@ -2015,7 +2014,7 @@ void MainWindow::parseTopLevelDocument()
 
     }
 
-    auto error = evaluatePython(fulltext_py_eval,this->animateWidget->getAnim_tval(),this->assignments_save); // add assignments
+    auto error = evaluatePython(fulltext_py_eval,this->animateWidget->getAnim_tval(),this->root_file->scope.assignments); // add assignments
     if (error.size() > 0) LOG(message_group::Error, Location::NONE, "", error.c_str());
     finishPython();
 
