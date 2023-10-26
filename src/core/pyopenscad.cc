@@ -31,7 +31,7 @@
 #include "PlatformUtils.h"
 #include <Context.h>
 
-/#define HAVE_PYTHON_YIELD
+#define HAVE_PYTHON_YIELD
 static PyObject *PyInit_openscad(void);
 
 // https://docs.python.org/3.10/extending/newtypes.html 
