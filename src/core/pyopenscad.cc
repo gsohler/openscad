@@ -31,6 +31,7 @@
 #include "PlatformUtils.h"
 #include <Context.h>
 
+/#define HAVE_PYTHON_YIELD
 static PyObject *PyInit_openscad(void);
 
 // https://docs.python.org/3.10/extending/newtypes.html 
@@ -444,11 +445,26 @@ PyMODINIT_FUNC PyInit_PyLibFive(void);
  * Main python evaluation entry
  */
 
+#ifdef HAVE_PYTHON_YIELD
+std::vector<PyObject *> python_orphan_objs;
+extern "C" {
+	void set_object_callback(void (*object_capture_callback)(PyObject *));
+}
+void openscad_object_callback(PyObject *obj) {
+	if(obj->ob_type == &PyOpenSCADType) {
+  		Py_INCREF(obj);
+		python_orphan_objs.push_back(obj);
+	}
+}
+#endif
 void initPython(void)
 {
     if(pythonInitDict) { /* If already initialized, undo to reinitialize after */
       finishPython();
     }
+#ifdef HAVE_PYTHON_YIELD
+    set_object_callback(openscad_object_callback);
+#endif
     if(!pythonInitDict) {
 	    char run_str[80];
 	    PyImport_AppendInittab("openscad", &PyInit_openscad);
@@ -481,6 +497,23 @@ void finishPython(void)
         exit(120);
       }
       pythonInitDict=NULL;
+#ifdef HAVE_PYTHON_YIELD
+      set_object_callback(NULL);
+      if(python_result_node == nullptr) {
+        if(python_orphan_objs.size() == 1) {
+  	  python_result_node = PyOpenSCADObjectToNode(python_orphan_objs[0]);
+        } else if(python_orphan_objs.size() > 1) {
+          DECLARE_INSTANCE
+	  auto node = std::make_shared<CsgOpNode>(instance, OpenSCADOperator::UNION);
+          int n = python_orphan_objs.size();
+          for (int i = 0; i < n; i++) {
+            std::shared_ptr<AbstractNode> child = PyOpenSCADObjectToNode(python_orphan_objs[i]);
+            node->children.push_back(child);
+          } 
+          python_result_node=node;
+        } 
+      }
+#endif
 }
 
 std::string evaluatePython(const std::string & code, double time,AssignmentList &assignments)
@@ -513,6 +546,12 @@ sys.stderr = stderr_bak\n\
 ";
 
     PyRun_SimpleString(python_init_code);
+#ifdef HAVE_PYTHON_YIELD
+    for(auto obj : python_orphan_objs) {
+        Py_DECREF(obj);
+    }
+    python_orphan_objs.clear();
+#endif
     PyObject *result = PyRun_String(code.c_str(), Py_file_input, pythonInitDict, pythonInitDict); /* actual code is run here */
 
     PyObject *key, *value;
