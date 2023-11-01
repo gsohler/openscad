@@ -798,6 +798,54 @@ PyObject *python_translate(PyObject *self, PyObject *args, PyObject *kwargs)
   return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
 }
 
+PyObject *python_dir_sub(PyObject *self, PyObject *args, PyObject *kwargs,int mode)
+{
+  DECLARE_INSTANCE
+  std::shared_ptr<AbstractNode> child;
+
+  auto node = std::make_shared<TransformNode>(instance, "translate");
+
+  char *kwlist[] = {"obj", "v", NULL};
+  PyObject *obj = NULL;
+  double dist;
+  double x = 0, y = 0, z = 0;
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "Od", kwlist,
+                                   &obj,
+                                   &dist
+                                   )) {
+    PyErr_SetString(PyExc_TypeError, "Error during parsing translate(object,vec3)");
+    return NULL;
+  }
+  child = PyOpenSCADObjectToNodeMulti(obj);
+  if (child == NULL) {
+    PyErr_SetString(PyExc_TypeError, "Invalid type for Object in translate");
+    return NULL;
+  }
+
+  Vector3d translatevec(dist, 0, 0);
+  if(mode == 0) node->matrix.translate(Vector3d(dist,0,0));
+  if(mode == 1) node->matrix.translate(Vector3d(-dist,0,0));
+  if(mode == 2) node->matrix.translate(Vector3d(0,-dist,0));
+  if(mode == 3) node->matrix.translate(Vector3d(0,dist,0));
+  if(mode == 4) node->matrix.translate(Vector3d(0,0,-dist));
+  if(mode == 5) node->matrix.translate(Vector3d(0,0,dist));
+  if(mode == 6) { Matrix3d rots=angle_axis_degrees(dist, Vector3d(1,0,0)); node->matrix.rotate(rots); }
+  if(mode == 7) { Matrix3d rots=angle_axis_degrees(dist, Vector3d(0,1,0)); node->matrix.rotate(rots); }
+  if(mode == 8) { Matrix3d rots=angle_axis_degrees(dist, Vector3d(0,0,1)); node->matrix.rotate(rots); }
+  node->children.push_back(child);
+  return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
+}
+
+PyObject *python_right(PyObject *self, PyObject *args, PyObject *kwargs) { return python_dir_sub(self, args,kwargs, 0); }
+PyObject *python_left(PyObject *self, PyObject *args, PyObject *kwargs) { return python_dir_sub(self, args,kwargs, 1); }
+PyObject *python_front(PyObject *self, PyObject *args, PyObject *kwargs) { return python_dir_sub(self, args,kwargs, 2); }
+PyObject *python_back(PyObject *self, PyObject *args, PyObject *kwargs) { return python_dir_sub(self, args,kwargs, 3); }
+PyObject *python_down(PyObject *self, PyObject *args, PyObject *kwargs) { return python_dir_sub(self, args,kwargs, 4); }
+PyObject *python_up(PyObject *self, PyObject *args, PyObject *kwargs) { return python_dir_sub(self, args,kwargs, 5); }
+PyObject *python_rotx(PyObject *self, PyObject *args, PyObject *kwargs) { return python_dir_sub(self, args,kwargs, 6); }
+PyObject *python_roty(PyObject *self, PyObject *args, PyObject *kwargs) { return python_dir_sub(self, args,kwargs, 7); }
+PyObject *python_rotz(PyObject *self, PyObject *args, PyObject *kwargs) { return python_dir_sub(self, args,kwargs, 8); }
+
 PyObject *python_translate_oo(PyObject *self, PyObject *args, PyObject *kwargs)
 {
   PyObject *new_args = python_oo_args(self, args);
@@ -805,6 +853,22 @@ PyObject *python_translate_oo(PyObject *self, PyObject *args, PyObject *kwargs)
   return result;
 }
 
+PyObject *python_dir_oo_sub(PyObject *self, PyObject *args, PyObject *kwargs, int mode)
+{
+  PyObject *new_args = python_oo_args(self, args);
+  PyObject *result = python_dir_sub(self, new_args, kwargs,mode);
+  return result;
+}
+
+PyObject *python_right_oo(PyObject *self, PyObject *args, PyObject *kwargs) { return python_dir_oo_sub(self, args,kwargs, 0); }
+PyObject *python_left_oo(PyObject *self, PyObject *args, PyObject *kwargs) { return python_dir_oo_sub(self, args,kwargs, 1); }
+PyObject *python_front_oo(PyObject *self, PyObject *args, PyObject *kwargs) { return python_dir_oo_sub(self, args,kwargs, 2); }
+PyObject *python_back_oo(PyObject *self, PyObject *args, PyObject *kwargs) { return python_dir_oo_sub(self, args,kwargs, 3); }
+PyObject *python_down_oo(PyObject *self, PyObject *args, PyObject *kwargs) { return python_dir_oo_sub(self, args,kwargs, 4); }
+PyObject *python_up_oo(PyObject *self, PyObject *args, PyObject *kwargs) { return python_dir_oo_sub(self, args,kwargs, 5); }
+PyObject *python_rotx_oo(PyObject *self, PyObject *args, PyObject *kwargs) { return python_dir_oo_sub(self, args,kwargs, 6); }
+PyObject *python_roty_oo(PyObject *self, PyObject *args, PyObject *kwargs) { return python_dir_oo_sub(self, args,kwargs, 7); }
+PyObject *python_rotz_oo(PyObject *self, PyObject *args, PyObject *kwargs) { return python_dir_oo_sub(self, args,kwargs, 8); }
 
 PyObject *python_multmatrix(PyObject *self, PyObject *args, PyObject *kwargs)
 {
@@ -2313,6 +2377,15 @@ PyMethodDef PyOpenSCADFunctions[] = {
 #endif  
 
   {"translate", (PyCFunction) python_translate, METH_VARARGS | METH_KEYWORDS, "Move  Object."},
+  {"right", (PyCFunction) python_right, METH_VARARGS | METH_KEYWORDS, "Move  Object."},
+  {"left", (PyCFunction) python_left, METH_VARARGS | METH_KEYWORDS, "Move Left Object."},
+  {"back", (PyCFunction) python_back, METH_VARARGS | METH_KEYWORDS, "Move Back Object."},
+  {"front", (PyCFunction) python_front, METH_VARARGS | METH_KEYWORDS, "Move Front Object."},
+  {"up", (PyCFunction) python_up, METH_VARARGS | METH_KEYWORDS, "Move Up Object."},
+  {"down", (PyCFunction) python_down, METH_VARARGS | METH_KEYWORDS, "Move Down Object."},
+  {"rotx", (PyCFunction) python_rotx, METH_VARARGS | METH_KEYWORDS, "Rotate X Object."},
+  {"roty", (PyCFunction) python_roty, METH_VARARGS | METH_KEYWORDS, "Rotate Y Object."},
+  {"rotz", (PyCFunction) python_rotz, METH_VARARGS | METH_KEYWORDS, "Rotate Z Object."},
   {"rotate", (PyCFunction) python_rotate, METH_VARARGS | METH_KEYWORDS, "Rotate Object."},
   {"scale", (PyCFunction) python_scale, METH_VARARGS | METH_KEYWORDS, "Scale Object."},
   {"mirror", (PyCFunction) python_mirror, METH_VARARGS | METH_KEYWORDS, "Mirror Object."},
@@ -2351,6 +2424,15 @@ PyMethodDef PyOpenSCADFunctions[] = {
 
 PyMethodDef PyOpenSCADMethods[] = {
   {"translate", (PyCFunction) python_translate_oo, METH_VARARGS | METH_KEYWORDS, "Move  Object."},
+  {"right", (PyCFunction) python_right_oo, METH_VARARGS | METH_KEYWORDS, "Move Right Object."},
+  {"left", (PyCFunction) python_left_oo, METH_VARARGS | METH_KEYWORDS, "Move Left Object."},
+  {"back", (PyCFunction) python_back_oo, METH_VARARGS | METH_KEYWORDS, "Move Back Object."},
+  {"front", (PyCFunction) python_front_oo, METH_VARARGS | METH_KEYWORDS, "Move Front Object."},
+  {"up", (PyCFunction) python_up_oo, METH_VARARGS | METH_KEYWORDS, "Move Up Object."},
+  {"down", (PyCFunction) python_down_oo, METH_VARARGS | METH_KEYWORDS, "Move Down Object."},
+  {"rotx", (PyCFunction) python_rotx_oo, METH_VARARGS | METH_KEYWORDS, "Rotate X Object."},
+  {"roty", (PyCFunction) python_roty_oo, METH_VARARGS | METH_KEYWORDS, "Rotate Y Object."},
+  {"rotz", (PyCFunction) python_rotz_oo, METH_VARARGS | METH_KEYWORDS, "Rotate Z Object."},
   {"rotate", (PyCFunction) python_rotate_oo, METH_VARARGS | METH_KEYWORDS, "Rotate Object."},
   {"scale", (PyCFunction) python_scale_oo, METH_VARARGS | METH_KEYWORDS, "Scale Object."},
   {"union", (PyCFunction) python_union_oo, METH_VARARGS | METH_KEYWORDS, "Union Object."},
