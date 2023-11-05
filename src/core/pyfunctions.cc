@@ -1235,13 +1235,13 @@ PyObject *python_rotate_extrude(PyObject *self, PyObject *args, PyObject *kwargs
   double angle = 360.0;
   PyObject *twist=NULL;
   PyObject *origin = NULL;
+  PyObject *offset = NULL;
   double fn = NAN, fa = NAN, fs = NAN;
 
   get_fnas(fn,fa,fs);
+  char *kwlist[] = {"obj", "layer", "convexity", "scale", "angle", "twist", "origin", "offset", "fn", "fa", "fs", NULL};
 
-  char *kwlist[] = {"obj", "layer", "convexity", "scale", "angle", "twist", "origin", "fn", "fa", "fs", NULL};
-
-   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|siddOOddd", kwlist, 
+   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|siddOOOddd", kwlist, 
                           &obj,
 			  &layer,
 			  &convexity,
@@ -1249,6 +1249,7 @@ PyObject *python_rotate_extrude(PyObject *self, PyObject *args, PyObject *kwargs
 			  &angle,
 			  &twist,
 			  &origin,
+			  &offset,
 			  &fn,&fa,&fs
                           )) {
 
@@ -1293,8 +1294,10 @@ PyObject *python_rotate_extrude(PyObject *self, PyObject *args, PyObject *kwargs
     node->origin_x = PyFloat_AsDouble(PyList_GetItem(origin, 0));
     node->origin_y = PyFloat_AsDouble(PyList_GetItem(origin, 1));
   }
-
-
+  if (offset != NULL && PyList_Check(offset) && PyList_Size(offset) == 2) {
+    node->offset_x = PyFloat_AsDouble(PyList_GetItem(offset, 0));
+    node->offset_y = PyFloat_AsDouble(PyList_GetItem(offset, 1));
+  }
 
   if (node->convexity <= 0) node->convexity = 2;
   if (node->scale <= 0) node->scale = 1;

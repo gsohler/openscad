@@ -104,6 +104,7 @@ std::string RotateExtrudeNode::toString() const
       "file = " << this->filename << ", "
       "layer = " << QuotedString(this->layername) << ", "
       "origin = [" << std::dec << this->origin_x << ", " << this->origin_y << "], "
+      "offset = [" << std::dec << this->offset_x << ", " << this->offset_y << "], "
       "scale = " << this->scale << ", "
            << "timestamp = " << (fs::exists(path) ? fs::last_write_time(path) : 0) << ", "
     ;

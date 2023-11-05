@@ -256,12 +256,26 @@ static int PyOpenSCADInit(PyOpenSCADObject *self, PyObject *arfs, PyObject *kwds
 }
 
 std::shared_ptr<AbstractNode> python_result_node = NULL;
-Outline2d python_getprofile(PyObject *cbfunc, double arg)
+Outline2d python_getprofile(PyObject *cbfunc, int fn, double arg)
 {
 	Outline2d result;
+	if(pythonInitDict == NULL)  initPython();
 	PyObject* args = PyTuple_Pack(1,PyFloat_FromDouble(arg));
 	PyObject* polygon = PyObject_CallObject(cbfunc, args);
-	if(polygon && PyList_Check(polygon)) {
+	if(polygon == NULL) { // TODO fix
+		for(unsigned int i=0;i < fn;i++) {
+			double ang=360.0*(i/(double) fn);
+			PyObject* args = PyTuple_Pack(2,PyFloat_FromDouble(arg),PyFloat_FromDouble(ang));
+			Py_XINCREF(args);
+			PyObject* pypt = PyObject_CallObject(cbfunc, args);
+			double r=PyFloat_AsDouble(pypt);
+			if(r < 0) r=-r;  // TODO who the hell knows, why this is needed
+			double ang1=ang*3.1415/180.0;
+			double x=r*cos(ang1);
+			double y=r*sin(ang1);
+			result.vertices.push_back(Vector2d(x,y));
+		}
+	} else if(polygon && PyList_Check(polygon)) {
 		unsigned int n=PyList_Size(polygon);
 		for(unsigned int i=0;i < n;i++) {
 			PyObject *pypt = PyList_GetItem(polygon, i);
@@ -466,7 +480,7 @@ void initPython(void)
     set_object_callback(openscad_object_callback);
 #endif
     if(!pythonInitDict) {
-	    char run_str[80];
+	    char run_str[200];
 	    PyImport_AppendInittab("openscad", &PyInit_openscad);
 #ifdef ENABLE_LIBFIVE	    
 	    PyImport_AppendInittab("libfive", &PyInit_libfive);
@@ -486,7 +500,7 @@ void initPython(void)
 #ifdef ENABLE_LIBFIVE	    
 	    PyInit_PyLibFive();
 #endif	    
-	    sprintf(run_str,"from openscad import *\nfa=12.0\nfn=0.0\nfs=2.0\nt=%g",time);
+	    sprintf(run_str,"from builtins import *\nfrom openscad import *\nfa=12.0\nfn=0.0\nfs=2.0\nt=%g",time);
 	    PyRun_String(run_str, Py_file_input, pythonInitDict, pythonInitDict);
     }
 }

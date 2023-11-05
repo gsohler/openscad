@@ -1698,7 +1698,7 @@ static Outline2d splitOutlineByFn(
   return o2;
 }
 
-static Outline2d alterprofile(Outline2d profile,double scalex, double scaley, double origin_x, double origin_y,double rot)
+static Outline2d alterprofile(Outline2d profile,double scalex, double scaley, double origin_x, double origin_y,double offset_x, double offset_y, double rot)
 {
 	Outline2d result;
 	double ang=rot*3.14/180.0;
@@ -1708,8 +1708,8 @@ static Outline2d alterprofile(Outline2d profile,double scalex, double scaley, do
 	for(int i=0;i<n;i++) {
 		double x=(profile.vertices[i][0]-origin_x)*scalex;
 		double y=(profile.vertices[i][1]-origin_y)*scaley;
-		double xr = (x*c - y*s)+origin_x;
-		double yr = (y*c + x*s)+origin_y;
+		double xr = (x*c - y*s)+origin_x + offset_x;
+		double yr = (y*c + x*s)+origin_y + offset_y;
 		result.vertices.push_back(Vector2d(xr,yr));
 	}
 	return result;
@@ -1926,7 +1926,7 @@ static Geometry *extrudePolygon(const LinearExtrudeNode& node, const Polygon2d& 
         } else lower_rot=0;
 
 	// Add Bottom face
-	lowerFace = alterprofile(python_getprofile(node.profile_func, 0),lower_scalex, lower_scaley,node.origin_x, node.origin_y, lower_rot);
+	lowerFace = alterprofile(python_getprofile(node.profile_func, node.fn, 0),lower_scalex, lower_scaley,node.origin_x, node.origin_y, 0, 0, lower_rot);
 	Polygon2d botface;
         botface.addOutline(lowerFace);
     	PolySet *ps_bot = botface.tessellate();
@@ -1944,7 +1944,7 @@ static Geometry *extrudePolygon(const LinearExtrudeNode& node, const Polygon2d& 
 	          upper_rot = python_doublefunc(node.twist_func, i/(double)slices);
         	} else upper_rot=i*node.twist /slices;
 		if(node.center) upper_h -= node.height/2;
-		upperFace = alterprofile(python_getprofile(node.profile_func, upper_h), upper_scalex, upper_scaley , node.origin_x, node.origin_y, upper_rot);
+		upperFace = alterprofile(python_getprofile(node.profile_func, node.fn, upper_h), upper_scalex, upper_scaley , node.origin_x, node.origin_y, 0, 0, upper_rot);
 		if(lowerFace.vertices.size() == upperFace.vertices.size()) {
 			unsigned int n=lowerFace.vertices.size();
 			for(unsigned int j=0;j<n;j++) {
@@ -2147,12 +2147,12 @@ static Geometry *extrudePolygon(const PathExtrudeNode& node, const Polygon2d& po
 	#ifdef ENABLE_PYTHON  
 	if(node.profile_func != NULL)
 	{
-		Outline2d tmpx=python_getprofile(node.profile_func, length_os[i%m]);
-        	profilemod = alterprofile(tmpx,cur_scalex,cur_scaley,node.origin_x, node.origin_y,cur_twist);
+		Outline2d tmpx=python_getprofile(node.profile_func, node.fn, length_os[i%m]);
+        	profilemod = alterprofile(tmpx,cur_scalex,cur_scaley,node.origin_x, node.origin_y,0, 0, cur_twist);
 	}
 	else
 	#endif  
-        profilemod = alterprofile(profile2d,cur_scalex,cur_scaley,node.origin_x, node.origin_y,cur_twist);
+        profilemod = alterprofile(profile2d,cur_scalex,cur_scaley,node.origin_x, node.origin_y,0, 0, cur_twist);
 
 	unsigned int n=profilemod.vertices.size();
 	curPt = path_os[i%m];
@@ -2366,9 +2366,9 @@ static Geometry *rotatePolygon(const RotateExtrudeNode& node, const Polygon2d& p
 #endif	
 	
 
+		lastFace = alterprofile(python_getprofile(node.profile_func, node.fn, 0),1.0, 1.0,node.origin_x, node.origin_y, node.offset_x, node.offset_y, last_twist);
 	if(node.angle != 360) {
 		// Add initial closing
-		lastFace = alterprofile(python_getprofile(node.profile_func, 0),1.0, 1.0,node.origin_x, node.origin_y, last_twist);
 		Polygon2d lastface;
 	        lastface.addOutline(lastFace);
     		PolySet *ps_last = lastface.tessellate();
@@ -2393,7 +2393,7 @@ static Geometry *rotatePolygon(const RotateExtrudeNode& node, const Polygon2d& p
 		} else
 		cur_twist=i*node.twist /fragments;
 
-		curFace = alterprofile(python_getprofile(node.profile_func, cur_ang), 1.0, 1.0 , node.origin_x, node.origin_y, cur_twist);
+		curFace = alterprofile(python_getprofile(node.profile_func, node.fn, cur_ang), 1.0, 1.0 , node.origin_x, node.origin_y, node.offset_x, node.offset_y , cur_twist);
 
 		if(lastFace.vertices.size() == curFace.vertices.size()) {
 			unsigned int n=lastFace.vertices.size();

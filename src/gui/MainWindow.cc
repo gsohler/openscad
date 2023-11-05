@@ -2011,7 +2011,7 @@ void MainWindow::parseTopLevelDocument()
 
     auto error = evaluatePython(fulltext_py_eval,this->animateWidget->getAnim_tval(),this->root_file->scope.assignments); // add assignments
     if (error.size() > 0) LOG(message_group::Error, Location::NONE, "", error.c_str());
-    finishPython();
+    finishPython(); // dont do that because callbacks are needed in GeometryEvalulator.cc
 
   } else // python not enabled
 #endif // ifdef ENABLE_PYTHON
