@@ -338,18 +338,19 @@ double calculateLineLineDistance(const Vector3d &l1b, const Vector3d &l1e, const
 	return d;
 }
 
-std::vector<SelectedObject> CGALRenderer::findModelObject(Vector3d near, Vector3d far,int mouse_x, int mouse_y, double tolerance) {
+std::vector<SelectedObject> CGALRenderer::findModelObject(Vector3d nearpt, Vector3d farpt,int mouse_x, int mouse_y, double tolerance) {
   std::vector<SelectedObject> results;
   double dist_near;
   double dist_nearest=NAN;
   Vector3d pt1_nearest;
   Vector3d pt2_nearest;
+  double dist_pt;
   for (const auto& p : this->getPolyhedrons()) {
   }
   for (const std::shared_ptr<const PolySet>& ps : this->polysets) {
     for(const Polygon &pol : ps->polygons) {
       for(const Vector3d &pt: pol) {
-        double dist_pt= calculateLinePointDistance(near, far, pt,dist_near);
+        dist_pt= calculateLinePointDistance(nearpt, farpt, pt,dist_near);
         if(dist_pt < tolerance  ) {
 	  if(isnan(dist_nearest) || dist_near < dist_nearest)
 	  {
@@ -375,7 +376,7 @@ std::vector<SelectedObject> CGALRenderer::findModelObject(Vector3d near, Vector3
 	  Vector3d pt1=pol[i];
 	  Vector3d pt2=pol[(i+1)%n];
 	  double dist_lat;
-          double dist_norm= fabs(calculateLineLineDistance(pt1, pt2, near, far,dist_lat));
+          double dist_norm= fabs(calculateLineLineDistance(pt1, pt2, nearpt, farpt,dist_lat));
           if(dist_lat >= 0 && dist_lat <= 1 && dist_norm < tolerance  ) {
 	      dist_nearest=dist_lat;
 	      pt1_nearest=pt1;

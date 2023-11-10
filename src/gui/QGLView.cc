@@ -534,14 +534,14 @@ std::vector<SelectedObject> QGLView::findObject(int mouse_x,int mouse_y)
 
   gluUnProject(winX, winY, 1, this->modelview, this->projection, viewport,&posXF, &posYF, &posZF);
   gluUnProject(winX, winY, -1, this->modelview, this->projection, viewport,&posXN, &posYN, &posZN);
-  Vector3d far(posXF, posYF, posZF);
-  Vector3d near(posXN, posYN, posZN);
-  Vector3d eyedir=far-near;
+  Vector3d farpt(posXF, posYF, posZF);
+  Vector3d nearpt(posXN, posYN, posZN);
+  Vector3d eyedir=farpt-nearpt;
 
   Vector3d testpt(0,0,0);
 
   auto renderer = this->getRenderer();
-  return renderer->findModelObject(near, far, mouse_x, mouse_y, cam.zoomValue()/300);
+  return renderer->findModelObject(nearpt, farpt, mouse_x, mouse_y, cam.zoomValue()/300);
 
 }
 
