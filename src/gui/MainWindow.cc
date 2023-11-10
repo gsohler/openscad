@@ -389,6 +389,7 @@ MainWindow::MainWindow(const QStringList& filenames)
   QSettingsCached settings;
   this->qglview->setMouseCentricZoom(Settings::Settings::mouseCentricZoom.value());
   this->qglview->setMouseSwapButtons(Settings::Settings::mouseSwapButtons.value());
+  this->qglview->measure_state = MEASURE_IDLE;
 
 
   autoReloadTimer = new QTimer(this);
@@ -468,6 +469,8 @@ MainWindow::MainWindow(const QStringList& filenames)
 #else
   this->designActionRender->setVisible(false);
 #endif
+  connect(this->designActionMeasureDist, SIGNAL(triggered()), this, SLOT(actionMeasureDistance()));
+  connect(this->designActionMeasureAngle, SIGNAL(triggered()), this, SLOT(actionMeasureAngle()));
   connect(this->designAction3DPrint, SIGNAL(triggered()), this, SLOT(action3DPrint()));
   connect(this->designCheckValidity, SIGNAL(triggered()), this, SLOT(actionCheckValidity()));
   connect(this->designActionDisplayAST, SIGNAL(triggered()), this, SLOT(actionDisplayAST()));
@@ -566,7 +569,8 @@ MainWindow::MainWindow(const QStringList& filenames)
   connect(this->qglview, SIGNAL(cameraChanged()), animateWidget, SLOT(cameraChanged()));
   connect(this->qglview, SIGNAL(cameraChanged()), viewportControlWidget, SLOT(cameraChanged()));
   connect(this->qglview, SIGNAL(resized()), viewportControlWidget, SLOT(viewResized()));
-  connect(this->qglview, SIGNAL(doSelectObject(QPoint)), this, SLOT(selectObject(QPoint)));
+  connect(this->qglview, SIGNAL(doRightClick(QPoint)), this, SLOT(rightClick(QPoint)));
+  connect(this->qglview, SIGNAL(doLeftClick(QPoint)), this, SLOT(leftClick(QPoint)));
 
   connect(Preferences::inst(), SIGNAL(requestRedraw()), this->qglview, SLOT(update()));
   connect(Preferences::inst(), SIGNAL(updateMouseCentricZoom(bool)), this->qglview, SLOT(setMouseCentricZoom(bool)));
@@ -630,6 +634,8 @@ MainWindow::MainWindow(const QStringList& filenames)
   initActionIcon(viewActionPerspective, ":/icons/svg-default/perspective.svg", ":/icons/svg-default/perspective-white.svg");
   initActionIcon(viewActionOrthogonal, ":/icons/svg-default/orthogonal.svg", ":/icons/svg-default/orthogonal-white.svg");
   initActionIcon(designActionPreview, ":/icons/svg-default/preview.svg", ":/icons/svg-default/preview-white.svg");
+  initActionIcon(designActionMeasureDist, ":/icons/svg-default/measure-dist.svg", ":/icons/svg-default/measure-dist-white.svg");
+  initActionIcon(designActionMeasureAngle, ":/icons/svg-default/measure-ang.svg", ":/icons/svg-default/measure-ang-white.svg");
   initActionIcon(fileActionExportSTL, ":/icons/svg-default/export-stl.svg", ":/icons/svg-default/export-stl-white.svg");
   initActionIcon(fileActionExportAMF, ":/icons/svg-default/export-amf.svg", ":/icons/svg-default/export-amf-white.svg");
   initActionIcon(fileActionExport3MF, ":/icons/svg-default/export-3mf.svg", ":/icons/svg-default/export-3mf-white.svg");
@@ -2416,12 +2422,137 @@ void MainWindow::actionRenderDone(const shared_ptr<const Geometry>& root_geom)
 
 #endif /* ENABLE_CGAL */
 
+void MainWindow::actionMeasureDistance()
+{
+	this->qglview->selected_obj.clear();
+	this->qglview->update();
+	this->qglview->measure_state=MEASURE_DIST1;
+}
+
+void MainWindow::actionMeasureAngle()
+{
+	this->qglview->selected_obj.clear();
+	this->qglview->update();
+	this->qglview->measure_state=MEASURE_ANG1;
+}
+
+extern double calculateLineLineDistance(const Vector3d &l1b, const Vector3d &l1e, const Vector3d &l2b, const Vector3d &l2e, double &dist_lat);
+extern double calculateLinePointDistance(const Vector3d &l1, const Vector3d &l2, const Vector3d &pt, double & dist_lat) ;
+
+void MainWindow::leftClick(QPoint mouse) 
+{
+  if(this->qglview->measure_state == MEASURE_IDLE) return;
+  this->qglview->selectPoint(mouse.x(),mouse.y());
+  double ang=NAN;
+  double dist=NAN;
+  SelectedObject obj1, obj2, obj3;
+  switch(qglview->measure_state) {
+		  case MEASURE_DIST1:
+			if(this->qglview->selected_obj.size() == 1) this->qglview->measure_state = MEASURE_DIST2;
+			break;
+		  case MEASURE_DIST2:
+			if(this->qglview->selected_obj.size() == 2)
+			{
+				double lat;
+				obj1=this->qglview->selected_obj[0];
+				obj2=this->qglview->selected_obj[1];
+				if(obj1.type == SELECTION_POINT && obj2.type == SELECTION_POINT) dist =(obj2.p1-obj1.p1).norm();
+				if(obj1.type == SELECTION_POINT && obj2.type == SELECTION_LINE) dist =calculateLinePointDistance(obj2.p1, obj2.p2,obj1.p1,lat);
+				if(obj1.type == SELECTION_LINE && obj2.type == SELECTION_POINT) dist =calculateLinePointDistance(obj1.p1, obj1.p2,obj2.p1,lat);
+				if(obj1.type == SELECTION_LINE && obj2.type == SELECTION_LINE) dist =calculateLineLineDistance(obj1.p1, obj1.p2,obj2.p1,obj2.p2,lat);
+				if(!isnan(dist)) {
+	    				std::stringstream ss;
+					ss << "Distance is " << fabs(dist);
+    					QMenu resultmenu(this);
+      					auto action = resultmenu.addAction(QString::fromStdString(ss.str()));
+        				connect(action, SIGNAL(triggered()), this, SLOT(qglview->measureFinished()));
+	    				resultmenu.exec(this->qglview->mapToGlobal(mouse));
+				}
+				this->qglview->selected_obj.clear();
+				this->qglview->shown_obj.clear();
+				this->qglview->update();
+				this->qglview->measure_state = MEASURE_IDLE;
+			}
+			break;
+		  case MEASURE_ANG1:
+			if(this->qglview->selected_obj.size() == 1) this->qglview->measure_state = MEASURE_ANG2;
+			break;
+		  case MEASURE_ANG2:
+			if(this->qglview->selected_obj.size() == 2)
+			{
+				obj1=this->qglview->selected_obj[0];
+				obj2=this->qglview->selected_obj[1];
+				Vector3d side1, side2;
+				if(obj1.type == SELECTION_LINE && obj2.type == SELECTION_POINT)
+				{
+					side1=(obj1.p2-obj1.p1).normalized();
+					side2=(obj1.p2-obj2.p1).normalized();
+					ang=acos(side1.dot(side2))*180.0/3.14159265359;
+					goto display_angle;
+				}
+				else if(obj1.type == SELECTION_POINT && obj2.type == SELECTION_LINE)
+				{
+					side1=(obj2.p2-obj2.p1).normalized();
+					side2=(obj2.p2-obj1.p1).normalized();
+					ang=acos(side1.dot(side2))*180.0/3.14159265359;
+					goto display_angle;
+				}
+				else if(obj1.type == SELECTION_LINE && obj2.type == SELECTION_LINE)
+				{
+					if(obj1.p2 == obj2.p1) {
+						side1=(obj2.p1-obj1.p1).normalized();
+						side2=(obj2.p1-obj2.p2).normalized();
+					}
+					else if(obj2.p2 == obj1.p1) {
+						side1=(obj1.p1-obj2.p1).normalized();
+						side2=(obj1.p1-obj1.p2).normalized();
+					} else {
+						side1=(obj1.p2-obj1.p1).normalized();
+						side2=(obj2.p2-obj2.p1).normalized();
+					}
+					ang=acos(side1.dot(side2))*180.0/3.14159265359;
+					goto display_angle;
+				} else
+					this->qglview->measure_state = MEASURE_ANG3;
+			}
+			break;
+		  case MEASURE_ANG3:
+			if(this->qglview->selected_obj.size() == 3){
+				obj1=this->qglview->selected_obj[0];
+				obj2=this->qglview->selected_obj[1];
+				obj3=this->qglview->selected_obj[2];
+				if(obj1.type == SELECTION_POINT && obj2.type == SELECTION_POINT && obj3.type == SELECTION_POINT)
+				{
+					Vector3d side1=(obj2.p1-obj1.p1).normalized();
+					Vector3d side2=(obj2.p1-obj3.p1).normalized();
+					ang=acos(side1.dot(side2))*180.0/3.14159265359;
+				}
+display_angle:
+				if(!isnan(ang))
+				{
+	    				std::stringstream ss;
+					ss << "Angle  is " << ang << " Degrees";
+    					QMenu resultmenu(this);
+      					auto action = resultmenu.addAction(QString::fromStdString(ss.str()));
+	       	 			connect(action, SIGNAL(triggered()), this, SLOT(measureFinished()));
+    					resultmenu.exec(this->qglview->mapToGlobal(mouse));
+				}
+				this->qglview->selected_obj.clear();
+				this->qglview->shown_obj.clear();
+				this->qglview->update();
+				this->qglview->measure_state = MEASURE_IDLE;
+			}
+			break;
+	}
+	return;
+}
+
 /**
  * Call the mouseselection to determine the id of the clicked-on object.
  * Use the generated ID and try to find it within the list of products
  * And finally move the cursor to the beginning of the selected object in the editor
  */
-void MainWindow::selectObject(QPoint mouse)
+void MainWindow::rightClick(QPoint mouse)
 {
   // selecting without a renderer?!
   if (!this->qglview->renderer) {
@@ -2485,12 +2616,19 @@ void MainWindow::selectObject(QPoint mouse)
         action->setProperty("line", location.firstLine());
         action->setProperty("column", location.firstColumn());
 
-        connect(action, SIGNAL(triggered()), this, SLOT(setCursor()));
+        connect(action, SIGNAL(triggered()), this, SLOT(measureFinished()));
       }
     }
 
     tracemenu.exec(this->qglview->mapToGlobal(mouse));
   }
+}
+void MainWindow::measureFinished(void)
+{
+	this->qglview->selected_obj.clear();
+	this->qglview->shown_obj.clear();
+	this->qglview->update();
+	this->qglview->measure_state = MEASURE_IDLE;
 }
 
 /**
