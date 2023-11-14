@@ -104,6 +104,7 @@ void finishPython(void);
 std::string evaluatePython(const std::string &code, double time,AssignmentList &assignments);
 extern bool python_trusted;
 
+#if ENABLE_CRYPTOPP
 #include "cryptopp/sha.h"
 #include "cryptopp/filters.h"
 #include "cryptopp/base64.h"
@@ -119,6 +120,7 @@ std::string SHA256HashString(std::string aString){
 
     return digest;
 }
+#endif
 
 #endif
 
@@ -1844,6 +1846,7 @@ bool MainWindow::fileChangedOnDisk()
 
 #ifdef ENABLE_PYTHON
 bool MainWindow::trust_python_file(const std::string &file,  const std::string &content) {
+#ifdef ENABLE_CRYPTOPP	
   QSettingsCached settings;
   char setting_key[256];
   if(python_trusted) return true;
@@ -1893,6 +1896,9 @@ bool MainWindow::trust_python_file(const std::string &file,  const std::string &
     return false;
   }
   return false;
+#else
+  return true; // no check available
+#endif  
 }
 #endif
 
