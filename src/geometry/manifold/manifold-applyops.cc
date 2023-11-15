@@ -5,7 +5,7 @@
 
 #include "manifoldutils.h"
 #include "ManifoldGeometry.h"
-#include "node.h"
+#include "src/core/node.h"
 #include "progress.h"
 #include "printutils.h"
 
