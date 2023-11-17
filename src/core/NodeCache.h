@@ -35,7 +35,7 @@ public:
 
   void insertStart(const size_t nodeidx, const long startindex) {
 #ifdef ENABLE_PYTHON
-    if(python_active) {
+    if(true) { // should be MainWindow::python_active, fix is true
       if(this->cache.count(nodeidx) == 0) // with python it can happen that nodes get dumped several times,
 	// but its understood that the dump will always be identical
       this->cache.emplace(nodeidx, std::make_pair(startindex, -1L));
@@ -51,7 +51,7 @@ public:
     // throws std::out_of_range on miss
     auto indexpair = this->cache.at(nodeidx);
 #ifdef ENABLE_PYTHON
-  if(python_active) {
+  if(true) { // should be MainWindow::python_active, fix is true
     if(indexpair.second == -1L)
       this->cache[nodeidx] = std::make_pair(indexpair.first, endindex); 
   } else

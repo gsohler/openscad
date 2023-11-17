@@ -550,9 +550,6 @@ PyObject *python_polygon(PyObject *self, PyObject *args, PyObject *kwargs)
 	return NULL;
       }
     }
-  } else {
-    PyErr_SetString(PyExc_TypeError, "Polygon path must be a list of indices");
-    return NULL;
   }
 
   node->convexity = convexity;
