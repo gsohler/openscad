@@ -739,6 +739,12 @@ void Preferences::on_checkBoxSummaryArea_toggled(bool checked)
   writeSettings();
 }
 
+void Preferences::on_checkBoxSummaryVolume_toggled(bool checked)
+{
+  Settings::Settings::summaryVolume.setValue(checked);
+  writeSettings();
+}
+
 void Preferences::on_checkBoxSummaryBoundingBox_toggled(bool checked)
 {
   Settings::Settings::summaryBoundingBox.setValue(checked);
@@ -993,6 +999,7 @@ void Preferences::updateGUI()
 
   BlockSignals<QCheckBox *>(this->checkBoxSummaryCamera)->setChecked(Settings::Settings::summaryCamera.value());
   BlockSignals<QCheckBox *>(this->checkBoxSummaryArea)->setChecked(Settings::Settings::summaryArea.value());
+  BlockSignals<QCheckBox *>(this->checkBoxSummaryVolume)->setChecked(Settings::Settings::summaryVolume.value());
   BlockSignals<QCheckBox *>(this->checkBoxSummaryBoundingBox)->setChecked(Settings::Settings::summaryBoundingBox.value());
 
   BlockSignals<QCheckBox *>(this->enableHidapiTraceCheckBox)->setChecked(Settings::Settings::inputEnableDriverHIDAPILog.value());

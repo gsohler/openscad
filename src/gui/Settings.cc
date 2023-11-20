@@ -130,6 +130,7 @@ SettingsEntryEnum Settings::toolbarExport2D("advanced", "toolbarExport2D", {{"no
 
 SettingsEntryBool Settings::summaryCamera("summary", "camera", false);
 SettingsEntryBool Settings::summaryArea("summary", "measurementArea", false);
+SettingsEntryBool Settings::summaryVolume("summary", "measurementVolume", false);
 SettingsEntryBool Settings::summaryBoundingBox("summary", "boundingBox", false);
 
 SettingsEntryBool Settings::inputEnableDriverHIDAPI("input", "enableDriverHIDAPI", false);

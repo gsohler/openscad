@@ -243,6 +243,31 @@ void LogVisitor::visit(const PolySet& ps)
   LOG("Top level object is a 3D object:");
   LOG("   Facets:     %1$6d", ps.numFacets());
   printBoundingBox3(ps.getBoundingBox());
+  if (is_enabled(RenderStatistic::VOLUME) || true ) {
+    double surface=0.0;
+    double volume=0.0;    
+    for(const Polygon &pol : ps.polygons) {
+      int n = pol.size();
+      for(int i=0;i < n-2;i++ ) {
+          Vector3d p1=pol[0];
+          Vector3d p2=pol[i+1];
+          Vector3d p3=pol[i+2]; 
+	  volume += 	+p1[0]*p2[1]*p3[2] // correct for concave
+		 	+p1[1]*p2[2]*p3[0]
+			+p1[2]*p2[0]*p3[1]
+			-p1[2]*p2[1]*p3[0]
+			-p1[0]*p2[2]*p3[1]
+			-p1[1]*p2[0]*p3[2];
+	  surface += (p2-p1).cross(p2-p3).norm(); // incorrect surface for concave polys
+      }         
+    }
+
+    volume /= 6.0;
+    surface /= 2.0;
+    LOG("Measurements:");
+    LOG("   Surface: %1$.2f", surface);
+    LOG("   Volume: %1$.2f", volume);
+  }
 }
 
 #ifdef ENABLE_CGAL

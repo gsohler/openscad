@@ -193,6 +193,7 @@ public:
 
   static SettingsEntryBool summaryCamera;
   static SettingsEntryBool summaryArea;
+  static SettingsEntryBool summaryVolume;
   static SettingsEntryBool summaryBoundingBox;
 
   static SettingsEntryBool inputEnableDriverHIDAPI;

@@ -57,6 +57,7 @@ public slots:
   void on_comboBoxToolbarExport2D_activated(int);
   void on_checkBoxSummaryCamera_toggled(bool);
   void on_checkBoxSummaryArea_toggled(bool);
+  void on_checkBoxSummaryVolume_toggled(bool);
   void on_checkBoxSummaryBoundingBox_toggled(bool);
   void on_enableHidapiTraceCheckBox_toggled(bool);
   void on_checkBoxShowWarningsIn3dView_toggled(bool);

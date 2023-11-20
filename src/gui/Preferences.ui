@@ -2321,6 +2321,13 @@
                  </property>
                 </widget>
                </item>
+               <item>
+                <widget class="QCheckBox" name="checkBoxSummaryVolume">
+                 <property name="text">
+                  <string>Measurements: Volume</string>
+                 </property>
+                </widget>
+               </item>
               </layout>
              </widget>
             </item>
