@@ -463,9 +463,6 @@ MainWindow::MainWindow(const QStringList& filenames)
   connect(this->designActionReloadAndPreview, SIGNAL(triggered()), this, SLOT(actionReloadRenderPreview()));
   connect(this->designActionPreview, SIGNAL(triggered()), this, SLOT(actionRenderPreview()));
   connect(this->designActionRender, SIGNAL(triggered()), this, SLOT(actionRender()));
-#else
-  this->designActionRender->setVisible(false);
-#endif
   connect(this->designActionMeasureDist, SIGNAL(triggered()), this, SLOT(actionMeasureDistance()));
   connect(this->designActionMeasureAngle, SIGNAL(triggered()), this, SLOT(actionMeasureAngle()));
   connect(this->designAction3DPrint, SIGNAL(triggered()), this, SLOT(action3DPrint()));
@@ -2407,8 +2404,6 @@ void MainWindow::actionRenderDone(const shared_ptr<const Geometry>& root_geom)
   activeEditor->contentsRendered = true;
   compileEnded();
 }
-
-#endif /* ENABLE_CGAL */
 
 void MainWindow::actionMeasureDistance()
 {

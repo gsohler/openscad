@@ -484,7 +484,6 @@ void initPython(void)
       if(key_str == NULL) continue;
       if (std::find(std::begin(pythonInventory), std::end(pythonInventory), key_str) == std::end(pythonInventory))
       {
-        printf("name is %s\n",key_str);
         PyDict_DelItemString(maindict, key_str); // TODO does not work!
       }
     }
