@@ -337,6 +337,7 @@ PyObject *python_polyhedron(PyObject *self, PyObject *args, PyObject *kwargs)
 
   node->convexity = convexity;
   if (node->convexity < 1) node->convexity = 1;
+
   return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
 }
 

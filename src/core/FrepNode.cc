@@ -37,6 +37,7 @@
 #include "io/fileutils.h"
 #include "Builtins.h"
 #include "handle_dep.h"
+#include "PolySetBuilder.h"
 
 
 
@@ -56,7 +57,7 @@ using namespace libfive;
 
 const Geometry *FrepNode::createGeometry() const
 {
-	auto p = new PolySet(3, true);
+	PolySetBuilder builder(0,0,3,true);
 	std::unique_ptr<Mesh> mesh=NULL;
 	libfive::Region<3> reg(
 			{this->x1, this->y1, this->z1}, 
@@ -67,73 +68,70 @@ const Geometry *FrepNode::createGeometry() const
 
 #ifdef ENABLE_PYTHON	
 	PyObject *exp = this->expression;
-	if(exp == NULL ) return p;
+	if(exp == NULL ) return new PolySet(3,true);
 
 	if(exp->ob_type == &PyLibFiveType) {
 		std::vector<Tree *> tree = PyLibFiveObjectToTree(exp);
 		// TODO fidget rein
 #ifdef FAKE
-	p->append_poly(3);
-	p->append_vertex(-0.500000, -0.500000, -0.500000);
-	p->append_vertex(-0.500000, -0.500000, 3.500000);
-	p->append_vertex(-0.500000, 3.500000, 3.500000);
-	p->append_poly(3);
-	p->append_vertex(-0.500000, -0.500000, -0.500000);
-	p->append_vertex(-0.500000, 3.500000, 3.500000);
-	p->append_vertex(-0.500000, 3.500000, -0.500000);
-	p->append_poly(3);
-	p->append_vertex(3.500000, -0.500000, -0.500000);
-	p->append_vertex(3.500000, 3.500000, -0.500000);
-	p->append_vertex(3.500000, 3.500000, 3.500000);
-	p->append_poly(3);
-	p->append_vertex(3.500000, -0.500000, -0.500000);
-	p->append_vertex(3.500000, 3.500000, 3.500000);
-	p->append_vertex(3.500000, -0.500000, 3.500000);
-	p->append_poly(3);
-	p->append_vertex(-0.500000, -0.500000, -0.500000);
-	p->append_vertex(3.500000, -0.500000, -0.500000);
-	p->append_vertex(3.500000, -0.500000, 3.500000);
-	p->append_poly(3);
-	p->append_vertex(-0.500000, -0.500000, -0.500000);
-	p->append_vertex(3.500000, -0.500000, 3.500000);
-	p->append_vertex(-0.500000, -0.500000, 3.500000);
-	p->append_poly(3);
-	p->append_vertex(-0.500000, 3.500000, -0.500000);
-	p->append_vertex(-0.500000, 3.500000, 3.500000);
-	p->append_vertex(3.500000, 3.500000, 3.500000);
-	p->append_poly(3);
-	p->append_vertex(-0.500000, 3.500000, -0.500000);
-	p->append_vertex(3.500000, 3.500000, 3.500000);
-	p->append_vertex(3.500000, 3.500000, -0.500000);
-	p->append_poly(3);
-	p->append_vertex(-0.500000, -0.500000, -0.500000);
-	p->append_vertex(-0.500000, 3.500000, -0.500000);
-	p->append_vertex(3.500000, 3.500000, -0.500000);
-	p->append_poly(3);
-	p->append_vertex(-0.500000, -0.500000, -0.500000);
-	p->append_vertex(3.500000, 3.500000, -0.500000);
-	p->append_vertex(3.500000, -0.500000, -0.500000);
-	p->append_poly(3);
-	p->append_vertex(-0.500000, -0.500000, 3.500000);
-	p->append_vertex(3.500000, -0.500000, 3.500000);
-	p->append_vertex(3.500000, 3.500000, 3.500000);
-	p->append_poly(3);
-	p->append_vertex(-0.500000, -0.500000, 3.500000);
-	p->append_vertex(3.500000, 3.500000, 3.500000);
-	p->append_vertex(-0.500000, 3.500000, 3.500000);
+	builder.appendPoly(3);
+	builder.appendVertex(-0.500000, -0.500000, -0.500000);
+	builder.appendVertex(-0.500000, -0.500000, 3.500000);
+	builder.appendVertex(-0.500000, 3.500000, 3.500000);
+	builder.appendPoly(3);
+	builder.appendVertex(-0.500000, -0.500000, -0.500000);
+	builder.appendVertex(-0.500000, 3.500000, 3.500000);
+	builder.appendVertex(-0.500000, 3.500000, -0.500000);
+	builder.appendPoly(3);
+	builder.appendVertex(3.500000, -0.500000, -0.500000);
+	builder.appendVertex(3.500000, 3.500000, -0.500000);
+	builder.appendVertex(3.500000, 3.500000, 3.500000);
+	builder.appendPoly(3);
+	builder.appendVertex(3.500000, -0.500000, -0.500000);
+	builder.appendVertex(3.500000, 3.500000, 3.500000);
+	builder.appendVertex(3.500000, -0.500000, 3.500000);
+	builder.appendPoly(3);
+	builder.appendVertex(-0.500000, -0.500000, -0.500000);
+	builder.appendVertex(3.500000, -0.500000, -0.500000);
+	builder.appendVertex(3.500000, -0.500000, 3.500000);
+	builder.appendPoly(3);
+	builder.appendVertex(-0.500000, -0.500000, -0.500000);
+	builder.appendVertex(3.500000, -0.500000, 3.500000);
+	builder.appendVertex(-0.500000, -0.500000, 3.500000);
+	builder.appendPoly(3);
+	builder.appendVertex(-0.500000, 3.500000, -0.500000);
+	builder.appendVertex(-0.500000, 3.500000, 3.500000);
+	builder.appendVertex(3.500000, 3.500000, 3.500000);
+	builder.appendPoly(3);
+	builder.appendVertex(-0.500000, 3.500000, -0.500000);
+	builder.appendVertex(3.500000, 3.500000, 3.500000);
+	builder.appendVertex(3.500000, 3.500000, -0.500000);
+	builder.appendPoly(3);
+	builder.appendVertex(-0.500000, -0.500000, -0.500000);
+	builder.appendVertex(-0.500000, 3.500000, -0.500000);
+	builder.appendVertex(3.500000, 3.500000, -0.500000);
+	builder.appendPoly(3);
+	builder.appendVertex(-0.500000, -0.500000, -0.500000);
+	builder.appendVertex(3.500000, 3.500000, -0.500000);
+	builder.appendVertex(3.500000, -0.500000, -0.500000);
+	builder.appendPoly(3);
+	builder.appendVertex(-0.500000, -0.500000, 3.500000);
+	builder.appendVertex(3.500000, -0.500000, 3.500000);
+	builder.appendVertex(3.500000, 3.500000, 3.500000);
+	builder.appendPoly(3);
+	builder.appendVertex(-0.500000, -0.500000, 3.500000);
+	builder.appendVertex(3.500000, 3.500000, 3.500000);
+	builder.appendVertex(-0.500000, 3.500000, 3.500000);
 #else		
                 mesh = Mesh::render(*tree[0], reg ,settings);
 		if(mesh != NULL) {
 			libfive_tri t;
-			// TODO libfive trees mergen
 			for (const auto& t : mesh->branes)
 			{
-				p->append_poly(3); 
-//				printf("p->append_poly(3);\n"); 
+				builder.appendPoly(3); 
 				for(int i=0;i<3;i++)
 				{
-					p->append_vertex(mesh->verts[t[i]].x(), mesh->verts[t[i]].y(), mesh->verts[t[i]].z() );
-//					printf("p->append_vertex(%f, %f, %f);\n",mesh->verts[t[i]].x(), mesh->verts[t[i]].y(), mesh->verts[t[i]].z() );
+					builder.appendVertex(builder.vertexIndex(Vector3d(mesh->verts[t[i]].x(), mesh->verts[t[i]].y(), mesh->verts[t[i]].z())));
 				}
 			}
 		}
@@ -143,55 +141,12 @@ const Geometry *FrepNode::createGeometry() const
 		mesh = NULL;
 	} else { printf("xxx\n"); }
 #endif	
-/*
-
-	libfive_mesh *mesh = libfive_tree_render_mesh(tree[0],  reg, this->res);
-	libfive_tri t;
-	for(int i=0;i<mesh->tri_count;i++) 
-	{
-		t = mesh->tris[i];
-		p->append_poly(); 
-		p->append_vertex(mesh->verts[t.a].x, mesh->verts[t.a].y, mesh->verts[t.a].z );
-		p->append_vertex(mesh->verts[t.b].x, mesh->verts[t.b].y, mesh->verts[t.b].z );
-		p->append_vertex(mesh->verts[t.c].x, mesh->verts[t.c].y, mesh->verts[t.c].z );
-//		printf("tree: %s\n",libfive_tree_print(tree)); 
-#endif	
->>>>>>> 2394429a781c7b1f17da303b9aa2eb2bb3960e71
-	}
-*/	
+	auto p = builder.build();
 	return p;
 }
 
 
 // polyset to SDF converter
-
-void convertToIndex(const PolySet *ps, std::vector<Vector3d> &pointList,  std::vector<intList> &polygons,std::vector<intList>  &pointToFaceInds)
-{
-  std::unordered_map<Vector3d, int, boost::hash<Vector3d> > pointIntMap;
-  intList emptyList;
-//  printf("polygons\n");
-  for(int i=0;i<ps->polygons.size();i++) {
-    Polygon pol = ps->polygons[i];
-    intList polygon;
-    for(int j=0;j<pol.size(); j++) {
-      int ptind=0;
-      Vector3d  pt=pol[j];
-      if(!pointIntMap.count(pt))
-      {
-        pointList.push_back(pt);
-        pointToFaceInds.push_back(emptyList);
-        ptind=pointList.size()-1;
-        pointIntMap[pt]=ptind;
-      } else ptind=pointIntMap[pt];
-//      printf("%d ",ptind);
-      polygon.push_back(ptind);
-      pointToFaceInds[ptind].push_back(i);
-    }
-//    printf("\n");
-    polygons.push_back(polygon);
-  }
-
-}
 
 int operator==(const CutFace &a, const CutFace &b)
 {
@@ -209,13 +164,13 @@ unsigned int hash_value(const CutFace& r) {
         return i;
 }
 
-std::vector<CutFace> calculateEdgeFaces( std::vector<Vector3d> &pointList,std::vector<intList> &polygons, std::vector<intList>  &pointToFaceInds, std::vector<CutFace> &normfaces)
+std::vector<CutFace> calculateEdgeFaces( const std::vector<Vector3d> &pointList,const std::vector<intList> &polygons, std::vector<intList>  &pointToFaceInds, std::vector<CutFace> &normfaces)
 {
   std::vector<CutFace> edgeFaces;
   std::unordered_set<CutFace, boost::hash<CutFace> > edgeFacePresent;
   for(int i=0;i<polygons.size();i++)
   { 
-    intList &poly = polygons[i];
+    const intList &poly = polygons[i];
     int n=poly.size();
     if(n < 3) continue;
     // normalvektor
@@ -245,7 +200,7 @@ std::vector<CutFace> calculateEdgeFaces( std::vector<Vector3d> &pointList,std::v
 	}
       }
       if(faceindfound == -1) continue;
-      intList &opoly = polygons[faceindfound];
+      const intList &opoly = polygons[faceindfound];
       p1=pointList[opoly[0]];
       p2=pointList[opoly[1]];
       p3=pointList[opoly[2]];
@@ -494,30 +449,39 @@ void OpenSCADOracle::evalFeatures(boost::container::small_vector<libfive::Featur
 #ifdef ENABLE_PYTHON
 PyObject *ifrep(const PolySet *ps)
 {
-  printf("ifrep\n");
-  std::vector<Vector3d> pointList; // list of all the points in the object
-  std::vector<intList> polygons; // list polygons represented by indexes
   std::vector<intList>  pointToFaceInds; //  mapping pt_ind -> list of polygon inds which use it
 
-  convertToIndex(ps,pointList, polygons,pointToFaceInds); // index umwandeln
-  printf("%d Faces, %d Points\n",polygons.size(),pointList.size());
+  intList emptyList;
+  for(int i=0;i<ps->vertices.size();i++)
+    pointToFaceInds.push_back(emptyList);
+  for(int i=0;i<ps->indices.size();i++) {
+    intList pol = ps->indices[i];
+    for(int j=0;j<pol.size(); j++) {
+      pointToFaceInds[pol[j]].push_back(i);
+    }
+  }
+
+
+  // TODO fill pointToFaceInd
+  //  TODO tsten
+  printf("%d Faces, %d Points\n",ps->indices.size(),ps->vertices.size());
 
   std::vector<CutFace> edgeFaces;
   std::vector<CutFace> normFaces;
-  edgeFaces = calculateEdgeFaces(pointList, polygons,pointToFaceInds,normFaces);
+  edgeFaces = calculateEdgeFaces(ps->vertices, ps->indices,pointToFaceInds,normFaces);
   printf("%d EdgeFaces generated\n",edgeFaces.size());
 
   std::vector<int> table; // x(0) dimenstion faces y(1) dimenions edgefas
   for(int i=0;i<edgeFaces.size();i++) // create table
   {
     CutFace &ef = edgeFaces[i];
-    for(int j=0;j<polygons.size();j++)
+    for(int j=0;j<ps->indices.size();j++)
     {
-      intList &poly=polygons[j];
+      const intList &poly=ps->indices[j];
       int poscount=0, negcount=0;
       for(int k=0;k<poly.size(); k++)
       {
-	      Vector3d pt=pointList[poly[k]];
+	      Vector3d pt=ps->vertices[poly[k]];
 	      double e=ef.a*pt[0]+ef.b*pt[1]+ef.c*pt[2]+ef.d;
 	      if(e >  0.00001) poscount++;
 	      if(e < -0.00001) negcount++;
@@ -531,12 +495,12 @@ PyObject *ifrep(const PolySet *ps)
 
 
   ProgramState state;
-  for(int i=0;i<polygons.size();i++) state.validFaces.push_back(i); 
+  for(int i=0;i<ps->indices.size();i++) state.validFaces.push_back(i); 
   state.state=0;
   state.resultind=0x80000000;
   programStack.push_back(state); // initially all the work
   std::vector<CutProgram> program;
-  int startind=generateProgramFlat(table ,program,edgeFaces, polygons,programStack); // create recursive program
+  int startind=generateProgramFlat(table ,program,edgeFaces, ps->indices,programStack); // create recursive program
   for(int i=0;i<program.size();i++) {
 	printf("%d\t%.3f\t%.3f\t%.3f\t%.3f\tP:%d\tN:%d\n",i,program[i].a,program[i].b,program[i].c,program[i].d,program[i].posbranch, program[i].negbranch);
   }
