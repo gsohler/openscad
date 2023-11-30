@@ -21,6 +21,7 @@
 #include "ClipperUtils.h"
 #include "PolySetUtils.h"
 #include "PolySet.h"
+#include "PolySetBuilder.h"
 #include "calc.h"
 #include "printutils.h"
 #include "calc.h"
@@ -429,63 +430,29 @@ void roundNumber(double &x)
 		x=-(double)i/100000.0;
 	}
 }
-PolySet *offset3D(const PolySet *ps,double off) {
-	PolySet ps_org = *ps; // TODO weg
-	printf("Running offset3D %d polygons\n",ps->polygons.size());
-	// diverging point is pol/pt 4/1, 5/0, 7/0, 134/1, 139/0, coord is 1.5/7.86328/1.99493, ptind=9
-	// TODO find out flat triangle left to it
 
+PolySet *offset3D(const PolySet *ps,double off) {
+	printf("Running offset3D %d polygons\n",ps->indices.size());
 	// ----------------------------------------------------------
 	// create a point database and use it. and form polygons
 	// ----------------------------------------------------------
 
 	std::unordered_map<Vector3d, int, boost::hash<Vector3d> > pointIntMap;
-	std::vector<Vector3d> pointList; // list of all the points in the object
 	std::vector<Vector3d> pointListNew; // list of all the points in the object
-	std::vector<intList> polygons; // list polygons represented by indexes
 	std::vector<intList>  pointToFaceInds; //  mapping pt_ind -> list of polygon inds which use it
 	intList emptyList;
-	printf("polygons\n");
-	for(int i=0;i<ps->polygons.size();i++) {
-		Polygon pol = ps->polygons[i];
-		intList polygon;
-		for(int j=0;j<pol.size(); j++) {
-			int ptind=0;
-			Vector3d  pt=pol[j];
-			if(!pointIntMap.count(pt)) {
-				pointList.push_back(pt);
-				pointToFaceInds.push_back(emptyList);
-				ptind=pointList.size()-1;
-//				printf("new pt %d %g/%g/%g\n",ptind, pt[0], pt[1], pt[2]);
-			if(
-					fabs(pt[0]-1.5) < 0.01 &&
-					fabs(pt[1]-7.863) < 0.01 &&
-					fabs(pt[2]-1.99493) < 0.01
-			  ) {
-				printf("point identified as %d\n",ptind);
-			}
-				pointIntMap[pt]=ptind;
-			} else ptind=pointIntMap[pt];
-			polygon.push_back(ptind);
-			printf("%d ",ptind);
-		}
-		printf("\n");
-		polygons.push_back(polygon);
-	}
-	printf("points\n");
-	for(int i=0;i<pointList.size();i++) {
-		printf("%d\t%g\t%g\t%g\n",i,pointList[i][0], pointList[i][1], pointList[i][2]);
-	}
-	
+	for(int i=0;i<ps->vertices.size();i++)
+		pointToFaceInds.push_back(emptyList);
+
 	// -------------------------------
 	// Calculating face normals
 	// -------------------------------
 	std::vector<Vector3d>  faceNormal;
-	for(int i=0;i<polygons.size();i++) {
-		intList pol = polygons[i];
+	for(int i=0;i<ps->indices.size();i++) {
+		intList pol = ps->indices[i];
 		assert (pol.size() >= 3);
-		Vector3d diff1=pointList[pol[1]] - pointList[pol[0]];
-		Vector3d diff2=pointList[pol[2]] - pointList[pol[1]];
+		Vector3d diff1=ps->vertices[pol[1]] - ps->vertices[pol[0]];
+		Vector3d diff2=ps->vertices[pol[2]] - ps->vertices[pol[1]];
 		Vector3d norm = diff1.cross(diff2);
 		assert(norm.norm() > 0.0001);
 		norm.normalize();
@@ -493,27 +460,23 @@ PolySet *offset3D(const PolySet *ps,double off) {
 		roundNumber(norm[1]);
 		roundNumber(norm[2]);
 		norm.normalize();
-//		printf("Face %d norm is %g/%g/%g\n",i,norm[0], norm[1], norm[2]);
 		faceNormal.push_back(norm);
 	}
-	//
-	// TODO combine triangles to polygons as much as possible first	
 
 	std::vector<Vector3d> newNormals;
-	std::vector<intList> polygons_merged = mergetriangles(polygons,faceNormal,newNormals); // TODO sind es immer dreiecke ?
+	std::vector<intList> polygons_merged = mergetriangles(ps->indices,faceNormal,newNormals); // TODO sind es immer dreiecke ?
 	faceNormal=newNormals;
-	polygons=polygons_merged;
 
 	// -------------------------------
 	// calculate point-to-polygon relation
 	// -------------------------------
-	for(int i=0;i<polygons.size();i++) {
-		intList pol = polygons[i];
+	for(int i=0;i<polygons_merged.size();i++) {
+		intList pol = polygons_merged[i];
 		for(int j=0;j<pol.size(); j++) {
 			pointToFaceInds[pol[j]].push_back(i);
 		}
 	}
-	printf("%d points\n",pointList.size());
+	printf("%d points\n",ps->vertices.size());
 	// -------------------------------
 	// Check, for all points, that the related face build a closed corner
 	// -------------------------------
@@ -526,7 +489,7 @@ PolySet *offset3D(const PolySet *ps,double off) {
 			// search for pt
 			int off=-1;
 			int ptaltind;
-			intList pol = polygons[faceind];
+			intList pol = polygons_merged[faceind];
 			int n=pol.size();
 			for(int k=0;k<n;k++) {
 				if(pol[k] == i) off=k;
@@ -543,7 +506,7 @@ PolySet *offset3D(const PolySet *ps,double off) {
 		for( const auto& [ptaltind, sum] : pointSum ) {
 			if(sum != 0)
 			{
-				printf("Edge from %g/%g/%g to %g/%g/%g is open\n",pointList[i][0],pointList[i][2],pointList[i][2],pointList[ptaltind][0],pointList[ptaltind][1],pointList[ptaltind][2]);
+				printf("Edge from %g/%g/%g to %g/%g/%g is open\n",ps->vertices[i][0],ps->vertices[i][2],ps->vertices[i][2],ps->vertices[ptaltind][0],ps->vertices[ptaltind][1],ps->vertices[ptaltind][2]);
 			}
 		}
 	}	
@@ -554,22 +517,7 @@ PolySet *offset3D(const PolySet *ps,double off) {
 	for( int i = 0; i< pointToFaceInds.size();i++ ) {
 		Vector3d newpt;
 		intList indexes = pointToFaceInds[i];
-		int debug=0;
-		if(i == 9) debug=1;
 		int valid;
-		if(debug) {
-			printf("ind %d pt: %g/%g/%g %d connected faces\n",i, pointList[i][0],pointList[i][1], pointList[i][2],indexes.size());
-			for(int i=0;i<indexes.size();i++) {
-				int faceind=indexes[i];
-				intList pol=polygons[faceind];
-				printf("Face %d pts are ",faceind);
-				for(int j=0;j<polygons[faceind].size();j++) {
-					Vector3d px=pointList[pol[j]];
-					printf("(%g/%g/%g) ",px[0],px[1],px[2]);
-				}
-				printf("norm (%g/%g/%g)\n",faceNormal[faceind][0], faceNormal[faceind][1], faceNormal[faceind][2]);
-			}
-		}			
 		do
 		{
 			valid=0;
@@ -605,9 +553,9 @@ PolySet *offset3D(const PolySet *ps,double off) {
 			
 			// now calculate the new pt
 			if(cut_face_face_face(
-						pointList[i]  +faceNormal[xind]*off  , faceNormal[xind], 
-						pointList[i]  +faceNormal[yind]*off  , faceNormal[yind], 
-						pointList[i]  +faceNormal[zind]*off  , faceNormal[zind], 
+						ps->vertices[i]  +faceNormal[xind]*off  , faceNormal[xind], 
+						ps->vertices[i]  +faceNormal[yind]*off  , faceNormal[yind], 
+						ps->vertices[i]  +faceNormal[zind]*off  , faceNormal[zind], 
 						newpt)){ printf("d\n");  break; }
 //			if(debug) printf("x y z ind is %d/%d/%d\n",xind, yind, zind);
 			valid=1;
@@ -615,10 +563,10 @@ PolySet *offset3D(const PolySet *ps,double off) {
 		if(!valid)
 		{
 			Vector3d dir={0,0,0};
-			printf("Emergency cut calculation for %g/%g/%g\n",pointList[i][0],pointList[i][1],pointList[i][2]);
+			printf("Emergency cut calculation for %g/%g/%g\n",ps->vertices[i][0],ps->vertices[i][1],ps->vertices[i][2]);
 			for(int j=0;j<indexes.size();j++)
 				dir += faceNormal[j];
-			newpt  = pointList[i] + off* dir.normalized();
+			newpt  = ps->vertices[i] + off* dir.normalized();
 		}
 		pointListNew.push_back(newpt);
 	}
@@ -626,46 +574,18 @@ PolySet *offset3D(const PolySet *ps,double off) {
 	// -------------------------------
 	// Map all points and assemble
 	// -------------------------------
-	PolySet *offset_result = new PolySet(3, /* convex */ false);
+	PolySet *offset_result =  new PolySet(3, /* convex */ true);
+	offset_result->vertices = pointListNew;
+	offset_result->indices = ps->indices;
 
-	for(int i=0;i<polygons.size();i++) {
-		Polygon offset_polygon;
-		intList pol = polygons[i];
-		int output=1;
-		int lv1cnt=0,lv2cnt=0;
-		for(int j=0;j<pol.size(); j++) {
-
-			Vector3d pt =  pointListNew[pol[j]];
-			if(pt[2] < -off+0.001) lv1cnt++;
-			if(pt[2] < -off-0.001) lv2cnt++;
-			offset_polygon.push_back(pt);
-			if(pt[1] > 9 && pt[2] > 0.2) {
-				printf("evil point %g/%g/%g pol %d pt %d\n",pt[0], pt[1],pt[2],i,j);
-				printf("org pt is %g/%g/%g\n",pointList[pol[j]][0],pointList[pol[j]][1], pointList[pol[j]][2]);
-			}
-
-		}
-//		if(faceNormal[i][0] > 0.9) output=1;
-//		if(faceNormal[i][1] > 0.9) output=1;
-//		if(faceNormal[i][2] > 0.9) output=1;
-		if(i == 2) output=1;
-		if(i == 4) output=1;
-		if(i == 62) output=1;
-//		if(lv1cnt == 3) output=1; // base 
-//		if(lv2cnt > 0) output=1; // wrong
-//		if((i %3) <= 1) output=1;
-//
-  		if(output) offset_result->polygons.push_back(offset_polygon);
-//		else offset_result->polygons.push_back(pol);
-	}
 	//
 	// -------------------------------
 	// Normal of result must be same as orginal
 	// -------------------------------
-	for(int i=0;i<polygons.size();i++) {
-		intList pol = polygons[i];
-		Vector3d diff1=pointList[pol[1]] - pointList[pol[0]];
-		Vector3d diff2=pointList[pol[2]] - pointList[pol[1]];
+	for(int i=0;i<polygons_merged.size();i++) {
+		intList pol = polygons_merged[i];
+		Vector3d diff1=ps->vertices[pol[1]] - ps->vertices[pol[0]];
+		Vector3d diff2=ps->vertices[pol[2]] - ps->vertices[pol[1]];
 		Vector3d norm = diff1.cross(diff2).normalized();
 		double sp = norm.dot(faceNormal[i]);
 		if(sp  >=1 && sp < 1.0001) sp=1.0;
@@ -682,7 +602,7 @@ PolySet *offset3D(const PolySet *ps,double off) {
 	for( int i=0;i<pointToFaceInds.size();i++ ) {
 		intList indexes = pointToFaceInds[i];
 		int debug=0;
-		Vector3d oldpt =pointList[i];
+		Vector3d oldpt =ps->vertices[i];
 		Vector3d newpt =pointListNew[i];
 		int error=0;
 		for(int j=0;j<indexes.size();j++) {
@@ -703,54 +623,6 @@ PolySet *offset3D(const PolySet *ps,double off) {
 			printf("\n");
 		}
 	}
-	// -------------------------------
-	//  output debug certain points
-	// -------------------------------
-
-	for( int i=0; i<pointToFaceInds.size();i++ )
-	{
-		Vector3d oldpt=pointList[i];
-		Vector3d newpt=pointListNew[i];
-		intList indexes = pointToFaceInds[i];
-		int debug=0;
-		if(newpt[2] < -1) debug=1;
-		if(debug) {
-			printf("debug ptind is %d\n",i);
-	       		printf("old pt is %g/%g/%g => %g/%g/%g\n",oldpt[0], oldpt[1],oldpt[2] ,newpt[0], newpt[1],newpt[2]);
-			printf("related polygons: \n");
-			for(int i=0;i<indexes.size();i++) {
-				int ind=indexes[i];
-				Polygon pol = ps_org.polygons[ind];
-				printf("ind: %d ",ind);
-				for(int j=0;j<pol.size();j++) {
-					printf("(%g/%g/%g) ",pol[j][0],pol[j][1],pol[j][2]);
-//					pol[j][0] += 20;// offset fopr debug
-				}
-				printf("norm =( %g/%g/%g)\n",faceNormal[ind][0],faceNormal[ind][1],faceNormal[ind][2]);
-			}
-			for(int i=0;i<indexes.size()-2;i++) {
-				int xind=indexes[i];
-				for(int j=i+1;j<indexes.size()-1;j++)  {
-					int yind=indexes[j];
-					for(int k=j+1;k<indexes.size();k++) {
-						int zind=indexes[k];
-						printf("inds=%d/%d/%d",indexes[i],indexes[j],indexes[k]);
-						if(cut_face_face_face(
-							oldpt  +faceNormal[xind]*off  , faceNormal[xind], 
-							oldpt  +faceNormal[yind]*off  , faceNormal[yind], 
-							oldpt  +faceNormal[zind]*off  , faceNormal[zind], 
-							newpt)){ printf(" error");  }
-						else {
-							printf("(%g/%g/%g) ",newpt[0],newpt[1], newpt[2]);
-						}
-						printf("\n");
-					}
-				}
-			}
-
-		}
-	}
-	
 	printf("End of Report!\n");
 	return offset_result;
 }
@@ -1443,12 +1315,10 @@ Response GeometryEvaluator::visit(State& state, const TransformNode& node)
   return Response::ContinueTraversal;
 }
 
-static void translate_PolySet(PolySet& ps, const Vector3d& translation)
+static void translate_PolySet(PolySet& ps, const Vector3d& translation) // TODO duplicate with CGALutils ?
 {
-  for (auto& p : ps.polygons) {
-    for (auto& v : p) {
+  for (auto& v : ps.vertices) {
       v += translation;
-    }
   }
 }
 
@@ -1484,7 +1354,7 @@ int sgn_vdiff(const Vector2d& v1, const Vector2d& v2) {
    Quads are triangulated across the shorter of the two diagonals, which works well in most cases.
    However, when diagonals are equal length, decision may flip depending on other factors.
  */
-static void add_slice(PolySet *ps, const Polygon2d& poly,
+static void add_slice(PolySetBuilder &builder, const Polygon2d& poly,
                       double rot1, double rot2,
                       double h1, double h2,
                       const Vector2d& scale1,
@@ -1527,47 +1397,51 @@ static void add_slice(PolySet *ps, const Polygon2d& poly,
         //Vector2d mid_prev = trans3 * (prev1 +curr1+curr2)/4;
         Vector2d mid = trans_mid * (o.vertices[(i - 1) % o.vertices.size()] + o.vertices[i % o.vertices.size()]) / 2;
         double h_mid = (h1 + h2) / 2;
-        ps->append_poly(3);
-        ps->insert_vertex(prev1[0], prev1[1], h1);
-        ps->insert_vertex(mid[0],   mid[1], h_mid);
-        ps->insert_vertex(curr1[0], curr1[1], h1);
-        ps->append_poly(3);
-        ps->insert_vertex(curr1[0], curr1[1], h1);
-        ps->insert_vertex(mid[0],   mid[1], h_mid);
-        ps->insert_vertex(curr2[0], curr2[1], h2);
-        ps->append_poly(3);
-        ps->insert_vertex(curr2[0], curr2[1], h2);
-        ps->insert_vertex(mid[0],   mid[1], h_mid);
-        ps->insert_vertex(prev2[0], prev2[1], h2);
-        ps->append_poly(3);
-        ps->insert_vertex(prev2[0], prev2[1], h2);
-        ps->insert_vertex(mid[0],   mid[1], h_mid);
-        ps->insert_vertex(prev1[0], prev1[1], h1);
+        builder.appendPoly(3);
+        builder.insertVertex(prev1[0], prev1[1], h1);
+        builder.prependVertex(mid[0],   mid[1], h_mid);
+        builder.prependVertex(curr1[0], curr1[1], h1);
+        builder.appendPoly(3);
+        builder.prependVertex(curr1[0], curr1[1], h1);
+        builder.prependVertex(mid[0],   mid[1], h_mid);
+        builder.prependVertex(curr2[0], curr2[1], h2);
+        builder.appendPoly(3);
+        builder.prependVertex(curr2[0], curr2[1], h2);
+        builder.prependVertex(mid[0],   mid[1], h_mid);
+        builder.prependVertex(prev2[0], prev2[1], h2);
+        builder.appendPoly(3);
+        builder.prependVertex(prev2[0], prev2[1], h2);
+        builder.prependVertex(mid[0],   mid[1], h_mid);
+        builder.prependVertex(prev1[0], prev1[1], h1);
       } else
 #endif // ifdef LINEXT_4WAY
       // Split along shortest diagonal,
       // unless at top for a 0-scaled axis (which can create 0 thickness "ears")
       if (splitfirst xor any_zero) {
-        ps->append_poly(3);
-        ps->insert_vertex(prev1[0], prev1[1], h1);
-        ps->insert_vertex(curr2[0], curr2[1], h2);
-        ps->insert_vertex(curr1[0], curr1[1], h1);
+        builder.appendPoly({
+		Vector3d(curr1[0], curr1[1], h1),
+		Vector3d(curr2[0], curr2[1], h2),
+		Vector3d(prev1[0], prev1[1], h1)
+		});
         if (!any_zero || (any_non_zero && prev2 != curr2)) {
-          ps->append_poly(3);
-          ps->insert_vertex(curr2[0], curr2[1], h2);
-          ps->insert_vertex(prev1[0], prev1[1], h1);
-          ps->insert_vertex(prev2[0], prev2[1], h2);
+          builder.appendPoly({
+		Vector3d(prev2[0], prev2[1], h2),
+		Vector3d(prev1[0], prev1[1], h1),
+		Vector3d(curr2[0], curr2[1], h2)
+	  });
         }
       } else {
-        ps->append_poly(3);
-        ps->insert_vertex(prev1[0], prev1[1], h1);
-        ps->insert_vertex(prev2[0], prev2[1], h2);
-        ps->insert_vertex(curr1[0], curr1[1], h1);
+        builder.appendPoly({
+		Vector3d(curr1[0], curr1[1], h1),
+		Vector3d(prev2[0], prev2[1], h2),
+		Vector3d(prev1[0], prev1[1], h1)
+	});
         if (!any_zero || (any_non_zero && prev2 != curr2)) {
-          ps->append_poly(3);
-          ps->insert_vertex(prev2[0], prev2[1], h2);
-          ps->insert_vertex(curr2[0], curr2[1], h2);
-          ps->insert_vertex(curr1[0], curr1[1], h1);
+          builder.appendPoly({
+		Vector3d(curr1[0], curr1[1], h1),
+		Vector3d(curr2[0], curr2[1], h2),
+		Vector3d(prev2[0], prev2[1], h2)
+	  });	
         }
       }
       prev1 = curr1;
@@ -1749,21 +1623,21 @@ static Outline2d alterprofile(Outline2d profile,double scalex, double scaley, do
 	return result;
 }
 
-void  append_linear_vertex(PolySet *ps,const Outline2d *face, int index, double h)
+void  append_linear_vertex(PolySetBuilder &builder,const Outline2d *face, int index, double h)
 {
-	ps->append_vertex(
+	builder.appendVertex(builder.vertexIndex(Vector3d(
 			face->vertices[index][0],
 			face->vertices[index][1],
-			h);
+			h)));
 }
 
-void  append_rotary_vertex(PolySet *ps,const Outline2d *face, int index, double ang)
+void  append_rotary_vertex(PolySetBuilder &builder,const Outline2d *face, int index, double ang)
 {
 	double a=ang*G_PI / 180.0;
-	ps->append_vertex(
+	builder.appendVertex(builder.vertexIndex(Vector3d(
 			face->vertices[index][0]*cos(a),
 			face->vertices[index][0]*sin(a),
-			face->vertices[index][1]);
+			face->vertices[index][1])));
 }
 
 void calculate_path_dirs(Vector3d prevpt, Vector3d curpt,Vector3d nextpt,Vector3d vec_x_last, Vector3d vec_y_last, Vector3d *vec_x, Vector3d *vec_y) {
@@ -1845,9 +1719,9 @@ static Geometry *extrudePolygon(const LinearExtrudeNode& node, const Polygon2d& 
   boost::tribool isConvex{poly.is_convex()};
   // Twist or non-uniform scale makes convex polygons into unknown polyhedrons
   if (isConvex && non_linear) isConvex = unknown;
-  auto *ps = new PolySet(3, isConvex);
-  ps->setConvexity(node.convexity);
-  if (node.height <= 0) return ps;
+  PolySetBuilder builder(0,0,3,isConvex);
+  builder.setConvexity(node.convexity);
+  if (node.height <= 0) return new PolySet(3);
 
   size_t slices;
   if (node.has_slices) {
@@ -1965,10 +1839,10 @@ static Geometry *extrudePolygon(const LinearExtrudeNode& node, const Polygon2d& 
         botface.addOutline(lowerFace);
     	PolySet *ps_bot = botface.tessellate();
 	translate_PolySet(*ps_bot, Vector3d(0, 0, lower_h));
-  	for (auto& p : ps_bot->polygons) {
+  	for (auto& p : ps_bot->indices) {
 	    std::reverse(p.begin(), p.end());
 	}
-	ps->append(*ps_bot);
+	builder.append(ps_bot);
 	delete ps_bot;
   	for (unsigned int i = 1; i <= slices; i++) {
 		upper_h=i*node.height/slices;
@@ -1982,15 +1856,15 @@ static Geometry *extrudePolygon(const LinearExtrudeNode& node, const Polygon2d& 
 		if(lowerFace.vertices.size() == upperFace.vertices.size()) {
 			unsigned int n=lowerFace.vertices.size();
 			for(unsigned int j=0;j<n;j++) {
-				ps->append_poly(3);
-				append_linear_vertex(ps,&lowerFace,(j+0)%n, lower_h);
-				append_linear_vertex(ps,&lowerFace,(j+1)%n, lower_h);
-				append_linear_vertex(ps,&upperFace,(j+1)%n, upper_h);
+				builder.appendPoly(3);
+				append_linear_vertex(builder,&lowerFace,(j+0)%n, lower_h);
+				append_linear_vertex(builder,&lowerFace,(j+1)%n, lower_h);
+				append_linear_vertex(builder,&upperFace,(j+1)%n, upper_h);
 
-				ps->append_poly(3);
-				append_linear_vertex(ps,&lowerFace,(j+0)%n, lower_h);
-				append_linear_vertex(ps,&upperFace,(j+1)%n, upper_h);
-				append_linear_vertex(ps,&upperFace,(j+0)%n, upper_h);
+				builder.appendPoly(3);
+				append_linear_vertex(builder,&lowerFace,(j+0)%n, lower_h);
+				append_linear_vertex(builder,&upperFace,(j+1)%n, upper_h);
+				append_linear_vertex(builder,&upperFace,(j+0)%n, upper_h);
 			}
 		}
 
@@ -2005,7 +1879,7 @@ static Geometry *extrudePolygon(const LinearExtrudeNode& node, const Polygon2d& 
         topface.addOutline(upperFace);
     	PolySet *ps_top = topface.tessellate();
 	translate_PolySet(*ps_top, Vector3d(0, 0, upper_h));
-	ps->append(*ps_top);
+	builder.append(ps_top);
 	delete ps_top;
   }
   else
@@ -2014,11 +1888,11 @@ static Geometry *extrudePolygon(const LinearExtrudeNode& node, const Polygon2d& 
   // Create bottom face.
   PolySet *ps_bottom = polyref.tessellate(); // bottom
   // Flip vertex ordering for bottom polygon
-  for (auto& p : ps_bottom->polygons) {
+  for (auto& p : ps_bottom->indices) {
     std::reverse(p.begin(), p.end());
   }
   translate_PolySet(*ps_bottom, Vector3d(0, 0, h1));
-  ps->append(*ps_bottom);
+  builder.append(ps_bottom);
   delete ps_bottom;
 
   // Create slice sides.
@@ -2042,7 +1916,7 @@ static Geometry *extrudePolygon(const LinearExtrudeNode& node, const Polygon2d& 
                     1 - (1 - node.scale_y) * j / slices);
     Vector2d scale2(1 - (1 - node.scale_x) * (j + 1) / slices,
                     1 - (1 - node.scale_y) * (j + 1) / slices);
-    add_slice(ps, polyref, rot1, rot2, height1, height2, scale1, scale2);
+    add_slice(builder, polyref, rot1, rot2, height1, height2, scale1, scale2);
     rot1=rot2;
   }
 
@@ -2054,18 +1928,18 @@ static Geometry *extrudePolygon(const LinearExtrudeNode& node, const Polygon2d& 
     top_poly.transform(trans);
     PolySet *ps_top = top_poly.tessellate();
     translate_PolySet(*ps_top, Vector3d(0, 0, h2));
-    ps->append(*ps_top);
+    builder.append(ps_top);
     delete ps_top;
   }
 }
-  return ps;
+  return builder.build();
 }
 
 static Geometry *extrudePolygon(const PathExtrudeNode& node, const Polygon2d& poly)
 {
   int i;
-  auto *ps = new PolySet(3, true);
-  ps->setConvexity(node.convexity);
+  PolySetBuilder builder;
+  builder.setConvexity(node.convexity);
   std::vector<Vector3d> path_os;
   std::vector<double> length_os;
   gboolean intersect=false;
@@ -2213,14 +2087,14 @@ static Geometry *extrudePolygon(const PathExtrudeNode& node, const Polygon2d& po
 		}
 		
 		for(unsigned int j=0;j<n;j++) {
-			ps->append_poly(3);
-			ps->append_vertex( lastProfile[(j+0)%n][0], lastProfile[(j+0)%n][1], lastProfile[(j+0)%n][2]);
-			ps->append_vertex( lastProfile[(j+1)%n][0], lastProfile[(j+1)%n][1], lastProfile[(j+1)%n][2]);
-			ps->append_vertex(  curProfile[(j+1)%n][0],  curProfile[(j+1)%n][1],  curProfile[(j+1)%n][2]);
-			ps->append_poly(3);
-			ps->append_vertex( lastProfile[(j+0)%n][0], lastProfile[(j+0)%n][1], lastProfile[(j+0)%n][2]);
-			ps->append_vertex(  curProfile[(j+1)%n][0],  curProfile[(j+1)%n][1],  curProfile[(j+1)%n][2]);
-			ps->append_vertex(  curProfile[(j+0)%n][0],  curProfile[(j+0)%n][1],  curProfile[(j+0)%n][2]);
+			builder.appendPoly(3);
+			builder.appendVertex( builder.vertexIndex(Vector3d(lastProfile[(j+0)%n][0], lastProfile[(j+0)%n][1], lastProfile[(j+0)%n][2])));
+			builder.appendVertex( builder.vertexIndex(Vector3d(lastProfile[(j+1)%n][0], lastProfile[(j+1)%n][1], lastProfile[(j+1)%n][2])));
+			builder.appendVertex( builder.vertexIndex(Vector3d( curProfile[(j+1)%n][0],  curProfile[(j+1)%n][1],  curProfile[(j+1)%n][2])));
+			builder.appendPoly(3);
+			builder.appendVertex( builder.vertexIndex(Vector3d(lastProfile[(j+0)%n][0], lastProfile[(j+0)%n][1], lastProfile[(j+0)%n][2])));
+			builder.appendVertex( builder.vertexIndex(Vector3d( curProfile[(j+1)%n][0],  curProfile[(j+1)%n][1],  curProfile[(j+1)%n][2])));
+			builder.appendVertex(builder.vertexIndex(Vector3d(  curProfile[(j+0)%n][0],  curProfile[(j+0)%n][1],  curProfile[(j+0)%n][2])));
 		}
 	}
        if(node.closed == false && (i == 0 || i == m-1)) {
@@ -2230,17 +2104,24 @@ static Geometry *extrudePolygon(const PathExtrudeNode& node, const Polygon2d& po
 
 		if(i == 0) {
 			// Flip vertex ordering for bottom polygon
-			for (Polygon & polygon : ps_face->polygons) {
+			for (auto & polygon : ps_face->indices) {
 				std::reverse(polygon.begin(), polygon.end());
 			}
 		}
-		for (Polygon &p3d : ps_face -> polygons) {
+// TODO path_extrude testen
+		builder.appendPoly(ps_face->indices.size());
+		for (auto &p3d : ps_face->indices) { 
 			std::vector<Vector2d> p2d;
-			for(int i=0;i<p3d.size();i++) 
-				p2d.push_back(Vector2d(p3d[i][0],p3d[i][1]));
-			p3d = calculate_path_profile(&vec_x, &vec_y,(i == 0)?curPt:nextPt,  p2d);
+			for(int i=0;i<p3d.size();i++) {
+				Vector3d pt = ps_face->vertices[p3d[i]];
+				p2d.push_back(Vector2d(pt[0],pt[1]));
+			}
+			std::vector<Vector3d> newprof = calculate_path_profile(&vec_x, &vec_y,(i == 0)?curPt:nextPt,  p2d);
+			for(Vector3d pt: newprof) {
+				builder.appendVertex(builder.vertexIndex(pt));
+			}
 		}
-		ps->append(*ps_face);
+		builder.append(ps_face);
 		delete ps_face;
 	}
 
@@ -2252,10 +2133,9 @@ static Geometry *extrudePolygon(const PathExtrudeNode& node, const Polygon2d& po
 
   }
   if(intersect == true && node.allow_intersect == false) {
-	  ps->polygons.clear();
-
+  	return new PolySet(3);
   }
-  return ps;
+  return builder.build();
 }
 
 /*!
@@ -2361,8 +2241,8 @@ static Geometry *rotatePolygon(const RotateExtrudeNode& node, const Polygon2d& p
 {
   if (node.angle == 0) return nullptr;
 
-  auto *ps = new PolySet(3);
-  ps->setConvexity(node.convexity);
+  PolySetBuilder builder;
+  builder.setConvexity(node.convexity);
 
   double min_x = 0;
   double max_x = 0;
@@ -2376,7 +2256,6 @@ static Geometry *rotatePolygon(const RotateExtrudeNode& node, const Polygon2d& p
 
   if ((max_x - min_x) > max_x && (max_x - min_x) > fabs(min_x)) {
     LOG(message_group::Error, "all points for rotate_extrude() must have the same X coordinate sign (range is %1$.2f -> %2$.2f)", min_x, max_x);
-    delete ps;
     return nullptr;
   }
 
@@ -2411,11 +2290,11 @@ static Geometry *rotatePolygon(const RotateExtrudeNode& node, const Polygon2d& p
 		ps_last->transform(rot);
 		// Flip vertex ordering
 		if (!flip_faces) {
-		for (auto& p : ps_last->polygons) {
+		for (auto& p : ps_last->indices) {
 		std::reverse(p.begin(), p.end());
 		}
 		}
-		ps->append(*ps_last);
+		builder.append(ps_last);
 		delete ps_last;
 
 	}
@@ -2432,14 +2311,14 @@ static Geometry *rotatePolygon(const RotateExtrudeNode& node, const Polygon2d& p
 		if(lastFace.vertices.size() == curFace.vertices.size()) {
 			unsigned int n=lastFace.vertices.size();
 			for(unsigned int j=0;j<n;j++) {
-				ps->append_poly(3);
-				append_rotary_vertex(ps,&lastFace,(j+0)%n, last_ang);
-				append_rotary_vertex(ps,&lastFace,(j+1)%n, last_ang);
-				append_rotary_vertex(ps,&curFace,(j+1)%n, cur_ang);
-				ps->append_poly(3);
-				append_rotary_vertex(ps,&lastFace,(j+0)%n, last_ang);
-				append_rotary_vertex(ps,&curFace,(j+1)%n, cur_ang);
-				append_rotary_vertex(ps,&curFace,(j+0)%n, cur_ang);
+				builder.appendPoly(3);
+				append_rotary_vertex(builder,&lastFace,(j+0)%n, last_ang);
+				append_rotary_vertex(builder,&lastFace,(j+1)%n, last_ang);
+				append_rotary_vertex(builder,&curFace,(j+1)%n, cur_ang);
+				builder.appendPoly(3);
+				append_rotary_vertex(builder,&lastFace,(j+0)%n, last_ang);
+				append_rotary_vertex(builder,&curFace,(j+1)%n, cur_ang);
+				append_rotary_vertex(builder,&curFace,(j+0)%n, cur_ang);
 			}
 		}
 
@@ -2454,11 +2333,11 @@ static Geometry *rotatePolygon(const RotateExtrudeNode& node, const Polygon2d& p
 		Transform3d rot2(angle_axis_degrees(cur_ang, Vector3d::UnitZ()) * angle_axis_degrees(90, Vector3d::UnitX()));
 		ps_cur->transform(rot2);
 		if (flip_faces) {
-			for (auto& p : ps_cur->polygons) {
+			for (auto& p : ps_cur->indices) {
 				std::reverse(p.begin(), p.end());
 			}
 		}
-		ps->append(*ps_cur);
+		builder.append(ps_cur);
 		delete ps_cur;
 	}
 	  
@@ -2472,22 +2351,22 @@ static Geometry *rotatePolygon(const RotateExtrudeNode& node, const Polygon2d& p
     ps_start->transform(rot);
     // Flip vertex ordering
     if (!flip_faces) {
-      for (auto& p : ps_start->polygons) {
+      for (auto& p : ps_start->indices) {
         std::reverse(p.begin(), p.end());
       }
     }
-    ps->append(*ps_start);
+    builder.append(ps_start);
     delete ps_start;
 
     PolySet *ps_end = poly.tessellate();
     Transform3d rot2(angle_axis_degrees(node.angle, Vector3d::UnitZ()) * angle_axis_degrees(90, Vector3d::UnitX()));
     ps_end->transform(rot2);
     if (flip_faces) {
-      for (auto& p : ps_end->polygons) {
+      for (auto& p : ps_end->indices) {
         std::reverse(p.begin(), p.end());
       }
     }
-    ps->append(*ps_end);
+    builder.append(ps_end);
     delete ps_end;
   }
 
@@ -2504,19 +2383,22 @@ static Geometry *rotatePolygon(const RotateExtrudeNode& node, const Polygon2d& p
       fill_ring(rings[(j + 1) % 2], o, a, flip_faces);
 
       for (size_t i = 0; i < o.vertices.size(); ++i) {
-        ps->append_poly(3);
-        ps->insert_vertex(rings[j % 2][i]);
-        ps->insert_vertex(rings[(j + 1) % 2][(i + 1) % o.vertices.size()]);
-        ps->insert_vertex(rings[j % 2][(i + 1) % o.vertices.size()]);
-        ps->append_poly(3);
-        ps->insert_vertex(rings[j % 2][i]);
-        ps->insert_vertex(rings[(j + 1) % 2][i]);
-        ps->insert_vertex(rings[(j + 1) % 2][(i + 1) % o.vertices.size()]);
+        builder.appendPoly({
+		rings[j % 2][(i + 1) % o.vertices.size()],
+		rings[(j + 1) % 2][(i + 1) % o.vertices.size()],
+		rings[j % 2][i]
+	});		
+
+        builder.appendPoly({
+		rings[(j + 1) % 2][(i + 1) % o.vertices.size()],
+		rings[(j + 1) % 2][i],
+		rings[j % 2][i]
+	});
       }
     }
   }
   }
-  return ps;
+  return builder.build();
 }
 
 /*!
@@ -2570,23 +2452,21 @@ static int pullObject_calccut(const PullNode &node, Vector3d p1, Vector3d p2,Vec
 	r =p1+dir*res[0];
 	return 0;
 }
-static void pullObject_addtri(PolySet *ps,Vector3d a, Vector3d b, Vector3d c)
+static void pullObject_addtri(PolySetBuilder &builder,Vector3d a, Vector3d b, Vector3d c)
 {
-	ps->append_poly(3);
-	ps->insert_vertex(a[0], a[1], a[2]);
-	ps->insert_vertex(b[0], b[1], b[2]);
-	ps->insert_vertex(c[0], c[1], c[2]);
+	builder.appendPoly(3);
+	builder.prependVertex(builder.vertexIndex(Vector3d(a[0], a[1], a[2])));
+	builder.prependVertex(builder.vertexIndex(Vector3d(b[0], b[1], b[2])));
+	builder.prependVertex(builder.vertexIndex(Vector3d(c[0], c[1], c[2])));
 }
-
 static PolySet *pullObject(const PullNode& node, const PolySet *ps)
 {
-  PolySet *newps = new PolySet(3);
-  newps->setConvexity(3);
+  PolySetBuilder builder(0,0,3,true);
   PolySet *ps_tess=new PolySet(3);
  
   PolySetUtils::tessellate_faces(*ps, *ps_tess);
-  for(int i=0;i<ps_tess->polygons.size();i++) {
-	  Polygon pol = ps_tess->polygons[i];
+  for(int i=0;i<ps_tess->indices.size();i++) {
+	  auto pol = ps_tess->indices[i];
 
 	  //count upper points
 	  int upper=0;
@@ -2594,72 +2474,70 @@ static PolySet *pullObject(const PullNode& node, const PolySet *ps)
 	  int highind=0;
 
 	  for(int j=0;j<3;j++) { 
-		Vector3d pt=pol[j];
+		Vector3d pt=ps_tess->vertices[pol[j]];
 		float dist=(pt-node.anchor).dot(node.dir);
 		if(dist > 0) { upper++; highind += j; } else {lowind += j; }
 	  }
 	  switch(upper)
 	  {
 		  case 0:
-	  		newps->append_poly(3);
+	  		builder.appendPoly(3);
 			for(int j=0;j<3;j++) { 
-				Vector3d pt=pol[j];
-			        newps->insert_vertex(pt[0],pt[1], pt[2]);
+			        builder.prependVertex(pol[j]);
 			}
 			break;
 		  case 1:
 			{
-				std::vector<Vector3d> pol1;
+				std::vector<int> pol1;
 				pol1.push_back(pol[(highind+1)%3]);
 				pol1.push_back(pol[(highind+2)%3]);
 				pol1.push_back(pol[highind]);
 				// pol1[2] ist oben 
 				//
 				Vector3d p02, p12;
-				if(pullObject_calccut(node, pol1[0],pol1[2],p02)) break;
-				if(pullObject_calccut(node, pol1[1],pol1[2],p12)) break;
+				if(pullObject_calccut(node, ps_tess->vertices[pol1[0]],ps_tess->vertices[pol1[2]],p02)) break;
+				if(pullObject_calccut(node, ps_tess->vertices[pol1[1]],ps_tess->vertices[pol1[2]],p12)) break;
 
-				pullObject_addtri(newps, pol1[0],pol1[1], p12);
-				pullObject_addtri(newps, pol1[0], p12,p02);
+				pullObject_addtri(builder, ps_tess->vertices[pol1[0]],ps_tess->vertices[pol1[1]], p12);
+				pullObject_addtri(builder, ps_tess->vertices[pol1[0]], p12,p02);
 
-				pullObject_addtri(newps, p02,p12,p12+node.dir);
-				pullObject_addtri(newps, p02,p12+node.dir,p02+node.dir);
+				pullObject_addtri(builder, p02,p12,p12+node.dir);
+				pullObject_addtri(builder, p02,p12+node.dir,p02+node.dir);
 
-				pullObject_addtri(newps, p02+node.dir,p12+node.dir,pol1[2]+node.dir);
+				pullObject_addtri(builder, p02+node.dir,p12+node.dir,ps_tess->vertices[pol1[2]]+node.dir);
 			}
 		  case 2: 
 			{
-				std::vector<Vector3d> pol1;
+				std::vector<int> pol1;
 				pol1.push_back(pol[(lowind+1)%3]);
 				pol1.push_back(pol[(lowind+2)%3]);
 				pol1.push_back(pol[lowind]);
 				// pol1[2] ist unten 
 				//
 				Vector3d p02, p12;
-				if(pullObject_calccut(node, pol1[0],pol1[2],p02)) break;
-				if(pullObject_calccut(node, pol1[1],pol1[2],p12)) break;
+				if(pullObject_calccut(node, ps_tess->vertices[pol1[0]],ps_tess->vertices[pol1[2]],p02)) break;
+				if(pullObject_calccut(node, ps_tess->vertices[pol1[1]],ps_tess->vertices[pol1[2]],p12)) break;
 
-				pullObject_addtri(newps, pol1[2],p02, p12);
+				pullObject_addtri(builder, ps_tess->vertices[pol1[2]],p02, p12);
 
-				pullObject_addtri(newps, p12, p02, p02+node.dir);
-				pullObject_addtri(newps, p12, p02+node.dir,p12+node.dir) ;
+				pullObject_addtri(builder, p12, p02, p02+node.dir);
+				pullObject_addtri(builder, p12, p02+node.dir,p12+node.dir) ;
 
-				pullObject_addtri(newps, p12+node.dir,p02+node.dir,pol1[0]+node.dir);
-				pullObject_addtri(newps, p12+node.dir,pol1[0]+node.dir,pol1[1]+node.dir);
+				pullObject_addtri(builder, p12+node.dir,p02+node.dir,ps_tess->vertices[pol1[0]]+node.dir);
+				pullObject_addtri(builder, p12+node.dir,ps_tess->vertices[pol1[0]]+node.dir,ps_tess->vertices[pol1[1]]+node.dir);
 			}
 			break;
 		  case 3:
-	  		newps->append_poly(3);
+	  		builder.appendPoly(3);
 			for(int j=0;j<3;j++) { 
-				Vector3d pt=pol[j]+node.dir;
-			        newps->insert_vertex(pt[0],pt[1], pt[2]);
+				Vector3d pt=ps_tess->vertices[pol[j]]+node.dir;
+			        builder.prependVertex(builder.vertexIndex(Vector3d(pt[0],pt[1], pt[2])));
 			}
 			break;
 	  }
   }
 
-
-  return newps;
+  return builder.build();
 }
 
 Response GeometryEvaluator::visit(State& state, const PullNode& node)

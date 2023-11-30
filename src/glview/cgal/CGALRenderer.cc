@@ -257,9 +257,10 @@ void CGALRenderer::draw(bool showfaces, bool showedges, const shaderinfo_t * /*s
         glDisable(GL_LIGHTING);
         setColor(ColorMode::CGAL_FACE_2D_COLOR);
 
-        for (const auto& polygon : polyset->polygons) {
+        for (const auto& polygon : polyset->indices) {
           glBegin(GL_POLYGON);
-          for (const auto& p : polygon) {
+          for (const auto& ind : polygon) {
+            Vector3d p=polyset->vertices[ind];		  
             glVertex3d(p[0], p[1], 0);
           }
           glEnd();
@@ -354,25 +355,22 @@ double calculateLineLineDistance(const Vector3d &l1b, const Vector3d &l1e, const
 	return d;
 }
 
-std::vector<SelectedObject> CGALRenderer::findModelObject(Vector3d nearpt, Vector3d farpt,int mouse_x, int mouse_y, double tolerance) {
+std::vector<SelectedObject> CGALRenderer::findModelObject(Vector3d near_pt, Vector3d far_pt,int mouse_x, int mouse_y, double tolerance) {
   std::vector<SelectedObject> results;
   double dist_near;
   double dist_nearest=NAN;
   Vector3d pt1_nearest;
   Vector3d pt2_nearest;
-  double dist_pt;
   for (const auto& p : this->getPolyhedrons()) {
   }
   for (const std::shared_ptr<const PolySet>& ps : this->polysets) {
-    for(const Polygon &pol : ps->polygons) {
-      for(const Vector3d &pt: pol) {
-        dist_pt= calculateLinePointDistance(nearpt, farpt, pt,dist_near);
-        if(dist_pt < tolerance  ) {
-	  if(isnan(dist_nearest) || dist_near < dist_nearest)
-	  {
-	    dist_nearest=dist_near;
-	    pt1_nearest=pt;
-	  }
+    for(const Vector3d &pt: ps->vertices) {
+      double dist_pt= calculateLinePointDistance(near_pt, far_pt, pt, dist_near);
+      if(dist_pt < tolerance  ) {
+        if(isnan(dist_nearest) || dist_near < dist_nearest)
+        {
+          dist_nearest=dist_near;
+          pt1_nearest=pt;
         }	  
       }
     }
@@ -385,18 +383,18 @@ std::vector<SelectedObject> CGALRenderer::findModelObject(Vector3d nearpt, Vecto
     return results;
   }
   for (const std::shared_ptr<const PolySet>& ps : this->polysets) {
-    for(const Polygon &pol : ps->polygons) {
+    for(const auto &pol : ps->indices) {
 	int n = pol.size();
         for(int i=0;i < n;i++ )
 	{
-	  Vector3d pt1=pol[i];
-	  Vector3d pt2=pol[(i+1)%n];
+	  int ind1=pol[i];
+	  int ind2=pol[(i+1)%n];
 	  double dist_lat;
-          double dist_norm= fabs(calculateLineLineDistance(pt1, pt2, nearpt, farpt,dist_lat));
+          double dist_norm= fabs(calculateLineLineDistance(ps->vertices[ind1], ps->vertices[ind2], near_pt, far_pt,dist_lat));
           if(dist_lat >= 0 && dist_lat <= 1 && dist_norm < tolerance  ) {
 	      dist_nearest=dist_lat;
-	      pt1_nearest=pt1;
-	      pt2_nearest=pt2;
+	      pt1_nearest=ps->vertices[ind1];
+	      pt2_nearest=ps->vertices[ind2];
 	  }
         }	  
       }

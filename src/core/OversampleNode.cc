@@ -33,6 +33,7 @@
 #include "io/fileutils.h"
 #include "Builtins.h"
 #include "handle_dep.h"
+#include "PolySetBuilder.h"
 
 #include <cmath>
 #include <sstream>
@@ -50,7 +51,7 @@ double roundCoord(double c) {
 }
 
 
-void ov_add_poly_round(PolySet *ps, std::unordered_map<Vector3d, Vector3d, boost::hash<Vector3d> > &weldMap, Vector3d p,const Vector3d & center,  double r, int round, int orgpt)
+void ov_add_poly_round(PolySetBuilder &builder, std::unordered_map<Vector3d, Vector3d, boost::hash<Vector3d> > &weldMap, Vector3d p,const Vector3d & center,  double r, int round, int orgpt)
 {
   if(round && !orgpt) {
     p[0]=roundCoord(p[0]);
@@ -66,7 +67,7 @@ void ov_add_poly_round(PolySet *ps, std::unordered_map<Vector3d, Vector3d, boost
       weldMap[p]=(weldMap[p]+pnew)/2.0;
     }      
   }
-  ps->append_vertex(p[0],p[1],p[2]);
+  builder.appendVertex(builder.vertexIndex(Vector3d(p[0],p[1],p[2])));
 }
 
 const Geometry *OversampleNode::createGeometry() const
@@ -92,12 +93,12 @@ const Geometry *OversampleNode::createGeometry() const
     std::vector<intList>  pointToFaceInds; //  mapping pt_ind -> list of polygon inds which use it
     std::vector<intList>  pointToFacePoss; //  mapping pt_ind -> list of polygon inds which use it
     intList emptyList;
-    for(int i=0;i<ps_tess->polygons.size();i++) {
-      Polygon pol = ps_tess->polygons[i];
+    for(int i=0;i<ps_tess->indices.size();i++) {
+      auto pol = ps_tess->indices[i];
       intList polygon;
       for(int j=0;j<pol.size(); j++) {
         int ptind=0;
-        Vector3d  pt=pol[j];
+        Vector3d  pt=ps_tess->vertices[pol[j]];
         pt[0]=roundCoord(pt[0]);
         pt[1]=roundCoord(pt[1]);
         pt[2]=roundCoord(pt[2]);
@@ -135,13 +136,13 @@ const Geometry *OversampleNode::createGeometry() const
     }
 
   }
-  PolySet *ps_ov = new PolySet(3,true);
-  for(int i=0;i<ps_tess->polygons.size();i++)
+  PolySetBuilder builder_ov(0,0,3,true);
+  for(int i=0;i<ps_tess->indices.size();i++)
   {
-    Polygon &pol = ps_tess->polygons[i];
-    Vector3d p1=pol[0];
-    Vector3d p2=pol[1];
-    Vector3d p3=pol[2];
+    auto &pol = ps_tess->indices[i];
+    Vector3d p1=ps_tess->vertices[pol[0]];
+    Vector3d p2=ps_tess->vertices[pol[1]];
+    Vector3d p3=ps_tess->vertices[pol[2]];
     Vector3d p21=(p2-p1)/this->n;
     Vector3d p31=(p3-p1)/this->n;
     Vector3d botlast,botcur, toplast, topcur;
@@ -152,10 +153,10 @@ const Geometry *OversampleNode::createGeometry() const
       Vector3d cutmean(0,0,0);				 
       int results=0;
       for(int j=0;j<3;j++) { // for all 3 edges
-	Vector3d dir1 = pol[(j+2)%3] - pol[(j+1)%3] ;
-	Vector3d dir2 = pt_dir[pointIntMap[pol[(j+1)%3]]];
+	Vector3d dir1 = ps_tess->vertices[pol[(j+2)%3]] - ps_tess->vertices[pol[(j+1)%3]] ;
+	Vector3d dir2 = pt_dir[pointIntMap[ps_tess->vertices[pol[(j+1)%3]]]];
 	Vector3d cut;
-        if(!cut_face_line(pol[(j+1)%3],dir1.cross(dir2), pol[j],pt_dir[pointIntMap[pol[j]]],cut,NULL)) {
+        if(!cut_face_line(ps_tess->vertices[pol[(j+1)%3]],dir1.cross(dir2), ps_tess->vertices[pol[j]],pt_dir[pointIntMap[ps_tess->vertices[pol[j]]]],cut,NULL)) {
          cutmean = cutmean + cut;	      
          results++;
 
@@ -176,27 +177,28 @@ const Geometry *OversampleNode::createGeometry() const
         if(k != 0) {
           toplast=topcur;
           topcur=topcur+p21;	
-          ps_ov->append_poly(3);
-          ov_add_poly_round(ps_ov, weldMap, botcur,center, r, round1, 0 );
-          ov_add_poly_round(ps_ov, weldMap, topcur,center, r, round1 , 0);
-          ov_add_poly_round(ps_ov, weldMap, toplast,center, r, round1 , 0);
+          builder_ov.appendPoly(3);
+          ov_add_poly_round(builder_ov, weldMap, botcur,center, r, round1, 0 );
+          ov_add_poly_round(builder_ov, weldMap, topcur,center, r, round1 , 0);
+          ov_add_poly_round(builder_ov, weldMap, toplast,center, r, round1 , 0);
 	}
 	botlast=botcur;
 	botcur=botlast+p21;
-        ps_ov->append_poly(3);
-        ov_add_poly_round(ps_ov, weldMap, botlast,center, r, round1, j == 0 && k == 0 );
-        ov_add_poly_round(ps_ov, weldMap, botcur,center, r, round1, j == 0 && k == this->n-1 );
-        ov_add_poly_round(ps_ov, weldMap, topcur,center, r, round1, j == this->n-1 );
+        builder_ov.appendPoly(3);
+        ov_add_poly_round(builder_ov, weldMap, botlast,center, r, round1, j == 0 && k == 0 );
+        ov_add_poly_round(builder_ov, weldMap, botcur,center, r, round1, j == 0 && k == this->n-1 );
+        ov_add_poly_round(builder_ov, weldMap, topcur,center, r, round1, j == this->n-1 );
       }	      
     }				 
 
   }
-  for(int i=0;i<ps_ov->polygons.size();i++) {
-    for(int j=0;j<ps_ov->polygons[i].size();j++)
+  PolySet *ps_ov = builder_ov.build();
+  for(int i=0;i<ps_ov->indices.size();i++) {
+    for(int j=0;j<ps_ov->indices[i].size();j++)
     {
-       Vector3d  pt=ps_ov->polygons[i][j];	    
+       Vector3d  pt=ps_ov->vertices[ps_ov->indices[i][j]];	    
        if(weldMap.count(pt) > 0) {
-	       ps_ov->polygons[i][j]=weldMap[pt];
+	       ps_ov->vertices[ps_ov->indices[i][j]]=weldMap[pt];
        }
     }
   }

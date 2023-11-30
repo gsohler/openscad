@@ -35,6 +35,7 @@
 #include "FrepNode.h"
 #endif
 
+#include "GeometryUtils.h"
 #include "primitives.h"
 #include "TransformNode.h"
 #include "RotateExtrudeNode.h"
@@ -259,7 +260,7 @@ PyObject *python_polyhedron(PyObject *self, PyObject *args, PyObject *kwargs)
   PyObject *triangles = NULL;
 
   PyObject *element;
-  point3d point;
+  Vector3d point;
 
   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O!O!|iO!", kwlist,
                                    &PyList_Type, &points,
@@ -279,9 +280,9 @@ PyObject *python_polyhedron(PyObject *self, PyObject *args, PyObject *kwargs)
     for (i = 0; i < PyList_Size(points); i++) {
       element = PyList_GetItem(points, i);
       if (PyList_Check(element) && PyList_Size(element) == 3) {
-        point.x = PyFloat_AsDouble(PyList_GetItem(element, 0));
-        point.y = PyFloat_AsDouble(PyList_GetItem(element, 1));
-        point.z = PyFloat_AsDouble(PyList_GetItem(element, 2));
+        point[0] = PyFloat_AsDouble(PyList_GetItem(element, 0));
+        point[1] = PyFloat_AsDouble(PyList_GetItem(element, 1));
+        point[2] = PyFloat_AsDouble(PyList_GetItem(element, 2));
         node->points.push_back(point);
       } else {
         PyErr_SetString(PyExc_TypeError, "Coordinate must exactly contain 3 numbers");
@@ -317,7 +318,7 @@ PyObject *python_polyhedron(PyObject *self, PyObject *args, PyObject *kwargs)
           face.push_back(pointIndex);
         }
         if (face.size() >= 3) {
-          node->faces.push_back(std::move(face));
+//          node->faces.push_back(std::move(face)); TODO activate
         } else {
     	  PyErr_SetString(PyExc_TypeError, "Polyhedron Face must sepcify at least 3 indices");
   	  return NULL;
@@ -494,7 +495,7 @@ PyObject *python_polygon(PyObject *self, PyObject *args, PyObject *kwargs)
   int convexity = 2;
 
   PyObject *element;
-  point2d point;
+  Vector2d point;
 
   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O!|O!i", kwlist,
                                    &PyList_Type, &points,
@@ -513,8 +514,8 @@ PyObject *python_polygon(PyObject *self, PyObject *args, PyObject *kwargs)
     for (i = 0; i < PyList_Size(points); i++) {
       element = PyList_GetItem(points, i);
       if (PyList_Check(element) && PyList_Size(element) == 2) {
-        point.x = PyFloat_AsDouble(PyList_GetItem(element, 0));
-        point.y = PyFloat_AsDouble(PyList_GetItem(element, 1));
+        point[0] = PyFloat_AsDouble(PyList_GetItem(element, 0));
+        point[1] = PyFloat_AsDouble(PyList_GetItem(element, 1));
         node->points.push_back(point);
       } else {
         PyErr_SetString(PyExc_TypeError, "Coordinate must exactly contain 2 numbers");
@@ -1117,49 +1118,22 @@ PyObject *python_mesh(PyObject *self, PyObject *args, PyObject *kwargs)
   shared_ptr<const Geometry> geom = geomevaluator.evaluateGeometry(*tree.root(), true);
   std::shared_ptr<const PolySet> ps = dynamic_pointer_cast<const PolySet>(geom);
 
-  // create indexed point list
-  std::unordered_map<Vector3d, int > pointIntMap;
-  std::vector<Vector3d> pointList; // list of all the points in the object
-  std::vector<Vector3d> pointListNew; // list of all the points in the object
-  std::vector<intList> polygons; // list polygons represented by indexes
-  std::vector<intList>  pointToFaceInds; //  mapping pt_ind -> list of polygon inds which use it
-  intList emptyList;
-  for(int i=0;i<ps->polygons.size();i++) {
-    Polygon pol = ps->polygons[i];
-    intList polygon;
-    for(int j=0;j<pol.size(); j++) {
-      int ptind=0;
-      Vector3d  pt=pol[j];
-      pt[0]=(int)(pt[0]*1000+0.5)/1000.0;
-      pt[1]=(int)(pt[1]*1000+0.5)/1000.0;
-      pt[2]=(int)(pt[2]*1000+0.5)/1000.0;
-      if(!pointIntMap.count(pt)) {
-        pointList.push_back(pt);
-        pointToFaceInds.push_back(emptyList);
-        ptind=pointList.size()-1;
-        pointIntMap[pt]=ptind;
-      } else ptind=pointIntMap[pt];
-      polygon.push_back(ptind);
-    }
-    polygons.push_back(polygon);
-  }
-
   // Now create Python Point array
-  PyObject *ptarr = PyList_New(pointList.size());  
-  for(int i=0;i<pointList.size();i++) {
+  PyObject *ptarr = PyList_New(ps->vertices.size());  
+  for(int i=0;i<ps->vertices.size();i++) {
     PyObject *coord = PyList_New(3);
     for(int j=0;j<3;j++) 
-        PyList_SetItem(coord, j, PyFloat_FromDouble(pointList[i][j]));
+        PyList_SetItem(coord, j, PyFloat_FromDouble(ps->vertices[i][j]));
     PyList_SetItem(ptarr, i, coord);
     Py_XINCREF(coord);
   }
   Py_XINCREF(ptarr);
   // Now create Python Point array
-  PyObject *polarr = PyList_New(polygons.size());  
-  for(int i=0;i<polygons.size();i++) {
-    PyObject *face = PyList_New(polygons[i].size());
-    for(int j=0;j<polygons[i].size();j++) 
-        PyList_SetItem(face, j, PyLong_FromLong(polygons[i][j]));
+  PyObject *polarr = PyList_New(ps->indices.size());  
+  for(int i=0;i<ps->indices.size();i++) {
+    PyObject *face = PyList_New(ps->indices[i].size());
+    for(int j=0;j<ps->indices[i].size();j++) 
+        PyList_SetItem(face, j, PyLong_FromLong(ps->indices[i][j]));
     PyList_SetItem(polarr, i, face);
     Py_XINCREF(face);
   }
