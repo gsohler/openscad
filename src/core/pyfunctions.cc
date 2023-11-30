@@ -308,7 +308,7 @@ PyObject *python_polyhedron(PyObject *self, PyObject *args, PyObject *kwargs)
     for (i = 0; i < PyList_Size(faces); i++) {
       element = PyList_GetItem(faces, i);
       if (PyList_Check(element)) {
-        std::vector<size_t> face;
+        std::vector<int> face;
         for (j = 0; j < PyList_Size(element); j++) {
           pointIndex = PyLong_AsLong(PyList_GetItem(element, j));
 	  if(pointIndex < 0 || pointIndex >= node->points.size()) {
@@ -318,7 +318,7 @@ PyObject *python_polyhedron(PyObject *self, PyObject *args, PyObject *kwargs)
           face.push_back(pointIndex);
         }
         if (face.size() >= 3) {
-//          node->faces.push_back(std::move(face)); TODO activate
+          node->faces.push_back(std::move(face));
         } else {
     	  PyErr_SetString(PyExc_TypeError, "Polyhedron Face must sepcify at least 3 indices");
   	  return NULL;
@@ -337,7 +337,6 @@ PyObject *python_polyhedron(PyObject *self, PyObject *args, PyObject *kwargs)
 
   node->convexity = convexity;
   if (node->convexity < 1) node->convexity = 1;
-
   return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
 }
 
@@ -406,22 +405,18 @@ PyObject *python_square(PyObject *self, PyObject *args, PyObject *kwargs)
 
   double x = 1, y = 1;
   PyObject *center = NULL;
+  double z=NAN;
 
 
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|O", kwlist,
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|OO", kwlist,
                                    &dim,
                                    &center)) {
     PyErr_SetString(PyExc_TypeError, "Error during parsing square(dim)");
     return NULL;
   }
   if (dim != NULL) {
-    double z=NAN;
     if (python_vectorval(dim, &(node->x), &(node->y), &z)) {
       PyErr_SetString(PyExc_TypeError, "Invalid Square dimensions");
-      return NULL;
-    }
-    if(!isnan(z)) {
-      PyErr_SetString(PyExc_TypeError, "Cannot specify z coordinate for square");
       return NULL;
     }
   }
