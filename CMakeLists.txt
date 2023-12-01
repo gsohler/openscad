@@ -416,6 +416,9 @@ if(ENABLE_PYTHON)
     target_link_libraries(OpenSCAD PRIVATE "${PYTHON_DEVPATH}/mingw64/lib/lib${PYTHON_VERSION}.dll.a")
   else()	  
     find_package(PythonLibs  REQUIRED COMPONENTS Interpreter Development)
+    SET(PYTHON_LIBRARIES "/lib64/libpython3.11.so.1.0" )
+    SET(PYTHON_INCLUDE_DIRS "/usr/include/python3.11/" )
+
     target_include_directories(OpenSCAD PRIVATE ${PYTHON_INCLUDE_DIRS})
     target_link_libraries(OpenSCAD PRIVATE ${PYTHON_LIBRARIES})
   endif()  
@@ -518,6 +521,7 @@ endif()
 target_include_directories(OpenSCAD PRIVATE
   "src"
   "src/core"
+  "src/python"
   "src/core/customizer"
   "src/ext"
   "src/ext/json"
@@ -840,16 +844,16 @@ set(CORE_SOURCES
   ${BISON_comment_parser_OUTPUTS})
 if(ENABLE_PYTHON)
 	list(APPEND CORE_SOURCES
-		    src/core/pyopenscad.cc 
-		    src/core/pyfunctions.cc)
+		    src/python/pyopenscad.cc 
+		    src/python/pyfunctions.cc)
 	target_compile_definitions(OpenSCAD PRIVATE ENABLE_PYTHON)
 	if(ENABLE_CRYPTOPP)
 		target_compile_definitions(OpenSCAD PRIVATE ENABLE_CRYPTOPP)
 	endif()		
 	if(ENABLE_LIBFIVE)
 		list(APPEND CORE_SOURCES
-			src/core/pylibfive.cc 
-	  		src/core/FrepNode.cc)
+			src/python/pylibfive.cc 
+	  		src/python/FrepNode.cc)
 		target_compile_definitions(OpenSCAD PRIVATE ENABLE_LIBFIVE)
 	endif()
 endif()
