@@ -449,7 +449,7 @@ PolySet *offset3D(const PolySet *ps,double off) {
 	// -------------------------------
 	std::vector<Vector3d>  faceNormal;
 	for(int i=0;i<ps->indices.size();i++) {
-		intList pol = ps->indices[i];
+		IndexedFace pol = ps->indices[i];
 		assert (pol.size() >= 3);
 		Vector3d diff1=ps->vertices[pol[1]] - ps->vertices[pol[0]];
 		Vector3d diff2=ps->vertices[pol[2]] - ps->vertices[pol[1]];
@@ -464,7 +464,7 @@ PolySet *offset3D(const PolySet *ps,double off) {
 	}
 
 	std::vector<Vector3d> newNormals;
-	std::vector<intList> polygons_merged = mergetriangles(ps->indices,faceNormal,newNormals); // TODO sind es immer dreiecke ?
+	std::vector<intList> polygons_merged ; // = mergetriangles(ps->indices,faceNormal,newNormals); // TODO sind es immer dreiecke ?
 	faceNormal=newNormals;
 
 	// -------------------------------

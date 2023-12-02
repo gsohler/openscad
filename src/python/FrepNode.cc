@@ -164,13 +164,13 @@ unsigned int hash_value(const CutFace& r) {
         return i;
 }
 
-std::vector<CutFace> calculateEdgeFaces( const std::vector<Vector3d> &pointList,const std::vector<intList> &polygons, std::vector<intList>  &pointToFaceInds, std::vector<CutFace> &normfaces)
+std::vector<CutFace> calculateEdgeFaces( const std::vector<Vector3d> &pointList,const std::vector<IndexedFace> &polygons, std::vector<intList>  &pointToFaceInds, std::vector<CutFace> &normfaces)
 {
   std::vector<CutFace> edgeFaces;
   std::unordered_set<CutFace, boost::hash<CutFace> > edgeFacePresent;
   for(int i=0;i<polygons.size();i++)
   { 
-    const intList &poly = polygons[i];
+    const IndexedFace &poly = polygons[i];
     int n=poly.size();
     if(n < 3) continue;
     // normalvektor
@@ -200,7 +200,7 @@ std::vector<CutFace> calculateEdgeFaces( const std::vector<Vector3d> &pointList,
 	}
       }
       if(faceindfound == -1) continue;
-      const intList &opoly = polygons[faceindfound];
+      const IndexedFace &opoly = polygons[faceindfound];
       p1=pointList[opoly[0]];
       p2=pointList[opoly[1]];
       p3=pointList[opoly[2]];
@@ -244,7 +244,7 @@ struct ProgramState
 std::vector<ProgramState> programStack;
 
 
-int generateProgram(intList &table, std::vector<CutProgram> &program,std::vector<CutFace> &edgeFaces, const std::vector<intList> &faces, intList &validFaces) 
+int generateProgram(intList &table, std::vector<CutProgram> &program,std::vector<CutFace> &edgeFaces, const std::vector<IndexedFace> &faces, intList &validFaces) 
 {
 	std::vector<int> posFaces, negFaces;
 	int i,j,v;
@@ -361,7 +361,7 @@ int generateProgram(intList &table, std::vector<CutProgram> &program,std::vector
 	return startind;
 }
 
-int generateProgramFlat(intList &table, std::vector<CutProgram> &program, std::vector<CutFace> &edgeFaces, const std::vector<intList> &faces, std::vector<ProgramState> &stack) 
+int generateProgramFlat(intList &table, std::vector<CutProgram> &program, std::vector<CutFace> &edgeFaces, const std::vector<IndexedFace> &faces, std::vector<ProgramState> &stack) 
 {
 	printf("flat\n");
 	while(1)
@@ -370,7 +370,7 @@ int generateProgramFlat(intList &table, std::vector<CutProgram> &program, std::v
 		ProgramState state = stack[stack.size()-1];
 		stack.pop_back();
 
-		int result=generateProgram(table ,program, edgeFaces, faces,state.validFaces); // create recursive program
+		int result= generateProgram(table ,program, edgeFaces, faces,state.validFaces); // create recursive program
 		if(state.resultind == 0x80000000) continue;
 		if(state.resultind >= 0) program[state.resultind].posbranch = result;		
 		else program[~(state.resultind)].negbranch = result;
@@ -455,7 +455,7 @@ PyObject *ifrep(const PolySet *ps)
   for(int i=0;i<ps->vertices.size();i++)
     pointToFaceInds.push_back(emptyList);
   for(int i=0;i<ps->indices.size();i++) {
-    intList pol = ps->indices[i];
+    IndexedFace pol = ps->indices[i];
     for(int j=0;j<pol.size(); j++) {
       pointToFaceInds[pol[j]].push_back(i);
     }
@@ -477,7 +477,7 @@ PyObject *ifrep(const PolySet *ps)
     CutFace &ef = edgeFaces[i];
     for(int j=0;j<ps->indices.size();j++)
     {
-      const intList &poly=ps->indices[j];
+      const IndexedFace &poly=ps->indices[j];
       int poscount=0, negcount=0;
       for(int k=0;k<poly.size(); k++)
       {
