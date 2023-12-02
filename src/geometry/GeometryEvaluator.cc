@@ -48,7 +48,7 @@
 #include <CGAL/Point_2.h>
 
 #ifdef ENABLE_PYTHON
-#include <pyopenscad.h>
+#include <src/python/python_public.h>
 #endif
 class Geometry;
 class Polygon2d;

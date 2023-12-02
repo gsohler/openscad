@@ -55,7 +55,7 @@ option(ENABLE_CGAL "Enable CGAL." ON)
 option(ALLOW_BUNDLED_HIDAPI "Allow usage of bundled HIDAPI library (Windows only)." OFF)
 option(ENABLE_PYTHON "Enable experimental Python Interpreter" OFF)
 option(ENABLE_LIBFIVE "Enable libfive Library" OFF)
-option(ENABLE_CRYPTOPP "Enable cryptopp Library with python" ON)
+option(ENABLE_NETTLE "Enable nettle Library with python" ON)
 include(CMakeDependentOption)
 cmake_dependent_option(APPLE_UNIX "Build OpenSCAD in Unix mode in MacOS X instead of an Apple Bundle" OFF "APPLE" OFF)
 cmake_dependent_option(ENABLE_QTDBUS "Enable DBus input driver for Qt5." ON "NOT HEADLESS" OFF)
@@ -388,19 +388,46 @@ target_include_directories(OpenSCAD SYSTEM PRIVATE ${LIBXML2_INCLUDE_DIR})
 target_link_libraries(OpenSCAD PRIVATE ${LIBXML2_LIBRARIES})
 
 if(ENABLE_PYTHON)
-  if(ENABLE_CRYPTOPP)	
+  SET(PYTHON_SOURCES
+    src/python/pyopenscad.cc
+    src/python/pyfunctions.cc)
+    if(ENABLE_LIBFIVE)
+      list(APPEND PYTHON_SOURCES
+        src/python/pylibfive.cc 
+        src/python/FrepNode.cc)
+     endif()
+  add_library(OpenSCADPy ${PYTHON_SOURCES} )# Base stuff
+
+  target_compile_definitions(OpenSCAD PRIVATE ENABLE_PYTHON)
+  target_compile_definitions(OpenSCADPy PRIVATE ENABLE_PYTHON)
+
+  if(ENABLE_NETTLE) # Signing
+	  target_compile_definitions(OpenSCAD PRIVATE ENABLE_NETTLE)
+	  target_compile_definitions(OpenSCADPy PRIVATE ENABLE_NETTLE)
     if(APPLE)	
-      target_include_directories(OpenSCAD PRIVATE "/usr/local/include")
-      target_link_directories(OpenSCAD PRIVATE "/usr/local/lib")
-      target_link_libraries(OpenSCAD PRIVATE "libnettle.a")
+      target_include_directories(OpenSCADPy PRIVATE "/usr/local/include")
+      target_link_directories(OpenSCADPy PRIVATE "/usr/local/lib")
+      target_link_libraries(OpenSCADPy PRIVATE "libnettle.a")
     else()
-      find_package(CryptoPP REQUIRED)
-      target_include_directories(OpenSCAD PRIVATE ${CryptoPP_INCLUDE_DIRS})
-      target_link_libraries(OpenSCAD PRIVATE ${CryptoPP_LIBRARIES})
-    endif()    
-    message(STATUS "Crypto++ ${CryptoPP_VERSION} needed for Python ")
+      find_package(Nettle REQUIRED)
+      message(STATUS "Python enabled, using Nettle ")
+      message(STATUS ${Nettle_INCLUDE_DIRS})
+      message(STATUS ${Nettle_LIBRARIES})
+      message(STATUS ${Nettle_FOUND})
+      target_include_directories(OpenSCADPy PRIVATE ${Nettle_INCLUDE_DIRS})
+      target_link_libraries(OpenSCADPy PRIVATE ${Nettle_LIBRARIES})
+    endif()   
   endif()  
-  if(MXECROSS)
+  if(ENABLE_LIBFIVE)
+    target_compile_definitions(OpenSCAD PRIVATE ENABLE_LIBFIVE)
+    target_compile_definitions(OpenSCADPy PRIVATE ENABLE_LIBFIVE)
+    add_subdirectory(submodules/libfive EXCLUDE_FROM_ALL)
+    target_link_libraries(OpenSCADPy PRIVATE libfive)
+    target_compile_definitions(OpenSCADPy PRIVATE BUILD_STUDIO_APP=OFF)
+    target_compile_definitions(OpenSCADPy PRIVATE BUILD_GUILE_BINDINGS=OFF)
+    target_compile_definitions(OpenSCADPy PRIVATE BUILD_PYTHON_BINDINGS=OFF)
+  endif()
+  if(MXECROSS) # Python Lib
     SET(PYTHON_DEVPATH "${CMAKE_CURRENT_SOURCE_DIR}/python")
     SET(PYTHON_PACKAGEFOLDER "https://mirror.msys2.org/mingw/mingw64")
     SET(PYTHON_PACKAGEFILE "mingw-w64-x86_64-python-3.11.5-2-any.pkg.tar.zst")
@@ -413,23 +440,58 @@ if(ENABLE_PYTHON)
     )
     add_custom_target(python_lib DEPENDS ${PYTHON_ARCHIVE})
     target_include_directories(OpenSCAD SYSTEM PRIVATE "${PYTHON_DEVPATH}/mingw64/include/${PYTHON_VERSION}")
-    target_link_libraries(OpenSCAD PRIVATE "${PYTHON_DEVPATH}/mingw64/lib/lib${PYTHON_VERSION}.dll.a")
-  else()	  
-    find_package(PythonLibs  REQUIRED COMPONENTS Interpreter Development)
+    target_link_libraries(OpenSCADPy PRIVATE "${PYTHON_DEVPATH}/mingw64/lib/lib${PYTHON_VERSION}.dll.a")
+  else() ## not MXE
+    find_package(PythonLibs REQUIRED COMPONENTS Interpreter Development)
     SET(PYTHON_LIBRARIES "/lib64/libpython3.11.so.1.0" )
     SET(PYTHON_INCLUDE_DIRS "/usr/include/python3.11/" )
-
-    target_include_directories(OpenSCAD PRIVATE ${PYTHON_INCLUDE_DIRS})
-    target_link_libraries(OpenSCAD PRIVATE ${PYTHON_LIBRARIES})
-  endif()  
-  message(STATUS "Python enabled ${PYTHONLIBS_FOUND} ${PYTHON_LIBRARIES}")
-  if(ENABLE_LIBFIVE)
-    add_subdirectory(submodules/libfive EXCLUDE_FROM_ALL)
-    target_link_libraries(OpenSCAD PRIVATE libfive)
-    target_compile_definitions(OpenSCAD PRIVATE BUILD_STUDIO_APP=OFF)
-    target_compile_definitions(OpenSCAD PRIVATE BUILD_GUILE_BINDINGS=OFF)
-    target_compile_definitions(OpenSCAD PRIVATE BUILD_PYTHON_BINDINGS=OFF)
-  endif()
+    target_include_directories(OpenSCADPy PRIVATE ${PYTHON_INCLUDE_DIRS})
+    target_link_libraries(OpenSCADPy PRIVATE ${PYTHON_LIBRARIES})
+    if(MSVC)
+      target_include_directories(OpenSCADPy SYSTEM PRIVATE ${HARFBUZZ_INCLUDE_DIRS}/harfbuzz)
+    else()
+      target_include_directories(OpenSCADPy SYSTEM PRIVATE ${HARFBUZZ_INCLUDE_DIRS})
+    endif()
+    message(STATUS "Python enabled ${PYTHONLIBS_FOUND} ${PYTHON_LIBRARIES}")
+    target_include_directories(OpenSCADPy SYSTEM PRIVATE ${FREETYPE_INCLUDE_DIRS})
+  endif() # end MXE
+  target_link_libraries(OpenSCADPy PRIVATE ${Python_LIBRARIES})
+  target_link_libraries(OpenSCADPy PRIVATE Eigen3::Eigen)
+  # copy compile options for the main OpenSCAD target
+  # duplication is not very ideal but not sure what better options do we have
+  set_property(TARGET OpenSCADPy PROPERTY CXX_STANDARD 17)
+  set_property(TARGET OpenSCADPy PROPERTY CXX_EXTENSIONS OFF)
+  set_property(TARGET OpenSCADPy PROPERTY CXX_STANDARD_REQUIRED ON)
+  target_compile_definitions(OpenSCADPy PRIVATE "STACKSIZE=${STACKSIZE}")
+  target_compile_options(OpenSCADPy PRIVATE "$<$<CONFIG:DEBUG>:-DDEBUG>")
+  target_compile_definitions(OpenSCADPy PRIVATE
+    OPENSCAD_VERSION=${OPENSCAD_VERSION}
+    OPENSCAD_SHORTVERSION=${OPENSCAD_SHORTVERSION}
+    OPENSCAD_YEAR=${OPENSCAD_YEAR}
+    OPENSCAD_MONTH=${OPENSCAD_MONTH})
+  target_include_directories(OpenSCADPy SYSTEM PRIVATE ${Boost_INCLUDE_DIRS})
+  target_include_directories(OpenSCADPy SYSTEM PRIVATE ${GLIB2_INCLUDE_DIRS})
+  target_include_directories(OpenSCADPy PRIVATE
+    "src"
+    "src/core"
+    "src/core/customizer"
+    "src/ext"
+    "src/ext/json"
+    "src/ext/lexertl/include"
+    "src/ext/libtess2/Include"
+    "src/ext"
+    "src/geometry"
+    "src/geometry/cgal"
+    "src/geometry/manifold"
+    "src/glview"
+    "src/glview/preview"
+    "src/glview/cgal"
+    "src/gui"
+    "src/io"
+    "src/platform"
+    "src/utils"
+  )
+  target_link_libraries(OpenSCAD PRIVATE OpenSCADPy)
 endif()
 
 if(ENABLE_HIDAPI)
@@ -842,21 +904,6 @@ set(CORE_SOURCES
   ${BISON_openscad_parser_OUTPUTS}
   ${FLEX_comment_lexer_OUTPUTS}
   ${BISON_comment_parser_OUTPUTS})
-if(ENABLE_PYTHON)
-	list(APPEND CORE_SOURCES
-		    src/python/pyopenscad.cc 
-		    src/python/pyfunctions.cc)
-	target_compile_definitions(OpenSCAD PRIVATE ENABLE_PYTHON)
-	if(ENABLE_CRYPTOPP)
-		target_compile_definitions(OpenSCAD PRIVATE ENABLE_CRYPTOPP)
-	endif()		
-	if(ENABLE_LIBFIVE)
-		list(APPEND CORE_SOURCES
-			src/python/pylibfive.cc 
-	  		src/python/FrepNode.cc)
-		target_compile_definitions(OpenSCAD PRIVATE ENABLE_LIBFIVE)
-	endif()
-endif()
 
 if(EXPERIMENTAL AND ENABLE_CGAL)
   list(APPEND CORE_SOURCES

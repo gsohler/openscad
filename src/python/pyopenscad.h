@@ -1,5 +1,6 @@
 #include <Python.h>
 #include <memory>
+#include "python_public.h"
 #include "node.h"
 #include <geometry/Polygon2d.h>
 #include "src/core/function.h"
@@ -37,8 +38,8 @@ PyObject *PyOpenSCADObjectFromNode(PyTypeObject *type, const std::shared_ptr<Abs
 std::shared_ptr<AbstractNode> PyOpenSCADObjectToNode(PyObject *object);
 std::shared_ptr<AbstractNode> PyOpenSCADObjectToNodeMulti(PyObject *object);
 int python_more_obj(std::vector<std::shared_ptr<AbstractNode>>& children, PyObject *more_obj);
-Outline2d python_getprofile(PyObject *cbfunc, int fn, double arg);
-double python_doublefunc(PyObject *cbfunc, double arg);
+Outline2d python_getprofile(void *cbfunc, int fn, double arg);
+double python_doublefunc(void *cbfunc, double arg);
 std::shared_ptr<AbstractNode> python_modulefunc(const ModuleInstantiation *module,const std::shared_ptr<const Context> &context, int *modulefound);
 
 Value python_functionfunc(const FunctionCall *call,const std::shared_ptr<const Context> &context);

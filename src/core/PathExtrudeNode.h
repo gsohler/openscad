@@ -4,7 +4,7 @@
 #include "Value.h"
 #include <linalg.h>
 #ifdef ENABLE_PYTHON
-#include <Python.h>
+#include <src/python/python_public.h>
 #endif
 
 class PathExtrudeNode : public AbstractPolyNode
@@ -28,8 +28,8 @@ public:
   bool closed=false;
   bool allow_intersect=false;
  #ifdef ENABLE_PYTHON
-  PyObject *profile_func;
-  PyObject *twist_func;
+  void *profile_func;
+  void *twist_func;
  #endif  
 
 };

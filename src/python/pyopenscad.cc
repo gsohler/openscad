@@ -39,9 +39,11 @@ static PyObject *PyInit_openscad(void);
 PyObject *pythonInitDict = nullptr;
 PyObject *pythonMainModule = nullptr ;
 std::list<std::string> pythonInventory;
-bool python_active;
-bool python_trusted;
+bool python_active;  /* if python is actually used during evaluation */
+bool python_trusted; /* global Python trust flag */
 #include "PlatformUtils.h"
+bool pythonMainModuleInitialized = false;
+bool pythonRuntimeInitialized = false;
 
 void PyOpenSCADObject_dealloc(PyOpenSCADObject *self)
 {
@@ -262,8 +264,9 @@ static int PyOpenSCADInit(PyOpenSCADObject *self, PyObject *arfs, PyObject *kwds
 }
 
 std::shared_ptr<AbstractNode> python_result_node = NULL;
-Outline2d python_getprofile(PyObject *cbfunc, int fn, double arg)
+Outline2d python_getprofile(void *v_cbfunc, int fn, double arg)
 {
+	PyObject *cbfunc = (PyObject *) v_cbfunc;
 	Outline2d result;
 	if(pythonInitDict == NULL)  initPython();
 	PyObject* args = PyTuple_Pack(1,PyFloat_FromDouble(arg));
@@ -303,8 +306,9 @@ Outline2d python_getprofile(PyObject *cbfunc, int fn, double arg)
 	return result;
 }
 
-double python_doublefunc(PyObject *cbfunc, double arg)
+double python_doublefunc(void *v_cbfunc, double arg)
 {
+	PyObject *cbfunc = (PyObject *) v_cbfunc;
 	double result=0;
 	PyObject* args = PyTuple_Pack(1,PyFloat_FromDouble(arg));
 	PyObject* funcresult = PyObject_CallObject(cbfunc, args);

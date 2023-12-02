@@ -29,10 +29,10 @@
 #include <boost/algorithm/string.hpp>
 
 #include <Python.h>
-#include <pyopenscad.h>
+#include <src/python/pyopenscad.h>
 #ifdef ENABLE_LIBFIVE
-#include <pylibfive.h>
-#include "FrepNode.h"
+#include <src/python/pylibfive.h>
+#include "src/python/FrepNode.h"
 #endif
 
 #include "GeometryUtils.h"
