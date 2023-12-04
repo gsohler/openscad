@@ -13,7 +13,7 @@
 #include "libfive/oracle/oracle_storage.hpp"
 
 #ifdef  ENABLE_PYTHON
-PyObject *ifrep(const PolySet *ps);
+PyObject *ifrep(const std::shared_ptr<const PolySet> &ps);
 #endif
 
 typedef std::vector<int> intList;
@@ -76,7 +76,7 @@ public:
     return  stream.str();
   }
   std::string name() const override { return "sdf"; }
-  const Geometry *createGeometry() const override;
+  std::unique_ptr<const Geometry> createGeometry() const override;
  #ifdef ENABLE_PYTHON
   PyObject *expression;
  #endif  

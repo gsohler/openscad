@@ -70,18 +70,18 @@ void ov_add_poly_round(PolySetBuilder &builder, std::unordered_map<Vector3d, Vec
   builder.appendVertex(builder.vertexIndex(Vector3d(p[0],p[1],p[2])));
 }
 
-const Geometry *OversampleNode::createGeometry() const
+std::unique_ptr<const Geometry> OversampleNode::createGeometry() const
 {
-  PolySet *ps_tess = new PolySet(3,true);
-  if(this->children.size() > 0) {
-   std::shared_ptr<AbstractNode> child=this->children[0];
-   Tree tree(child, "");
-   GeometryEvaluator geomevaluator(tree);
-   shared_ptr<const Geometry> geom = geomevaluator.evaluateGeometry(*tree.root(), true);
-   std::shared_ptr<const PolySet> ps = dynamic_pointer_cast<const PolySet>(geom);
-  // tesselate object
-   PolySetUtils::tessellate_faces(*ps, *ps_tess);
+  if(this->children.size() == 0) {
+	return std::unique_ptr<PolySet>();
   }
+  std::shared_ptr<AbstractNode> child=this->children[0];
+  Tree tree(child, "");
+  GeometryEvaluator geomevaluator(tree);
+  std::shared_ptr<const Geometry> geom = geomevaluator.evaluateGeometry(*tree.root(), true);
+  std::shared_ptr<const PolySet> ps = std::dynamic_pointer_cast<const PolySet>(geom);
+  // tesselate object
+  auto ps_tess = PolySetUtils::tessellate_faces(*ps);
   std::vector<Vector3d> pt_dir;
   std::unordered_map<Vector3d, int, boost::hash<Vector3d> > pointIntMap;
   std::unordered_map<Vector3d, Vector3d, boost::hash<Vector3d> > weldMap; 
@@ -192,7 +192,7 @@ const Geometry *OversampleNode::createGeometry() const
     }				 
 
   }
-  PolySet *ps_ov = builder_ov.build();
+  auto ps_ov = builder_ov.build();
   for(int i=0;i<ps_ov->indices.size();i++) {
     for(int j=0;j<ps_ov->indices[i].size();j++)
     {

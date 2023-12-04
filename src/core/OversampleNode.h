@@ -16,7 +16,7 @@ public:
     return  stream.str();
   }
   std::string name() const override { return "oversample"; }
-  const Geometry *createGeometry() const override;
+  std::unique_ptr<const Geometry> createGeometry() const override;
   int n;
   int round;
 };

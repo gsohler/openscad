@@ -4,10 +4,10 @@
 #include <string>
 #include <variant>
 #include <vector>
+#include <memory>
 #include <boost/logic/tribool.hpp>
 #include "Assignment.h"
 #include "function.h"
-#include "memory.h"
 #include "Value.h"
 
 template <class T> class ContextHandle;
@@ -37,7 +37,7 @@ private:
   [[nodiscard]] const char *opString() const;
 
   Op op;
-  shared_ptr<Expression> expr;
+  std::shared_ptr<Expression> expr;
 };
 
 class BinaryOp : public Expression
@@ -68,8 +68,8 @@ private:
   [[nodiscard]] const char *opString() const;
 
   Op op;
-  shared_ptr<Expression> left;
-  shared_ptr<Expression> right;
+  std::shared_ptr<Expression> left;
+  std::shared_ptr<Expression> right;
 };
 
 class TernaryOp : public Expression
@@ -80,9 +80,9 @@ public:
   [[nodiscard]] Value evaluate(const std::shared_ptr<const Context>& context) const override;
   void print(std::ostream& stream, const std::string& indent) const override;
 private:
-  shared_ptr<Expression> cond;
-  shared_ptr<Expression> ifexpr;
-  shared_ptr<Expression> elseexpr;
+  std::shared_ptr<Expression> cond;
+  std::shared_ptr<Expression> ifexpr;
+  std::shared_ptr<Expression> elseexpr;
 };
 
 class ArrayLookup : public Expression
@@ -92,8 +92,8 @@ public:
   [[nodiscard]] Value evaluate(const std::shared_ptr<const Context>& context) const override;
   void print(std::ostream& stream, const std::string& indent) const override;
 private:
-  shared_ptr<Expression> array;
-  shared_ptr<Expression> index;
+  std::shared_ptr<Expression> array;
+  std::shared_ptr<Expression> index;
 };
 
 class Literal : public Expression
@@ -128,22 +128,22 @@ public:
   void print(std::ostream& stream, const std::string& indent) const override;
   [[nodiscard]] bool isLiteral() const override;
 private:
-  shared_ptr<Expression> begin;
-  shared_ptr<Expression> step;
-  shared_ptr<Expression> end;
+  std::shared_ptr<Expression> begin;
+  std::shared_ptr<Expression> step;
+  std::shared_ptr<Expression> end;
 };
 
 class Vector : public Expression
 {
 public:
   Vector(const Location& loc);
-  const std::vector<shared_ptr<Expression>>& getChildren() const { return children; }
+  const std::vector<std::shared_ptr<Expression>>& getChildren() const { return children; }
   Value evaluate(const std::shared_ptr<const Context>& context) const override;
   void print(std::ostream& stream, const std::string& indent) const override;
   void emplace_back(Expression *expr);
   bool isLiteral() const override;
 private:
-  std::vector<shared_ptr<Expression>> children;
+  std::vector<std::shared_ptr<Expression>> children;
   mutable boost::tribool literal_flag; // cache if already computed
 };
 
@@ -165,7 +165,7 @@ public:
   [[nodiscard]] Value evaluate(const std::shared_ptr<const Context>& context) const override;
   void print(std::ostream& stream, const std::string& indent) const override;
 private:
-  shared_ptr<Expression> expr;
+  std::shared_ptr<Expression> expr;
   std::string member;
 };
 
@@ -181,7 +181,7 @@ public:
 public:
   bool isLookup;
   std::string name;
-  shared_ptr<Expression> expr;
+  std::shared_ptr<Expression> expr;
   AssignmentList arguments;
 };
 
@@ -192,9 +192,9 @@ public:
   [[nodiscard]] Value evaluate(const std::shared_ptr<const Context>& context) const override;
   void print(std::ostream& stream, const std::string& indent) const override;
 public:
-  shared_ptr<const Context> context;
+  std::shared_ptr<const Context> context;
   AssignmentList parameters;
-  shared_ptr<Expression> expr;
+  std::shared_ptr<Expression> expr;
 };
 
 class Assert : public Expression
@@ -207,7 +207,7 @@ public:
   void print(std::ostream& stream, const std::string& indent) const override;
 private:
   AssignmentList arguments;
-  shared_ptr<Expression> expr;
+  std::shared_ptr<Expression> expr;
 };
 
 class Echo : public Expression
@@ -219,7 +219,7 @@ public:
   void print(std::ostream& stream, const std::string& indent) const override;
 private:
   AssignmentList arguments;
-  shared_ptr<Expression> expr;
+  std::shared_ptr<Expression> expr;
 };
 
 class Texture : public Expression
@@ -231,7 +231,7 @@ public:
   void print(std::ostream& stream, const std::string& indent) const override;
 private:
   AssignmentList arguments;
-  shared_ptr<Expression> expr;
+  std::shared_ptr<Expression> expr;
 };
 class Let : public Expression
 {
@@ -244,7 +244,7 @@ public:
   void print(std::ostream& stream, const std::string& indent) const override;
 private:
   AssignmentList arguments;
-  shared_ptr<Expression> expr;
+  std::shared_ptr<Expression> expr;
 };
 
 class ListComprehension : public Expression
@@ -260,9 +260,9 @@ public:
   [[nodiscard]] Value evaluate(const std::shared_ptr<const Context>& context) const override;
   void print(std::ostream& stream, const std::string& indent) const override;
 private:
-  shared_ptr<Expression> cond;
-  shared_ptr<Expression> ifexpr;
-  shared_ptr<Expression> elseexpr;
+  std::shared_ptr<Expression> cond;
+  std::shared_ptr<Expression> ifexpr;
+  std::shared_ptr<Expression> elseexpr;
 };
 
 class LcFor : public ListComprehension
@@ -274,7 +274,7 @@ public:
   void print(std::ostream& stream, const std::string& indent) const override;
 private:
   AssignmentList arguments;
-  shared_ptr<Expression> expr;
+  std::shared_ptr<Expression> expr;
 };
 
 class LcForC : public ListComprehension
@@ -286,8 +286,8 @@ public:
 private:
   AssignmentList arguments;
   AssignmentList incr_arguments;
-  shared_ptr<Expression> cond;
-  shared_ptr<Expression> expr;
+  std::shared_ptr<Expression> cond;
+  std::shared_ptr<Expression> expr;
 };
 
 class LcEach : public ListComprehension
@@ -298,7 +298,7 @@ public:
   void print(std::ostream& stream, const std::string& indent) const override;
 private:
   Value evalRecur(Value&& v, const std::shared_ptr<const Context>& context) const;
-  shared_ptr<Expression> expr;
+  std::shared_ptr<Expression> expr;
 };
 
 class LcLet : public ListComprehension
@@ -309,5 +309,5 @@ public:
   void print(std::ostream& stream, const std::string& indent) const override;
 private:
   AssignmentList arguments;
-  shared_ptr<Expression> expr;
+  std::shared_ptr<Expression> expr;
 };

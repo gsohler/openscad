@@ -388,8 +388,8 @@ PyObject *python_ifrep(PyObject *self, PyObject *args, PyObject *kwargs)
 
   child = PyOpenSCADObjectToNodeMulti(object);
   LeafNode *node = (LeafNode *)   child.get();
-  auto geom = node->createGeometry();
-  const PolySet *ps = dynamic_cast<const PolySet *>(geom);
+  const std::shared_ptr<const Geometry> geom = node->createGeometry();
+  const std::shared_ptr<const PolySet> ps = std::dynamic_pointer_cast<const PolySet>(geom);
  
   return ifrep(ps);
 }
@@ -1111,8 +1111,8 @@ PyObject *python_mesh(PyObject *self, PyObject *args, PyObject *kwargs)
 
   Tree tree(child, "");
   GeometryEvaluator geomevaluator(tree);
-  shared_ptr<const Geometry> geom = geomevaluator.evaluateGeometry(*tree.root(), true);
-  std::shared_ptr<const PolySet> ps = dynamic_pointer_cast<const PolySet>(geom);
+  std::shared_ptr<const Geometry> geom = geomevaluator.evaluateGeometry(*tree.root(), true);
+  std::shared_ptr<const PolySet> ps = std::dynamic_pointer_cast<const PolySet>(geom);
 
   // Now create Python Point array
   PyObject *ptarr = PyList_New(ps->vertices.size());  

@@ -55,7 +55,7 @@
 
 using namespace libfive;
 
-const Geometry *FrepNode::createGeometry() const
+std::unique_ptr<const Geometry> FrepNode::createGeometry() const
 {
 	PolySetBuilder builder(0,0,3,true);
 	std::unique_ptr<Mesh> mesh=NULL;
@@ -68,7 +68,7 @@ const Geometry *FrepNode::createGeometry() const
 
 #ifdef ENABLE_PYTHON	
 	PyObject *exp = this->expression;
-	if(exp == NULL ) return new PolySet(3,true);
+	if(exp == NULL ) return std::unique_ptr<PolySet>();
 
 	if(exp->ob_type == &PyLibFiveType) {
 		std::vector<Tree *> tree = PyLibFiveObjectToTree(exp);
@@ -447,7 +447,7 @@ void OpenSCADOracle::evalFeatures(boost::container::small_vector<libfive::Featur
 }
 
 #ifdef ENABLE_PYTHON
-PyObject *ifrep(const PolySet *ps)
+PyObject *ifrep(const std::shared_ptr<const PolySet> &ps)
 {
   std::vector<intList>  pointToFaceInds; //  mapping pt_ind -> list of polygon inds which use it
 
