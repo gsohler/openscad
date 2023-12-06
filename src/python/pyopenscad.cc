@@ -93,7 +93,7 @@ PyObject *PyOpenSCADObjectFromNode(PyTypeObject *type, const std::shared_ptr<Abs
 /*
  *  parses either a PyOpenSCAD Object or an List of PyOpenScad Object and adds it to the list of supplied children, returns 1 on success
  */
-
+#if 0
 int python_more_obj(std::vector<std::shared_ptr<AbstractNode>>& children, PyObject *more_obj) {
   int i, n;
   PyObject *obj;
@@ -156,7 +156,7 @@ std::shared_ptr<AbstractNode> PyOpenSCADObjectToNodeMulti(PyObject *objs)
 /*
  * converts a python obejct into an integer by all means
  */
-
+#endif
 int python_numberval(PyObject *number, double *result)
 {
   if(number == Py_False) return 1;	
@@ -331,6 +331,7 @@ PyObject *python_callfunction(const std::shared_ptr<const Context> &cxt , const 
  * Actually trying use python to evaluate a OpenSCAD Module
  */
 
+#if 0
 std::shared_ptr<AbstractNode> python_modulefunc(const ModuleInstantiation *op_module,const std::shared_ptr<const Context> &cxt, int *modulefound)
 {
 	*modulefound=0;
@@ -358,6 +359,7 @@ std::shared_ptr<AbstractNode> python_modulefunc(const ModuleInstantiation *op_mo
 /*
  * Converting a python result to an openscad result. extra function required as it might call itself hierarchically
  */
+#endif
 
 Value python_convertresult(PyObject *arg)
 {
@@ -420,7 +422,7 @@ void initPython(double time)
     }
   } else {
     char run_str[200];
-    PyImport_AppendInittab("openscad", &PyInit_openscad);
+//    PyImport_AppendInittab("openscad", &PyInit_openscad);
     PyConfig config;
     PyConfig_InitPythonConfig(&config);
     char libdir[256];
@@ -433,8 +435,8 @@ void initPython(double time)
     pythonMainModuleInitialized = pythonMainModule != nullptr;
     pythonInitDict = PyModule_GetDict(pythonMainModule);
     pythonRuntimeInitialized = pythonInitDict != nullptr;
-    PyInit_PyOpenSCAD();
-    sprintf(run_str,"from openscad import *\nfa=12.0\nfn=0.0\nfs=2.0\nt=%g",time);
+//    PyInit_PyOpenSCAD();
+    sprintf(run_str,"fa=12.0\nfn=0.0\nfs=2.0\nt=%g",time);
     PyRun_String(run_str, Py_file_input, pythonInitDict, pythonInitDict);
 
       // find base variables
@@ -573,6 +575,7 @@ sys.stderr = stderr_bak\n\
  * the magical Python Type descriptor for an OpenSCAD Object. Adding more fields makes the type more powerful
  */
 
+#if 0
 PyTypeObject PyOpenSCADType = {
     PyVarObject_HEAD_INIT(nullptr, 0)
     "PyOpenSCAD",             			/* tp_name */
@@ -642,4 +645,5 @@ PyMODINIT_FUNC PyInit_PyOpenSCAD(void)
   PyModule_AddObject(m, "openscad", (PyObject *)&PyOpenSCADType);
   return m;
 }
+#endif
 

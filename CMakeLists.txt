@@ -400,9 +400,9 @@ if(NOT Python_FOUND OR NOT Nettle_FOUND)
 endif()
 
 if(ENABLE_PYTHON)
-  add_library(OpenSCADPy
-    src/python/pyopenscad.cc
-    src/python/pyfunctions.cc)
+  add_subdirectory(src/python)
+  add_library(OpenSCADPy src/python/pyopenscad.cc)
+  target_compile_definitions(OpenSCAD PRIVATE ENABLE_PYTHON)
   message(STATUS "Python enabled, using Nettle ")
   message(STATUS ${Nettle_INCLUDE_DIRS})
   message(STATUS ${Nettle_LIBRARIES})
@@ -420,6 +420,8 @@ if(ENABLE_PYTHON)
   target_link_libraries(OpenSCADPy PRIVATE Eigen3::Eigen)
   target_link_libraries(OpenSCADPy PRIVATE ${GETTEXT_LIBRARY})
   target_link_libraries(OpenSCADPy PRIVATE ${GLIB2_LIBRARIES})
+  target_link_directories(OpenSCADPy PRIVATE ".")
+  target_link_libraries(OpenSCADPy PRIVATE "openscad.cpython-311-x86_64-linux-gnu.so")
   # copy compile options for the main OpenSCAD target
   # duplication is not very ideal but not sure what better options do we have
   set_property(TARGET OpenSCADPy PROPERTY CXX_STANDARD 17)
@@ -437,6 +439,7 @@ if(ENABLE_PYTHON)
   target_include_directories(OpenSCADPy PRIVATE
     "src"
     "src/core"
+    "submodules/nanobind/include"
     "src/core/customizer"
     "src/ext"
     "src/ext/json"
@@ -854,12 +857,6 @@ set(CORE_SOURCES
   ${BISON_openscad_parser_OUTPUTS}
   ${FLEX_comment_lexer_OUTPUTS}
   ${BISON_comment_parser_OUTPUTS})
-if(ENABLE_PYTHON)
-  # list(APPEND CORE_SOURCES
-	 # 	    src/python/pyopenscad.cc 
-	 # 	    src/python/pyfunctions.cc)
-	target_compile_definitions(OpenSCAD PRIVATE ENABLE_PYTHON)
-endif()
 
 if(EXPERIMENTAL AND ENABLE_CGAL)
   list(APPEND CORE_SOURCES

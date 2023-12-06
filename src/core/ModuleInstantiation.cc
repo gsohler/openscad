@@ -66,7 +66,7 @@ std::shared_ptr<AbstractNode> ModuleInstantiation::evaluate(const std::shared_pt
   boost::optional<InstantiableModule> module = context->lookup_module(this->name(), this->loc);
   if (!module) {
     std::shared_ptr<AbstractNode> result=nullptr;
-#ifdef ENABLE_PYTHON
+#if 0
     int modulefound;
     result = python_modulefunc(this, context,&modulefound);
     if(result == nullptr && modulefound && pythonMainModuleInitialized) {
