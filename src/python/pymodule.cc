@@ -52,9 +52,8 @@
 #include "io/fileutils.h"
 #include "handle_dep.h"
 
-#include "nanobind/nanobind.h"
-namespace nb = nanobind;
-using namespace nb::literals;
+#include <pybind11/embed.h>
+namespace py = pybind11;
 
 //using namespace boost::assign; // bring 'operator+=()' into scope
 
@@ -2010,9 +2009,10 @@ PyMappingMethods PyOpenSCADMapping =
 };
 
 #endif
-
-NB_MODULE(openscad, m) {
+err
+PYBIND11_EMBEDDED_MODULE(openscad, m) {
     m.def("cube", &cube, "x"_a, "y"_a, "z"_a );
 }
+
 
 

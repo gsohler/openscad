@@ -1,16 +1,14 @@
 project(python)
 
-add_subdirectory(nanobind)
+add_subdirectory(pybind11)
 
-nanobind_add_module(
-  openscad
-  NB_STATIC STABLE_ABI
-  pymodule.cc)
+pybind11_add_module(openscad pymodule.cc)
+
 target_include_directories(openscad PRIVATE
     ".."
     "../.."
     "../core"
-    "../nanobind/include"
+    "pybind11/include"
     "../core/customizer"
     "../ext"
     "../ext/json"

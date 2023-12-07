@@ -400,9 +400,10 @@ if(NOT Python_FOUND OR NOT Nettle_FOUND)
 endif()
 
 if(ENABLE_PYTHON)
-  add_subdirectory(src/python)
-  add_library(OpenSCADPy src/python/pyopenscad.cc)
-  target_compile_definitions(OpenSCAD PRIVATE ENABLE_PYTHON)
+
+  add_subdirectory(src/python/pybind11)
+
+  add_library(OpenSCADPy src/python/pyopenscad.cc) #Python part
   message(STATUS "Python enabled, using Nettle ")
   message(STATUS ${Nettle_INCLUDE_DIRS})
   message(STATUS ${Nettle_LIBRARIES})
@@ -421,7 +422,6 @@ if(ENABLE_PYTHON)
   target_link_libraries(OpenSCADPy PRIVATE ${GETTEXT_LIBRARY})
   target_link_libraries(OpenSCADPy PRIVATE ${GLIB2_LIBRARIES})
   target_link_directories(OpenSCADPy PRIVATE ".")
-  target_link_libraries(OpenSCADPy PRIVATE "openscad.cpython-311-x86_64-linux-gnu.so")
   # copy compile options for the main OpenSCAD target
   # duplication is not very ideal but not sure what better options do we have
   set_property(TARGET OpenSCADPy PROPERTY CXX_STANDARD 17)
@@ -457,7 +457,45 @@ if(ENABLE_PYTHON)
     "src/platform"
     "src/utils"
   )
-  target_link_libraries(OpenSCAD PRIVATE OpenSCADPy)
+
+  # Pybind11 part
+  project(OpenSCADBind)
+
+  pybind11_add_module(OpenSCADBind src/python/pymodule.cc)
+  
+  target_include_directories(OpenSCADBind PRIVATE
+    "src/python"
+    "src"
+    "src/core"
+    "src/python/pybind11/include"
+    "src/core/customizer"
+    "src/ext"
+    "src/ext/json"
+    "src/ext/lexertl/include"
+    "src/ext/libtess2/Include"
+    "src/ext"
+    "src/geometry"
+    "src/geometry/cgal"
+    "src/geometry/manifold"
+    "src/glview"
+    "src/glview/preview"
+    "src/glview/cgal"
+    "src/gui"
+    "src/io"
+    "src/platform"
+    "src/utils"
+    "${EIGEN3_INCLUDE_DIR}"
+    "${GLIB2_INCLUDE_DIRS}"
+    "${FREETYPE_INCLUDE_DIRS}"
+  )
+
+  target_compile_features(OpenSCADBind PUBLIC cxx_std_17)
+
+  #Main part
+  target_compile_definitions(OpenSCAD PRIVATE ENABLE_PYTHON)
+  target_link_libraries(OpenSCAD PRIVATE OpenSCADPy) 
+  target_link_libraries(OpenSCAD PRIVATE OpenSCADBind)
+
 endif()
 
 if(ENABLE_HIDAPI)
