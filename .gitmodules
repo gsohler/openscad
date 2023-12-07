@@ -14,6 +14,6 @@
 [submodule "OpenCSG"]
 	path = submodules/OpenCSG
 	url = https://github.com/openscad/OpenCSG.git
-[submodule "src/python/nanobind"]
-	path = src/python/nanobind
-	url = https://github.com/wjakob/nanobind.git
+[submodule "src/python/pybind11"]
+	path = src/python/pybind11
+	url = https://github.com/pybind/pybind11.git
