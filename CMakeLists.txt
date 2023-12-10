@@ -403,7 +403,7 @@ if(ENABLE_PYTHON)
 
   add_subdirectory(src/python/pybind11)
 
-  add_library(OpenSCADPy src/python/pyopenscad.cc) #Python part
+  add_library(OpenSCADPy src/python/pyopenscad.cc src/python/pymodule.cc) #Python part
   message(STATUS "Python enabled, using Nettle ")
   message(STATUS ${Nettle_INCLUDE_DIRS})
   message(STATUS ${Nettle_LIBRARIES})
@@ -439,34 +439,6 @@ if(ENABLE_PYTHON)
   target_include_directories(OpenSCADPy PRIVATE
     "src"
     "src/core"
-    "submodules/nanobind/include"
-    "src/core/customizer"
-    "src/ext"
-    "src/ext/json"
-    "src/ext/lexertl/include"
-    "src/ext/libtess2/Include"
-    "src/ext"
-    "src/geometry"
-    "src/geometry/cgal"
-    "src/geometry/manifold"
-    "src/glview"
-    "src/glview/preview"
-    "src/glview/cgal"
-    "src/gui"
-    "src/io"
-    "src/platform"
-    "src/utils"
-  )
-
-  # Pybind11 part
-  project(OpenSCADBind)
-
-  pybind11_add_module(OpenSCADBind src/python/pymodule.cc)
-  
-  target_include_directories(OpenSCADBind PRIVATE
-    "src/python"
-    "src"
-    "src/core"
     "src/python/pybind11/include"
     "src/core/customizer"
     "src/ext"
@@ -484,17 +456,11 @@ if(ENABLE_PYTHON)
     "src/io"
     "src/platform"
     "src/utils"
-    "${EIGEN3_INCLUDE_DIR}"
-    "${GLIB2_INCLUDE_DIRS}"
-    "${FREETYPE_INCLUDE_DIRS}"
   )
-
-  target_compile_features(OpenSCADBind PUBLIC cxx_std_17)
 
   #Main part
   target_compile_definitions(OpenSCAD PRIVATE ENABLE_PYTHON)
   target_link_libraries(OpenSCAD PRIVATE OpenSCADPy) 
-  target_link_libraries(OpenSCAD PRIVATE OpenSCADBind)
 
 endif()
 

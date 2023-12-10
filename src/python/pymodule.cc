@@ -63,14 +63,14 @@ namespace py = pybind11;
 extern std::unordered_map<std::string, Color4f> webcolors;
 extern boost::optional<Color4f> parse_hex_color(const std::string& hex);
 
-void cube(double x, double y, double z)
+PyObject *cube(double x, double y, double z)
 {
   DECLARE_INSTANCE
   auto node = std::make_shared<CubeNode>(instance);
   node->x = x;
   node->y = y;
   node->z = z;
-  return ; // return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
+  return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
 }
 
 #if 0
@@ -2009,9 +2009,10 @@ PyMappingMethods PyOpenSCADMapping =
 };
 
 #endif
-err
 PYBIND11_EMBEDDED_MODULE(openscad, m) {
-    m.def("cube", &cube, "x"_a, "y"_a, "z"_a );
+    m.def("cube", &cube, "x", "y", "z" );
+    py::class_<PyOpenSCADObject>(m, "PyOpenSCADObject2");
+//        .def("go", &PyOpenSCAD::go);
 }
 
 

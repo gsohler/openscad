@@ -19,6 +19,8 @@ typedef struct {
   /* Type-specific fields go here. */
 } PyOpenSCADObject;
 
+
+
 PyMODINIT_FUNC PyInit_PyOpenSCAD(void);
 
 extern PyTypeObject PyOpenSCADType;
@@ -50,3 +52,8 @@ extern PyMethodDef PyOpenSCADMethods[];
 
 extern PyObject *pythonMainModule;
 extern PyObject *pythonInitDict;
+
+//extern "C"{
+//	void pybind11_init_impl_openscad(void);
+////	PyTypeObject pybind11_module_openscad;
+//}

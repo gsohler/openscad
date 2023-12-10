@@ -407,6 +407,8 @@ Value python_functionfunc(const FunctionCall *call,const std::shared_ptr<const C
  * Main python evaluation entry
  */
 
+extern "C" void pybind11_init_impl_openscad(void);
+
 void initPython(double time)
 {
   if(pythonInitDict) { /* If already initialized, undo to reinitialize after */
@@ -437,6 +439,8 @@ void initPython(double time)
     pythonMainModuleInitialized = pythonMainModule != nullptr;
     pythonInitDict = PyModule_GetDict(pythonMainModule);
     pythonRuntimeInitialized = pythonInitDict != nullptr;
+    printf("calling spec\n");
+    pybind11_init_impl_openscad();
 //    PyInit_PyOpenSCAD();
     sprintf(run_str,"fa=12.0\nfn=0.0\nfs=2.0\nt=%g",time);
     PyRun_String(run_str, Py_file_input, pythonInitDict, pythonInitDict);
@@ -460,9 +464,13 @@ void finishPython()
 {
 }
 
+int evcount=0;
 std::string evaluatePython(const std::string & code)
 {
+  evcount++;
+  if(evcount != 4) { printf("not\n");   return ""; }
   std::string error;
+  printf("eval %s\n",code.c_str());
   python_result_node = nullptr;
   PyObject *pyExcType = nullptr;
   PyObject *pyExcValue = nullptr;
@@ -513,7 +521,7 @@ sys.stderr = stderr_bak\n\
     }
 
     PyErr_Fetch(&pyExcType, &pyExcValue, &pyExcTraceback); /* extract actual python stack trace in case of an expception and return the error string to the caller */
-//    PyErr_NormalizeException(&pyExcType, &pyExcValue, &pyExcTraceback);
+//    PyErr_NormalizeException(&pyExcType, &pyExcValue, &pyExcTraceback)
     PyObject* str_exc_value = PyObject_Repr(pyExcValue);
     PyObject* pyExcValueStr = PyUnicode_AsEncodedString(str_exc_value, "utf-8", "~");
     if(str_exc_value != nullptr) Py_XDECREF(str_exc_value);
@@ -536,10 +544,9 @@ sys.stderr = stderr_bak\n\
  * the magical Python Type descriptor for an OpenSCAD Object. Adding more fields makes the type more powerful
  */
 
-#if 0
 PyTypeObject PyOpenSCADType = {
     PyVarObject_HEAD_INIT(nullptr, 0)
-    "PyOpenSCAD",             			/* tp_name */
+    "PyOpenSCAD1",             			/* tp_name */
     sizeof(PyOpenSCADObject), 			/* tp_basicsize */
     0,                         			/* tp_itemsize */
     (destructor) PyOpenSCADObject_dealloc,	/* tp_dealloc */
@@ -547,13 +554,13 @@ PyTypeObject PyOpenSCADType = {
     0,                         			/* tp_getattr */
     0,                         			/* tp_setattr */
     0,                         			/* tp_as_async */
-    python_str,               			/* tp_repr */
-    &PyOpenSCADNumbers,        			/* tp_as_number */
+    0,                  			/* tp_repr */
+    0,                  			/* tp_as_number */
     0,                         			/* tp_as_sequence */
-    &PyOpenSCADMapping,        			/* tp_as_mapping */
+    0,                  			/* tp_as_mapping */
     0,                         			/* tp_hash  */
     0,                         			/* tp_call */
-    python_str,                			/* tp_str */
+    0,                   			/* tp_str */
     0,                         			/* tp_getattro */
     0,                         			/* tp_setattro */
     0,                         			/* tp_as_buffer */
@@ -565,7 +572,7 @@ PyTypeObject PyOpenSCADType = {
     0,                         			/* tp_weaklistoffset */
     0,                         			/* tp_iter */
     0,                         			/* tp_iternext */
-    PyOpenSCADMethods,             		/* tp_methods */
+    0, /*PyOpenSCADMethods,*/             		/* tp_methods */
     0,             				/* tp_members */
     0,                         			/* tp_getset */
     0,                         			/* tp_base */
@@ -578,6 +585,7 @@ PyTypeObject PyOpenSCADType = {
     PyOpenSCADObject_new,                	/* tp_new */
 };
 
+#if 0
 
 
 static PyModuleDef OpenSCADModule = {
