@@ -100,21 +100,26 @@
 
 #ifdef ENABLE_PYTHON
 #include "python/python_public.h"
-#if ENABLE_CRYPTOPP
-#include "cryptopp/sha.h"
-#include "cryptopp/filters.h"
-#include "cryptopp/base64.h"
+#if ENABLE_NETTLE
+#include "nettle/sha2.h"
+#include "nettle/base64.h"
 
 std::string SHA256HashString(std::string aString){
-    std::string digest;
-    CryptoPP::SHA256 hash;
+    uint8_t  digest[SHA256_DIGEST_SIZE];
+    sha256_ctx sha256_ctx;
 
-    CryptoPP::StringSource foo(aString, true,
-    new CryptoPP::HashFilter(hash,
-      new CryptoPP::Base64Encoder (
-         new CryptoPP::StringSink(digest))));
+    sha256_init(&sha256_ctx);
+    sha256_update(&sha256_ctx, aString.length(), (uint8_t *) aString.c_str());
+    sha256_digest(&sha256_ctx, SHA256_DIGEST_SIZE, digest);
 
-    return digest;
+    base64_encode_ctx base64_ctx;
+    char digest_base64[BASE64_ENCODE_LENGTH(SHA256_DIGEST_SIZE)+1];
+    memset(digest_base64,0,sizeof(digest_base64));
+
+    base64_encode_init(&base64_ctx);
+    base64_encode_update(&base64_ctx, digest_base64, SHA256_DIGEST_SIZE, digest);
+    base64_encode_final(&base64_ctx, digest_base64);		    
+    return digest_base64;
 }
 #endif
 
@@ -1826,7 +1831,7 @@ bool MainWindow::fileChangedOnDisk()
 
 #ifdef ENABLE_PYTHON
 bool MainWindow::trust_python_file(const std::string &file,  const std::string &content) {
-#ifdef ENABLE_CRYPTOPP	
+#ifdef ENABLE_NETTLE	
   QSettingsCached settings;
   char setting_key[256];
   if(python_trusted) return true;
@@ -1933,11 +1938,11 @@ void MainWindow::parseTopLevelDocument()
     this->root_file =new SourceFile(parser_sourcefile.parent_path().string(), parser_sourcefile.filename().string());
     this->parsed_file = this->root_file;
 
-    initPython();
+    initPython(this->animateWidget->getAnim_tval());
     this->activeEditor->resetHighlighting();
     if (this->root_file != nullptr) {
       //add parameters as annotation in AST
-      auto error = evaluatePython(fulltext_py, 0.0);
+      auto error = evaluatePython(fulltext_py);
       this->root_file->scope.assignments=customizer_parameters;
       CommentParser::collectParameters(fulltext_py, this->root_file, '#');  // add annotations
       this->activeEditor->parameterWidget->setParameters(this->root_file, "\n"); // set widgets values
@@ -1950,7 +1955,7 @@ void MainWindow::parseTopLevelDocument()
 
     customizer_parameters_finished = this->root_file->scope.assignments;
     customizer_parameters.clear();
-    auto error = evaluatePython(fulltext_py, 0.0); // add assignments 
+    auto error = evaluatePython(fulltext_py); // add assignments 
     if (error.size() > 0) LOG(message_group::Error, Location::NONE, "", error.c_str());
     finishPython();
 

@@ -270,7 +270,7 @@ Outline2d python_getprofile(void *v_cbfunc, int fn, double arg)
 {
 	PyObject *cbfunc = (PyObject *) v_cbfunc;
 	Outline2d result;
-	if(pythonInitDict == NULL)  initPython();
+	if(pythonInitDict == NULL)  initPython(0.0);
 	PyObject* args = PyTuple_Pack(1,PyFloat_FromDouble(arg));
 	PyObject* polygon = PyObject_CallObject(cbfunc, args);
 	if(polygon == NULL) { // TODO fix
@@ -484,7 +484,7 @@ void openscad_object_callback(PyObject *obj) {
 	}
 }
 #endif
-void initPython(void)
+void initPython(double time)
 {
   if(pythonInitDict) { /* If already initialized, undo to reinitialize after */
     PyObject *key, *value;
@@ -517,7 +517,9 @@ void initPython(void)
     PyConfig_Clear(&config);
 
     pythonMainModule =  PyImport_AddModule("__main__");
+    pythonMainModuleInitialized = pythonMainModule != nullptr;
     pythonInitDict = PyModule_GetDict(pythonMainModule);
+    pythonRuntimeInitialized = pythonInitDict != nullptr;
     PyInit_PyOpenSCAD();
 #ifdef ENABLE_LIBFIVE	    
     PyInit_PyLibFive();
@@ -562,7 +564,7 @@ void finishPython(void)
 #endif
 }
 
-std::string evaluatePython(const std::string & code, double time)
+std::string evaluatePython(const std::string & code)
 {
   std::string error;
   python_result_node = nullptr;

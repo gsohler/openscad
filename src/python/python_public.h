@@ -8,11 +8,11 @@ extern bool python_trusted;
 extern AssignmentList customizer_parameters;
 extern AssignmentList customizer_parameters_finished;
 
-void initPython(void);
+void initPython(double time);
 
 void finishPython();
 
-std::string evaluatePython(const std::string &code, double time);
+std::string evaluatePython(const std::string &code);
 
 std::shared_ptr<AbstractNode>
 python_modulefunc(const ModuleInstantiation *module,
