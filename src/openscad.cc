@@ -402,9 +402,8 @@ int cmdline(const CommandLine& cmd)
 
   if(python_active) {
     auto fulltext_py = text;
-    AssignmentList dummy_assignments;
     initPython();
-    auto error  = evaluatePython(fulltext_py, 0.0, dummy_assignments);
+    auto error  = evaluatePython(fulltext_py, 0.0);
     if(error.size() > 0) LOG(error.c_str());
     text ="\n";
     finishPython();
@@ -495,6 +494,7 @@ int do_export(const CommandLine& cmd, const RenderVariables& render_variables, F
   AbstractNode::resetIndexCounter();
   std::shared_ptr<const FileContext> file_context;
   std::shared_ptr<AbstractNode> absolute_root_node;
+
 #ifdef ENABLE_PYTHON    
     if(python_result_node != NULL && python_active) absolute_root_node = python_result_node;
     else

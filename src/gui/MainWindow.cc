@@ -25,7 +25,6 @@
  */
 #include <iostream>
 #include <memory>
-
 #include "boost-utils.h"
 #include "BuiltinContext.h"
 #include "CommentParser.h"
@@ -99,12 +98,7 @@
 #include <QSound>
 
 #ifdef ENABLE_PYTHON
-extern std::shared_ptr<AbstractNode> python_result_node;
-void initPython(void);
-void finishPython(void);
-std::string evaluatePython(const std::string &code, double time,AssignmentList &assignments);
-extern bool python_trusted;
-
+#include "python/python_public.h"
 #if ENABLE_CRYPTOPP
 #include "cryptopp/sha.h"
 #include "cryptopp/filters.h"
@@ -1525,7 +1519,12 @@ void MainWindow::saveBackup()
   }
 
   if (!this->tempFile) {
-    this->tempFile = new QTemporaryFile(backupPath.append(basename + "-backup-XXXXXXXX.scad"));
+    QString suffix="scad";
+#ifdef ENABLE_PYTHON
+    this->recomputePythonActive();
+    if(this->python_active) suffix="py";
+#endif
+    this->tempFile = new QTemporaryFile(backupPath.append(basename + "-backup-XXXXXXXX." + suffix));
   }
 
   if ((!this->tempFile->isOpen()) && (!this->tempFile->open())) {
@@ -1939,11 +1938,9 @@ void MainWindow::parseTopLevelDocument()
     this->activeEditor->resetHighlighting();
     if (this->root_file != nullptr) {
       //add parameters as annotation in AST
-      if(this->root_file->scope.assignments.size() == 0) {
-        auto error = evaluatePython(fulltext_py,0,this->root_file->scope.assignments); // add assignments
-        if (error.size() > 0) LOG(message_group::Error, Location::NONE, "", error.c_str());
-      }
-      CommentParser::collectParameters(fulltext_py, this->root_file, '#' );  // add annotations
+      auto error = evaluatePython(fulltext_py, 0.0);
+      this->root_file->scope.assignments=customizer_parameters;
+      CommentParser::collectParameters(fulltext_py, this->root_file, '#');  // add annotations
       this->activeEditor->parameterWidget->setParameters(this->root_file, "\n"); // set widgets values
       this->activeEditor->parameterWidget->applyParameters(this->root_file); // use widget values
       this->activeEditor->parameterWidget->setEnabled(true);
@@ -1952,60 +1949,11 @@ void MainWindow::parseTopLevelDocument()
       this->activeEditor->parameterWidget->setEnabled(false);
     }
 
-    // now replace all new variables
-
-    std::istringstream iss(fulltext_py);
-    boost::smatch results;
-    std::string fulltext_py_eval="";
-    for (std::string line; std::getline(iss, line); ) {
-      bool found=false;
-
-      if (boost::regex_search(line, results, ex_number) && results.size() >= 3) {
-	for (auto par: this->root_file->scope.assignments) {
-          const std::shared_ptr<Expression> &expr = par->getExpr();
-          if (!expr->isLiteral()) continue; // Only consider literals
-            if(par->getName() == results[1]) {
-              const auto &lit=std::dynamic_pointer_cast<Literal>(expr);
-	      if(lit->isDouble()) {
-                fulltext_py_eval.append(results[1]);
-                fulltext_py_eval.append("=");
-                fulltext_py_eval.append(std::to_string(lit->toDouble()));
-                found=true;
-	      }
-	      if(lit->isBool()) {
-                fulltext_py_eval.append(results[1]);
-                fulltext_py_eval.append("=");
-                fulltext_py_eval.append(lit->toBool()?"True":"False");
-                found=true;
-	      }
-          } 
-        }
-      }
-      if (boost::regex_search(line, results, ex_string) && results.size() >= 3) {
-	for (auto par: this->root_file->scope.assignments) {
-          const std::shared_ptr<Expression> &expr = par->getExpr();
-          if (!expr->isLiteral()) continue; // Only consider literals
-            if(par->getName() == results[1]) {
-              const auto &lit=std::dynamic_pointer_cast<Literal>(expr);
-	      if(lit->isString()) {
-                fulltext_py_eval.append(results[1]);
-                fulltext_py_eval.append("=\"");
-                fulltext_py_eval.append(lit->toString());
-                fulltext_py_eval.append("\"");
-                found=true;
-	      }
-          } 
-        }
-      }
-
-      if(!found) fulltext_py_eval.append(line);
-      fulltext_py_eval.append("\r\n");
-
-    }
-
-    auto error = evaluatePython(fulltext_py_eval,this->animateWidget->getAnim_tval(),this->root_file->scope.assignments); // add assignments
+    customizer_parameters_finished = this->root_file->scope.assignments;
+    customizer_parameters.clear();
+    auto error = evaluatePython(fulltext_py, 0.0); // add assignments 
     if (error.size() > 0) LOG(message_group::Error, Location::NONE, "", error.c_str());
-    finishPython(); // dont do that because callbacks are needed in GeometryEvalulator.cc
+    finishPython();
 
   } else // python not enabled
 #endif // ifdef ENABLE_PYTHON

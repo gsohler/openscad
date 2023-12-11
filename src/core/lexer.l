@@ -103,8 +103,8 @@ extern YYLTYPE parserlloc;
 #define YY_USER_ACTION parserlloc.last_column += yyleng; \
         PRINTDB("YY_USER_ACTION(): %3d, %3d - %3d, %3d | %3d: %s", \
                 parserlloc.first_line % parserlloc.first_column % \
-				parserlloc.last_line % parserlloc.last_column % \
-				yyleng % quoted_string(yytext));
+                parserlloc.last_line % parserlloc.last_column % \
+                yyleng % quoted_string(yytext));
 #else
 #define YY_USER_ACTION parserlloc.last_column += yyleng;
 #endif

@@ -39,6 +39,9 @@ static PyObject *PyInit_openscad(void);
 PyObject *pythonInitDict = nullptr;
 PyObject *pythonMainModule = nullptr ;
 std::list<std::string> pythonInventory;
+AssignmentList customizer_parameters;
+AssignmentList customizer_parameters_finished;
+std::shared_ptr<AbstractNode> python_result_node = nullptr; /* global result veriable containing the python created result */
 bool python_active;  /* if python is actually used during evaluation */
 bool python_trusted; /* global Python trust flag */
 #include "PlatformUtils.h"
@@ -60,7 +63,7 @@ PyObject *PyOpenSCADObject_alloc(PyTypeObject *cls, Py_ssize_t nitems)
  *  allocates a new PyOpenSCAD Object including its internal dictionary
  */
 
-static PyObject *PyOpenSCADObject_new(PyTypeObject *type, PyObject *args,  PyObject *kwds)
+static PyObject *PyOpenSCADObject_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
   (void)args;
   (void)kwds;
@@ -85,7 +88,7 @@ PyObject *PyOpenSCADObjectFromNode(PyTypeObject *type, const std::shared_ptr<Abs
 {
   PyOpenSCADObject *self;
   self = (PyOpenSCADObject *)  type->tp_alloc(type, 0);
-  if (self != NULL) {
+  if (self != nullptr) {
     self->node = node;
     self->dict = PyDict_New();
     Py_XINCREF(self->dict);
@@ -263,7 +266,6 @@ static int PyOpenSCADInit(PyOpenSCADObject *self, PyObject *arfs, PyObject *kwds
   return 0;
 }
 
-std::shared_ptr<AbstractNode> python_result_node = NULL;
 Outline2d python_getprofile(void *v_cbfunc, int fn, double arg)
 {
 	PyObject *cbfunc = (PyObject *) v_cbfunc;
@@ -353,6 +355,7 @@ PyObject *python_callfunction(const std::shared_ptr<const Context> &cxt , const 
 	for(int i=0;i<op_args.size();i++)
 	{
 		Assignment *op_arg=op_args[i].get();
+		
 		std::shared_ptr<Expression> expr=op_arg->getExpr();
 		Value val = expr.get()->evaluate(cxt);
 		switch(val.type())
@@ -398,14 +401,14 @@ std::shared_ptr<AbstractNode> python_modulefunc(const ModuleInstantiation *op_mo
 	*modulefound=0;
 	std::shared_ptr<AbstractNode> result=nullptr;
 	const char *errorstr = nullptr;
-	do {
+	{
 		PyObject *funcresult = python_callfunction(cxt,op_module->name(),op_module->arguments, errorstr);
-		if (errorstr != NULL){
+		if (errorstr != nullptr){
 			PyErr_SetString(PyExc_TypeError, errorstr);
-			return NULL;
+			return nullptr;
 		}
 		*modulefound=1;
-		if(funcresult == NULL) return NULL;
+		if(funcresult == nullptr) return nullptr;
 
 		if(funcresult->ob_type == &PyOpenSCADType) result=PyOpenSCADObjectToNode(funcresult);
 		else {
@@ -413,7 +416,7 @@ std::shared_ptr<AbstractNode> python_modulefunc(const ModuleInstantiation *op_mo
 //			LOG(message_group::Warning, Location::NONE, cxt->documentRoot(), "Python function result is not a solid.");
 //			break;
 		}
-	} while(0);
+	}
 	return result;
 }
 
@@ -493,7 +496,7 @@ void initPython(void)
       if(key_str == NULL) continue;
       if (std::find(std::begin(pythonInventory), std::end(pythonInventory), key_str) == std::end(pythonInventory))
       {
-        PyDict_DelItemString(maindict, key_str); // TODO does not work!
+        PyDict_DelItemString(maindict, key_str);
       }
     }
   } else {
@@ -508,7 +511,7 @@ void initPython(void)
     PyConfig config;
     PyConfig_InitPythonConfig(&config);
     char libdir[256];
-    snprintf(libdir, 256, "%s/../libraries/python/",PlatformUtils::applicationPath().c_str()); /* add libraries/python to python search path */
+    snprintf(libdir, 256, "%s/../libraries/python/:.",PlatformUtils::applicationPath().c_str()); /* add libraries/python to python search path */
     PyConfig_SetBytesString(&config, &config.pythonpath_env, libdir);
     Py_InitializeFromConfig(&config);
     PyConfig_Clear(&config);
@@ -534,15 +537,12 @@ void initPython(void)
       pythonInventory.push_back(key_str);
     }
   }
+  customizer_parameters_finished = customizer_parameters;
+  customizer_parameters.clear();
 }
 
 void finishPython(void)
 {
-      // annotation "Parameter" missing
-//      if (Py_FinalizeEx() < 0) {
-//        exit(120);
-//      }
-//      pythonInitDict=NULL;
 #ifdef HAVE_PYTHON_YIELD
       set_object_callback(NULL);
       if(python_result_node == nullptr) {
@@ -562,7 +562,7 @@ void finishPython(void)
 #endif
 }
 
-std::string evaluatePython(const std::string & code, double time,AssignmentList &assignments)
+std::string evaluatePython(const std::string & code, double time)
 {
   std::string error;
   python_result_node = nullptr;
@@ -605,44 +605,6 @@ sys.stderr = stderr_bak\n\
     PyObject *pFunc;
 
     PyObject *maindict = PyModule_GetDict(pythonMainModule);
-    assignments.clear();
-    while (PyDict_Next(maindict, &pos, &key, &value)) {
-      PyObject* key1 = PyUnicode_AsEncodedString(key, "utf-8", "~");
-      const char *key_str =  PyBytes_AS_STRING(key1);
-      if(key_str == nullptr) continue;
-      if(strcmp(key_str,"fn") == 0) continue;
-      if(strcmp(key_str,"fa") == 0) continue;
-      if(strcmp(key_str,"fs") == 0) continue;
-      if(strcmp(key_str,"t") == 0) continue;
-      if(strcmp(key_str,"__name__") == 0) continue;
-      // annotation "Parameter" missing
-      std::shared_ptr<Literal> lit;
-      bool found=false;
-      if(value == Py_True) {
-        lit = std::make_shared<Literal>(true,Location::NONE);
-        found=true;
-      } else if(value == Py_False) {
-        lit = std::make_shared<Literal>(false,Location::NONE);
-        found=true;
-      } else if(PyFloat_Check(value)) {
-        lit  = std::make_shared<Literal>(PyFloat_AsDouble(value),Location::NONE);
-        found=true;
-      }
-      else if(PyLong_Check(value)){
-        lit = std::make_shared<Literal>(PyLong_AsLong(value)*1.0,Location::NONE);
-        found=true;
-      }
-      else if(PyUnicode_Check(value)){
-        PyObject* value1 = PyUnicode_AsEncodedString(value, "utf-8", "~");
-        const char *value_str =  PyBytes_AS_STRING(value1);
-        lit = std::make_shared<Literal>(value_str,Location::NONE);
-        found=true;
-      }
-      if(found == true) {
-        auto assignment = std::make_shared<Assignment>(key_str,lit);
-        assignments.push_back(assignment);
-      }
-    }
 
     if(result  == nullptr) PyErr_Print();
     PyRun_SimpleString(python_exit_code);

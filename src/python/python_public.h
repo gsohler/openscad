@@ -5,14 +5,14 @@
 
 extern bool python_active;
 extern bool python_trusted;
+extern AssignmentList customizer_parameters;
+extern AssignmentList customizer_parameters_finished;
 
 void initPython(void);
 
 void finishPython();
 
-std::string evaluatePython(const std::string &code,
-			   double time,
-                           AssignmentList &assignments);
+std::string evaluatePython(const std::string &code, double time);
 
 std::shared_ptr<AbstractNode>
 python_modulefunc(const ModuleInstantiation *module,
@@ -21,11 +21,8 @@ python_modulefunc(const ModuleInstantiation *module,
 
 Value python_functionfunc(const FunctionCall *call,
                           const std::shared_ptr<const Context> &context);
-
 double python_doublefunc(void *cbfunc, double arg);
 Outline2d python_getprofile(void *cbfunc, int fn, double arg);
-
-
 
 extern bool pythonMainModuleInitialized;
 extern bool pythonRuntimeInitialized;
