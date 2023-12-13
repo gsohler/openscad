@@ -443,8 +443,10 @@ if(ENABLE_PYTHON)
       WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     )
     add_custom_target(python_lib DEPENDS ${PYTHON_ARCHIVE})
-    target_include_directories(OpenSCAD SYSTEM PRIVATE "${PYTHON_DEVPATH}/mingw64/include/${PYTHON_VERSION}")
+    target_include_directories(OpenSCADPy SYSTEM PRIVATE "${PYTHON_DEVPATH}/mingw64/include/${PYTHON_VERSION}")
     target_link_libraries(OpenSCADPy PRIVATE "${PYTHON_DEVPATH}/mingw64/lib/lib${PYTHON_VERSION}.dll.a")
+    target_include_directories(OpenSCADPy SYSTEM PRIVATE ${HARFBUZZ_INCLUDE_DIRS})
+    target_include_directories(OpenSCADPy SYSTEM PRIVATE ${FREETYPE_INCLUDE_DIRS})
   else() ## not MXE
     find_package(PythonLibs REQUIRED COMPONENTS Interpreter Development)
     SET(PYTHON_LIBRARIES "/lib64/libpython3.11.so.1.0" )
