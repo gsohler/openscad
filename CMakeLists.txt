@@ -411,11 +411,6 @@ if(ENABLE_PYTHON)
   add_library(OpenSCADPy
     ${PYTHON_SOURCES} )
     if(ENABLE_LIBFIVE)
-       list(APPEND PYTHON_SOURCES
-         src/python/pylibfive.cc 
-         src/python/FrepNode.cc)
-     endif()
-    if(ENABLE_LIBFIVE)
        target_compile_definitions(OpenSCAD PRIVATE ENABLE_LIBFIVE)
        target_compile_definitions(OpenSCADPy PRIVATE ENABLE_LIBFIVE)
        add_subdirectory(submodules/libfive EXCLUDE_FROM_ALL)
