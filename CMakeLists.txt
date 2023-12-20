@@ -55,7 +55,6 @@ option(ENABLE_CGAL "Enable CGAL." ON)
 option(ALLOW_BUNDLED_HIDAPI "Allow usage of bundled HIDAPI library (Windows only)." OFF)
 option(ENABLE_PYTHON "Enable experimental Python Interpreter" OFF)
 option(ENABLE_LIBFIVE "Enable libfive Library" OFF)
-option(ENABLE_NETTLE "Enable nettle Library with python" ON)
 include(CMakeDependentOption)
 cmake_dependent_option(APPLE_UNIX "Build OpenSCAD in Unix mode in MacOS X instead of an Apple Bundle" OFF "APPLE" OFF)
 cmake_dependent_option(ENABLE_QTDBUS "Enable DBus input driver for Qt5." ON "NOT HEADLESS" OFF)
@@ -134,6 +133,7 @@ endif()
 
 if(WASM)
   set(NULLGL ON CACHE BOOL "" FORCE)
+  set(ENABLE_PYTHON OFF CACHE BOOL "" FORCE)
   set(ENV{PKG_CONFIG_PATH} "/emsdk/upstream/emscripten/cache/sysroot/lib/pkgconfig")
   target_compile_definitions(OpenSCAD PRIVATE CGAL_DISABLE_ROUNDING_MATH_CHECK)
 endif()
@@ -391,78 +391,104 @@ message(STATUS "LibXml2: ${LIBXML2_VERSION_STRING}")
 target_include_directories(OpenSCAD SYSTEM PRIVATE ${LIBXML2_INCLUDE_DIR})
 target_link_libraries(OpenSCAD PRIVATE ${LIBXML2_LIBRARIES})
 
+find_package(Python COMPONENTS Interpreter Development)
+find_package(Nettle)
+if(NOT Nettle_FOUND)
+  if(ENABLE_PYTHON)
+    message(WARNING "Nettle not found, disabling python support.")
+    set(ENABLE_PYTHON OFF CACHE BOOL "" FORCE)
+  endif()
+endif()
+if(NOT Python_FOUND  AND NOT WIN32)
+  if(ENABLE_PYTHON)
+    message(WARNING "Python not found, disabling python support.")
+    set(ENABLE_PYTHON OFF CACHE BOOL "" FORCE)
+  endif()
+endif()
 if(ENABLE_PYTHON)
   SET(PYTHON_SOURCES
     src/python/pyopenscad.cc
     src/python/pyfunctions.cc)
+  if(ENABLE_LIBFIVE)
+    list(APPEND PYTHON_SOURCES
+      src/python/pylibfive.cc 
+      src/python/FrepNode.cc)
+  endif()
+  add_library(OpenSCADPy
+    ${PYTHON_SOURCES} )
     if(ENABLE_LIBFIVE)
-      list(APPEND PYTHON_SOURCES
-        src/python/pylibfive.cc 
-        src/python/FrepNode.cc)
+       target_compile_definitions(OpenSCAD PRIVATE ENABLE_LIBFIVE)
+       target_compile_definitions(OpenSCADPy PRIVATE ENABLE_LIBFIVE)
+       add_subdirectory(submodules/libfive EXCLUDE_FROM_ALL)
+       target_link_libraries(OpenSCADPy PRIVATE libfive)
+       target_compile_definitions(OpenSCADPy PRIVATE BUILD_STUDIO_APP=OFF)
+       target_compile_definitions(OpenSCADPy PRIVATE BUILD_GUILE_BINDINGS=OFF)
+       target_compile_definitions(OpenSCADPy PRIVATE BUILD_PYTHON_BINDINGS=OFF)
      endif()
-  add_library(OpenSCADPy ${PYTHON_SOURCES} )# Base stuff
-
+  message(STATUS "Python enabled, using Nettle ")
+  message(STATUS ${Nettle_INCLUDE_DIRS})
+  message(STATUS ${Nettle_LIBRARIES})
+  message(STATUS ${Nettle_FOUND})
   target_compile_definitions(OpenSCAD PRIVATE ENABLE_PYTHON)
   target_compile_definitions(OpenSCADPy PRIVATE ENABLE_PYTHON)
-
-  if(ENABLE_NETTLE) # Signing
-	  target_compile_definitions(OpenSCAD PRIVATE ENABLE_NETTLE)
-	  target_compile_definitions(OpenSCADPy PRIVATE ENABLE_NETTLE)
-    if(APPLE)	
-      target_include_directories(OpenSCADPy PRIVATE "/usr/local/include")
-      target_link_directories(OpenSCADPy PRIVATE "/usr/local/lib")
-      target_link_libraries(OpenSCADPy PRIVATE "libnettle.a")
-    else()
-      find_package(Nettle REQUIRED)
-      message(STATUS "Python enabled, using Nettle ")
-      message(STATUS ${Nettle_INCLUDE_DIRS})
-      message(STATUS ${Nettle_LIBRARIES})
-      message(STATUS ${Nettle_FOUND})
-      target_include_directories(OpenSCADPy PRIVATE ${Nettle_INCLUDE_DIRS})
-      target_link_libraries(OpenSCADPy PRIVATE ${Nettle_LIBRARIES})
-    endif()   
-  endif()  
-  if(ENABLE_LIBFIVE)
-    target_compile_definitions(OpenSCAD PRIVATE ENABLE_LIBFIVE)
-    target_compile_definitions(OpenSCADPy PRIVATE ENABLE_LIBFIVE)
-    add_subdirectory(submodules/libfive EXCLUDE_FROM_ALL)
-    target_link_libraries(OpenSCADPy PRIVATE libfive)
-    target_compile_definitions(OpenSCADPy PRIVATE BUILD_STUDIO_APP=OFF)
-    target_compile_definitions(OpenSCADPy PRIVATE BUILD_GUILE_BINDINGS=OFF)
-    target_compile_definitions(OpenSCADPy PRIVATE BUILD_PYTHON_BINDINGS=OFF)
-  endif()
-  if(MXECROSS) # Python Lib
-    SET(PYTHON_DEVPATH "${CMAKE_CURRENT_SOURCE_DIR}/python")
-    SET(PYTHON_PACKAGEFOLDER "https://mirror.msys2.org/mingw/mingw64")
-    SET(PYTHON_PACKAGEFILE "mingw-w64-x86_64-python-3.11.5-2-any.pkg.tar.zst")
-    SET(PYTHON_VERSION "python3.11")
-    SET(PYTHON_ARCHIVE "${PYTHON_DEVPATH}/mingw64/lib/lib${PYTHON_VERSION}.dll.a")
+  if(WIN32) 
+    #MINGW environment	  
+    SET(PYTHON_MINGW_DEVPATH "${CMAKE_CURRENT_SOURCE_DIR}/python_mingw")
+    SET(PYTHON_MINGW_PACKAGEFOLDER "https://mirror.msys2.org/mingw/mingw64")
+    SET(PYTHON_MINGW_PACKAGEFILE "mingw-w64-x86_64-python-3.11.5-2-any.pkg.tar.zst")
+    SET(PYTHON_MINGW_PACKAGETAR "mingw-w64-x86_64-python-3.11.5-2-any.pkg.tar")
+    SET(PYTHON_MINGW_VERSION "python3.11")
+    SET(PYTHON_MINGW_ARCHIVE "${PYTHON_MINGW_DEVPATH}/mingw64/lib/lib${PYTHON_MINGW_VERSION}.dll.a")
     add_custom_command(
-      OUTPUT ${PYTHON_ARCHIVE}
-      COMMAND mkdir -p python && cd python && wget ${PYTHON_PACKAGEFOLDER}/${PYTHON_PACKAGEFILE} && tar -I zstd -xf ${PYTHON_PACKAGEFILE}
       WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+      COMMAND rm -rf python_mingw && mkdir python_mingw && cd python_mingw && wget ${PYTHON_MINGW_PACKAGEFOLDER}/${PYTHON_MINGW_PACKAGEFILE} && unzstd ${PYTHON_MINGW_PACKAGEFILE} && tar -xf ${PYTHON_MINGW_PACKAGETAR}
+      OUTPUT ${PYTHON_MINGW_ARCHIVE}
     )
-    add_custom_target(python_lib DEPENDS ${PYTHON_ARCHIVE})
-    target_include_directories(OpenSCADPy SYSTEM PRIVATE "${PYTHON_DEVPATH}/mingw64/include/${PYTHON_VERSION}")
-    target_link_libraries(OpenSCADPy PRIVATE "${PYTHON_DEVPATH}/mingw64/lib/lib${PYTHON_VERSION}.dll.a")
+    add_custom_target(tgt_python_mingw DEPENDS ${PYTHON_MINGW_ARCHIVE})
+
+    # Python embeddable Package
+    SET(PYTHON_EMBEDDABLE_DEVPATH "${CMAKE_CURRENT_SOURCE_DIR}/bin")
+    SET(PYTHON_EMBEDDABLE_PACKAGEFILE "python-3.11.5-embed-amd64.zip")
+    SET(PYTHON_EMBEDDABLE_URL "http://www.python.org/ftp/python/3.11.5")
+    SET(PYTHON_EMBEDDABLE_DLL "${PYTHON_EMBEDDABLE_DEVPATH}/python311.dll")
+    add_custom_command(
+      WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+      COMMAND rm -rf bin && mkdir bin && cd bin && wget ${PYTHON_EMBEDDABLE_URL}/${PYTHON_EMBEDDABLE_PACKAGEFILE} && unzip ${PYTHON_EMBEDDABLE_PACKAGEFILE}
+      OUTPUT ${PYTHON_EMBEDDABLE_DLL}
+    )
+    add_custom_target(tgt_python_embed DEPENDS ${PYTHON_EMBEDDABLE_DLL})
+
+    add_dependencies(OpenSCADPy tgt_python_embed)
+    add_dependencies(OpenSCADPy tgt_python_mingw)
+
+    target_include_directories(OpenSCADPy SYSTEM PRIVATE "${PYTHON_MINGW_DEVPATH}/mingw64/include/${PYTHON_MINGW_VERSION}")
+    target_link_libraries(OpenSCADPy PRIVATE "${PYTHON_MINGW_ARCHIVE}")
     target_include_directories(OpenSCADPy SYSTEM PRIVATE ${HARFBUZZ_INCLUDE_DIRS})
     target_include_directories(OpenSCADPy SYSTEM PRIVATE ${FREETYPE_INCLUDE_DIRS})
-  else() ## not MXE
-    find_package(PythonLibs REQUIRED COMPONENTS Interpreter Development)
+  else() #MXE
     SET(PYTHON_LIBRARIES "/lib64/libpython3.11.so.1.0" )
     SET(PYTHON_INCLUDE_DIRS "/usr/include/python3.11/" )
-    target_include_directories(OpenSCADPy PRIVATE ${PYTHON_INCLUDE_DIRS})
-    target_link_libraries(OpenSCADPy PRIVATE ${PYTHON_LIBRARIES})
-    if(MSVC)
-      target_include_directories(OpenSCADPy SYSTEM PRIVATE ${HARFBUZZ_INCLUDE_DIRS}/harfbuzz)
-    else()
-      target_include_directories(OpenSCADPy SYSTEM PRIVATE ${HARFBUZZ_INCLUDE_DIRS})
-    endif()
-    message(STATUS "Python enabled ${PYTHONLIBS_FOUND} ${PYTHON_LIBRARIES}")
-    target_include_directories(OpenSCADPy SYSTEM PRIVATE ${FREETYPE_INCLUDE_DIRS})
-  endif() # end MXE
-  target_link_libraries(OpenSCADPy PRIVATE ${Python_LIBRARIES})
+    target_include_directories(OpenSCADPy PRIVATE ${Python_INCLUDE_DIRS})
+    target_link_libraries(OpenSCADPy PRIVATE ${Python_LIBRARIES})
+  endif() # endif MXE
+  target_include_directories(OpenSCADPy SYSTEM PRIVATE ${FREETYPE_INCLUDE_DIRS})
+  if(MSVC)
+    target_include_directories(OpenSCADPy SYSTEM PRIVATE ${HARFBUZZ_INCLUDE_DIRS}/harfbuzz)
+  else()
+    target_include_directories(OpenSCADPy SYSTEM PRIVATE ${HARFBUZZ_INCLUDE_DIRS})
+  endif()
+  if(APPLE) # Nettle
+    target_include_directories(OpenSCADPy PRIVATE "/usr/local/include")
+    target_link_directories(OpenSCADPy PRIVATE "/usr/local/lib")
+    target_link_libraries(OpenSCADPy PRIVATE "libnettle.a")
+  else()
+    target_include_directories(OpenSCADPy PRIVATE ${Nettle_INCLUDE_DIRS})
+    target_link_libraries(OpenSCADPy PRIVATE ${Nettle_LIBRARIES})
+  endif()   
+#  target_include_directories(OpenSCADPy SYSTEM PRIVATE ${FREETYPE_INCLUDE_DIRS})
   target_link_libraries(OpenSCADPy PRIVATE Eigen3::Eigen)
+  target_link_libraries(OpenSCADPy PRIVATE ${GETTEXT_LIBRARY})
+  target_link_libraries(OpenSCADPy PRIVATE ${GLIB2_LIBRARIES})
   # copy compile options for the main OpenSCAD target
   # duplication is not very ideal but not sure what better options do we have
   set_property(TARGET OpenSCADPy PROPERTY CXX_STANDARD 17)
@@ -1322,18 +1348,22 @@ endif()
 
 if(NOT APPLE OR APPLE_UNIX)
   set_target_properties(OpenSCAD PROPERTIES OUTPUT_NAME openscad${SUFFIX_WITH_DASH})
-  install(TARGETS OpenSCAD RUNTIME DESTINATION "${OPENSCAD_BINDIR}")
   if(WIN32)
+    if(ENABLE_PYTHON)
+      install(DIRECTORY ${CMAKE_SOURCE_DIR}/bin DESTINATION "." )
+      install(FILES ${CMAKE_SOURCE_DIR}/bin/python311.dll DESTINATION "bin" RENAME "libpython3.11.dll")
+    endif()  
+    install(TARGETS OpenSCAD RUNTIME DESTINATION "bin")
     if(USE_MIMALLOC AND MI_LINK_SHARED)
       if(CMAKE_SIZEOF_VOID_P EQUAL 8)
-        install(FILES ${CMAKE_SOURCE_DIR}/submodules/mimalloc/bin/mimalloc-redirect.dll DESTINATION ".")
+        install(FILES ${CMAKE_SOURCE_DIR}/submodules/mimalloc/bin/mimalloc-redirect.dll DESTINATION "bin")
       elseif(CMAKE_SIZEOF_VOID_P EQUAL 4)
-        install(FILES ${CMAKE_SOURCE_DIR}/submodules/mimalloc/bin/mimalloc-redirect32.dll DESTINATION ".")
+        install(FILES ${CMAKE_SOURCE_DIR}/submodules/mimalloc/bin/mimalloc-redirect32.dll DESTINATION "bin")
       endif()
-      install(FILES ${CMAKE_BINARY_DIR}/submodules/mimalloc/mimalloc.dll DESTINATION ".")
+      install(FILES ${CMAKE_BINARY_DIR}/submodules/mimalloc/mimalloc.dll DESTINATION "bin")
     endif()
-    install(FILES ${CMAKE_SOURCE_DIR}/libpython3.11.dll DESTINATION ".")
   else()
+    install(TARGETS OpenSCAD RUNTIME DESTINATION "${OPENSCAD_BINDIR}")
     install(FILES ${CMAKE_CURRENT_LIST_DIR}/doc/openscad.1 DESTINATION ${CMAKE_INSTALL_MANDIR}/man1 RENAME openscad${SUFFIX_WITH_DASH}.1)
     install(FILES ${CMAKE_CURRENT_LIST_DIR}/openscad.appdata.xml DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/metainfo RENAME org.openscad.OpenSCAD${SUFFIX_WITH_DASH}.appdata.xml)
     if(ENABLE_LIBFIVE)
@@ -1376,10 +1406,12 @@ if(MXECROSS)
   ")
   set(CPACK_NSIS_EXTRA_INSTALL_COMMANDS "\
     \\\${RegisterExtension} '$INSTDIR\\\\openscad.exe' '.scad' 'OpenSCAD_File'\n\
+    CreateShortCut \\\"$INSTDIR\\\\OpenSCAD.lnk\\\" \\\"$INSTDIR\\\\bin\\\\OpenSCAD.exe\\\"
     \\\${RefreshShellIcons}\
   ")
   set(CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS "\
     \\\${UnRegisterExtension} '.scad' 'OpenSCAD_File'\n\
+    Delete \\\"$INSTDIR\\\\OpenSCAD.lnk\\\"
     \\\${RefreshShellIcons}\
   ")
 endif()
@@ -1390,7 +1422,6 @@ configure_file("${CMAKE_CURRENT_SOURCE_DIR}/cmake/Modules/openscad_cpack.cmake.i
 # CPACK_PROJECT_CONFIG_FILE is for configuring CPack-generator specific settings
 set(CPACK_PROJECT_CONFIG_FILE "${CMAKE_BINARY_DIR}/openscad_cpack.cmake")
 set(CPACK_THREADS 0)
-
 if (MXECROSS)
   get_target_property(TARGET_LIBRARIES OpenSCAD LINK_LIBRARIES)
   LIST(FILTER TARGET_LIBRARIES EXCLUDE REGEX .*libdouble-conversion.a )
