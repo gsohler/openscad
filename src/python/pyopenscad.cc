@@ -128,6 +128,9 @@ std::shared_ptr<AbstractNode> PyOpenSCADObjectToNode(PyObject *obj)
 {
   std::shared_ptr<AbstractNode> result = ((PyOpenSCADObject *) obj)->node;
   Py_XDECREF(obj); 
+  if(result.use_count() > 2) {
+    result = result->clone();
+  }
   return result;
 }
 
@@ -141,6 +144,9 @@ std::shared_ptr<AbstractNode> PyOpenSCADObjectToNodeMulti(PyObject *objs)
   std::shared_ptr<AbstractNode> result;
   if (Py_TYPE(objs) == &PyOpenSCADType) {
     result = ((PyOpenSCADObject *) objs)->node;
+    if(result.use_count() > 2) {
+	    result = result->clone();
+    }
   } else if (PyList_Check(objs)) {
 
     DECLARE_INSTANCE
