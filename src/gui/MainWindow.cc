@@ -100,7 +100,6 @@
 
 #ifdef ENABLE_PYTHON
 #include "python/python_public.h"
-#if ENABLE_NETTLE
 #include "nettle/sha2.h"
 #include "nettle/base64.h"
 
@@ -121,7 +120,6 @@ std::string SHA256HashString(std::string aString){
     base64_encode_final(&base64_ctx, digest_base64);		    
     return digest_base64;
 }
-#endif
 
 #endif
 
@@ -1831,7 +1829,6 @@ bool MainWindow::fileChangedOnDisk()
 
 #ifdef ENABLE_PYTHON
 bool MainWindow::trust_python_file(const std::string &file,  const std::string &content) {
-#ifdef ENABLE_NETTLE	
   QSettingsCached settings;
   char setting_key[256];
   if(python_trusted) return true;
@@ -1881,9 +1878,6 @@ bool MainWindow::trust_python_file(const std::string &file,  const std::string &
     return false;
   }
   return false;
-#else
-  return true; // no check available
-#endif  
 }
 #endif
 

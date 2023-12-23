@@ -362,19 +362,6 @@ function(add_cmdline_test TESTCMD_BASENAME)
     else()
       set(MANIFOLD_OPTION "")
     endif()
-    
-    # Enable fast-csg for all tests but those that have different expectations or fail for other reasons.
-    if (NOT SCADFILE IN_LIST SCADFILES_WITH_DIFFERENT_FAST_CSG_EXPECTATIONS
-        AND NOT SCADFILE IN_LIST SCADFILES_FAILING_WITH_FAST_CSG
-        AND NOT TEST_FULLNAME IN_LIST TESTS_FAILING_WITH_FAST_CSG)
-      set(EXPERIMENTAL_OPTION ${EXPERIMENTAL_OPTION} "--enable=fast-csg")
-      if (SCADFILE IN_LIST FAST_CSG_SAFER_NEEDED)
-        set(EXPERIMENTAL_OPTION ${EXPERIMENTAL_OPTION} "--enable=fast-csg-safer")
-      endif()
-      if (SCADFILE IN_LIST FEATURES_PYTHON_FILES)
-        set(EXPERIMENTAL_OPTION ${EXPERIMENTAL_OPTION} "--enable=python-engine")
-      endif()
-    endif()
 
     # 2D tests should be viewed from the top, not an angle.
     set(CAMERA_OPTION "")
@@ -553,7 +540,8 @@ file(GLOB REDEFINITION_FILES       ${TEST_SCAD_DIR}/redefinition/*.scad)
 file(GLOB_RECURSE BUGS_FILES       ${TEST_SCAD_DIR}/bugs/*.scad)
 file(GLOB_RECURSE BUGS_2D_FILES    ${TEST_SCAD_DIR}/bugs2D/*.scad)
 file(GLOB_RECURSE EXAMPLE_3D_FILES ${EXAMPLES_DIR}/*.scad)
-file(GLOB FEATURES_PYTHON_FILES    ${TEST_PYTHON_DIR}/language/*.py)
+list(APPEND CGALPNGTEST_PYTHON_FILES  ${TEST_PYTHON_DIR}/language/primitives.py )
+list(APPEND ECHO_PYTHON_FILES         ${TEST_PYTHON_DIR}/language/abuse.py )
 
 list(REMOVE_ITEM EXAMPLE_3D_FILES
   ${EXAMPLES_DIR}/Old/example015.scad
@@ -711,7 +699,6 @@ list(APPEND CGALPNGTEST_3D_FILES
   ${TEST_SCAD_DIR}/misc/preview_variable.scad
 )
 
-list(APPEND CGALPNGTEST_PYTHON_FILES ${FEATURES_PYTHON_FILES} )
 # test importing unparseable files, result will be an empty image
 list(APPEND STL_IMPORT_FILES
   ${TEST_SCAD_DIR}/stl/stl-import-invalidvertex.scad
@@ -1004,7 +991,8 @@ add_cmdline_test(csgpngtest         SCRIPT ${EX_IM_PNGTEST_PY} SUFFIX png FILES 
 # FIXME: We don't actually need to compare the output of cgalstlsanitytest
 # with anything. It's self-contained and returns != 0 on error
 add_cmdline_test(cgalstlsanitytest  SCRIPT ${CGALSTLSANITYTEST_PY} SUFFIX txt FILES ${CGALSTLSANITYTEST_FILES} ARGS ${OPENSCAD_ARG})
-add_cmdline_test(cgalpngtest_python  OPENSCAD FILES ${CGALPNGTEST_PYTHON_FILES} SUFFIX png ARGS --enable-python --render)
+add_cmdline_test(cgalpngtest_python  OPENSCAD FILES ${CGALPNGTEST_PYTHON_FILES} SUFFIX png  ARGS --trust-python --render)
+add_cmdline_test(echotest_python     OPENSCAD FILES ${ECHO_PYTHON_FILES}        SUFFIX echo ARGS --trust-python )
 
 set(VIEWBOX_TEST "${TEST_SCAD_DIR}/svg/extruded/viewbox-test.scad")
 foreach(TEST ${SVG_VIEWBOX_TESTS})
@@ -1328,9 +1316,7 @@ if(APPLE)
     ${NEF3_BROKEN_TESTS}
     # Python not enabled for MAC yet
     cgalpngtest_python_primitives
-    # Z issues specific to edge shader: https://github.com/openscad/openscad/issues/4595
-    openscad-viewoptions-edges_view-options-tests
-    openscad-viewoptions-axes-scales-edges_view-options-tests
+    echotest_python_abuse
     # issue3158 test failing on macos, see: https://github.com/openscad/openscad/issues/4509
     opencsgtest_issue3158
     # On macOS, GL_POINTS are sometimes circular even though GL_POINT_SMOOTH is disabled
@@ -1349,8 +1335,9 @@ elseif(WIN32 OR MXECROSS)
     # requires `gs` tool
     pdfexporttest_centered
     pdfexporttest_simple-pdf
-    # Python not enabled in windows
+    # Python not enabled in windows yet
     cgalpngtest_python_primitives
+    echotest_python_abuse
     PROPERTIES DISABLED TRUE
   )
 endif()
