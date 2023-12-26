@@ -619,6 +619,9 @@ PyObject *python_rotate(PyObject *self, PyObject *args, PyObject *kwargs)
     return NULL;
   }
 
+//  PyObject *mat = python_matrix(obj,0,x,y,z); // 0=translate
+//  if(mat != nullptr) return mat;
+
   child = PyOpenSCADObjectToNodeMulti(obj);
   if (child == NULL) {
     PyErr_SetString(PyExc_TypeError, "Invalid type for Object in rotate");
@@ -738,6 +741,49 @@ PyObject *python_mirror(PyObject *self, PyObject *args, PyObject *kwargs)
   return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
 }
 
+PyObject *python_matrix(PyObject *mat,int mode, Vector3d vec)
+{
+  // 0=translate	
+  // check if its a matrix
+  double raw[4][4];
+  if(mat == nullptr) return nullptr;
+  PyObject *row, *cell;
+  double val;
+  double xn, yn, zn;
+  if(!PyList_Check(mat)) return nullptr;
+  if(PyList_Size(mat) != 4) return nullptr;
+  for(int i=0;i<4;i++) {
+    row=PyList_GetItem(mat,i);
+    if(!PyList_Check(row)) return nullptr;
+    if(PyList_Size(row) != 4) return nullptr;
+    for(int j=0;j<4;j++) {
+      cell=PyList_GetItem(row,j);
+      if(python_numberval(cell,&val)) return nullptr;
+      raw[i][j]=val;
+    }
+  }
+  switch(mode) {
+	  case 0: // translate
+		  xn=raw[0][0]*vec[0]+raw[0][1]*vec[1]+raw[0][2]*vec[2];
+		  yn=raw[1][0]*vec[0]+raw[1][1]*vec[1]+raw[1][2]*vec[2];
+		  zn=raw[2][0]*vec[0]+raw[2][1]*vec[1]+raw[2][2]*vec[2];
+		  raw[0][3] += xn;
+		  raw[1][3] += yn;
+		  raw[2][3] += zn;
+		  break;
+  }
+  PyObject *result=PyList_New(4);
+  for(int i=0;i<4;i++) {
+    row=PyList_New(4);
+    for(int j=0;j<4;j++)
+      PyList_SetItem(row,j,PyFloat_FromDouble(raw[i][j]));
+    PyList_SetItem(result,i,row);
+//      Py_XDECREF(row);
+  }
+
+  return result;
+}
+
 PyObject *python_translate(PyObject *self, PyObject *args, PyObject *kwargs)
 {
   DECLARE_INSTANCE
@@ -756,17 +802,19 @@ PyObject *python_translate(PyObject *self, PyObject *args, PyObject *kwargs)
     PyErr_SetString(PyExc_TypeError, "Error during parsing translate(object,vec3)");
     return NULL;
   }
+  if (python_vectorval(v, &x, &y, &z)) {
+    PyErr_SetString(PyExc_TypeError, "Invalid vector specifiaction in trans");
+    return NULL;
+  }
+  Vector3d translatevec(x, y, z);
+  PyObject *mat = python_matrix(obj,0,translatevec); // 0=translate
+  if(mat != nullptr) return mat;
   child = PyOpenSCADObjectToNodeMulti(obj);
   if (child == NULL) {
     PyErr_SetString(PyExc_TypeError, "Invalid type for Object in translate");
     return NULL;
   }
 
-  if (python_vectorval(v, &x, &y, &z)) {
-    PyErr_SetString(PyExc_TypeError, "Invalid vector specifiaction in trans");
-    return NULL;
-  }
-  Vector3d translatevec(x, y, z);
   node->matrix.translate(translatevec);
   node->children.push_back(child);
   return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
@@ -774,38 +822,58 @@ PyObject *python_translate(PyObject *self, PyObject *args, PyObject *kwargs)
 
 PyObject *python_dir_sub(PyObject *self, PyObject *args, PyObject *kwargs,int mode)
 {
-  DECLARE_INSTANCE
   std::shared_ptr<AbstractNode> child;
 
-  auto node = std::make_shared<TransformNode>(instance, "translate");
 
   char *kwlist[] = {"obj", "v", NULL};
   PyObject *obj = NULL;
-  double dist;
+  double arg;
   double x = 0, y = 0, z = 0;
   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "Od", kwlist,
                                    &obj,
-                                   &dist
+                                   &arg
                                    )) {
     PyErr_SetString(PyExc_TypeError, "Error during parsing translate(object,vec3)");
     return NULL;
   }
+
+  DECLARE_INSTANCE
+  auto node = std::make_shared<TransformNode>(instance, "translate");
+
+  if(mode < 6)
+  {
+    Vector3d trans;
+    switch(mode) {	  
+      case 0: trans=Vector3d(arg,0,0); break;
+      case 1: trans=Vector3d(-arg,0,0); break;
+      case 2: trans=Vector3d(0,-arg,0); break;
+      case 3: trans=Vector3d(0,arg,0); break;
+      case 4: trans=Vector3d(0,0,-arg); break;
+      case 5: trans=Vector3d(0,0,arg); break;
+    }
+    PyObject *mat = python_matrix(obj,0,trans); // 0=translate
+    if(mat != nullptr) return mat;
+    node->matrix.translate(trans);
+  }
+  else 
+  {
+    Vector3d rot;
+    switch(mode) {	  
+      case 6: rot = Vector3d(1,0,0);
+      case 7: rot = Vector3d(0,1,0);
+      case 8: rot = Vector3d(0,0,1);
+    }		       
+    Matrix3d rots=angle_axis_degrees(arg, rot);
+    node->matrix.rotate(rots);
+  }
+
+
   child = PyOpenSCADObjectToNodeMulti(obj);
   if (child == NULL) {
     PyErr_SetString(PyExc_TypeError, "Invalid type for Object in translate");
     return NULL;
   }
 
-  Vector3d translatevec(dist, 0, 0);
-  if(mode == 0) node->matrix.translate(Vector3d(dist,0,0));
-  if(mode == 1) node->matrix.translate(Vector3d(-dist,0,0));
-  if(mode == 2) node->matrix.translate(Vector3d(0,-dist,0));
-  if(mode == 3) node->matrix.translate(Vector3d(0,dist,0));
-  if(mode == 4) node->matrix.translate(Vector3d(0,0,-dist));
-  if(mode == 5) node->matrix.translate(Vector3d(0,0,dist));
-  if(mode == 6) { Matrix3d rots=angle_axis_degrees(dist, Vector3d(1,0,0)); node->matrix.rotate(rots); }
-  if(mode == 7) { Matrix3d rots=angle_axis_degrees(dist, Vector3d(0,1,0)); node->matrix.rotate(rots); }
-  if(mode == 8) { Matrix3d rots=angle_axis_degrees(dist, Vector3d(0,0,1)); node->matrix.rotate(rots); }
   node->children.push_back(child);
   return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
 }
@@ -2369,12 +2437,26 @@ PyMethodDef PyOpenSCADFunctions[] = {
 #define	OO_METHOD_ENTRY(name,desc) \
   { #name, (PyCFunction) ( [ ] (PyObject *self, PyObject *args) -> PyObject * { \
   PyObject *new_args = python_oo_args(self, args); \
-  PyObject *result = python_##name(self, new_args, NULL); \
+  PyObject *result = python_##name(self, self, new_args); \
   return result;  } ),  METH_VARARGS | METH_KEYWORDS, (desc)},
 
+#define	OO_METHOD_FUNC(name) \
+PyObject *python_oo_output(PyObject *self, PyObject *args, PyObject *kwargs)  \
+{\
+  PyObject *new_args = python_oo_args(self, args); \
+  PyObject *result = python_##name(self, new_args, kwargs); \
+  return result; \
+} 
+		  
+#define	OO_METHOD_ENTRY1(name,desc) \
+  { #name, (PyCFunction) python_oo_output ,  METH_VARARGS | METH_KEYWORDS, (desc)},
+
+OO_METHOD_FUNC(output)
 
 PyMethodDef PyOpenSCADMethods[] = {
 
+  OO_METHOD_ENTRY1(output,"Output Object")	
+	  /*
   OO_METHOD_ENTRY(translate,"Move Object")	
   OO_METHOD_ENTRY(right,"Right Object")	
   OO_METHOD_ENTRY(left,"Left Object")	
@@ -2416,7 +2498,7 @@ PyMethodDef PyOpenSCADMethods[] = {
 
   OO_METHOD_ENTRY(projection,"Projection Object")	
   OO_METHOD_ENTRY(render,"Render Object")	
-
+*/
   {NULL, NULL, 0, NULL}
 };
 

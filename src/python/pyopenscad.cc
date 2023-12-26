@@ -58,6 +58,16 @@ PyObject *PyOpenSCADObject_alloc(PyTypeObject *cls, Py_ssize_t nitems)
 {
   PyObject *self = PyType_GenericAlloc(cls, nitems);
   ((PyOpenSCADObject *)self)->dict = PyDict_New();
+  PyObject *origin=PyList_New(4);
+  for(int i=0;i<4;i++) {
+  	PyObject *row=PyList_New(4);
+	for(int j=0;j<4;j++)
+		PyList_SetItem(row,j,PyFloat_FromDouble(i==j?1.0:0.0));
+	PyList_SetItem(origin,i,row);
+//  	Py_XDECREF(row);
+  }
+  PyDict_SetItemString(((PyOpenSCADObject *)self)->dict,"origin",origin);
+//  Py_XDECREF(origin);
   return self;
 }
 
@@ -234,6 +244,7 @@ void get_fnas(double& fn, double& fa, double& fs) {
 PyObject *python_oo_args(PyObject *self, PyObject *args) // returns new reference,
 {
   int i;
+  printf("oo args\n");
   PyObject *item;
   int n = PyTuple_Size(args);
   PyObject *new_args = PyTuple_New(n + 1);
@@ -660,9 +671,29 @@ sys.stderr = stderr_bak\n\
 
     return error;
 }
+PyObject *python__getitem__(PyObject *dict, PyObject *key);
+int python__setitem__(PyObject *dict, PyObject *key, PyObject *v);
+
+PyObject *PyOpenSCAD_GetAttr(PyObject *self, char *attr)
+{
+	PyObject *key = PyUnicode_FromString(attr);
+	PyObject *result = python__getitem__(self,key);
+  	Py_XDECREF(key);
+	return result;
+}
+int PyOpenSCAD_SetAttr(PyObject *self, char *attr, PyObject *value)
+{
+	PyObject *key = PyUnicode_FromString(attr);
+	int res = python__setitem__(self, key,value);
+  	Py_XDECREF(key);
+	return res;
+}
+
+
 /*
  * the magical Python Type descriptor for an OpenSCAD Object. Adding more fields makes the type more powerful
  */
+
 
 PyTypeObject PyOpenSCADType = {
     PyVarObject_HEAD_INIT(nullptr, 0)
@@ -671,8 +702,8 @@ PyTypeObject PyOpenSCADType = {
     0,                         			/* tp_itemsize */
     (destructor) PyOpenSCADObject_dealloc,	/* tp_dealloc */
     0,                         			/* vectorcall_offset */
-    0,                         			/* tp_getattr */
-    0,                         			/* tp_setattr */
+    PyOpenSCAD_GetAttr,       			/* tp_getattr */
+    PyOpenSCAD_SetAttr,        			/* tp_setattr */
     0,                         			/* tp_as_async */
     python_str,               			/* tp_repr */
     &PyOpenSCADNumbers,        			/* tp_as_number */
