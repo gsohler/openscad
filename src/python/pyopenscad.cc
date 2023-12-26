@@ -244,7 +244,6 @@ void get_fnas(double& fn, double& fa, double& fs) {
 PyObject *python_oo_args(PyObject *self, PyObject *args) // returns new reference,
 {
   int i;
-  printf("oo args\n");
   PyObject *item;
   int n = PyTuple_Size(args);
   PyObject *new_args = PyTuple_New(n + 1);
@@ -631,8 +630,7 @@ sys.stderr = stderr_bak\n\
     PyObject *key, *value;
     Py_ssize_t pos = 0;
     PyObject *pFunc;
-
-    if(result  == nullptr) PyErr_Print();
+//    if(result  == nullptr) PyErr_Print();
     PyRun_SimpleString(python_exit_code);
 
     for(int i=0;i<2;i++)
@@ -702,8 +700,8 @@ PyTypeObject PyOpenSCADType = {
     0,                         			/* tp_itemsize */
     (destructor) PyOpenSCADObject_dealloc,	/* tp_dealloc */
     0,                         			/* vectorcall_offset */
-    PyOpenSCAD_GetAttr,       			/* tp_getattr */
-    PyOpenSCAD_SetAttr,        			/* tp_setattr */
+    0,                          		/* tp_getattr */
+    0,                  			/* tp_setattr */
     0,                         			/* tp_as_async */
     python_str,               			/* tp_repr */
     &PyOpenSCADNumbers,        			/* tp_as_number */
