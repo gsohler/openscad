@@ -248,6 +248,7 @@ PyObject *python_oo_args(PyObject *self, PyObject *args) // returns new referenc
   int n = PyTuple_Size(args);
   PyObject *new_args = PyTuple_New(n + 1);
 
+  Py_INCREF(self);
   PyTuple_SetItem(new_args, 0, self);
 
   for (i = 0; i < PyTuple_Size(args); i++) {
