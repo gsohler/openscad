@@ -631,7 +631,7 @@ sys.stderr = stderr_bak\n\
     PyObject *key, *value;
     Py_ssize_t pos = 0;
     PyObject *pFunc;
-//    if(result  == nullptr) PyErr_Print();
+    if(result  == nullptr) PyErr_Print();
     PyRun_SimpleString(python_exit_code);
 
     for(int i=0;i<2;i++)
@@ -672,22 +672,6 @@ sys.stderr = stderr_bak\n\
 }
 PyObject *python__getitem__(PyObject *dict, PyObject *key);
 int python__setitem__(PyObject *dict, PyObject *key, PyObject *v);
-
-PyObject *PyOpenSCAD_GetAttr(PyObject *self, char *attr)
-{
-	PyObject *key = PyUnicode_FromString(attr);
-	PyObject *result = python__getitem__(self,key);
-  	Py_XDECREF(key);
-	return result;
-}
-int PyOpenSCAD_SetAttr(PyObject *self, char *attr, PyObject *value)
-{
-	PyObject *key = PyUnicode_FromString(attr);
-	int res = python__setitem__(self, key,value);
-  	Py_XDECREF(key);
-	return res;
-}
-
 
 /*
  * the magical Python Type descriptor for an OpenSCAD Object. Adding more fields makes the type more powerful

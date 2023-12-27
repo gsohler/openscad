@@ -598,12 +598,102 @@ PyObject *python_scale(PyObject *self, PyObject *args, PyObject *kwargs)
   return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
 }
 
-
-
-PyObject *python_rotate_sub(PyObject *obj, PyObject *val_a)
+PyObject *python_matrix(PyObject *mat,int mode, Vector3d transvec, Matrix3d rotvec) // TODO ein arg weniger
 {
-//  PyObject *mat = python_matrix(obj,1,x,y,z); // 1=rotate
-//  if(mat != nullptr) return mat;
+  // 0=translate	
+  // 1=rotate
+  // check if its a matrix
+  double raw[4][4];
+  if(mat == nullptr) return nullptr;
+  PyObject *row, *cell;
+  double val;
+  double xn, yn, zn;
+  if(!PyList_Check(mat)) return nullptr;
+  if(PyList_Size(mat) != 4) return nullptr;
+  for(int i=0;i<4;i++) {
+    row=PyList_GetItem(mat,i);
+    if(!PyList_Check(row)) return nullptr;
+    if(PyList_Size(row) != 4) return nullptr;
+    for(int j=0;j<4;j++) {
+      cell=PyList_GetItem(row,j);
+      if(python_numberval(cell,&val)) return nullptr;
+      raw[i][j]=val;
+    }
+  }
+  Matrix3d M;
+  Vector3d n;
+  Transform3d matrix;
+  switch(mode) {
+	  case 0: // translate
+		  // col0 = xvec col1=yvec, col2=zvec, col3=trans
+		  M 	 << raw[0][0] , raw[0][1] , raw[0][2]
+			  , raw[1][0] , raw[1][1] , raw[1][2]
+			  , raw[2][0] , raw[2][1] , raw[2][2] ;
+		  n = M * transvec;
+
+		  xn=raw[0][0]*transvec[0]+raw[0][1]*transvec[1]+raw[0][2]*transvec[2];
+		  yn=raw[1][0]*transvec[0]+raw[1][1]*transvec[1]+raw[1][2]*transvec[2];
+		  zn=raw[2][0]*transvec[0]+raw[2][1]*transvec[1]+raw[2][2]*transvec[2];
+		  raw[0][3] += xn;
+		  raw[1][3] += yn;
+		  raw[2][3] += zn;
+		  break;
+	  case 1: // rotate
+  		matrix.rotate(rotvec);
+		for(int i=0;i<4;i++) {
+		  n =Vector3d(raw[0][i],raw[1][i],raw[2][i]);
+		  n = matrix * n;
+		  for(int j=0;j<3;j++) raw[j][i] = n[j];
+		}  
+		break;
+  }
+  PyObject *result=PyList_New(4);
+  for(int i=0;i<4;i++) {
+    row=PyList_New(4);
+    for(int j=0;j<4;j++)
+      PyList_SetItem(row,j,PyFloat_FromDouble(raw[i][j]));
+    PyList_SetItem(result,i,row);
+//      Py_XDECREF(row);
+  }
+
+  return result;
+}
+
+
+
+
+PyObject *python_rotate_sub(PyObject *obj, Vector3d rot)
+{
+
+  double sx = 0, sy = 0, sz = 0;
+  double cx = 1, cy = 1, cz = 1;
+  double a = 0.0;
+  bool ok = true;
+//    const auto& vec_a = val_a.toVector();
+  if(rot[2] != 0) {
+    a = rot[2];
+    sz = sin_degrees(a);
+    cz = cos_degrees(a);
+  }
+  if(rot[1] != 0) {
+    a = rot[1];
+    sy = sin_degrees(a);
+    cy = cos_degrees(a);
+  }
+  if(rot[0] != 0) {
+    a = rot[0];
+    sx = sin_degrees(a);
+    cx = cos_degrees(a);
+  }
+
+  Matrix3d M;
+  M << cy * cz,  cz *sx *sy - cx * sz,   cx *cz *sy + sx * sz,
+    cy *sz,  cx *cz + sx * sy * sz,  -cz * sx + cx * sy * sz,
+    -sy,       cy *sx,                  cx *cy;
+  
+  Vector3d dum;
+  PyObject *mat = python_matrix(obj,1,dum, M); // 1=rotate
+  if(mat != nullptr) return mat;
 
   DECLARE_INSTANCE
   auto node = std::make_shared<TransformNode>(instance, "rotate");
@@ -613,63 +703,8 @@ PyObject *python_rotate_sub(PyObject *obj, PyObject *val_a)
     PyErr_SetString(PyExc_TypeError, "Invalid type for Object in rotate");
     return NULL;
   }
-  if (PyList_Check(val_a) && PyList_Size(val_a) > 0) {
-    double sx = 0, sy = 0, sz = 0;
-    double cx = 1, cy = 1, cz = 1;
-    double a = 0.0;
-    bool ok = true;
-//    const auto& vec_a = val_a.toVector();
-    switch (PyList_Size(val_a)) {
-    case 3:
-      a = PyFloat_AsDouble(PyList_GetItem(val_a, 2));
-      sz = sin_degrees(a);
-      cz = cos_degrees(a);
-    /* fallthrough */
-    case 2:
-      a = PyFloat_AsDouble(PyList_GetItem(val_a, 1));
-      sy = sin_degrees(a);
-      cy = cos_degrees(a);
-    /* fallthrough */
-    case 1:
-      a = PyFloat_AsDouble(PyList_GetItem(val_a, 0));
-      sx = sin_degrees(a);
-      cx = cos_degrees(a);
-    /* fallthrough */
-    case 0:
-      break;
-    default:
-      PyErr_SetString(PyExc_TypeError, "rotate accepts at most 3 angles");
-      return NULL;
-      break;
+  node->matrix.rotate(M);
 
-    }
-    Matrix3d M;
-    M << cy * cz,  cz *sx *sy - cx * sz,   cx *cz *sy + sx * sz,
-      cy *sz,  cx *cz + sx * sy * sz,  -cz * sx + cx * sy * sz,
-      -sy,       cy *sx,                  cx *cy;
-    node->matrix.rotate(M);
-
-  } else {
-#if 0
-// TODO activate this option (need better par parsing)
-    double a = 0.0;
-    bool aConverted = val_a.getDouble(a);
-    aConverted &= !std::isinf(a) && !std::isnan(a);
-
-    Vector3d v(0, 0, 1);
-    bool vConverted = val_v.getVec3(v[0], v[1], v[2], 0.0);
-    node->matrix.rotate(angle_axis_degrees(aConverted ? a : 0, v));
-    if (val_v.isDefined() && !vConverted) {
-      if (aConverted) {
-        LOG(message_group::Warning, inst->location(), parameters.documentRoot(), "Problem converting rotate(..., v=%1$s) parameter", val_v.toEchoStringNoThrow());
-      } else {
-        LOG(message_group::Warning, inst->location(), parameters.documentRoot(), "Problem converting rotate(a=%1$s, v=%2$s) parameter", val_a.toEchoStringNoThrow(), val_v.toEchoStringNoThrow());
-      }
-    } else if (!aConverted) {
-      LOG(message_group::Warning, inst->location(), parameters.documentRoot(), "Problem converting rotate(a=%1$s) parameter", val_a.toEchoStringNoThrow());
-    }
-#endif // if 0
-  }
 
   node->children.push_back(child);
   return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
@@ -689,10 +724,14 @@ PyObject *python_rotate(PyObject *self, PyObject *args, PyObject *kwargs)
     PyErr_SetString(PyExc_TypeError, "Error during parsing rotate(object, vec3)");
     return NULL;
   }
-
-
-  return python_rotate_sub(obj, val_a);
-
+  Vector3d rot(0,0,0);
+  if (PyList_Check(val_a) && PyList_Size(val_a) > 0) {
+    if(PyList_Size(val_a) >= 1) rot[0]= PyFloat_AsDouble(PyList_GetItem(val_a, 0));
+    if(PyList_Size(val_a) >= 2) rot[1]= PyFloat_AsDouble(PyList_GetItem(val_a, 1));
+    if(PyList_Size(val_a) >= 3) rot[2]= PyFloat_AsDouble(PyList_GetItem(val_a, 2));
+    return python_rotate_sub(obj, rot);
+  }
+  return obj;
 }
 
 PyObject *python_mirror(PyObject *self, PyObject *args, PyObject *kwargs)
@@ -746,59 +785,10 @@ PyObject *python_mirror(PyObject *self, PyObject *args, PyObject *kwargs)
   return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
 }
 
-PyObject *python_matrix(PyObject *mat,int mode, Vector3d vec)
-{
-  // 0=translate	
-  // 1=rotate
-  // check if its a matrix
-  double raw[4][4];
-  if(mat == nullptr) return nullptr;
-  PyObject *row, *cell;
-  double val;
-  double xn, yn, zn;
-  if(!PyList_Check(mat)) return nullptr;
-  if(PyList_Size(mat) != 4) return nullptr;
-  for(int i=0;i<4;i++) {
-    row=PyList_GetItem(mat,i);
-    if(!PyList_Check(row)) return nullptr;
-    if(PyList_Size(row) != 4) return nullptr;
-    for(int j=0;j<4;j++) {
-      cell=PyList_GetItem(row,j);
-      if(python_numberval(cell,&val)) return nullptr;
-      raw[i][j]=val;
-    }
-  }
-  switch(mode) {
-	  case 0: // translate
-		  // col0 = xvec col1=yvec, col2=zvec, col3=trans
-		  xn=raw[0][0]*vec[0]+raw[0][1]*vec[1]+raw[0][2]*vec[2];
-		  yn=raw[1][0]*vec[0]+raw[1][1]*vec[1]+raw[1][2]*vec[2];
-		  zn=raw[2][0]*vec[0]+raw[2][1]*vec[1]+raw[2][2]*vec[2];
-		  raw[0][3] += xn;
-		  raw[1][3] += yn;
-		  raw[2][3] += zn;
-		  break;
-	  case 1: // rotate
-		  // rotx
-		  // roty
-		  // rotz
-		  break;
-  }
-  PyObject *result=PyList_New(4);
-  for(int i=0;i<4;i++) {
-    row=PyList_New(4);
-    for(int j=0;j<4;j++)
-      PyList_SetItem(row,j,PyFloat_FromDouble(raw[i][j]));
-    PyList_SetItem(result,i,row);
-//      Py_XDECREF(row);
-  }
-
-  return result;
-}
-
 PyObject *python_translate_sub(PyObject *obj, Vector3d translatevec)
 {
-  PyObject *mat = python_matrix(obj,0,translatevec); // 0=translate
+  Matrix3d dum;	
+  PyObject *mat = python_matrix(obj,0,translatevec,dum); // 0=translate
   if(mat != nullptr) return mat;
 
   DECLARE_INSTANCE
@@ -810,7 +800,6 @@ PyObject *python_translate_sub(PyObject *obj, Vector3d translatevec)
     return NULL;
   }
 // TODO props auch translaten
-// TODO error handling falsch
 // TODO attributes
   node->matrix.translate(translatevec);
   node->children.push_back(child);
@@ -852,9 +841,6 @@ PyObject *python_dir_sub(PyObject *self, PyObject *args, PyObject *kwargs,int mo
     return NULL;
   }
 
-  DECLARE_INSTANCE
-  auto node = std::make_shared<TransformNode>(instance, "translate");
-  std::shared_ptr<AbstractNode> child;
   if(mode < 6)
   {
     Vector3d trans;
@@ -872,23 +858,12 @@ PyObject *python_dir_sub(PyObject *self, PyObject *args, PyObject *kwargs,int mo
   {
     Vector3d rot;
     switch(mode) {	  
-      case 6: rot = Vector3d(1,0,0);
-      case 7: rot = Vector3d(0,1,0);
-      case 8: rot = Vector3d(0,0,1);
+      case 6: rot = Vector3d(arg,0,0);
+      case 7: rot = Vector3d(0,arg,0);
+      case 8: rot = Vector3d(0,0,arg);
     }		       
-    Matrix3d rots=angle_axis_degrees(arg, rot);
-    node->matrix.rotate(rots);
+    return python_rotate_sub(obj, rot);
   }
-
-
-  child = PyOpenSCADObjectToNodeMulti(obj);
-  if (child == NULL) {
-    PyErr_SetString(PyExc_TypeError, "Invalid type for Object in translate");
-    return NULL;
-  }
-
-  node->children.push_back(child);
-  return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
 }
 
 PyObject *python_right(PyObject *self, PyObject *args, PyObject *kwargs) { return python_dir_sub(self, args,kwargs, 0); }
