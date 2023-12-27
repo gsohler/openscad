@@ -102,16 +102,18 @@ PyObject *PyOpenSCADObjectFromNode(PyTypeObject *type, const std::shared_ptr<Abs
 int python_more_obj(std::vector<std::shared_ptr<AbstractNode>>& children, PyObject *more_obj) {
   int i, n;
   PyObject *obj;
+  PyObject *dummy_dict;
   std::shared_ptr<AbstractNode> child;
   if (PyList_Check(more_obj)) {
     n = PyList_Size(more_obj);
     for (i = 0; i < n; i++) {
+
       obj = PyList_GetItem(more_obj, i);
-      child = PyOpenSCADObjectToNode(obj);
+      child = PyOpenSCADObjectToNode(obj, &dummy_dict);
       children.push_back(child);
     }
   } else if (Py_TYPE(more_obj) == &PyOpenSCADType) {
-    child = PyOpenSCADObjectToNode(more_obj);
+    child = PyOpenSCADObjectToNode(more_obj, &dummy_dict);
     children.push_back(child);
   } else return 1;
   return 0;
@@ -121,7 +123,7 @@ int python_more_obj(std::vector<std::shared_ptr<AbstractNode>>& children, PyObje
  *  extracts Absrtract Node from PyOpenSCAD Object
  */
 
-std::shared_ptr<AbstractNode> PyOpenSCADObjectToNode(PyObject *obj)
+std::shared_ptr<AbstractNode> PyOpenSCADObjectToNode(PyObject *obj, PyObject **dict)
 {
   std::shared_ptr<AbstractNode> result = ((PyOpenSCADObject *) obj)->node;
   if(result.use_count() > 2) {
@@ -135,13 +137,14 @@ std::shared_ptr<AbstractNode> PyOpenSCADObjectToNode(PyObject *obj)
  * same as  python_more_obj but always returns only one AbstractNode by creating an UNION operation
  */
 
-std::shared_ptr<AbstractNode> PyOpenSCADObjectToNodeMulti(PyObject *objs)
+std::shared_ptr<AbstractNode> PyOpenSCADObjectToNodeMulti(PyObject *objs,PyObject **dict)
 {
   std::shared_ptr<AbstractNode> result;
   if (Py_TYPE(objs) == &PyOpenSCADType) {
     result = ((PyOpenSCADObject *) objs)->node;
     if(result.use_count() > 2) {
 	    result = result->clone();
+	    *dict =  ((PyOpenSCADObject *) objs)->dict;
     }
   } else if (PyList_Check(objs)) {
     DECLARE_INSTANCE
@@ -151,11 +154,12 @@ std::shared_ptr<AbstractNode> PyOpenSCADObjectToNodeMulti(PyObject *objs)
     for (int i = 0; i < n; i++) {
       PyObject *obj = PyList_GetItem(objs, i);
       if(Py_TYPE(obj) ==  &PyOpenSCADType) {
-        std::shared_ptr<AbstractNode> child = PyOpenSCADObjectToNode(obj);
+        std::shared_ptr<AbstractNode> child = PyOpenSCADObjectToNode(obj,dict);
         node->children.push_back(child);
       } else return nullptr;
     }
     result=node;
+    *dict = nullptr; // TODO improve
   } else result=nullptr;
   return result;
 }
@@ -420,6 +424,7 @@ PyObject *python_callfunction(const std::shared_ptr<const Context> &cxt , const 
 std::shared_ptr<AbstractNode> python_modulefunc(const ModuleInstantiation *op_module,const std::shared_ptr<const Context> &cxt, int *modulefound)
 {
    *modulefound=0;
+  PyObject *dummydict;   
   std::shared_ptr<AbstractNode> result=nullptr;
   const char *errorstr = nullptr;
   {
@@ -431,7 +436,7 @@ std::shared_ptr<AbstractNode> python_modulefunc(const ModuleInstantiation *op_mo
     *modulefound=1;
     if(funcresult == nullptr) return nullptr;
 
-    if(funcresult->ob_type == &PyOpenSCADType) result=PyOpenSCADObjectToNode(funcresult);
+    if(funcresult->ob_type == &PyOpenSCADType) result=PyOpenSCADObjectToNode(funcresult, &dummydict);
     Py_XDECREF(funcresult);
   }
   return result;
@@ -631,6 +636,7 @@ sys.stderr = stderr_bak\n\
     PyObject *key, *value;
     Py_ssize_t pos = 0;
     PyObject *pFunc;
+
     if(result  == nullptr) PyErr_Print();
     PyRun_SimpleString(python_exit_code);
 
@@ -670,13 +676,9 @@ sys.stderr = stderr_bak\n\
 
     return error;
 }
-PyObject *python__getitem__(PyObject *dict, PyObject *key);
-int python__setitem__(PyObject *dict, PyObject *key, PyObject *v);
-
 /*
  * the magical Python Type descriptor for an OpenSCAD Object. Adding more fields makes the type more powerful
  */
-
 
 PyTypeObject PyOpenSCADType = {
     PyVarObject_HEAD_INIT(nullptr, 0)
@@ -685,8 +687,8 @@ PyTypeObject PyOpenSCADType = {
     0,                         			/* tp_itemsize */
     (destructor) PyOpenSCADObject_dealloc,	/* tp_dealloc */
     0,                         			/* vectorcall_offset */
-    0,                          		/* tp_getattr */
-    0,                  			/* tp_setattr */
+    0,                         			/* tp_getattr */
+    0,                         			/* tp_setattr */
     0,                         			/* tp_as_async */
     python_str,               			/* tp_repr */
     &PyOpenSCADNumbers,        			/* tp_as_number */
