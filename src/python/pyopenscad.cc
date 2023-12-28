@@ -144,8 +144,8 @@ std::shared_ptr<AbstractNode> PyOpenSCADObjectToNodeMulti(PyObject *objs,PyObjec
     result = ((PyOpenSCADObject *) objs)->node;
     if(result.use_count() > 2) {
 	    result = result->clone();
-	    *dict =  ((PyOpenSCADObject *) objs)->dict;
     }
+    *dict =  ((PyOpenSCADObject *) objs)->dict;
   } else if (PyList_Check(objs)) {
     DECLARE_INSTANCE
     auto node = std::make_shared<CsgOpNode>(instance, OpenSCADOperator::UNION);

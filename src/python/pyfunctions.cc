@@ -655,7 +655,7 @@ PyObject *python_matrix(PyObject *mat,int mode, Vector3d transvec, Matrix3d rotv
 
 PyObject *python_rotate_sub(PyObject *obj, Vector3d rot)
 {
-  PyObject *dummydict;
+  PyObject *child_dict;
   double sx = 0, sy = 0, sz = 0;
   double cx = 1, cy = 1, cz = 1;
   double a = 0.0;
@@ -689,16 +689,25 @@ PyObject *python_rotate_sub(PyObject *obj, Vector3d rot)
   DECLARE_INSTANCE
   auto node = std::make_shared<TransformNode>(instance, "rotate");
 
-  std::shared_ptr<AbstractNode> child = PyOpenSCADObjectToNodeMulti(obj, &dummydict);
+  std::shared_ptr<AbstractNode> child = PyOpenSCADObjectToNodeMulti(obj, &child_dict);
   if (child == NULL) {
     PyErr_SetString(PyExc_TypeError, "Invalid type for Object in rotate");
     return NULL;
   }
   node->matrix.rotate(M);
 
-
   node->children.push_back(child);
-  return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
+  PyObject *pyresult =  PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
+  if(child_dict != nullptr) {
+    PyObject *key, *value;
+    Py_ssize_t pos = 0;
+     while(PyDict_Next(child_dict, &pos, &key, &value)) {
+       PyObject *value1 = python_matrix(value,1,dum,M);
+       if(value1 != nullptr) PyDict_SetItem(((PyOpenSCADObject *) pyresult)->dict,key, value1);
+       else PyDict_SetItem(((PyOpenSCADObject *) pyresult)->dict,key, value);
+    }
+  }
+  return pyresult;
 }
 
 PyObject *python_rotate(PyObject *self, PyObject *args, PyObject *kwargs)
@@ -798,18 +807,13 @@ PyObject *python_translate_sub(PyObject *obj, Vector3d translatevec)
 
   node->children.push_back(child);
   PyObject *pyresult = PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
-  if(child_dict != nullptr) {
+  if(child_dict != nullptr) { // TODO dies ueberall
     PyObject *key, *value;
-     Py_ssize_t pos = 0;
+    Py_ssize_t pos = 0;
      while(PyDict_Next(child_dict, &pos, &key, &value)) {
        PyObject *value1 = python_matrix(value,0,translatevec,dum);
-       if(value1 != nullptr) {
-         PyObject* value1 = PyUnicode_AsEncodedString(key, "utf-8", "~");
-         const char *value_str =  PyBytes_AS_STRING(value1);
-         printf("dict name is %s\n",	     value_str);
-	 PyDict_SetItem(((PyOpenSCADObject *) pyresult)->dict,key, Py_None);
-       }
-       	     
+       if(value1 != nullptr) PyDict_SetItem(((PyOpenSCADObject *) pyresult)->dict,key, value1);
+       else PyDict_SetItem(((PyOpenSCADObject *) pyresult)->dict,key, value);
     }
   }
   return pyresult;
@@ -1517,7 +1521,6 @@ PyObject* python_path_extrude(PyObject *self, PyObject *args, PyObject *kwargs)
 PyObject *python_csg_sub(PyObject *self, PyObject *args, PyObject *kwargs, OpenSCADOperator mode)
 {
   DECLARE_INSTANCE
-  std::shared_ptr<AbstractNode> child;
   int i;
   int n;
 
@@ -1525,10 +1528,19 @@ PyObject *python_csg_sub(PyObject *self, PyObject *args, PyObject *kwargs, OpenS
   char *kwlist[] = { "obj", NULL };
   PyObject *objs = NULL;
   PyObject *obj;
-  PyObject *dummydict;	  
+  PyObject *child_dict;	  
+  std::shared_ptr<AbstractNode> child;
+  PyObject *new_dict=PyDict_New();
   for (i = 0; i < PyTuple_Size(args);i++) {
     obj = PyTuple_GetItem(args, i);
-    child = PyOpenSCADObjectToNodeMulti(obj, &dummydict);
+    child = PyOpenSCADObjectToNodeMulti(obj, &child_dict);
+    if(child_dict != nullptr) {
+      PyObject *key, *value;
+      Py_ssize_t pos = 0;
+       while(PyDict_Next(child_dict, &pos, &key, &value)) {
+         PyDict_SetItem(new_dict, key, value);
+      }
+    }
     if(child != NULL) {
       node->children.push_back(child);
     } else {
@@ -1547,7 +1559,11 @@ PyObject *python_csg_sub(PyObject *self, PyObject *args, PyObject *kwargs, OpenS
     }
   }
 
-  return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
+  PyObject *pyresult =PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
+  Py_XDECREF(((PyOpenSCADObject *) pyresult)->dict);
+  ((PyOpenSCADObject *) pyresult)->dict=new_dict;
+  // TODO new_dict ueberschreiben
+  return pyresult;
 }
 
 PyObject *python_union(PyObject *self, PyObject *args, PyObject *kwargs)
