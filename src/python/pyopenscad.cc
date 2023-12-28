@@ -680,6 +680,23 @@ sys.stderr = stderr_bak\n\
  * the magical Python Type descriptor for an OpenSCAD Object. Adding more fields makes the type more powerful
  */
 
+
+int python__setitem__(PyObject *dict, PyObject *key, PyObject *v);
+PyObject *python__getitem__(PyObject *dict, PyObject *key);
+
+PyObject *python__getattro__(PyObject *dict, PyObject *key)
+{
+	PyObject *result=python__getitem__(dict,key);
+	if(result == Py_None || result == nullptr)  result = PyObject_GenericGetAttr(dict,key);
+	return result;
+}
+
+int python__setattro__(PyObject *dict, PyObject *key, PyObject *v)
+{
+	return python__setitem__(dict, key, v);
+}
+
+
 PyTypeObject PyOpenSCADType = {
     PyVarObject_HEAD_INIT(nullptr, 0)
     "PyOpenSCAD",             			/* tp_name */
@@ -697,8 +714,8 @@ PyTypeObject PyOpenSCADType = {
     0,                         			/* tp_hash  */
     0,                         			/* tp_call */
     python_str,                			/* tp_str */
-    0,                         			/* tp_getattro */
-    0,                         			/* tp_setattro */
+    python__getattro__,      		/* tp_getattro */
+    python__setattro__,  			/* tp_setattro */
     0,                         			/* tp_as_buffer */
     Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,	/* tp_flags */
     "PyOpenSCAD Object",          		/* tp_doc */

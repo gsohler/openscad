@@ -801,8 +801,6 @@ PyObject *python_translate_sub(PyObject *obj, Vector3d translatevec)
     PyErr_SetString(PyExc_TypeError, "Invalid type for Object in translate");
     return NULL;
   }
-// TODO props auch translaten
-// TODO attributes
   node->matrix.translate(translatevec);
 
   node->children.push_back(child);
@@ -1562,7 +1560,6 @@ PyObject *python_csg_sub(PyObject *self, PyObject *args, PyObject *kwargs, OpenS
   PyObject *pyresult =PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
   Py_XDECREF(((PyOpenSCADObject *) pyresult)->dict);
   ((PyOpenSCADObject *) pyresult)->dict=new_dict;
-  // TODO new_dict ueberschreiben
   return pyresult;
 }
 
