@@ -1532,7 +1532,7 @@ PyObject *python_csg_sub(PyObject *self, PyObject *args, PyObject *kwargs, OpenS
   for (i = 0; i < PyTuple_Size(args);i++) {
     obj = PyTuple_GetItem(args, i);
     child = PyOpenSCADObjectToNodeMulti(obj, &child_dict);
-    if(child_dict != nullptr) {
+    if(child_dict != nullptr && i == 1) {
       PyObject *key, *value;
       Py_ssize_t pos = 0;
        while(PyDict_Next(child_dict, &pos, &key, &value)) {
@@ -1582,29 +1582,38 @@ PyObject *python_nb_sub(PyObject *arg1, PyObject *arg2, OpenSCADOperator mode)
 {
   DECLARE_INSTANCE
   std::shared_ptr<AbstractNode> child;
-  PyObject *dummydict;	  
+  PyObject *child_dict;	  
+  PyObject *dummy_dict;	  
 
   double x, y, z;
-
   if(arg1 == Py_None && mode == OpenSCADOperator::UNION) return arg2;
   if(arg2 == Py_None && mode == OpenSCADOperator::UNION) return arg1;
   if(arg2 == Py_None && mode == OpenSCADOperator::DIFFERENCE) return arg1;
 
   auto node = std::make_shared<CsgOpNode>(instance, mode);
 
-  child = PyOpenSCADObjectToNodeMulti(arg1, &dummydict);
+  child = PyOpenSCADObjectToNodeMulti(arg1, &child_dict);
   if (child == NULL) {
     PyErr_SetString(PyExc_TypeError, "invalid argument left to operator");
     return NULL;
   }
   node->children.push_back(child);
-  child = PyOpenSCADObjectToNodeMulti(arg2, &dummydict);
+  child = PyOpenSCADObjectToNodeMulti(arg2, &dummy_dict);
   if (child == NULL) {
     PyErr_SetString(PyExc_TypeError, "invalid argument right to operator");
     return NULL;
   }
   node->children.push_back(child);
-  return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
+  PyObject *pyresult = PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
+  if(child_dict != nullptr) {
+    PyObject *key, *value;
+    Py_ssize_t pos = 0;
+     while(PyDict_Next(child_dict, &pos, &key, &value)) {
+       PyDict_SetItem(((PyOpenSCADObject *) pyresult)->dict,key, value);
+    }
+  }
+
+  return pyresult;
 }
 
 PyObject *python_nb_sub_vec3(PyObject *arg1, PyObject *arg2, int mode) // 0: translate, 1: scale
