@@ -358,8 +358,6 @@ std::vector<SelectedObject> CGALRenderer::findModelObject(Vector3d near_pt, Vect
   double dist_nearest=NAN;
   Vector3d pt1_nearest;
   Vector3d pt2_nearest;
-  for (const auto& p : this->getPolyhedrons()) {
-  }
   for (const std::shared_ptr<const PolySet>& ps : this->polysets) {
     for(const Vector3d &pt: ps->vertices) {
       double dist_pt= calculateLinePointDistance(near_pt, far_pt, pt, dist_near);
@@ -398,7 +396,6 @@ std::vector<SelectedObject> CGALRenderer::findModelObject(Vector3d near_pt, Vect
    }
 
   if(!isnan(dist_nearest)) {
-//    printf("Found one line\n");	  
     SelectedObject obj;
     obj.type = SELECTION_LINE;
     obj.p1=pt1_nearest;

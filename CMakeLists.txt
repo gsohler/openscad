@@ -1085,6 +1085,7 @@ set(GUI_SOURCES
   src/gui/LaunchingScreen.cc
   src/gui/LibraryInfoDialog.cc
   src/gui/MainWindow.cc
+  src/gui/Measurement.cc
   src/gui/Animate.cc
   src/gui/MouseSelector.cc
   src/gui/OctoPrint.cc

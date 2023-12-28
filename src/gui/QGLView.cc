@@ -57,6 +57,7 @@
 #endif
 
 #include "qt-obsolete.h"
+#include "Measurement.h"
 
 QGLView::QGLView(QWidget *parent) : QOpenGLWidget(parent)
 {
@@ -286,7 +287,7 @@ void QGLView::normalizeAngle(GLdouble& angle)
 void QGLView::mouseMoveEvent(QMouseEvent *event)
 {
   auto this_mouse = event->globalPos();
-  if(measure_state != 0) {
+  if(measure_state != MEASURE_IDLE) {
 	QPoint pt = event->pos();
   	this->shown_obj = findObject(pt.x(), pt.y());
 	update();
@@ -534,14 +535,14 @@ std::vector<SelectedObject> QGLView::findObject(int mouse_x,int mouse_y)
 
   gluUnProject(winX, winY, 1, this->modelview, this->projection, viewport,&posXF, &posYF, &posZF);
   gluUnProject(winX, winY, -1, this->modelview, this->projection, viewport,&posXN, &posYN, &posZN);
-  Vector3d farpt(posXF, posYF, posZF);
-  Vector3d nearpt(posXN, posYN, posZN);
-  Vector3d eyedir=farpt-nearpt;
+  Vector3d far_pt(posXF, posYF, posZF);
+  Vector3d near_pt(posXN, posYN, posZN);
+  Vector3d eyedir=far_pt-near_pt;
 
   Vector3d testpt(0,0,0);
 
   auto renderer = this->getRenderer();
-  return renderer->findModelObject(nearpt, farpt, mouse_x, mouse_y, cam.zoomValue()/300);
+  return renderer->findModelObject(near_pt, far_pt, mouse_x, mouse_y, cam.zoomValue()/300);
 
 }
 
