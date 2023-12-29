@@ -1871,7 +1871,6 @@ PyObject *python_render(PyObject *self, PyObject *args, PyObject *kwargs)
   char *kwlist[] = {"obj", "convexity", NULL};
   PyObject *obj = NULL;
   PyObject *dummydict;	  
-  const char *cutmode = NULL;
   long convexity = 2;
   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O!|i", kwlist,
                                    &PyOpenSCADType, &obj,
@@ -2197,7 +2196,6 @@ PyObject *python_group(PyObject *self, PyObject *args, PyObject *kwargs)
   char *kwlist[] = {"obj", NULL};
   PyObject *obj = NULL;
   PyObject *dummydict;	  
-  const char *cutmode = NULL;
   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O!", kwlist,
                                    &PyOpenSCADType, &obj
                                    )) {
@@ -2208,6 +2206,68 @@ PyObject *python_group(PyObject *self, PyObject *args, PyObject *kwargs)
 
   node->children.push_back(child);
   return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
+}
+
+PyObject *python_attach(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+  std::shared_ptr<AbstractNode> refnode;
+  std::shared_ptr<AbstractNode> dstnode;
+
+  char *kwlist[] = {"ref","refhandle","dst","dsthandle",NULL};
+  PyObject *ref = NULL, *dst=NULL;
+  PyObject *dummydict;	  
+  const char *refhandle=NULL;
+  const char *dsthandle=NULL;
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O!sO!|s", kwlist,
+                                   &PyOpenSCADType, &ref, &refhandle,
+                                   &PyOpenSCADType, &dst, &dsthandle
+                                   )) {
+    PyErr_SetString(PyExc_TypeError, "Error during attach");
+    return NULL;
+  }
+  refnode = PyOpenSCADObjectToNode(ref, &dummydict);
+  dstnode = PyOpenSCADObjectToNode(dst, &dummydict);
+
+  std::string instance_name_trans;
+  AssignmentList inst_asslist_trans;
+  ModuleInstantiation *instance_trans = new ModuleInstantiation(instance_name_trans,inst_asslist_trans, Location::NONE);
+  PyObject *mat = PyDict_GetItemString(((PyOpenSCADObject *) ref)->dict, refhandle);
+  if(mat == nullptr) return Py_None;
+  Py_INCREF(mat);
+
+  double raw[4][4];
+  PyObject *row, *cell;
+  double val;
+  if(!PyList_Check(mat)) return Py_None;
+  if(PyList_Size(mat) != 4) return Py_None;
+  for(int i=0;i<4;i++) {
+    row=PyList_GetItem(mat,i);
+    if(!PyList_Check(row)) return Py_None;
+    if(PyList_Size(row) != 4) return Py_None;
+    for(int j=0;j<4;j++) {
+      cell=PyList_GetItem(row,j);
+      if(python_numberval(cell,&val)) return Py_None;
+      raw[i][j]=val;
+    }
+  }
+  Py_XDECREF(mat);
+
+  auto transnode = std::make_shared<TransformNode>(instance_trans, "translate");
+  transnode->children.push_back(dstnode);
+  Matrix4d M;
+  M << 
+	  raw[0][0], raw[0][1], raw[0][2], raw[0][3],
+	  raw[1][0], raw[1][1], raw[1][2], raw[1][3],
+	  raw[2][0], raw[2][1], raw[2][2], raw[2][3],
+	  raw[3][0], raw[3][1], raw[3][2], raw[3][3];
+
+  transnode->matrix =M;
+  DECLARE_INSTANCE
+  auto node = std::make_shared<CsgOpNode>(instance,OpenSCADOperator::UNION);
+  node->children.push_back(refnode);
+  node->children.push_back(transnode);
+  ((PyOpenSCADObject *) ref)->node = node;
+  return Py_None;
 }
 
 PyObject *do_import_python(PyObject *self, PyObject *args, PyObject *kwargs, ImportType type)
@@ -2472,6 +2532,7 @@ PyMethodDef PyOpenSCADFunctions[] = {
   {"version", (PyCFunction) python_version, METH_VARARGS | METH_KEYWORDS, "Output openscad Version."},
   {"version_num", (PyCFunction) python_version_num, METH_VARARGS | METH_KEYWORDS, "Output openscad Version."},
   {"add_parameter", (PyCFunction) python_add_parameter, METH_VARARGS | METH_KEYWORDS, "Add Parameter for Customizer."},
+  {"attach", (PyCFunction) python_attach, METH_VARARGS | METH_KEYWORDS, "Attach one object to another."},
   {NULL, NULL, 0, NULL}
 };
 
@@ -2518,6 +2579,7 @@ PyMethodDef PyOpenSCADMethods[] = {
 
   OO_METHOD_ENTRY(mesh, "Mesh Object")	
   OO_METHOD_ENTRY(oversample,"Oversample Object")	
+  OO_METHOD_ENTRY(attach,"Attach Object")	
 
   OO_METHOD_ENTRY(highlight,"Highlight Object")	
   OO_METHOD_ENTRY(background,"Background Object")	
