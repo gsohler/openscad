@@ -1034,16 +1034,19 @@ PyObject *python_output(PyObject *self, PyObject *args, PyObject *kwargs)
   }
   python_result_node = child;
   python_result_handle.clear();
-  python_result_handlename.clear();
   PyObject *key, *value;
   Py_ssize_t pos = 0;
   double raw[16];
+  SelectedObject sel;
   while(PyDict_Next(child_dict, &pos, &key, &value)) {
      if(python_tomatrix(value, raw)) continue;
      PyObject* value1 = PyUnicode_AsEncodedString(key, "utf-8", "~");
      const char *value_str =  PyBytes_AS_STRING(value1);
-     python_result_handle.push_back(Vector3d(raw[3],raw[7],raw[11]));
-     python_result_handlename.push_back(value_str);
+     sel.p1 = Vector3d(raw[3],raw[7],raw[11]);
+     sel.type=SELECTION_HANDLE;
+     sel.name=value_str;
+     python_result_handle.push_back(sel);
+
 
   }
 

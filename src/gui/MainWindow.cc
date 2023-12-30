@@ -93,6 +93,7 @@
 #include <QTemporaryFile>
 #include <QDockWidget>
 #include <QClipboard>
+#include <QToolTip>
 #include <memory>
 #include <string>
 #include "QWordSearchField.h"
@@ -565,6 +566,7 @@ MainWindow::MainWindow(const QStringList& filenames)
   connect(this->qglview, SIGNAL(resized()), viewportControlWidget, SLOT(viewResized()));
   connect(this->qglview, SIGNAL(doRightClick(QPoint)), this, SLOT(rightClick(QPoint)));
   connect(this->qglview, SIGNAL(doLeftClick(QPoint)), this, SLOT(leftClick(QPoint)));
+  connect(this->qglview, SIGNAL(toolTipShow(QPoint,QString)), this, SLOT(toolTipShow(QPoint,QString)));
 
   connect(Preferences::inst(), SIGNAL(requestRedraw()), this->qglview, SLOT(update()));
   connect(Preferences::inst(), SIGNAL(updateMouseCentricZoom(bool)), this->qglview, SLOT(setMouseCentricZoom(bool)));
@@ -758,6 +760,12 @@ void MainWindow::openFileFromPath(const QString& path, int line)
     activeEditor->setFocus();
     activeEditor->setCursorPosition(line, 0);
   }
+}
+
+void MainWindow::toolTipShow(QPoint pt,QString msg)
+{
+  QPoint pos = QCursor::pos();
+  QToolTip::showText(pos,msg,this);
 }
 
 bool MainWindow::isLightTheme(){
@@ -2380,6 +2388,7 @@ void MainWindow::actionMeasureAngle()
 void MainWindow::actionFindHandle()
 {
   meas.startFindHandle();	
+  qglview->handle_mode=true;
 }
 
 void MainWindow::leftClick(QPoint mouse) 
@@ -2476,6 +2485,7 @@ void MainWindow::measureFinished(void)
   this->qglview->shown_obj.clear();
   this->qglview->update();
   this->qglview->measure_state = MEASURE_IDLE;
+  this->qglview->handle_mode=false;
 }
 
 /**

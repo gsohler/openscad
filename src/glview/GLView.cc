@@ -37,6 +37,7 @@ GLView::GLView()
   static int sId = 0;
   this->opencsg_id = sId++;
 #endif
+  this->handle_mode=false;
 }
 
 void GLView::setRenderer(Renderer *r)
@@ -190,14 +191,12 @@ void GLView::paintGL()
   for (const SelectedObject obj: this->shown_obj) {
     showObject(obj,eyedir);
   }
-
-  glColor3f(0,0,1);
-  SelectedObject sel;	  
-  for (const Vector3d pos: python_result_handle) {
-    sel.type=SELECTION_HANDLE;
-    sel.p1=pos;
-    showObject(sel,eyedir);
-  }
+  if(this->handle_mode) {
+    glColor3f(0,0,1);
+    for (const SelectedObject sel: python_result_handle) {
+      showObject(sel,eyedir);
+    }
+  }  
 
   glDisable(GL_LIGHTING);
   if (showaxes) GLView::showSmallaxes(axescolor);
@@ -433,7 +432,7 @@ void GLView::showCrosshairs(const Color4f& col)
 
 void GLView::showObject(const SelectedObject &obj, const Vector3d &eyedir)
 {
-  auto vd = cam.zoomValue()/200.0;
+  auto vd = cam.zoomValue()/150.0;
   switch(obj.type) {
     case SELECTION_POINT:
     case SELECTION_HANDLE:	    

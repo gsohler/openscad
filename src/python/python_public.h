@@ -2,6 +2,7 @@
 #include "node.h"
 #include "src/core/function.h"
 #include "src/geometry/Polygon2d.h"
+#include <Selection.h>
 
 extern bool python_active;
 extern bool python_trusted;
@@ -27,5 +28,4 @@ Outline2d python_getprofile(void *cbfunc, int fn, double arg);
 extern bool pythonMainModuleInitialized;
 extern bool pythonRuntimeInitialized;
 extern std::shared_ptr<AbstractNode> python_result_node;
-extern std::vector<Vector3d> python_result_handle;
-extern std::vector<std::string> python_result_handlename;
+extern std::vector<SelectedObject> python_result_handle;

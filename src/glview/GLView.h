@@ -83,6 +83,7 @@ public:
   void enable_opencsg_shaders();
   virtual void display_opencsg_warning() = 0;
   int opencsg_id;
+  bool  handle_mode;
 #endif
   void showObject(const SelectedObject &pt,const Vector3d &eyedir);
 private:

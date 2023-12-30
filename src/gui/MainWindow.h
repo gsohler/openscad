@@ -312,6 +312,7 @@ public slots:
   void processEvents();
   void jumpToLine(int, int);
   void openFileFromPath(const QString&, int);
+  void toolTipShow(QPoint,QString msg);
 
 #ifdef ENABLE_OPENCSG
   void viewModePreview();

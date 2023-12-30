@@ -30,6 +30,7 @@
 #include "Expression.h"
 #include "PlatformUtils.h"
 #include <Context.h>
+#include <Selection.h>
 
 // #define HAVE_PYTHON_YIELD
 static PyObject *PyInit_openscad(void);
@@ -42,8 +43,7 @@ std::list<std::string> pythonInventory;
 AssignmentList customizer_parameters;
 AssignmentList customizer_parameters_finished;
 std::shared_ptr<AbstractNode> python_result_node = nullptr; /* global result veriable containing the python created result */
-std::vector<Vector3d> python_result_handle;
-std::vector<std::string> python_result_handlename;
+std::vector<SelectedObject> python_result_handle;
 bool python_active;  /* if python is actually used during evaluation */
 bool python_trusted; /* global Python trust flag */
 #include "PlatformUtils.h"
@@ -601,6 +601,7 @@ std::string evaluatePython(const std::string & code)
 {
   std::string error;
   python_result_node = nullptr;
+  python_result_handle.clear();
   PyObject *pyExcType = nullptr;
   PyObject *pyExcValue = nullptr;
   PyObject *pyExcTraceback = nullptr;
