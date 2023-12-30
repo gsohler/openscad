@@ -17,6 +17,7 @@
 #ifdef ENABLE_OPENCSG
 #include <opencsg.h>
 #endif
+#include <python_public.h>
 
 GLView::GLView()
 {
@@ -36,6 +37,7 @@ GLView::GLView()
   static int sId = 0;
   this->opencsg_id = sId++;
 #endif
+  this->handle_mode=false;
 }
 
 void GLView::setRenderer(Renderer *r)
@@ -189,6 +191,13 @@ void GLView::paintGL()
   for (const SelectedObject obj: this->shown_obj) {
     showObject(obj,eyedir);
   }
+  if(this->handle_mode) {
+    glColor3f(0,0,1);
+    for (const SelectedObject sel: python_result_handle) {
+      showObject(sel,eyedir);
+    }
+  }  
+
   glDisable(GL_LIGHTING);
   if (showaxes) GLView::showSmallaxes(axescolor);
 }
@@ -423,9 +432,10 @@ void GLView::showCrosshairs(const Color4f& col)
 
 void GLView::showObject(const SelectedObject &obj, const Vector3d &eyedir)
 {
-  auto vd = cam.zoomValue()/200.0;
+  auto vd = cam.zoomValue()/150.0;
   switch(obj.type) {
     case SELECTION_POINT:
+    case SELECTION_HANDLE:	    
     {
       double n=1/sqrt(3);
       // create an octaeder	   

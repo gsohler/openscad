@@ -247,6 +247,7 @@ private slots:
   void cgalRender();
   void actionMeasureDistance();
   void actionMeasureAngle();
+  void actionFindHandle();
   void actionCheckValidity();
   void actionDisplayAST();
   void actionDisplayCSGTree();
@@ -311,6 +312,7 @@ public slots:
   void processEvents();
   void jumpToLine(int, int);
   void openFileFromPath(const QString&, int);
+  void toolTipShow(QPoint,QString msg);
 
 #ifdef ENABLE_OPENCSG
   void viewModePreview();

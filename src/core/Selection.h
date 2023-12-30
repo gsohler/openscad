@@ -28,11 +28,12 @@
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 
-enum { SELECTION_POINT, SELECTION_LINE};
+enum { SELECTION_POINT, SELECTION_LINE, SELECTION_HANDLE};
 
 struct SelectedObject {
 	int type;
 	Vector3d p1;
 	Vector3d p2;
+	std::string name;
 };
 

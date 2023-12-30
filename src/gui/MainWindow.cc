@@ -93,6 +93,7 @@
 #include <QTemporaryFile>
 #include <QDockWidget>
 #include <QClipboard>
+#include <QToolTip>
 #include <memory>
 #include <string>
 #include "QWordSearchField.h"
@@ -469,6 +470,7 @@ MainWindow::MainWindow(const QStringList& filenames)
   connect(this->designActionRender, SIGNAL(triggered()), this, SLOT(actionRender()));
   connect(this->designActionMeasureDist, SIGNAL(triggered()), this, SLOT(actionMeasureDistance()));
   connect(this->designActionMeasureAngle, SIGNAL(triggered()), this, SLOT(actionMeasureAngle()));
+  connect(this->designActionFindHandle, SIGNAL(triggered()), this, SLOT(actionFindHandle()));
   connect(this->designAction3DPrint, SIGNAL(triggered()), this, SLOT(action3DPrint()));
   connect(this->designCheckValidity, SIGNAL(triggered()), this, SLOT(actionCheckValidity()));
   connect(this->designActionDisplayAST, SIGNAL(triggered()), this, SLOT(actionDisplayAST()));
@@ -564,6 +566,7 @@ MainWindow::MainWindow(const QStringList& filenames)
   connect(this->qglview, SIGNAL(resized()), viewportControlWidget, SLOT(viewResized()));
   connect(this->qglview, SIGNAL(doRightClick(QPoint)), this, SLOT(rightClick(QPoint)));
   connect(this->qglview, SIGNAL(doLeftClick(QPoint)), this, SLOT(leftClick(QPoint)));
+  connect(this->qglview, SIGNAL(toolTipShow(QPoint,QString)), this, SLOT(toolTipShow(QPoint,QString)));
 
   connect(Preferences::inst(), SIGNAL(requestRedraw()), this->qglview, SLOT(update()));
   connect(Preferences::inst(), SIGNAL(updateMouseCentricZoom(bool)), this->qglview, SLOT(setMouseCentricZoom(bool)));
@@ -629,6 +632,7 @@ MainWindow::MainWindow(const QStringList& filenames)
   initActionIcon(designActionPreview, ":/icons/svg-default/preview.svg", ":/icons/svg-default/preview-white.svg");
   initActionIcon(designActionMeasureDist, ":/icons/svg-default/measure-dist.svg", ":/icons/svg-default/measure-dist-white.svg");
   initActionIcon(designActionMeasureAngle, ":/icons/svg-default/measure-ang.svg", ":/icons/svg-default/measure-ang-white.svg");
+  initActionIcon(designActionFindHandle, ":/icons/svg-default/find-handle.svg", ":/icons/svg-default/find-handle-white.svg");
   initActionIcon(fileActionExportSTL, ":/icons/svg-default/export-stl.svg", ":/icons/svg-default/export-stl-white.svg");
   initActionIcon(fileActionExportAMF, ":/icons/svg-default/export-amf.svg", ":/icons/svg-default/export-amf-white.svg");
   initActionIcon(fileActionExport3MF, ":/icons/svg-default/export-3mf.svg", ":/icons/svg-default/export-3mf-white.svg");
@@ -756,6 +760,12 @@ void MainWindow::openFileFromPath(const QString& path, int line)
     activeEditor->setFocus();
     activeEditor->setCursorPosition(line, 0);
   }
+}
+
+void MainWindow::toolTipShow(QPoint pt,QString msg)
+{
+  QPoint pos = QCursor::pos();
+  QToolTip::showText(pos,msg,this);
 }
 
 bool MainWindow::isLightTheme(){
@@ -2375,6 +2385,11 @@ void MainWindow::actionMeasureAngle()
 {
   meas.startMeasureAngle();
 }
+void MainWindow::actionFindHandle()
+{
+  meas.startFindHandle();	
+  qglview->handle_mode=true;
+}
 
 void MainWindow::leftClick(QPoint mouse) 
 {
@@ -2470,6 +2485,7 @@ void MainWindow::measureFinished(void)
   this->qglview->shown_obj.clear();
   this->qglview->update();
   this->qglview->measure_state = MEASURE_IDLE;
+  this->qglview->handle_mode=false;
 }
 
 /**

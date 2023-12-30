@@ -134,5 +134,7 @@
     <file>icons/svg-default/measure-dist-white.svg</file>
     <file>icons/svg-default/measure-ang.svg</file>
     <file>icons/svg-default/measure-ang-white.svg</file>
+    <file>icons/svg-default/find-handle.svg</file>
+    <file>icons/svg-default/find-handle-white.svg</file>
   </qresource>
 </RCC>
