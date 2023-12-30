@@ -27,3 +27,5 @@ Outline2d python_getprofile(void *cbfunc, int fn, double arg);
 extern bool pythonMainModuleInitialized;
 extern bool pythonRuntimeInitialized;
 extern std::shared_ptr<AbstractNode> python_result_node;
+extern std::vector<Vector3d> python_result_handle;
+extern std::vector<std::string> python_result_handlename;

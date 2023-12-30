@@ -48,6 +48,13 @@ void Measurement::startMeasureAngle(void)
   this->qglview->update();
   this->qglview->measure_state=MEASURE_ANG1;
 }
+
+void Measurement::startFindHandle(void)
+{
+  this->qglview->selected_obj.clear();
+  this->qglview->update();
+  this->qglview->measure_state=MEASURE_HANDLE1;
+}
 QString Measurement::statemachine(QPoint mouse) 
 {
   if(qglview->measure_state == MEASURE_IDLE) return "";
@@ -141,6 +148,14 @@ display_angle:
         qglview->shown_obj.clear();
         qglview->update();
         qglview->measure_state = MEASURE_IDLE;
+      }
+      break;
+      case MEASURE_HANDLE1:
+      if(qglview->selected_obj.size() == 1){
+          qglview->selected_obj.clear();
+          qglview->shown_obj.clear();
+          qglview->update();
+          return QString("Handle %1 found").arg(qglview->selected_obj[0].name.c_str());
       }
       break;
   }

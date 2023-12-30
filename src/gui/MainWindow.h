@@ -247,6 +247,7 @@ private slots:
   void cgalRender();
   void actionMeasureDistance();
   void actionMeasureAngle();
+  void actionFindHandle();
   void actionCheckValidity();
   void actionDisplayAST();
   void actionDisplayCSGTree();

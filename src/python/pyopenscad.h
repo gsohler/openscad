@@ -24,8 +24,8 @@ PyMODINIT_FUNC PyInit_PyOpenSCAD(void);
 extern PyTypeObject PyOpenSCADType;
 
 extern std::shared_ptr<AbstractNode> python_result_node;
-extern std::vector<PyObject *> python_orphan_objs;
-
+extern std::vector<Vector3d> python_result_handle;
+extern std::vector<std::string> python_result_handlename;
 
 extern bool python_active;
 extern std::string trusted_edit_document_name;

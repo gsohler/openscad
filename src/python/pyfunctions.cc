@@ -600,54 +600,61 @@ PyObject *python_scale(PyObject *self, PyObject *args, PyObject *kwargs)
   return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
 }
 
+int python_tomatrix(PyObject *mat, double *raw)
+{
+  if(mat == nullptr) return 1;
+  PyObject *row, *cell;
+  double val;
+  if(!PyList_Check(mat)) return 1;
+  if(PyList_Size(mat) != 4) return 1;
+  for(int i=0;i<4;i++) {
+    row=PyList_GetItem(mat,i);
+    if(!PyList_Check(row)) return 1;
+    if(PyList_Size(row) != 4) return 1;
+    for(int j=0;j<4;j++) {
+      cell=PyList_GetItem(row,j);
+      if(python_numberval(cell,&val)) return 1;
+      raw[i*4+j]=val;
+    }
+  }
+  return 0;
+}
+PyObject *python_frommatrix(double *raw) {
+  PyObject *mat=PyList_New(4);
+  PyObject *row;
+  for(int i=0;i<4;i++) {
+    row=PyList_New(4);
+    for(int j=0;j<4;j++)
+      PyList_SetItem(row,j,PyFloat_FromDouble(raw[i*4+j]));
+    PyList_SetItem(mat,i,row);
+//      Py_XDECREF(row);
+  }
+  return mat;
+}
 PyObject *python_matrix(PyObject *mat,int mode, Vector3d transvec, Matrix3d rotvec) // TODO ein arg weniger
 {
   // 0=translate	
   // 1=rotate
-  // check if its a matrix
-  double raw[4][4];
-  if(mat == nullptr) return nullptr;
-  PyObject *row, *cell;
-  double val;
-  if(!PyList_Check(mat)) return nullptr;
-  if(PyList_Size(mat) != 4) return nullptr;
-  for(int i=0;i<4;i++) {
-    row=PyList_GetItem(mat,i);
-    if(!PyList_Check(row)) return nullptr;
-    if(PyList_Size(row) != 4) return nullptr;
-    for(int j=0;j<4;j++) {
-      cell=PyList_GetItem(row,j);
-      if(python_numberval(cell,&val)) return nullptr;
-      raw[i][j]=val;
-    }
-  }
+  double raw[16];
+  if(python_tomatrix(mat, raw)) return nullptr;
   Matrix3d M;
   Vector3d n;
   Transform3d matrix=Transform3d::Identity();
   switch(mode) {
 	  case 0: // translate
 		  // col0 = xvec col1=yvec, col2=zvec, col3=trans
-		  for(int i=0;i<3;i++) raw[i][3] += transvec[i];
+		  for(int i=0;i<3;i++) raw[i*4+3] += transvec[i];
 		  break;
 	  case 1: // rotate
   		matrix.rotate(rotvec);
 		for(int i=0;i<4;i++) {
-		  n =Vector3d(raw[0][i],raw[1][i],raw[2][i]);
+		  n =Vector3d(raw[i],raw[4+i],raw[8+i]);
 		  n = matrix * n;
-		  for(int j=0;j<3;j++) raw[j][i] = n[j];
+		  for(int j=0;j<3;j++) raw[j*4+i] = n[j];
 		}  
 		break;
   }
-  PyObject *result=PyList_New(4);
-  for(int i=0;i<4;i++) {
-    row=PyList_New(4);
-    for(int j=0;j<4;j++)
-      PyList_SetItem(row,j,PyFloat_FromDouble(raw[i][j]));
-    PyList_SetItem(result,i,row);
-//      Py_XDECREF(row);
-  }
-
-  return result;
+  return python_frommatrix(raw);
 }
 
 
@@ -1011,7 +1018,7 @@ PyObject *python_pull(PyObject *self, PyObject *args, PyObject *kwargs)
 PyObject *python_output(PyObject *self, PyObject *args, PyObject *kwargs)
 {
   PyObject *object = NULL;
-  PyObject *dummydict;
+  PyObject *child_dict;
   char *kwlist[] = {"object", NULL};
   std::shared_ptr<AbstractNode> child;
   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O", kwlist,
@@ -1020,12 +1027,26 @@ PyObject *python_output(PyObject *self, PyObject *args, PyObject *kwargs)
     PyErr_SetString(PyExc_TypeError, "Error during parsing output(object)");
     return NULL;
   }
-  child = PyOpenSCADObjectToNodeMulti(object, &dummydict);
+  child = PyOpenSCADObjectToNodeMulti(object, &child_dict);
   if (child == NULL) {
     PyErr_SetString(PyExc_TypeError, "Invalid type for Object in output");
     return NULL;
   }
   python_result_node = child;
+  python_result_handle.clear();
+  python_result_handlename.clear();
+  PyObject *key, *value;
+  Py_ssize_t pos = 0;
+  double raw[16];
+  while(PyDict_Next(child_dict, &pos, &key, &value)) {
+     if(python_tomatrix(value, raw)) continue;
+     PyObject* value1 = PyUnicode_AsEncodedString(key, "utf-8", "~");
+     const char *value_str =  PyBytes_AS_STRING(value1);
+     python_result_handle.push_back(Vector3d(raw[3],raw[7],raw[11]));
+     python_result_handlename.push_back(value_str);
+
+  }
+
   return Py_None;
 }
 
@@ -2233,33 +2254,20 @@ PyObject *python_attach(PyObject *self, PyObject *args, PyObject *kwargs)
   ModuleInstantiation *instance_trans = new ModuleInstantiation(instance_name_trans,inst_asslist_trans, Location::NONE);
   PyObject *mat = PyDict_GetItemString(((PyOpenSCADObject *) ref)->dict, refhandle);
   if(mat == nullptr) return Py_None;
-  Py_INCREF(mat);
 
-  double raw[4][4];
-  PyObject *row, *cell;
-  double val;
-  if(!PyList_Check(mat)) return Py_None;
-  if(PyList_Size(mat) != 4) return Py_None;
-  for(int i=0;i<4;i++) {
-    row=PyList_GetItem(mat,i);
-    if(!PyList_Check(row)) return Py_None;
-    if(PyList_Size(row) != 4) return Py_None;
-    for(int j=0;j<4;j++) {
-      cell=PyList_GetItem(row,j);
-      if(python_numberval(cell,&val)) return Py_None;
-      raw[i][j]=val;
-    }
-  }
+  Py_INCREF(mat);
+  double raw[16];
+  if(python_tomatrix(mat, raw)) return Py_None;
   Py_XDECREF(mat);
 
   auto transnode = std::make_shared<TransformNode>(instance_trans, "translate");
   transnode->children.push_back(dstnode);
   Matrix4d M;
   M << 
-	  raw[0][0], raw[0][1], raw[0][2], raw[0][3],
-	  raw[1][0], raw[1][1], raw[1][2], raw[1][3],
-	  raw[2][0], raw[2][1], raw[2][2], raw[2][3],
-	  raw[3][0], raw[3][1], raw[3][2], raw[3][3];
+	  raw[0], raw[1], raw[2], raw[3],
+	  raw[4], raw[5], raw[6], raw[7],
+	  raw[8], raw[9], raw[10], raw[11],
+	  raw[12], raw[13], raw[14], raw[15];
 
   transnode->matrix =M;
   DECLARE_INSTANCE

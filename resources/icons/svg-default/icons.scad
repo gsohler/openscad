@@ -68,7 +68,8 @@ icons = [
     ["vcr-control-step-forward"],
     ["vcr-control-end"],
     ["measure-dist"],
-    ["measure-ang"]
+    ["measure-ang"],
+    ["find-handle"]
 ];
 
 icon(selected_icon) {
@@ -125,6 +126,7 @@ icon(selected_icon) {
     vcr_control_end();
     measure_dist();
     measure_ang();
+    find_handle();
 }
 
 if (list_icons) {
@@ -769,4 +771,12 @@ module measure_ang() {
     translate([30,30])
     resize([40, 40], true)
     text("45", 40, font = export_font);
+}
+
+module find_handle() {
+    r = 0.4 * width;
+    translate([width / 2, height / 2]) {
+        outline(thin) circle(r = r - thin / 2);
+        
+    }
 }

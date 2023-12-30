@@ -48,6 +48,8 @@
 #include <QOpenGLContext>
 #endif
 #include "OpenCSGWarningDialog.h"
+#include <python_public.h>
+#include <math.h>
 
 #include <cstdio>
 #include <sstream>
@@ -540,9 +542,39 @@ std::vector<SelectedObject> QGLView::findObject(int mouse_x,int mouse_y)
   Vector3d eyedir=far_pt-near_pt;
 
   Vector3d testpt(0,0,0);
+  double tolerance=cam.zoomValue()/300;
+  if(1) {
+    double dist_near;
+    double dist_nearest=NAN;
+    std::string dist_name;
+    int found_ind=-1;
+    for(int i=0;i<python_result_handle.size();i++) 
+    {    
+      double dist_pt= calculateLinePointDistance(near_pt, far_pt, python_result_handle[i], dist_near);
+      if(dist_pt < tolerance  ) {
+        if(isnan(dist_nearest) || dist_near < dist_nearest)
+        {
+          found_ind=i;		
+          dist_nearest=dist_near;
+	  dist_name=python_result_handlename[i];
+	  printf("Found handle %s\n",dist_name.c_str());
+
+        }	  
+      }
+    }
+    if(!isnan(dist_nearest)) {
+      SelectedObject obj;
+      obj.type = SELECTION_HANDLE;
+      obj.p1=python_result_handle[found_ind];
+      obj.name = dist_name;
+      std::vector<SelectedObject> results;
+      results.push_back(obj);
+      return results;
+     }
+  }
 
   auto renderer = this->getRenderer();
-  return renderer->findModelObject(near_pt, far_pt, mouse_x, mouse_y, cam.zoomValue()/300);
+  return renderer->findModelObject(near_pt, far_pt, mouse_x, mouse_y, tolerance);
 
 }
 

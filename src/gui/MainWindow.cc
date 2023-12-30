@@ -469,6 +469,7 @@ MainWindow::MainWindow(const QStringList& filenames)
   connect(this->designActionRender, SIGNAL(triggered()), this, SLOT(actionRender()));
   connect(this->designActionMeasureDist, SIGNAL(triggered()), this, SLOT(actionMeasureDistance()));
   connect(this->designActionMeasureAngle, SIGNAL(triggered()), this, SLOT(actionMeasureAngle()));
+  connect(this->designActionFindHandle, SIGNAL(triggered()), this, SLOT(actionFindHandle()));
   connect(this->designAction3DPrint, SIGNAL(triggered()), this, SLOT(action3DPrint()));
   connect(this->designCheckValidity, SIGNAL(triggered()), this, SLOT(actionCheckValidity()));
   connect(this->designActionDisplayAST, SIGNAL(triggered()), this, SLOT(actionDisplayAST()));
@@ -629,6 +630,7 @@ MainWindow::MainWindow(const QStringList& filenames)
   initActionIcon(designActionPreview, ":/icons/svg-default/preview.svg", ":/icons/svg-default/preview-white.svg");
   initActionIcon(designActionMeasureDist, ":/icons/svg-default/measure-dist.svg", ":/icons/svg-default/measure-dist-white.svg");
   initActionIcon(designActionMeasureAngle, ":/icons/svg-default/measure-ang.svg", ":/icons/svg-default/measure-ang-white.svg");
+  initActionIcon(designActionFindHandle, ":/icons/svg-default/find-handle.svg", ":/icons/svg-default/find-handle-white.svg");
   initActionIcon(fileActionExportSTL, ":/icons/svg-default/export-stl.svg", ":/icons/svg-default/export-stl-white.svg");
   initActionIcon(fileActionExportAMF, ":/icons/svg-default/export-amf.svg", ":/icons/svg-default/export-amf-white.svg");
   initActionIcon(fileActionExport3MF, ":/icons/svg-default/export-3mf.svg", ":/icons/svg-default/export-3mf-white.svg");
@@ -2374,6 +2376,10 @@ void MainWindow::actionMeasureDistance()
 void MainWindow::actionMeasureAngle()
 {
   meas.startMeasureAngle();
+}
+void MainWindow::actionFindHandle()
+{
+  meas.startFindHandle();	
 }
 
 void MainWindow::leftClick(QPoint mouse) 

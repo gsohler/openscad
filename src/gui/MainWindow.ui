@@ -176,6 +176,7 @@
          <addaction name="viewActionResetView"/>
          <addaction name="designActionMeasureDist"/>
          <addaction name="designActionMeasureAngle"/>
+         <addaction name="designActionFindHandle"/>
          <addaction name="separator"/>
          <addaction name="viewActionRight"/>
          <addaction name="viewActionLeft"/>
@@ -314,6 +315,7 @@
     <addaction name="designAction3DPrint"/>
     <addaction name="designActionMeasureDist"/>
     <addaction name="designActionMeasureAngle"/>
+    <addaction name="designActionFindHandle"/>
     <addaction name="separator"/>
     <addaction name="designCheckValidity"/>
     <addaction name="designActionDisplayAST"/>
@@ -1001,6 +1003,11 @@
    </property>
    <property name="shortcut">
     <string>a</string>
+   </property>
+  </action>
+  <action name="designActionFindHandle">
+   <property name="text">
+    <string>Find Handle</string>
    </property>
   </action>
   <action name="designCheckValidity">
