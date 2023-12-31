@@ -2232,53 +2232,84 @@ PyObject *python_group(PyObject *self, PyObject *args, PyObject *kwargs)
   return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
 }
 
-PyObject *python_attach(PyObject *self, PyObject *args, PyObject *kwargs)
+ 
+PyObject *python_orient(PyObject *self, PyObject *args, PyObject *kwargs)
 {
-  std::shared_ptr<AbstractNode> refnode;
   std::shared_ptr<AbstractNode> dstnode;
 
-  char *kwlist[] = {"ref","refhandle","dst","dsthandle",NULL};
-  PyObject *ref = NULL, *dst=NULL;
-  PyObject *dummydict;	  
-  const char *refhandle=NULL;
-  const char *dsthandle=NULL;
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O!sO!|s", kwlist,
-                                   &PyOpenSCADType, &ref, &refhandle,
-                                   &PyOpenSCADType, &dst, &dsthandle
+  char *kwlist[] = {"dst","refmat","dstmat",NULL};
+  PyObject *dst=NULL;
+  PyObject *child_dict;	  
+  PyObject *refmat=NULL;
+  PyObject *dstmat=NULL;
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OO|O", kwlist,
+                                   &dst, 
+				   &refmat,
+				   &dstmat
                                    )) {
-    PyErr_SetString(PyExc_TypeError, "Error during attach");
+    PyErr_SetString(PyExc_TypeError, "Error during orient");
     return NULL;
   }
-  refnode = PyOpenSCADObjectToNode(ref, &dummydict);
-  dstnode = PyOpenSCADObjectToNode(dst, &dummydict);
+  dstnode = PyOpenSCADObjectToNode(dst, &child_dict);
+  if(dstnode == nullptr) {
+    PyErr_SetString(PyExc_TypeError, "Invalid orient object");
+    return Py_None;
+  }
+  DECLARE_INSTANCE
+  auto multmatnode = std::make_shared<TransformNode>(instance, "orient");
+  multmatnode->children.push_back(dstnode);
 
-  std::string instance_name_trans;
-  AssignmentList inst_asslist_trans;
-  ModuleInstantiation *instance_trans = new ModuleInstantiation(instance_name_trans,inst_asslist_trans, Location::NONE);
-  PyObject *mat = PyDict_GetItemString(((PyOpenSCADObject *) ref)->dict, refhandle);
-  if(mat == nullptr) return Py_None;
-
-  Py_INCREF(mat);
   double raw[16];
-  if(python_tomatrix(mat, raw)) return Py_None;
-  Py_XDECREF(mat);
-
-  auto transnode = std::make_shared<TransformNode>(instance_trans, "translate");
-  transnode->children.push_back(dstnode);
   Matrix4d M;
-  M << 
+
+  if(refmat != nullptr) {
+    Py_INCREF(refmat);
+    if(python_tomatrix(refmat, raw)) return Py_None;
+    Py_XDECREF(refmat); 
+
+    M << 
 	  raw[0], raw[1], raw[2], raw[3],
 	  raw[4], raw[5], raw[6], raw[7],
 	  raw[8], raw[9], raw[10], raw[11],
 	  raw[12], raw[13], raw[14], raw[15];
+    multmatnode -> matrix = M ;
+  }
 
-  transnode->matrix =M;
-  DECLARE_INSTANCE
-  auto node = std::make_shared<CsgOpNode>(instance,OpenSCADOperator::UNION);
-  node->children.push_back(refnode);
-  node->children.push_back(transnode);
-  ((PyOpenSCADObject *) ref)->node = node;
-  return Py_None;
+  if(dstmat != nullptr) {
+    Py_INCREF(dstmat);
+    if(python_tomatrix(dstmat, raw)) return Py_None;
+    Py_XDECREF(dstmat); 
+
+    M << 
+	  raw[0], raw[1], raw[2], raw[3],
+	  raw[4], raw[5], raw[6], raw[7],
+	  raw[8], raw[9], raw[10], raw[11],
+	  raw[12], raw[13], raw[14], raw[15];
+    multmatnode -> matrix *= M.inverse() ;
+  }
+
+  PyObject *pyresult =PyOpenSCADObjectFromNode(&PyOpenSCADType, multmatnode);
+  if(child_dict != nullptr) {
+    Matrix4d M1;
+    PyObject *key, *value;
+    Py_ssize_t pos = 0;
+     while(PyDict_Next(child_dict, &pos, &key, &value)) {
+       if(!python_tomatrix(value, raw)){
+	 M1  << 
+	   raw[0], raw[1], raw[2], raw[3],
+	   raw[4], raw[5], raw[6], raw[7],
+	   raw[8], raw[9], raw[10], raw[11],
+	   raw[12], raw[13], raw[14], raw[15];
+//         M1 = M1 * ( multmatnode -> matrix);   TODO activate
+         for(int i=0;i<4;i++)
+           for(int j=0;j<4;j++)
+             raw[i*4+j]=M1(i,j);		         
+         PyDict_SetItem(((PyOpenSCADObject *) pyresult)->dict,key, python_frommatrix(raw));
+       } else PyDict_SetItem(((PyOpenSCADObject *) pyresult)->dict,key, value);
+    }
+  }
+
+  return pyresult;
 }
 
 PyObject *do_import_python(PyObject *self, PyObject *args, PyObject *kwargs, ImportType type)
@@ -2543,7 +2574,7 @@ PyMethodDef PyOpenSCADFunctions[] = {
   {"version", (PyCFunction) python_version, METH_VARARGS | METH_KEYWORDS, "Output openscad Version."},
   {"version_num", (PyCFunction) python_version_num, METH_VARARGS | METH_KEYWORDS, "Output openscad Version."},
   {"add_parameter", (PyCFunction) python_add_parameter, METH_VARARGS | METH_KEYWORDS, "Add Parameter for Customizer."},
-  {"attach", (PyCFunction) python_attach, METH_VARARGS | METH_KEYWORDS, "Attach one object to another."},
+  {"orient", (PyCFunction) python_orient, METH_VARARGS | METH_KEYWORDS, "Orient Object to another."},
   {NULL, NULL, 0, NULL}
 };
 
@@ -2590,7 +2621,7 @@ PyMethodDef PyOpenSCADMethods[] = {
 
   OO_METHOD_ENTRY(mesh, "Mesh Object")	
   OO_METHOD_ENTRY(oversample,"Oversample Object")	
-  OO_METHOD_ENTRY(attach,"Attach Object")	
+  OO_METHOD_ENTRY(orient,"Orient Object to another")	
 
   OO_METHOD_ENTRY(highlight,"Highlight Object")	
   OO_METHOD_ENTRY(background,"Background Object")	
