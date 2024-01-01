@@ -2239,7 +2239,7 @@ PyObject *python_orient(PyObject *self, PyObject *args, PyObject *kwargs)
 
   char *kwlist[] = {"dst","refmat","dstmat",NULL};
   PyObject *dst=NULL;
-  PyObject *child_dict;	  
+  PyObject *child_dict=nullptr;	  
   PyObject *refmat=NULL;
   PyObject *dstmat=NULL;
   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OO|O", kwlist,
@@ -2260,6 +2260,7 @@ PyObject *python_orient(PyObject *self, PyObject *args, PyObject *kwargs)
   multmatnode->children.push_back(dstnode);
 
   double raw[16];
+  Matrix4d MT=Matrix4d::Identity();
   Matrix4d M;
 
   if(refmat != nullptr) {
@@ -2272,7 +2273,7 @@ PyObject *python_orient(PyObject *self, PyObject *args, PyObject *kwargs)
 	  raw[4], raw[5], raw[6], raw[7],
 	  raw[8], raw[9], raw[10], raw[11],
 	  raw[12], raw[13], raw[14], raw[15];
-    multmatnode -> matrix = M ;
+    MT = MT * M;	  
   }
 
   if(dstmat != nullptr) {
@@ -2285,8 +2286,9 @@ PyObject *python_orient(PyObject *self, PyObject *args, PyObject *kwargs)
 	  raw[4], raw[5], raw[6], raw[7],
 	  raw[8], raw[9], raw[10], raw[11],
 	  raw[12], raw[13], raw[14], raw[15];
-    multmatnode -> matrix *= M.inverse() ;
+    MT = MT * M.inverse();	  
   }
+  multmatnode -> matrix = MT ;
 
   PyObject *pyresult =PyOpenSCADObjectFromNode(&PyOpenSCADType, multmatnode);
   if(child_dict != nullptr) {
@@ -2294,13 +2296,15 @@ PyObject *python_orient(PyObject *self, PyObject *args, PyObject *kwargs)
     PyObject *key, *value;
     Py_ssize_t pos = 0;
      while(PyDict_Next(child_dict, &pos, &key, &value)) {
+       PyObject* value1 = PyUnicode_AsEncodedString(key, "utf-8", "~");
+       const char *value_str =  PyBytes_AS_STRING(value1);
        if(!python_tomatrix(value, raw)){
 	 M1  << 
 	   raw[0], raw[1], raw[2], raw[3],
 	   raw[4], raw[5], raw[6], raw[7],
 	   raw[8], raw[9], raw[10], raw[11],
 	   raw[12], raw[13], raw[14], raw[15];
-//         M1 = M1 * ( multmatnode -> matrix);   TODO activate
+         M1 = MT * M1;
          for(int i=0;i<4;i++)
            for(int j=0;j<4;j++)
              raw[i*4+j]=M1(i,j);		         
@@ -2308,7 +2312,6 @@ PyObject *python_orient(PyObject *self, PyObject *args, PyObject *kwargs)
        } else PyDict_SetItem(((PyOpenSCADObject *) pyresult)->dict,key, value);
     }
   }
-
   return pyresult;
 }
 

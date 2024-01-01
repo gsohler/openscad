@@ -131,6 +131,7 @@ std::shared_ptr<AbstractNode> PyOpenSCADObjectToNode(PyObject *obj, PyObject **d
   if(result.use_count() > 2) {
     result = result->clone();
   }
+  *dict =  ((PyOpenSCADObject *) obj)->dict;
   return result;
 }
 
