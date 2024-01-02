@@ -600,57 +600,56 @@ PyObject *python_scale(PyObject *self, PyObject *args, PyObject *kwargs)
   return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
 }
 
-int python_tomatrix(PyObject *mat, double *raw)
+int python_tomatrix(PyObject *pyt, Matrix4d &mat)
 {
-  if(mat == nullptr) return 1;
+  if(pyt == nullptr) return 1;
   PyObject *row, *cell;
   double val;
-  if(!PyList_Check(mat)) return 1;
-  if(PyList_Size(mat) != 4) return 1;
+  if(!PyList_Check(pyt)) return 1;
+  if(PyList_Size(pyt) != 4) return 1;
   for(int i=0;i<4;i++) {
-    row=PyList_GetItem(mat,i);
+    row=PyList_GetItem(pyt,i);
     if(!PyList_Check(row)) return 1;
     if(PyList_Size(row) != 4) return 1;
     for(int j=0;j<4;j++) {
       cell=PyList_GetItem(row,j);
       if(python_numberval(cell,&val)) return 1;
-      raw[i*4+j]=val;
+      mat(i,j)=val;
     }
   }
   return 0;
 }
-PyObject *python_frommatrix(double *raw) {
-  PyObject *mat=PyList_New(4);
+PyObject *python_frommatrix(const Matrix4d &mat) {
+  PyObject *pyo=PyList_New(4);
   PyObject *row;
   for(int i=0;i<4;i++) {
     row=PyList_New(4);
     for(int j=0;j<4;j++)
-      PyList_SetItem(row,j,PyFloat_FromDouble(raw[i*4+j]));
-    PyList_SetItem(mat,i,row);
+      PyList_SetItem(row,j,PyFloat_FromDouble(mat(i,j)));
+    PyList_SetItem(pyo,i,row);
 //      Py_XDECREF(row);
   }
-  return mat;
+  return pyo;
 }
 PyObject *python_matrix(PyObject *mat,int mode, Vector3d transvec, Matrix3d rotvec) // TODO ein arg weniger
 {
   // 0=translate	
   // 1=rotate
-  double raw[16];
+  Matrix4d raw;
   if(python_tomatrix(mat, raw)) return nullptr;
-  Matrix3d M;
   Vector3d n;
   Transform3d matrix=Transform3d::Identity();
   switch(mode) {
 	  case 0: // translate
 		  // col0 = xvec col1=yvec, col2=zvec, col3=trans
-		  for(int i=0;i<3;i++) raw[i*4+3] += transvec[i];
+		  for(int i=0;i<3;i++) raw(i,3) += transvec[i];
 		  break;
 	  case 1: // rotate
   		matrix.rotate(rotvec);
-		for(int i=0;i<4;i++) {
-		  n =Vector3d(raw[i],raw[4+i],raw[8+i]);
+		for(int i=0;i<3;i++) {
+		  n =Vector3d(raw(0,i),raw(1,i),raw(2,i));
 		  n = matrix * n;
-		  for(int j=0;j<3;j++) raw[j*4+i] = n[j];
+		  for(int j=0;j<3;j++) raw(j,i) = n[j];
 		}  
 		break;
   }
@@ -918,19 +917,51 @@ PyObject *python_rotx_oo(PyObject *self, PyObject *args, PyObject *kwargs) { ret
 PyObject *python_roty_oo(PyObject *self, PyObject *args, PyObject *kwargs) { return python_dir_oo_sub(self, args,kwargs, 7); }
 PyObject *python_rotz_oo(PyObject *self, PyObject *args, PyObject *kwargs) { return python_dir_oo_sub(self, args,kwargs, 8); }
 
-PyObject *python_multmatrix(PyObject *self, PyObject *args, PyObject *kwargs)
+PyObject *python_multmatrix_sub(PyObject *pyobj, PyObject *pymat, int div)
 {
-  DECLARE_INSTANCE
-  std::shared_ptr<AbstractNode> child;
   int i, j;
 
+  PyObject *element = NULL;
+  Matrix4d mat;
+  if(!python_tomatrix(pymat, mat)) {
+    double w = mat(3, 3);
+    if (w != 1.0) mat = mat / w;
+  } else {
+    PyErr_SetString(PyExc_TypeError, "Matrix vector should be 4x4 array");
+    return NULL;
+  }
+
+  Matrix4d objmat;
+  if(!python_tomatrix(pyobj, objmat)){
+    objmat = mat * objmat;
+    return python_frommatrix(objmat);
+  } 
+
+  DECLARE_INSTANCE
   auto node = std::make_shared<TransformNode>(instance, "multmatrix");
+  std::shared_ptr<AbstractNode> child;
+  PyObject *dummydict;
+  child = PyOpenSCADObjectToNodeMulti(pyobj, &dummydict);
+  if (child == NULL) {
+    PyErr_SetString(PyExc_TypeError, "Invalid type for Object in multmatrix");
+    return NULL;
+  }
+ 
+
+  if(div) node->matrix = mat.inverse();
+  else node->matrix = mat;
+  node->children.push_back(child);
+  return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
+
+}
+
+
+PyObject *python_multmatrix(PyObject *self, PyObject *args, PyObject *kwargs)
+{
 
   char *kwlist[] = {"obj", "m", NULL};
   PyObject *obj = NULL;
-  PyObject *dummydict;
   PyObject *mat = NULL;
-  PyObject *element = NULL;
   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OO!", kwlist,
                                    &obj,
                                    &PyList_Type, &mat
@@ -938,38 +969,23 @@ PyObject *python_multmatrix(PyObject *self, PyObject *args, PyObject *kwargs)
     PyErr_SetString(PyExc_TypeError, "Error during parsing multmatrix(object, vec16)");
     return NULL;
   }
+  return python_multmatrix_sub(obj, mat,0);
+}
 
-  child = PyOpenSCADObjectToNodeMulti(obj, &dummydict);
-  if (child == NULL) {
-    PyErr_SetString(PyExc_TypeError, "Invalid type for Object in multmatrix");
+PyObject *python_divmatrix(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+
+  char *kwlist[] = {"obj", "m", NULL};
+  PyObject *obj = NULL;
+  PyObject *mat = NULL;
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OO!", kwlist,
+                                   &obj,
+                                   &PyList_Type, &mat
+                                   )) {
+    PyErr_SetString(PyExc_TypeError, "Error during parsing divmatrix(object, vec16)");
     return NULL;
   }
-
-
-  bool valid=1;
-  Matrix4d rawmatrix{Matrix4d::Identity()};
-  if (mat != NULL && PyList_Check(mat)) {
-    if(PyList_Size(mat) != 4) valid=0;
-    for (i = 0; valid && i < std::min(size_t(PyList_Size(mat)), size_t(4)); i++) {
-      element = PyList_GetItem(mat, i);
-      if(PyList_Check(element)) {
-        if(PyList_Size(element) != 4) valid=0;
-        for (j = 0; valid && j < std::min(size_t(PyList_Size(element)), size_t(4)); j++) {
-          rawmatrix(i, j) = PyFloat_AsDouble(PyList_GetItem(element, j));
-        }
-      }
-    }
-    double w = rawmatrix(3, 3);
-    if (w != 1.0) node->matrix = rawmatrix / w;
-    else node->matrix = rawmatrix;
-  } else valid=0;
-  if(!valid) {
-    PyErr_SetString(PyExc_TypeError, "Matrix vector should be 4x4 array");
-    return NULL;
-  }
-  node->children.push_back(child);
-  return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
-
+  return python_multmatrix_sub(obj, mat,1);
 }
 
 PyObject *python_pull(PyObject *self, PyObject *args, PyObject *kwargs)
@@ -1036,13 +1052,13 @@ PyObject *python_output(PyObject *self, PyObject *args, PyObject *kwargs)
   python_result_handle.clear();
   PyObject *key, *value;
   Py_ssize_t pos = 0;
-  double raw[16];
+  Matrix4d raw;
   SelectedObject sel;
   while(PyDict_Next(child_dict, &pos, &key, &value)) {
      if(python_tomatrix(value, raw)) continue;
      PyObject* value1 = PyUnicode_AsEncodedString(key, "utf-8", "~");
      const char *value_str =  PyBytes_AS_STRING(value1);
-     sel.p1 = Vector3d(raw[3],raw[7],raw[11]);
+     sel.p1 = Vector3d(raw(0,3),raw(1,3),raw(2,3));
      sel.type=SELECTION_HANDLE;
      sel.name=value_str;
      python_result_handle.push_back(sel);
@@ -2240,12 +2256,12 @@ PyObject *python_orient(PyObject *self, PyObject *args, PyObject *kwargs)
   char *kwlist[] = {"dst","refmat","dstmat",NULL};
   PyObject *dst=NULL;
   PyObject *child_dict=nullptr;	  
-  PyObject *refmat=NULL;
-  PyObject *dstmat=NULL;
+  PyObject *pyrefmat=NULL;
+  PyObject *pydstmat=NULL;
   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OO|O", kwlist,
                                    &dst, 
-				   &refmat,
-				   &dstmat
+				   &pyrefmat,
+				   &pydstmat
                                    )) {
     PyErr_SetString(PyExc_TypeError, "Error during orient");
     return NULL;
@@ -2259,56 +2275,30 @@ PyObject *python_orient(PyObject *self, PyObject *args, PyObject *kwargs)
   auto multmatnode = std::make_shared<TransformNode>(instance, "orient");
   multmatnode->children.push_back(dstnode);
 
-  double raw[16];
+  Matrix4d mat;
   Matrix4d MT=Matrix4d::Identity();
-  Matrix4d M;
 
-  if(refmat != nullptr) {
-    Py_INCREF(refmat);
-    if(python_tomatrix(refmat, raw)) return Py_None;
-    Py_XDECREF(refmat); 
-
-    M << 
-	  raw[0], raw[1], raw[2], raw[3],
-	  raw[4], raw[5], raw[6], raw[7],
-	  raw[8], raw[9], raw[10], raw[11],
-	  raw[12], raw[13], raw[14], raw[15];
-    MT = MT * M;	  
+  if(pyrefmat != nullptr) {
+    if(python_tomatrix(pyrefmat, mat)) return Py_None;
+    MT = MT * mat;	  
   }
 
-  if(dstmat != nullptr) {
-    Py_INCREF(dstmat);
-    if(python_tomatrix(dstmat, raw)) return Py_None;
-    Py_XDECREF(dstmat); 
-
-    M << 
-	  raw[0], raw[1], raw[2], raw[3],
-	  raw[4], raw[5], raw[6], raw[7],
-	  raw[8], raw[9], raw[10], raw[11],
-	  raw[12], raw[13], raw[14], raw[15];
-    MT = MT * M.inverse();	  
+  if(pydstmat != nullptr) {
+    if(python_tomatrix(pydstmat, mat)) return Py_None;
+    MT = MT * mat.inverse();	  
   }
   multmatnode -> matrix = MT ;
 
   PyObject *pyresult =PyOpenSCADObjectFromNode(&PyOpenSCADType, multmatnode);
   if(child_dict != nullptr) {
-    Matrix4d M1;
     PyObject *key, *value;
     Py_ssize_t pos = 0;
      while(PyDict_Next(child_dict, &pos, &key, &value)) {
        PyObject* value1 = PyUnicode_AsEncodedString(key, "utf-8", "~");
        const char *value_str =  PyBytes_AS_STRING(value1);
-       if(!python_tomatrix(value, raw)){
-	 M1  << 
-	   raw[0], raw[1], raw[2], raw[3],
-	   raw[4], raw[5], raw[6], raw[7],
-	   raw[8], raw[9], raw[10], raw[11],
-	   raw[12], raw[13], raw[14], raw[15];
-         M1 = MT * M1;
-         for(int i=0;i<4;i++)
-           for(int j=0;j<4;j++)
-             raw[i*4+j]=M1(i,j);		         
-         PyDict_SetItem(((PyOpenSCADObject *) pyresult)->dict,key, python_frommatrix(raw));
+       if(!python_tomatrix(value, mat)){
+         mat = MT * mat;
+         PyDict_SetItem(((PyOpenSCADObject *) pyresult)->dict,key, python_frommatrix(mat));
        } else PyDict_SetItem(((PyOpenSCADObject *) pyresult)->dict,key, value);
     }
   }
@@ -2543,6 +2533,7 @@ PyMethodDef PyOpenSCADFunctions[] = {
   {"scale", (PyCFunction) python_scale, METH_VARARGS | METH_KEYWORDS, "Scale Object."},
   {"mirror", (PyCFunction) python_mirror, METH_VARARGS | METH_KEYWORDS, "Mirror Object."},
   {"multmatrix", (PyCFunction) python_multmatrix, METH_VARARGS | METH_KEYWORDS, "Multmatrix Object."},
+  {"divmatrix", (PyCFunction) python_divmatrix, METH_VARARGS | METH_KEYWORDS, "Divmatrix Object."},
   {"offset", (PyCFunction) python_offset, METH_VARARGS | METH_KEYWORDS, "Offset Object."},
   {"roof", (PyCFunction) python_roof, METH_VARARGS | METH_KEYWORDS, "Roof Object."},
   {"pull", (PyCFunction) python_pull, METH_VARARGS | METH_KEYWORDS, "Pull apart Object."},
@@ -2606,6 +2597,7 @@ PyMethodDef PyOpenSCADMethods[] = {
   OO_METHOD_ENTRY(scale,"Scale Object")	
   OO_METHOD_ENTRY(mirror,"Mirror Object")	
   OO_METHOD_ENTRY(multmatrix,"Multmatrix Object")	
+  OO_METHOD_ENTRY(divmatrix,"Divmatrix Object")	
   OO_METHOD_ENTRY(offset,"Offset Object")	
   OO_METHOD_ENTRY(roof,"Roof Object")	
   OO_METHOD_ENTRY(color,"Color Object")	
