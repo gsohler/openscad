@@ -568,9 +568,11 @@ std::vector<SelectedObject> QGLView::findObject(int mouse_x,int mouse_y)
     return results;
   }
 
+  std::vector<SelectedObject> result;
   auto renderer = this->getRenderer();
-  return renderer->findModelObject(near_pt, far_pt, mouse_x, mouse_y, tolerance);
-
+  if(renderer == nullptr) return result;
+  result = renderer->findModelObject(near_pt, far_pt, mouse_x, mouse_y, cam.zoomValue()/300);
+  return result;
 }
 
 void QGLView::selectPoint(int mouse_x, int mouse_y)
