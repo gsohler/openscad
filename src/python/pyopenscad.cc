@@ -69,7 +69,7 @@ PyObject *PyOpenSCADObject_alloc(PyTypeObject *cls, Py_ssize_t nitems)
 //  	Py_XDECREF(row);
   }
   PyDict_SetItemString(((PyOpenSCADObject *)self)->dict,"origin",origin);
-//  Py_XDECREF(origin);
+  Py_XDECREF(origin);
   return self;
 }
 
@@ -79,7 +79,7 @@ PyObject *PyOpenSCADObject_alloc(PyTypeObject *cls, Py_ssize_t nitems)
 
 static PyObject *PyOpenSCADObject_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
-  return PyOpenSCADObject_alloc(&PyOpenSCADType, 1);
+  return PyOpenSCADObject_alloc(&PyOpenSCADType, 0);
 }
 
 /*
@@ -523,7 +523,7 @@ void initPython(double time)
       PyObject* key1 = PyUnicode_AsEncodedString(key, "utf-8", "~");
       if(key1 != nullptr) {
         const char *key_str =  PyBytes_AS_STRING(key1);
-        if(key_str == NULL) continue;
+        if(key_str == nullptr) continue;
         if (std::find(std::begin(pythonInventory), std::end(pythonInventory), key_str) == std::end(pythonInventory))
         {
           PyDict_DelItemString(maindict, key_str);
@@ -535,7 +535,6 @@ void initPython(double time)
 #ifdef HAVE_PYTHON_YIELD
     set_object_callback(openscad_object_callback);
 #endif
-    char run_str[200];
     PyImport_AppendInittab("openscad", &PyInit_openscad);
 #ifdef ENABLE_LIBFIVE	    
     PyImport_AppendInittab("libfive", &PyInit_libfive);
@@ -559,10 +558,6 @@ void initPython(double time)
     PyInit_PyLibFive();
 #endif	    
     PyRun_String("from builtins import *\n", Py_file_input, pythonInitDict, pythonInitDict);
-    sprintf(run_str,"fa=12.0\nfn=0.0\nfs=2.0\nt=%g",time);
-    PyRun_String(run_str, Py_file_input, pythonInitDict, pythonInitDict);
-
-      // find base variables
     PyObject *key, *value;
     Py_ssize_t pos = 0;
     PyObject *maindict = PyModule_GetDict(pythonMainModule);
@@ -573,6 +568,9 @@ void initPython(double time)
       Py_XDECREF(key1);
     }
   }
+  char run_str[200];
+  sprintf(run_str,"fa=12.0\nfn=0.0\nfs=2.0\nt=%g",time);
+  PyRun_String(run_str, Py_file_input, pythonInitDict, pythonInitDict);
   customizer_parameters_finished = customizer_parameters;
   customizer_parameters.clear();
 }
@@ -647,6 +645,7 @@ sys.stderr = stderr_bak\n\
     for(int i=0;i<2;i++)
     {
       PyObject* catcher = PyObject_GetAttrString(pythonMainModule, i==1?"catcher_err":"catcher_out");
+	if(catcher == nullptr) continue;
       PyObject* command_output = PyObject_GetAttrString(catcher, "data");
       Py_XDECREF(catcher);
       PyObject* command_output_value = PyUnicode_AsEncodedString(command_output, "utf-8", "~");
@@ -718,7 +717,7 @@ PyTypeObject PyOpenSCADType = {
     0,                         			/* tp_hash  */
     0,                         			/* tp_call */
     python_str,                			/* tp_str */
-    python__getattro__,      		/* tp_getattro */
+    python__getattro__,      			/* tp_getattro */
     python__setattro__,  			/* tp_setattro */
     0,                         			/* tp_as_buffer */
     Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,	/* tp_flags */

@@ -1567,18 +1567,12 @@ PyObject *python_csg_sub(PyObject *self, PyObject *args, PyObject *kwargs, OpenS
   PyObject *objs = NULL;
   PyObject *obj;
   PyObject *child_dict;	  
+  PyObject *dummy_dict;	  
   std::shared_ptr<AbstractNode> child;
-  PyObject *new_dict=PyDict_New();
   for (i = 0; i < PyTuple_Size(args);i++) {
     obj = PyTuple_GetItem(args, i);
-    child = PyOpenSCADObjectToNodeMulti(obj, &child_dict);
-    if(child_dict != nullptr && i == 1) {
-      PyObject *key, *value;
-      Py_ssize_t pos = 0;
-       while(PyDict_Next(child_dict, &pos, &key, &value)) {
-         PyDict_SetItem(new_dict, key, value);
-      }
-    }
+    if(i == 0) child = PyOpenSCADObjectToNodeMulti(obj, &child_dict);
+    else child = PyOpenSCADObjectToNodeMulti(obj, &dummy_dict);
     if(child != NULL) {
       node->children.push_back(child);
     } else {
@@ -1598,8 +1592,13 @@ PyObject *python_csg_sub(PyObject *self, PyObject *args, PyObject *kwargs, OpenS
   }
 
   PyObject *pyresult =PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
-  Py_XDECREF(((PyOpenSCADObject *) pyresult)->dict);
-  ((PyOpenSCADObject *) pyresult)->dict=new_dict;
+  if(child_dict != nullptr ) {
+    PyObject *key, *value;
+    Py_ssize_t pos = 0;
+     while(PyDict_Next(child_dict, &pos, &key, &value)) {
+       PyDict_SetItem(((PyOpenSCADObject *) pyresult)->dict, key, value);
+    }
+  }
   return pyresult;
 }
 
@@ -2249,7 +2248,7 @@ PyObject *python_group(PyObject *self, PyObject *args, PyObject *kwargs)
 }
 
  
-PyObject *python_orient(PyObject *self, PyObject *args, PyObject *kwargs)
+PyObject *python_align(PyObject *self, PyObject *args, PyObject *kwargs)
 {
   std::shared_ptr<AbstractNode> dstnode;
 
@@ -2263,16 +2262,16 @@ PyObject *python_orient(PyObject *self, PyObject *args, PyObject *kwargs)
 				   &pyrefmat,
 				   &pydstmat
                                    )) {
-    PyErr_SetString(PyExc_TypeError, "Error during orient");
+    PyErr_SetString(PyExc_TypeError, "Error during align");
     return NULL;
   }
   dstnode = PyOpenSCADObjectToNode(dst, &child_dict);
   if(dstnode == nullptr) {
-    PyErr_SetString(PyExc_TypeError, "Invalid orient object");
+    PyErr_SetString(PyExc_TypeError, "Invalid align object");
     return Py_None;
   }
   DECLARE_INSTANCE
-  auto multmatnode = std::make_shared<TransformNode>(instance, "orient");
+  auto multmatnode = std::make_shared<TransformNode>(instance, "align");
   multmatnode->children.push_back(dstnode);
 
   Matrix4d mat;
@@ -2568,7 +2567,7 @@ PyMethodDef PyOpenSCADFunctions[] = {
   {"version", (PyCFunction) python_version, METH_VARARGS | METH_KEYWORDS, "Output openscad Version."},
   {"version_num", (PyCFunction) python_version_num, METH_VARARGS | METH_KEYWORDS, "Output openscad Version."},
   {"add_parameter", (PyCFunction) python_add_parameter, METH_VARARGS | METH_KEYWORDS, "Add Parameter for Customizer."},
-  {"orient", (PyCFunction) python_orient, METH_VARARGS | METH_KEYWORDS, "Orient Object to another."},
+  {"align", (PyCFunction) python_align, METH_VARARGS | METH_KEYWORDS, "Align Object to another."},
   {NULL, NULL, 0, NULL}
 };
 
@@ -2616,7 +2615,7 @@ PyMethodDef PyOpenSCADMethods[] = {
 
   OO_METHOD_ENTRY(mesh, "Mesh Object")	
   OO_METHOD_ENTRY(oversample,"Oversample Object")	
-  OO_METHOD_ENTRY(orient,"Orient Object to another")	
+  OO_METHOD_ENTRY(align,"Align Object to another")	
 
   OO_METHOD_ENTRY(highlight,"Highlight Object")	
   OO_METHOD_ENTRY(background,"Background Object")	
