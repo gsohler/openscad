@@ -74,6 +74,16 @@
 extern std::unordered_map<std::string, Color4f> webcolors;
 extern boost::optional<Color4f> parse_hex_color(const std::string& hex);
 
+#define FUNC_HEADER(name) PyObject *python_##name(PyObject *self, PyObject *args, PyObject *kwargs); \
+PyObject *python_oo_##name(PyObject *self, PyObject *args, PyObject *kwargs) \
+{ \
+  PyObject *new_args = python_oo_args(self, args); \
+  PyObject *result = python_##name(Py_None, new_args, kwargs); \
+  return result; \
+} \
+PyObject *python_##name(PyObject *self, PyObject *args, PyObject *kwargs) 
+
+//  Py_XDECREF(new_args); \
 
 PyObject *python_cube(PyObject *self, PyObject *args, PyObject *kwargs)
 {
@@ -557,7 +567,7 @@ PyObject *python_polygon(PyObject *self, PyObject *args, PyObject *kwargs)
 
   return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
 }
-PyObject *python_scale(PyObject *self, PyObject *args, PyObject *kwargs)
+FUNC_HEADER(scale)
 {
   DECLARE_INSTANCE
   std::shared_ptr<AbstractNode> child;
@@ -716,7 +726,7 @@ PyObject *python_rotate_sub(PyObject *obj, Vector3d rot)
   return pyresult;
 }
 
-PyObject *python_rotate(PyObject *self, PyObject *args, PyObject *kwargs)
+FUNC_HEADER(rotate)
 {
 
   char *kwlist[] = {"obj", "a", "v", NULL};
@@ -740,7 +750,7 @@ PyObject *python_rotate(PyObject *self, PyObject *args, PyObject *kwargs)
   return obj;
 }
 
-PyObject *python_mirror(PyObject *self, PyObject *args, PyObject *kwargs)
+FUNC_HEADER(mirror)
 {
   DECLARE_INSTANCE
   std::shared_ptr<AbstractNode> child;
@@ -823,40 +833,44 @@ PyObject *python_translate_sub(PyObject *obj, Vector3d translatevec)
   return pyresult;
 }
 
-PyObject *python_translate(PyObject *self, PyObject *args, PyObject *kwargs)
+PyObject *python_translate_core(PyObject *obj, PyObject *v) 
 {
-  char *kwlist[] = {"obj", "v", NULL};
-  PyObject *v = NULL;
-  PyObject *obj = NULL;
   double x = 0, y = 0, z = 0;
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OO", kwlist,
-                                   &obj,
-                                   &v
-                                   )) {
-    PyErr_SetString(PyExc_TypeError, "Error during parsing translate(object,vec3)");
-    return NULL;
-  }
   if (python_vectorval(v, &x, &y, &z)) {
     PyErr_SetString(PyExc_TypeError, "Invalid vector specifiaction in trans");
     return NULL;
   }
   Vector3d translatevec(x, y, z);
   return python_translate_sub(obj, translatevec);
-}
+}	
 
-PyObject *python_dir_sub(PyObject *self, PyObject *args, PyObject *kwargs,int mode)
+PyObject *python_translate(PyObject *self, PyObject *args, PyObject *kwargs)
 {
   char *kwlist[] = {"obj", "v", NULL};
   PyObject *obj = NULL;
-  double arg;
-  double x = 0, y = 0, z = 0;
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "Od", kwlist,
-                                   &obj,
-                                   &arg
-                                   )) {
+  PyObject *v = NULL;
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|O", kwlist, &obj, &v)) {
     PyErr_SetString(PyExc_TypeError, "Error during parsing translate(object,vec3)");
     return NULL;
   }
+  return python_translate_core(obj,v);
+}
+
+PyObject *python_oo_translate(PyObject *obj, PyObject *args, PyObject *kwargs)
+{
+  char *kwlist[] = {"v", NULL};
+  PyObject *v = NULL;
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|O", kwlist, &v)) {
+    PyErr_SetString(PyExc_TypeError, "Error during parsing translate(object,vec3)");
+    return NULL;
+  }
+  return python_translate_core(obj,v);
+}
+
+
+PyObject *python_dir_sub_core(PyObject *obj, double arg, int mode)
+{
+  double x = 0, y = 0, z = 0;
 
   if(mode < 6)
   {
@@ -883,22 +897,52 @@ PyObject *python_dir_sub(PyObject *self, PyObject *args, PyObject *kwargs,int mo
   }
 }
 
-PyObject *python_right(PyObject *self, PyObject *args, PyObject *kwargs) { return python_dir_sub(self, args,kwargs, 0); }
-PyObject *python_left(PyObject *self, PyObject *args, PyObject *kwargs) { return python_dir_sub(self, args,kwargs, 1); }
-PyObject *python_front(PyObject *self, PyObject *args, PyObject *kwargs) { return python_dir_sub(self, args,kwargs, 2); }
-PyObject *python_back(PyObject *self, PyObject *args, PyObject *kwargs) { return python_dir_sub(self, args,kwargs, 3); }
-PyObject *python_down(PyObject *self, PyObject *args, PyObject *kwargs) { return python_dir_sub(self, args,kwargs, 4); }
-PyObject *python_up(PyObject *self, PyObject *args, PyObject *kwargs) { return python_dir_sub(self, args,kwargs, 5); }
-PyObject *python_rotx(PyObject *self, PyObject *args, PyObject *kwargs) { return python_dir_sub(self, args,kwargs, 6); }
-PyObject *python_roty(PyObject *self, PyObject *args, PyObject *kwargs) { return python_dir_sub(self, args,kwargs, 7); }
-PyObject *python_rotz(PyObject *self, PyObject *args, PyObject *kwargs) { return python_dir_sub(self, args,kwargs, 8); }
-
-PyObject *python_translate_oo(PyObject *self, PyObject *args, PyObject *kwargs)
+PyObject *python_dir_sub(PyObject *self, PyObject *args, PyObject *kwargs,int mode)
 {
-  PyObject *new_args = python_oo_args(self, args);
-  PyObject *result = python_translate(self, new_args, kwargs);
-  return result;
+  char *kwlist[] = {"obj", "v", NULL};
+  PyObject *obj = NULL;
+  double arg;
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "Od", kwlist,
+                                   &obj,
+                                   &arg
+                                   )) {
+    PyErr_SetString(PyExc_TypeError, "Error during parsing translate(object,vec3)");
+    return NULL;
+  }
+  return python_dir_sub_core(obj,arg,mode);
 }
+
+PyObject *python_oo_dir_sub(PyObject *obj, PyObject *args, PyObject *kwargs,int mode)
+{
+  char *kwlist[] = {"v", NULL};
+  double arg;
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "d", kwlist,
+                                   &arg
+                                   )) {
+    PyErr_SetString(PyExc_TypeError, "Error during parsing translate(object,vec3)");
+    return NULL;
+  }
+  return python_dir_sub_core(obj,arg,mode);
+}
+
+PyObject *python_right(PyObject *self, PyObject *args, PyObject *kwargs) { return python_dir_sub(self, args,kwargs, 0); }
+PyObject *python_oo_right(PyObject *self, PyObject *args, PyObject *kwargs) { return python_oo_dir_sub(self, args,kwargs, 0); }
+PyObject *python_left(PyObject *self, PyObject *args, PyObject *kwargs) { return python_dir_sub(self, args,kwargs, 1); }
+PyObject *python_oo_left(PyObject *self, PyObject *args, PyObject *kwargs) { return python_oo_dir_sub(self, args,kwargs, 1); }
+PyObject *python_front(PyObject *self, PyObject *args, PyObject *kwargs) { return python_dir_sub(self, args,kwargs, 2); }
+PyObject *python_oo_front(PyObject *self, PyObject *args, PyObject *kwargs) { return python_oo_dir_sub(self, args,kwargs, 2); }
+PyObject *python_back(PyObject *self, PyObject *args, PyObject *kwargs) { return python_dir_sub(self, args,kwargs, 3); }
+PyObject *python_oo_back(PyObject *self, PyObject *args, PyObject *kwargs) { return python_oo_dir_sub(self, args,kwargs, 3); }
+PyObject *python_down(PyObject *self, PyObject *args, PyObject *kwargs) { return python_dir_sub(self, args,kwargs, 4); }
+PyObject *python_oo_down(PyObject *self, PyObject *args, PyObject *kwargs) { return python_oo_dir_sub(self, args,kwargs, 4); }
+PyObject *python_up(PyObject *self, PyObject *args, PyObject *kwargs) { return python_dir_sub(self, args,kwargs, 5); }
+PyObject *python_oo_up(PyObject *self, PyObject *args, PyObject *kwargs) { return python_oo_dir_sub(self, args,kwargs, 5); }
+PyObject *python_rotx(PyObject *self, PyObject *args, PyObject *kwargs) { return python_dir_sub(self, args,kwargs, 6); }
+PyObject *python_oo_rotx(PyObject *self, PyObject *args, PyObject *kwargs) { return python_oo_dir_sub(self, args,kwargs, 6); }
+PyObject *python_roty(PyObject *self, PyObject *args, PyObject *kwargs) { return python_dir_sub(self, args,kwargs, 7); }
+PyObject *python_oo_roty(PyObject *self, PyObject *args, PyObject *kwargs) { return python_oo_dir_sub(self, args,kwargs, 7); }
+PyObject *python_rotz(PyObject *self, PyObject *args, PyObject *kwargs) { return python_dir_sub(self, args,kwargs, 8); }
+PyObject *python_oo_rotz(PyObject *self, PyObject *args, PyObject *kwargs) { return python_oo_dir_sub(self, args,kwargs, 8); }
 
 PyObject *python_dir_oo_sub(PyObject *self, PyObject *args, PyObject *kwargs, int mode)
 {
@@ -906,16 +950,6 @@ PyObject *python_dir_oo_sub(PyObject *self, PyObject *args, PyObject *kwargs, in
   PyObject *result = python_dir_sub(self, new_args, kwargs,mode);
   return result;
 }
-
-PyObject *python_right_oo(PyObject *self, PyObject *args, PyObject *kwargs) { return python_dir_oo_sub(self, args,kwargs, 0); }
-PyObject *python_left_oo(PyObject *self, PyObject *args, PyObject *kwargs) { return python_dir_oo_sub(self, args,kwargs, 1); }
-PyObject *python_front_oo(PyObject *self, PyObject *args, PyObject *kwargs) { return python_dir_oo_sub(self, args,kwargs, 2); }
-PyObject *python_back_oo(PyObject *self, PyObject *args, PyObject *kwargs) { return python_dir_oo_sub(self, args,kwargs, 3); }
-PyObject *python_down_oo(PyObject *self, PyObject *args, PyObject *kwargs) { return python_dir_oo_sub(self, args,kwargs, 4); }
-PyObject *python_up_oo(PyObject *self, PyObject *args, PyObject *kwargs) { return python_dir_oo_sub(self, args,kwargs, 5); }
-PyObject *python_rotx_oo(PyObject *self, PyObject *args, PyObject *kwargs) { return python_dir_oo_sub(self, args,kwargs, 6); }
-PyObject *python_roty_oo(PyObject *self, PyObject *args, PyObject *kwargs) { return python_dir_oo_sub(self, args,kwargs, 7); }
-PyObject *python_rotz_oo(PyObject *self, PyObject *args, PyObject *kwargs) { return python_dir_oo_sub(self, args,kwargs, 8); }
 
 PyObject *python_multmatrix_sub(PyObject *pyobj, PyObject *pymat, int div)
 {
@@ -956,7 +990,7 @@ PyObject *python_multmatrix_sub(PyObject *pyobj, PyObject *pymat, int div)
 }
 
 
-PyObject *python_multmatrix(PyObject *self, PyObject *args, PyObject *kwargs)
+FUNC_HEADER(multmatrix)
 {
 
   char *kwlist[] = {"obj", "m", NULL};
@@ -972,7 +1006,7 @@ PyObject *python_multmatrix(PyObject *self, PyObject *args, PyObject *kwargs)
   return python_multmatrix_sub(obj, mat,0);
 }
 
-PyObject *python_divmatrix(PyObject *self, PyObject *args, PyObject *kwargs)
+FUNC_HEADER(divmatrix)
 {
 
   char *kwlist[] = {"obj", "m", NULL};
@@ -988,7 +1022,7 @@ PyObject *python_divmatrix(PyObject *self, PyObject *args, PyObject *kwargs)
   return python_multmatrix_sub(obj, mat,1);
 }
 
-PyObject *python_pull(PyObject *self, PyObject *args, PyObject *kwargs)
+FUNC_HEADER(pull)
 {
   DECLARE_INSTANCE
   std::shared_ptr<AbstractNode> child;
@@ -1031,19 +1065,10 @@ PyObject *python_pull(PyObject *self, PyObject *args, PyObject *kwargs)
   return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
 }
 
-PyObject *python_output(PyObject *self, PyObject *args, PyObject *kwargs)
+PyObject *python_output_core(PyObject *obj)
 {
-  PyObject *object = NULL;
   PyObject *child_dict;
-  char *kwlist[] = {"object", NULL};
-  std::shared_ptr<AbstractNode> child;
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O", kwlist,
-                                   &object
-                                   ))  {
-    PyErr_SetString(PyExc_TypeError, "Error during parsing output(object)");
-    return NULL;
-  }
-  child = PyOpenSCADObjectToNodeMulti(object, &child_dict);
+  std::shared_ptr<AbstractNode> child = PyOpenSCADObjectToNodeMulti(obj, &child_dict);
   if (child == NULL) {
     PyErr_SetString(PyExc_TypeError, "Invalid type for Object in output");
     return NULL;
@@ -1065,10 +1090,33 @@ PyObject *python_output(PyObject *self, PyObject *args, PyObject *kwargs)
 
 
   }
-
   return Py_None;
 }
 
+
+PyObject *python_output(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+  PyObject *obj = NULL;
+  char *kwlist[] = {"obj", NULL};
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O", kwlist,
+                                   &obj
+                                   ))  {
+    PyErr_SetString(PyExc_TypeError, "Error during parsing output(obj)");
+    return NULL;
+  }
+  return python_output_core(obj);
+}
+
+PyObject *python_oo_output(PyObject *obj, PyObject *args, PyObject *kwargs)
+{
+  char *kwlist[] = {NULL};
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "", kwlist
+                                   ))  {
+    PyErr_SetString(PyExc_TypeError, "Error during parsing output(obj)");
+    return NULL;
+  }
+  return python_output_core(obj);
+}
 
 PyObject *python__getitem__(PyObject *dict, PyObject *key)
 {
@@ -1094,34 +1142,18 @@ int python__setitem__(PyObject *dict, PyObject *key, PyObject *v)
 }
 
 
-
-
-PyObject *python_color(PyObject *self, PyObject *args, PyObject *kwargs)
+PyObject *python_color_core(PyObject *obj, char *colorname, double alpha, int textureind)
 {
-  DECLARE_INSTANCE
-  std::shared_ptr<AbstractNode> child;
-
-  auto node = std::make_shared<ColorNode>(instance);
-
-  char *kwlist[] = {"obj", "c", "alpha", "texture",NULL};
-  PyObject *obj = NULL;
   PyObject *dummydict;
-  char *colorname = NULL;
-  double alpha = 1.0;
   double x = 0, y = 0, z = 0;
-  int textureind=-1;
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|sdi", kwlist,
-                                   &obj,
-                                   &colorname, &alpha, &textureind
-                                   )) {
-    PyErr_SetString(PyExc_TypeError, "error duing parsing color");
-    return NULL;
-  }
+  std::shared_ptr<AbstractNode> child;
   child = PyOpenSCADObjectToNodeMulti(obj, &dummydict);
   if (child == NULL) {
     PyErr_SetString(PyExc_TypeError, "Invalid type for Object in color");
     return NULL;
   }
+  DECLARE_INSTANCE
+  auto node = std::make_shared<ColorNode>(instance);
 
   /*
      if (parameters["c"].type() == Value::Type::VECTOR) {
@@ -1162,9 +1194,41 @@ if(colorname != NULL) {
   return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
 }
 
+PyObject *python_color(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+  char *kwlist[] = {"obj", "c", "alpha", "texture",NULL};
+  PyObject *obj = NULL;
+  char *colorname = NULL;
+  double alpha = 1.0;
+  int textureind=-1;
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|sdi", kwlist,
+                                   &obj,
+                                   &colorname, &alpha, &textureind
+                                   )) {
+    PyErr_SetString(PyExc_TypeError, "error duing parsing color");
+    return NULL;
+  }
+  return python_color_core(obj, colorname, alpha, textureind);
+}
+
+PyObject *python_oo_color(PyObject *obj, PyObject *args, PyObject *kwargs)
+{
+  char *kwlist[] = {"c", "alpha", "texture",NULL};
+  char *colorname = NULL;
+  double alpha = 1.0;
+  int textureind=-1;
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|sdi", kwlist,
+                                   &colorname, &alpha, &textureind
+                                   )) {
+    PyErr_SetString(PyExc_TypeError, "error duing parsing color");
+    return NULL;
+  }
+  return python_color_core(obj, colorname, alpha, textureind);
+}
+
 typedef std::vector<int> intList;
 
-PyObject *python_mesh(PyObject *self, PyObject *args, PyObject *kwargs)
+FUNC_HEADER(mesh)
 {
   DECLARE_INSTANCE
 
@@ -1214,9 +1278,7 @@ PyObject *python_mesh(PyObject *self, PyObject *args, PyObject *kwargs)
   return result;
 }
 
-
-
-PyObject *python_oversample(PyObject *self, PyObject *args, PyObject *kwargs)
+FUNC_HEADER(oversample)
 {
   DECLARE_INSTANCE
   int n=2;
@@ -1244,7 +1306,7 @@ PyObject *python_oversample(PyObject *self, PyObject *args, PyObject *kwargs)
   return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
 }
 
-PyObject *python_rotate_extrude(PyObject *self, PyObject *args, PyObject *kwargs)
+FUNC_HEADER(rotate_extrude)
 {
   DECLARE_INSTANCE
   std::shared_ptr<AbstractNode> child;
@@ -1331,7 +1393,7 @@ PyObject *python_rotate_extrude(PyObject *self, PyObject *args, PyObject *kwargs
   return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
 }
 
-PyObject *python_linear_extrude(PyObject *self, PyObject *args, PyObject *kwargs)
+FUNC_HEADER(linear_extrude)
 {
   DECLARE_INSTANCE
   std::shared_ptr<AbstractNode> child;
@@ -1432,7 +1494,7 @@ PyObject *python_linear_extrude(PyObject *self, PyObject *args, PyObject *kwargs
 }
 
 
-PyObject* python_path_extrude(PyObject *self, PyObject *args, PyObject *kwargs)
+FUNC_HEADER(path_extrude)
 {
   DECLARE_INSTANCE
   std::shared_ptr<AbstractNode> child;
@@ -1602,17 +1664,17 @@ PyObject *python_csg_sub(PyObject *self, PyObject *args, PyObject *kwargs, OpenS
   return pyresult;
 }
 
-PyObject *python_union(PyObject *self, PyObject *args, PyObject *kwargs)
+FUNC_HEADER(union)
 {
   return python_csg_sub(self, args, kwargs, OpenSCADOperator::UNION);
 }
 
-PyObject *python_difference(PyObject *self, PyObject *args, PyObject *kwargs)
+FUNC_HEADER(difference)
 {
   return python_csg_sub(self, args, kwargs, OpenSCADOperator::DIFFERENCE);
 }
 
-PyObject *python_intersection(PyObject *self, PyObject *args, PyObject *kwargs)
+FUNC_HEADER(intersection)
 {
   return python_csg_sub(self, args, kwargs, OpenSCADOperator::INTERSECTION);
 }
@@ -1769,19 +1831,19 @@ PyObject *python_minkowski(PyObject *self, PyObject *args, PyObject *kwargs)
 }
 
 
-PyObject *python_hull(PyObject *self, PyObject *args, PyObject *kwargs)
+FUNC_HEADER(hull)
 {
   return python_csg_adv_sub(self, args, kwargs, CgalAdvType::HULL);
 }
 
 
-PyObject *python_fill(PyObject *self, PyObject *args, PyObject *kwargs)
+FUNC_HEADER(fill)
 {
   return python_csg_adv_sub(self, args, kwargs, CgalAdvType::FILL);
 }
 
 
-PyObject *python_resize(PyObject *self, PyObject *args, PyObject *kwargs)
+FUNC_HEADER(resize)
 {
   DECLARE_INSTANCE
   std::shared_ptr<AbstractNode> child;
@@ -1841,7 +1903,7 @@ PyObject *python_resize(PyObject *self, PyObject *args, PyObject *kwargs)
   return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
 }
 
-PyObject *python_roof(PyObject *self, PyObject *args, PyObject *kwargs)
+FUNC_HEADER(roof)
 {
   DECLARE_INSTANCE
   std::shared_ptr<AbstractNode> child;
@@ -1900,7 +1962,7 @@ PyObject *python_roof(PyObject *self, PyObject *args, PyObject *kwargs)
   return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
 }
 
-PyObject *python_render(PyObject *self, PyObject *args, PyObject *kwargs)
+FUNC_HEADER(render)
 {
   DECLARE_INSTANCE
   std::shared_ptr<AbstractNode> child;
@@ -2137,7 +2199,7 @@ PyObject *python_version_num(PyObject *self, PyObject *args, PyObject *kwargs)
 }
 
 
-PyObject *python_offset(PyObject *self, PyObject *args, PyObject *kwargs)
+FUNC_HEADER(offset)
 {
   DECLARE_INSTANCE
   std::shared_ptr<AbstractNode> child;
@@ -2192,7 +2254,7 @@ PyObject *python_offset(PyObject *self, PyObject *args, PyObject *kwargs)
   return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
 }
 
-PyObject *python_projection(PyObject *self, PyObject *args, PyObject *kwargs)
+FUNC_HEADER(projection)
 {
   DECLARE_INSTANCE
   std::shared_ptr<AbstractNode> child;
@@ -2248,24 +2310,11 @@ PyObject *python_group(PyObject *self, PyObject *args, PyObject *kwargs)
 }
 
  
-PyObject *python_align(PyObject *self, PyObject *args, PyObject *kwargs)
-{
-  std::shared_ptr<AbstractNode> dstnode;
 
-  char *kwlist[] = {"dst","refmat","dstmat",NULL};
-  PyObject *dst=NULL;
+PyObject *python_align_core(PyObject *obj, PyObject *pyrefmat, PyObject *pydstmat)
+{
   PyObject *child_dict=nullptr;	  
-  PyObject *pyrefmat=NULL;
-  PyObject *pydstmat=NULL;
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OO|O", kwlist,
-                                   &dst, 
-				   &pyrefmat,
-				   &pydstmat
-                                   )) {
-    PyErr_SetString(PyExc_TypeError, "Error during align");
-    return NULL;
-  }
-  dstnode = PyOpenSCADObjectToNode(dst, &child_dict);
+  std::shared_ptr<AbstractNode> dstnode = PyOpenSCADObjectToNode(obj, &child_dict);
   if(dstnode == nullptr) {
     PyErr_SetString(PyExc_TypeError, "Invalid align object");
     return Py_None;
@@ -2302,6 +2351,38 @@ PyObject *python_align(PyObject *self, PyObject *args, PyObject *kwargs)
     }
   }
   return pyresult;
+}
+
+PyObject *python_align(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+  char *kwlist[] = {"obj","refmat","objmat",NULL};
+  PyObject *obj=NULL;
+  PyObject *pyrefmat=NULL;
+  PyObject *pyobjmat=NULL;
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OO|O", kwlist,
+                                   &obj, 
+				   &pyrefmat,
+				   &pyobjmat
+                                   )) {
+    PyErr_SetString(PyExc_TypeError, "Error during align");
+    return NULL;
+  }
+  return python_align_core(obj, pyrefmat, pyobjmat);
+}
+
+PyObject *python_oo_align(PyObject *obj, PyObject *args, PyObject *kwargs)
+{
+  char *kwlist[] = {"refmat","objmat",NULL};
+  PyObject *pyrefmat=NULL;
+  PyObject *pyobjmat=NULL;
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|O", kwlist,
+				   &pyrefmat,
+				   &pyobjmat
+                                   )) {
+    PyErr_SetString(PyExc_TypeError, "Error during align");
+    return NULL;
+  }
+  return python_align_core(obj, pyrefmat, pyobjmat);
 }
 
 PyObject *do_import_python(PyObject *self, PyObject *args, PyObject *kwargs, ImportType type)
@@ -2494,9 +2575,9 @@ PyObject *python_debug_modifier_func(PyObject *self, PyObject *args, PyObject *k
   return python_debug_modifier(obj, mode);
 }
 
-PyObject *python_highlight(PyObject *self, PyObject *args, PyObject *kwargs) { return python_debug_modifier_func(self, args, kwargs, 0); }
-PyObject *python_background(PyObject *self, PyObject *args, PyObject *kwargs) { return python_debug_modifier_func(self, args, kwargs, 1); }
-PyObject *python_only(PyObject *self, PyObject *args, PyObject *kwargs) { return python_debug_modifier_func(self, args, kwargs, 2); }
+FUNC_HEADER(highlight) { return python_debug_modifier_func(self, args, kwargs, 0); }
+FUNC_HEADER(background) { return python_debug_modifier_func(self, args, kwargs, 1); }
+FUNC_HEADER(only) { return python_debug_modifier_func(self, args, kwargs, 2); }
 
 PyObject *python_nb_invert(PyObject *arg) { return python_debug_modifier(arg,0); }
 PyObject *python_nb_neg(PyObject *arg) { return python_debug_modifier(arg,1); }
@@ -2572,10 +2653,14 @@ PyMethodDef PyOpenSCADFunctions[] = {
 };
 
 #define	OO_METHOD_ENTRY(name,desc) \
-  { #name, (PyCFunction) ( [ ] (PyObject *self, PyObject *args) -> PyObject * { \
-  PyObject *new_args = python_oo_args(self, args); \
-  PyObject *result = python_##name(self, new_args, NULL); \
-  return result;  } ),  METH_VARARGS | METH_KEYWORDS, (desc)},
+  {#name, (PyCFunction) python_oo_##name, METH_VARARGS | METH_KEYWORDS, desc},
+
+//  { #name, (PyCFunction) ( [ ] (PyObject *self, PyObject *args) -> PyObject * { \
+// PyObject *new_args = python_oo_args(self, args); \
+// Py_XINCREF(self); \
+// Py_XINCREF(new_args); \
+// PyObject *result = python_##name(self, new_args, NULL); \
+// return result;  } ),  METH_VARARGS | METH_KEYWORDS, (desc)},
 
 
 PyMethodDef PyOpenSCADMethods[] = {
@@ -2609,7 +2694,6 @@ PyMethodDef PyOpenSCADMethods[] = {
   OO_METHOD_ENTRY(intersection,"Intersection Object")	
 
   OO_METHOD_ENTRY(hull,"Hull Object")	
-  OO_METHOD_ENTRY(minkowski,"Minkowski Object")	
   OO_METHOD_ENTRY(fill,"fill Object")	
   OO_METHOD_ENTRY(resize,"Resize Object")	
 

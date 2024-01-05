@@ -250,18 +250,12 @@ void get_fnas(double& fn, double& fa, double& fs) {
 
 PyObject *python_oo_args(PyObject *self, PyObject *args) // returns new reference,
 {
-  int i;
-  PyObject *item;
   int n = PyTuple_Size(args);
   PyObject *new_args = PyTuple_New(n + 1);
-
-  Py_INCREF(self);
   PyTuple_SetItem(new_args, 0, self);
 
-  for (i = 0; i < PyTuple_Size(args); i++) {
-    item = PyTuple_GetItem(args, i);
-    PyTuple_SetItem(new_args, i + 1, item);
-  }
+  for (int i = 0; i < n; i++) 
+    PyTuple_SetItem(new_args, i + 1, PyTuple_GetItem(args, i));
   return new_args;
 }
 
