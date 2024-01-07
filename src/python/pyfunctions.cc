@@ -567,7 +567,7 @@ int python_tomatrix(PyObject *pyt, Matrix4d &mat)
   if(pyt == nullptr) return 1;
   PyObject *row, *cell;
   double val;
-  if(!PyList_Check(pyt)) return 1;
+  if(!PyList_Check(pyt)) return 1; // TODO crash wenn pyt eine funktion ist
   if(PyList_Size(pyt) != 4) return 1;
   for(int i=0;i<4;i++) {
     row=PyList_GetItem(pyt,i);
@@ -693,7 +693,7 @@ PyObject *python_matrix_rot(PyObject *mat, Matrix3d rotvec)
   Matrix4d raw;
   if(python_tomatrix(mat, raw)) return nullptr;
   Vector3d n;
-  for(int i=0;i<3;i++) {
+  for(int i=0;i<4;i++) {
     n =Vector3d(raw(0,i),raw(1,i),raw(2,i));
     n = matrix * n;
     for(int j=0;j<3;j++) raw(j,i) = n[j];
