@@ -561,61 +561,6 @@ PyObject *python_polygon(PyObject *self, PyObject *args, PyObject *kwargs)
   return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
 }
 
-PyObject *python_scale_core(PyObject *obj, PyObject *val_v)
-{
-  DECLARE_INSTANCE
-  std::shared_ptr<AbstractNode> child;
-  auto node = std::make_shared<TransformNode>(instance, "scale");
-  PyObject *dummydict;
-  child = PyOpenSCADObjectToNodeMulti(obj,&dummydict);
-  if (child == NULL) {
-    PyErr_SetString(PyExc_TypeError, "Invalid type for Object in scale");
-    return NULL;
-  }
-
-  double x, y, z;
-  if (python_vectorval(val_v, &x, &y, &z)) {
-    PyErr_SetString(PyExc_TypeError, "Invalid vector specifiaction in scale, use 1 to 3 ordinates.");
-    return NULL;
-  }
-  Vector3d scalevec(x, y, z);
-
-  if (OpenSCAD::rangeCheck) {
-    if (scalevec[0] == 0 || scalevec[1] == 0 || scalevec[2] == 0 || !std::isfinite(scalevec[0])|| !std::isfinite(scalevec[1])|| !std::isfinite(scalevec[2])) {
-//      LOG(message_group::Warning, instance->location(), parameters.documentRoot(), "scale(%1$s)", parameters["v"].toEchoStringNoThrow());
-    }
-  }
-  node->matrix.scale(scalevec);
-
-  node->children.push_back(child);
-  return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
-}
-
-PyObject *python_scale(PyObject *self, PyObject *args, PyObject *kwargs)
-{
-  char *kwlist[] = {"obj", "v", NULL};
-  PyObject *obj = NULL;
-  PyObject *val_v = NULL;
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OO", kwlist,
-                                   &obj,
-                                   &val_v)) {
-    PyErr_SetString(PyExc_TypeError, "Error during parsing scale(object, scale)");
-    return NULL;
-  }
-  return python_scale_core(obj,val_v);
-}
-
-PyObject *python_oo_scale(PyObject *obj, PyObject *args, PyObject *kwargs)
-{
-  char *kwlist[] = {"v", NULL};
-  PyObject *val_v = NULL;
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O", kwlist,
-                                   &val_v)) {
-    PyErr_SetString(PyExc_TypeError, "Error during parsing scale(object, scale)");
-    return NULL;
-  }
-  return python_scale_core(obj,val_v);
-}
 
 int python_tomatrix(PyObject *pyt, Matrix4d &mat)
 {
@@ -649,30 +594,113 @@ PyObject *python_frommatrix(const Matrix4d &mat) {
   return pyo;
 }
 
-PyObject *python_matrix(PyObject *mat,int mode, Vector3d transvec, Matrix3d rotvec) // TODO ein arg weniger
+
+PyObject *python_matrix_scale(PyObject *mat, Vector3d scalevec)
 {
-  // 0=translate	
-  // 1=rotate
+  Transform3d matrix=Transform3d::Identity();
+  matrix.scale(scalevec);
   Matrix4d raw;
   if(python_tomatrix(mat, raw)) return nullptr;
   Vector3d n;
-  Transform3d matrix=Transform3d::Identity();
-  switch(mode) {
-	  case 0: // translate
-		  // col0 = xvec col1=yvec, col2=zvec, col3=trans
-		  for(int i=0;i<3;i++) raw(i,3) += transvec[i];
-		  break;
-	  case 1: // rotate
-  		matrix.rotate(rotvec);
-		for(int i=0;i<3;i++) {
-		  n =Vector3d(raw(0,i),raw(1,i),raw(2,i));
-		  n = matrix * n;
-		  for(int j=0;j<3;j++) raw(j,i) = n[j];
-		}  
-		break;
-  }
+  for(int i=0;i<3;i++) {
+    n =Vector3d(raw(0,i),raw(1,i),raw(2,i)); // TODO fix
+    n = matrix * n;
+    for(int j=0;j<3;j++) raw(j,i) = n[j];
+  }  
   return python_frommatrix(raw);
 }
+
+
+PyObject *python_scale_sub(PyObject *obj, Vector3d scalevec)
+{
+  PyObject *mat = python_matrix_scale(obj, scalevec);
+  if(mat != nullptr) return mat;
+
+  DECLARE_INSTANCE
+  std::shared_ptr<AbstractNode> child;
+  auto node = std::make_shared<TransformNode>(instance, "scale");
+  PyObject *child_dict;
+  child = PyOpenSCADObjectToNodeMulti(obj,&child_dict);
+  if (child == NULL) {
+    PyErr_SetString(PyExc_TypeError, "Invalid type for Object in scale");
+    return NULL;
+  }
+  node->matrix.scale(scalevec);
+  node->children.push_back(child);
+  PyObject *pyresult =  PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
+  if(child_dict != nullptr) {
+    PyObject *key, *value;
+    Py_ssize_t pos = 0;
+     while(PyDict_Next(child_dict, &pos, &key, &value)) {
+       PyObject *value1 = python_matrix_scale(value,scalevec);
+       if(value1 != nullptr) PyDict_SetItem(((PyOpenSCADObject *) pyresult)->dict,key, value1);
+       else PyDict_SetItem(((PyOpenSCADObject *) pyresult)->dict,key, value);
+    }
+  }
+  return pyresult;
+
+}
+
+PyObject *python_scale_core(PyObject *obj, PyObject *val_v)
+{
+ 
+  double x, y, z;
+  if (python_vectorval(val_v, &x, &y, &z)) {
+    PyErr_SetString(PyExc_TypeError, "Invalid vector specifiaction in scale, use 1 to 3 ordinates.");
+    return NULL;
+  }
+  Vector3d scalevec(x, y, z);
+
+  if (OpenSCAD::rangeCheck) {
+    if (scalevec[0] == 0 || scalevec[1] == 0 || scalevec[2] == 0 || !std::isfinite(scalevec[0])|| !std::isfinite(scalevec[1])|| !std::isfinite(scalevec[2])) {
+//      LOG(message_group::Warning, instance->location(), parameters.documentRoot(), "scale(%1$s)", parameters["v"].toEchoStringNoThrow());
+    }
+  }
+
+  return python_scale_sub(obj,scalevec);
+}
+
+
+PyObject *python_scale(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+  char *kwlist[] = {"obj", "v", NULL};
+  PyObject *obj = NULL;
+  PyObject *val_v = NULL;
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OO", kwlist,
+                                   &obj,
+                                   &val_v)) {
+    PyErr_SetString(PyExc_TypeError, "Error during parsing scale(object, scale)");
+    return NULL;
+  }
+  return python_scale_core(obj,val_v);
+}
+
+PyObject *python_oo_scale(PyObject *obj, PyObject *args, PyObject *kwargs)
+{
+  char *kwlist[] = {"v", NULL};
+  PyObject *val_v = NULL;
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O", kwlist,
+                                   &val_v)) {
+    PyErr_SetString(PyExc_TypeError, "Error during parsing scale(object, scale)");
+    return NULL;
+  }
+  return python_scale_core(obj,val_v);
+}
+PyObject *python_matrix_rot(PyObject *mat, Matrix3d rotvec)
+{
+  Transform3d matrix=Transform3d::Identity();
+  matrix.rotate(rotvec);
+  Matrix4d raw;
+  if(python_tomatrix(mat, raw)) return nullptr;
+  Vector3d n;
+  for(int i=0;i<3;i++) {
+    n =Vector3d(raw(0,i),raw(1,i),raw(2,i));
+    n = matrix * n;
+    for(int j=0;j<3;j++) raw(j,i) = n[j];
+  }  
+  return python_frommatrix(raw);
+}
+
 
 PyObject *python_rotate_sub(PyObject *obj, Vector3d rot)
 {
@@ -703,8 +731,7 @@ PyObject *python_rotate_sub(PyObject *obj, Vector3d rot)
     cy *sz,  cx *cz + sx * sy * sz,  -cz * sx + cx * sy * sz,
     -sy,       cy *sx,                  cx *cy;
   
-  Vector3d dum;
-  PyObject *mat = python_matrix(obj,1,dum, M); // 1=rotate
+  PyObject *mat = python_matrix_rot(obj, M);
   if(mat != nullptr) return mat;
 
   DECLARE_INSTANCE
@@ -723,7 +750,7 @@ PyObject *python_rotate_sub(PyObject *obj, Vector3d rot)
     PyObject *key, *value;
     Py_ssize_t pos = 0;
      while(PyDict_Next(child_dict, &pos, &key, &value)) {
-       PyObject *value1 = python_matrix(value,1,dum,M);
+       PyObject *value1 = python_matrix_rot(value,M);
        if(value1 != nullptr) PyDict_SetItem(((PyOpenSCADObject *) pyresult)->dict,key, value1);
        else PyDict_SetItem(((PyOpenSCADObject *) pyresult)->dict,key, value);
     }
@@ -771,17 +798,53 @@ PyObject *python_oo_rotate(PyObject *obj, PyObject *args, PyObject *kwargs)
   return python_rotate_core(obj, val_a, val_v);
 }
 
-PyObject *python_mirror_core(PyObject *obj, PyObject *val_v)
+
+PyObject *python_matrix_mirror(PyObject *mat, Matrix4d m)
 {
+//  Transform3d matrix=Transform3d::Identity();
+//  matrix.rotate(rotvec);
+  Matrix4d raw;
+  if(python_tomatrix(mat, raw)) return nullptr;
+  Vector4d n;
+  for(int i=0;i<3;i++) {
+    n =Vector4d(raw(0,i),raw(1,i),raw(2,i),0);
+    n = m * n;
+    for(int j=0;j<3;j++) raw(j,i) = n[j];
+  }  
+  return python_frommatrix(raw);
+}
+
+
+PyObject *python_mirror_sub(PyObject *obj, Matrix4d &m)
+{
+  PyObject *mat = python_matrix_mirror(obj,m);
+  if(mat != nullptr) return mat;
+
   DECLARE_INSTANCE
   auto node = std::make_shared<TransformNode>(instance, "mirror");
-  PyObject *dummydict;
-  std::shared_ptr<AbstractNode> child = PyOpenSCADObjectToNodeMulti(obj, &dummydict);
+  node->matrix = m;
+  PyObject *child_dict;
+  std::shared_ptr<AbstractNode> child = PyOpenSCADObjectToNodeMulti(obj, &child_dict);
   if (child == NULL) {
     PyErr_SetString(PyExc_TypeError, "Invalid type for Object in mirror");
     return NULL;
   }
+  node->children.push_back(child);
+  PyObject *pyresult =  PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
+  if(child_dict != nullptr) {
+    PyObject *key, *value;
+    Py_ssize_t pos = 0;
+     while(PyDict_Next(child_dict, &pos, &key, &value)) {
+       PyObject *value1 = python_matrix_mirror(value,m);
+       if(value1 != nullptr) PyDict_SetItem(((PyOpenSCADObject *) pyresult)->dict,key, value1);
+       else PyDict_SetItem(((PyOpenSCADObject *) pyresult)->dict,key, value);
+    }
+  }
+  return pyresult;
+}
 
+PyObject *python_mirror_core(PyObject *obj, PyObject *val_v)
+{
   Vector3d mirrorvec;
   double x = 1.0, y = 1.0, z = 1.0;
   if (python_vectorval(val_v, &x, &y, &z)) {
@@ -791,23 +854,21 @@ PyObject *python_mirror_core(PyObject *obj, PyObject *val_v)
   // x /= sqrt(x*x + y*y + z*z)
   // y /= sqrt(x*x + y*y + z*z)
   // z /= sqrt(x*x + y*y + z*z)
+  Matrix4d m=Matrix4d::Identity();
   if (x != 0.0 || y != 0.0 || z != 0.0) {
     // skip using sqrt to normalize the vector since each element of matrix contributes it with two multiplied terms
     // instead just divide directly within each matrix element
     // simplified calculation leads to less float errors
     double a = x * x + y * y + z * z;
 
-    Matrix4d m;
     m << 1 - 2 * x * x / a, -2 * y * x / a, -2 * z * x / a, 0,
       -2 * x * y / a, 1 - 2 * y * y / a, -2 * z * y / a, 0,
       -2 * x * z / a, -2 * y * z / a, 1 - 2 * z * z / a, 0,
       0, 0, 0, 1;
-    node->matrix = m;
   }
-
-  node->children.push_back(child);
-  return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
+  return python_mirror_sub(obj,m);
 }
+
 
 PyObject *python_mirror(PyObject *self, PyObject *args, PyObject *kwargs)
 {
@@ -838,11 +899,19 @@ PyObject *python_oo_mirror(PyObject *obj, PyObject *args, PyObject *kwargs)
   return python_mirror_core(obj, val_v);
 }
 
+
+PyObject *python_matrix_trans(PyObject *mat, Vector3d transvec)
+{
+  Matrix4d raw;
+  if(python_tomatrix(mat, raw)) return nullptr;
+  for(int i=0;i<3;i++) raw(i,3) += transvec[i];
+  return python_frommatrix(raw);
+}
+
 PyObject *python_translate_sub(PyObject *obj, Vector3d translatevec)
 {
-  Matrix3d dum;	
   PyObject *child_dict;
-  PyObject *mat = python_matrix(obj,0,translatevec,dum); // 0=translate
+  PyObject *mat = python_matrix_trans(obj,translatevec);
   if(mat != nullptr) return mat;
 
   DECLARE_INSTANCE
@@ -861,7 +930,7 @@ PyObject *python_translate_sub(PyObject *obj, Vector3d translatevec)
     PyObject *key, *value;
     Py_ssize_t pos = 0;
      while(PyDict_Next(child_dict, &pos, &key, &value)) {
-       PyObject *value1 = python_matrix(value,0,translatevec,dum);
+       PyObject *value1 = python_matrix_trans(value,translatevec);
        if(value1 != nullptr) PyDict_SetItem(((PyOpenSCADObject *) pyresult)->dict,key, value1);
        else PyDict_SetItem(((PyOpenSCADObject *) pyresult)->dict,key, value);
     }
@@ -876,8 +945,7 @@ PyObject *python_translate_core(PyObject *obj, PyObject *v)
     PyErr_SetString(PyExc_TypeError, "Invalid vector specifiaction in trans");
     return NULL;
   }
-  Vector3d translatevec(x, y, z);
-  return python_translate_sub(obj, translatevec);
+  return python_translate_sub(obj, Vector3d(x, y, z));
 }	
 
 PyObject *python_translate(PyObject *self, PyObject *args, PyObject *kwargs)
@@ -979,13 +1047,6 @@ PyObject *python_roty(PyObject *self, PyObject *args, PyObject *kwargs) { return
 PyObject *python_oo_roty(PyObject *self, PyObject *args, PyObject *kwargs) { return python_oo_dir_sub(self, args,kwargs, 7); }
 PyObject *python_rotz(PyObject *self, PyObject *args, PyObject *kwargs) { return python_dir_sub(self, args,kwargs, 8); }
 PyObject *python_oo_rotz(PyObject *self, PyObject *args, PyObject *kwargs) { return python_oo_dir_sub(self, args,kwargs, 8); }
-
-PyObject *python_dir_oo_sub(PyObject *self, PyObject *args, PyObject *kwargs, int mode)
-{
-  PyObject *new_args = python_oo_args(self, args);
-  PyObject *result = python_dir_sub(self, new_args, kwargs,mode);
-  return result;
-}
 
 PyObject *python_multmatrix_sub(PyObject *pyobj, PyObject *pymat, int div)
 {
