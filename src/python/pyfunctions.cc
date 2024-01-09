@@ -39,7 +39,6 @@ extern bool parse(SourceFile *& file, const std::string& text, const std::string
 #include <src/python/pylibfive.h>
 #include "src/python/FrepNode.h"
 #endif
-
 #include "GeometryUtils.h"
 #include "primitives.h"
 #include "TransformNode.h"
@@ -561,7 +560,6 @@ PyObject *python_polygon(PyObject *self, PyObject *args, PyObject *kwargs)
   return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
 }
 
-
 int python_tomatrix(PyObject *pyt, Matrix4d &mat)
 {
   if(pyt == nullptr) return 1;
@@ -868,7 +866,6 @@ PyObject *python_mirror_core(PyObject *obj, PyObject *val_v)
   }
   return python_mirror_sub(obj,m);
 }
-
 
 PyObject *python_mirror(PyObject *self, PyObject *args, PyObject *kwargs)
 {
@@ -1976,11 +1973,6 @@ PyObject *python_nb_or(PyObject *arg1, PyObject *arg2) { return python_nb_sub(ar
 PyObject *python_nb_andnot(PyObject *arg1, PyObject *arg2) { return python_nb_sub(arg1, arg2,  OpenSCADOperator::DIFFERENCE); }
 PyObject *python_nb_and(PyObject *arg1, PyObject *arg2) { return python_nb_sub(arg1, arg2,  OpenSCADOperator::INTERSECTION); }
 
-
-
-
-
-
 PyObject *python_csg_adv_sub(PyObject *self, PyObject *args, PyObject *kwargs, CgalAdvType mode)
 {
   DECLARE_INSTANCE
@@ -2770,11 +2762,6 @@ PyObject *do_import_python(PyObject *self, PyObject *args, PyObject *kwargs, Imp
   double val = dpi;
   if (val < 0.001) {
     PyErr_SetString(PyExc_TypeError, "Invalid dpi value giving");
-//      std::string filePath = boostfs_uncomplete(instance->location().filePath(), "");
-//      LOG(message_group::Warning, Location::NONE, "",
-//          "Invalid dpi value giving, using default of %1$f dpi. Value must be positive and >= 0.001, file %2$s, import() at line %3$d",
-//          origin.toEchoStringNoThrow(), filePath, filePath, inst->location().firstLine()
-//          );
     return NULL;
   } else {
     node->dpi = val;
