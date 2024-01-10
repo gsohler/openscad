@@ -113,7 +113,7 @@ PyObject *python_cube(PyObject *self, PyObject *args, PyObject *kwargs)
       PyErr_SetString(PyExc_TypeError, "Unknown Value for center parameter");
       return NULL;
   }
-
+  python_retrieve_pyname(node);
   return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
 }
 
@@ -162,6 +162,7 @@ PyObject *python_sphere(PyObject *self, PyObject *args, PyObject *kwargs)
 
   node->r = vr;
 
+  python_retrieve_pyname(node);
   return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
 }
 
@@ -247,6 +248,7 @@ PyObject *python_cylinder(PyObject *self, PyObject *args, PyObject *kwargs)
       return NULL;
   }
 
+  python_retrieve_pyname(node);
   return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
 }
 
@@ -342,6 +344,7 @@ PyObject *python_polyhedron(PyObject *self, PyObject *args, PyObject *kwargs)
   node->convexity = convexity;
   if (node->convexity < 1) node->convexity = 1;
 
+  python_retrieve_pyname(node);
   return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
 }
 
@@ -374,6 +377,7 @@ PyObject *python_frep(PyObject *self, PyObject *args, PyObject *kwargs)
     return NULL;
   }
 
+  python_retrieve_pyname(node);
   return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
 }
 
@@ -433,6 +437,7 @@ PyObject *python_square(PyObject *self, PyObject *args, PyObject *kwargs)
       return NULL;
   }
 
+  python_retrieve_pyname(node);
   return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
 }
 
@@ -480,6 +485,7 @@ PyObject *python_circle(PyObject *self, PyObject *args, PyObject *kwargs)
   node->r = vr;
 
 
+  python_retrieve_pyname(node);
   return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
 }
 
@@ -557,6 +563,7 @@ PyObject *python_polygon(PyObject *self, PyObject *args, PyObject *kwargs)
   node->convexity = convexity;
   if (node->convexity < 1) node->convexity = 1;
 
+  python_retrieve_pyname(node);
   return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
 }
 
@@ -624,6 +631,7 @@ PyObject *python_scale_sub(PyObject *obj, Vector3d scalevec)
     return NULL;
   }
   node->matrix.scale(scalevec);
+  node->setPyName(child->getPyName());
   node->children.push_back(child);
   PyObject *pyresult =  PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
   if(child_dict != nullptr) {
@@ -741,6 +749,7 @@ PyObject *python_rotate_sub(PyObject *obj, Vector3d rot)
     return NULL;
   }
   node->matrix.rotate(M);
+  node->setPyName(child->getPyName());
 
   node->children.push_back(child);
   PyObject *pyresult =  PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
@@ -828,6 +837,7 @@ PyObject *python_mirror_sub(PyObject *obj, Matrix4d &m)
     return NULL;
   }
   node->children.push_back(child);
+  node->setPyName(child->getPyName());
   PyObject *pyresult =  PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
   if(child_dict != nullptr) {
     PyObject *key, *value;
@@ -915,6 +925,7 @@ PyObject *python_translate_sub(PyObject *obj, Vector3d translatevec)
   auto node = std::make_shared<TransformNode>(instance, "translate");
   std::shared_ptr<AbstractNode> child;
   child = PyOpenSCADObjectToNodeMulti(obj, &child_dict);
+  node->setPyName(child->getPyName());
   if (child == NULL) {
     PyErr_SetString(PyExc_TypeError, "Invalid type for Object in translate");
     return NULL;
@@ -1070,6 +1081,7 @@ PyObject *python_multmatrix_sub(PyObject *pyobj, PyObject *pymat, int div)
   std::shared_ptr<AbstractNode> child;
   PyObject *dummydict;
   child = PyOpenSCADObjectToNodeMulti(pyobj, &dummydict);
+  node->setPyName(child->getPyName());
   if (child == NULL) {
     PyErr_SetString(PyExc_TypeError, "Invalid type for Object in multmatrix");
     return NULL;
@@ -1207,19 +1219,24 @@ PyObject *python_output_core(PyObject *obj)
     PyErr_SetString(PyExc_TypeError, "Invalid type for Object in output");
     return NULL;
   }
-  python_result_node = child;
-  python_result_handle.clear();
   PyObject *key, *value;
   Py_ssize_t pos = 0;
+  python_result_node = child;
+  mapping_name.clear();
+  mapping_code.clear();
+  mapping_level.clear();
+  python_build_hashmap(child);
+  python_result_handle.clear();
   Matrix4d raw;
   SelectedObject sel;
+  std::string varname=child->getPyName();
   while(PyDict_Next(child_dict, &pos, &key, &value)) {
      if(python_tomatrix(value, raw)) continue;
      PyObject* value1 = PyUnicode_AsEncodedString(key, "utf-8", "~");
      const char *value_str =  PyBytes_AS_STRING(value1);
      sel.p1 = Vector3d(raw(0,3),raw(1,3),raw(2,3));
      sel.type=SELECTION_HANDLE;
-     sel.name=value_str;
+     sel.name=varname+"."+value_str;
      python_result_handle.push_back(sel);
 
 
@@ -1254,8 +1271,8 @@ PyObject *python_oo_output(PyObject *obj, PyObject *args, PyObject *kwargs)
 PyObject *python__getitem__(PyObject *dict, PyObject *key)
 {
   PyOpenSCADObject *self = (PyOpenSCADObject *) dict;
-  if (self->dict == NULL) {
-    return 0;
+  if (self->dict == nullptr) {
+    return nullptr;
   }
   PyObject *result = PyDict_GetItem(self->dict, key);
   if (result == NULL) result = Py_None;
@@ -1900,38 +1917,49 @@ PyObject *python_intersection(PyObject *self, PyObject *args, PyObject *kwargs)
 PyObject *python_nb_sub(PyObject *arg1, PyObject *arg2, OpenSCADOperator mode)
 {
   DECLARE_INSTANCE
-  std::shared_ptr<AbstractNode> child;
-  PyObject *child_dict;	  
-  PyObject *dummy_dict;	  
+  std::shared_ptr<AbstractNode> child[2];
+  PyObject *child_dict[2];	  
 
   double x, y, z;
   if(arg1 == Py_None && mode == OpenSCADOperator::UNION) return arg2;
   if(arg2 == Py_None && mode == OpenSCADOperator::UNION) return arg1;
   if(arg2 == Py_None && mode == OpenSCADOperator::DIFFERENCE) return arg1;
 
-  auto node = std::make_shared<CsgOpNode>(instance, mode);
 
-  child = PyOpenSCADObjectToNodeMulti(arg1, &child_dict);
-  if (child == NULL) {
+  child[0] = PyOpenSCADObjectToNodeMulti(arg1, &child_dict[0]);
+  if (child[0] == NULL) {
     PyErr_SetString(PyExc_TypeError, "invalid argument left to operator");
     return NULL;
   }
-  node->children.push_back(child);
-  child = PyOpenSCADObjectToNodeMulti(arg2, &dummy_dict);
-  if (child == NULL) {
+  child[1] = PyOpenSCADObjectToNodeMulti(arg2, &child_dict[1]);
+  if (child[1] == NULL) {
     PyErr_SetString(PyExc_TypeError, "invalid argument right to operator");
     return NULL;
   }
-  node->children.push_back(child);
+  auto node = std::make_shared<CsgOpNode>(instance, mode);
+  node->children.push_back(child[0]);
+  node->children.push_back(child[1]);
+  python_retrieve_pyname(node);
   PyObject *pyresult = PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
-  if(child_dict != nullptr) {
-    PyObject *key, *value;
-    Py_ssize_t pos = 0;
-     while(PyDict_Next(child_dict, &pos, &key, &value)) {
-       PyDict_SetItem(((PyOpenSCADObject *) pyresult)->dict,key, value);
-    }
-  }
+  for(int i=0;i<2;i++) {
+    if(child_dict[i] != nullptr) {
+      std::string name=child[i]->getPyName();
+      PyObject *key, *value;
+      Py_ssize_t pos = 0;
+      while(PyDict_Next(child_dict[i], &pos, &key, &value)) {
+        if(name.size() > 0) {	      
+          PyObject *key1=PyUnicode_AsEncodedString(key, "utf-8", "~");
+          const char *key_str =  PyBytes_AS_STRING(key1);
+          std::string handle_name=name+"_"+key_str;
+          PyObject *key_mod = PyUnicode_FromStringAndSize(handle_name.c_str(),strlen(handle_name.c_str()));
+          PyDict_SetItem(((PyOpenSCADObject *) pyresult)->dict,key_mod, value);
+	} else {
+          PyDict_SetItem(((PyOpenSCADObject *) pyresult)->dict,key, value);
+	}
 
+      }
+    }
+  }  
   return pyresult;
 }
 
@@ -2641,6 +2669,7 @@ PyObject *python_align_core(PyObject *obj, PyObject *pyrefmat, PyObject *pydstma
     MT = MT * mat.inverse();	  
   }
   multmatnode -> matrix = MT ;
+  multmatnode->setPyName(dstnode->getPyName());
 
   PyObject *pyresult =PyOpenSCADObjectFromNode(&PyOpenSCADType, multmatnode);
   if(child_dict != nullptr) {

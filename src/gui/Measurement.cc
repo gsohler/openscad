@@ -155,7 +155,7 @@ display_angle:
           qglview->selected_obj.clear();
           qglview->shown_obj.clear();
           qglview->update();
-          return QString("Handle %1 found").arg(qglview->selected_obj[0].name.c_str());
+          return QString("I:%1").arg(qglview->selected_obj[0].name.c_str());
       }
       break;
   }

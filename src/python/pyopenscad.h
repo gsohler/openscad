@@ -42,6 +42,12 @@ Value python_functionfunc(const FunctionCall *call,const std::shared_ptr<const C
 int python_vectorval(PyObject *vec, double *x, double *y, double *z, double *w=NULL);
 int python_numberval(PyObject *number, double *result);
 void get_fnas(double& fn, double& fa, double& fs);
+void python_retrieve_pyname(const std::shared_ptr<AbstractNode> &node);
+void python_build_hashmap(const std::shared_ptr<AbstractNode> &node);
+
+extern std::vector<std::string> mapping_name;
+extern std::vector<std::string> mapping_code;
+extern std::vector<int> mapping_level;
 
 PyObject *python_str(PyObject *self);
 

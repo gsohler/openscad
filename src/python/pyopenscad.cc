@@ -50,6 +50,11 @@ bool python_trusted; /* global Python trust flag */
 bool pythonMainModuleInitialized = false;
 bool pythonRuntimeInitialized = false;
 
+std::vector<std::string> mapping_name;
+std::vector<std::string> mapping_code;
+std::vector<int> mapping_level;
+
+
 void PyOpenSCADObject_dealloc(PyOpenSCADObject *self)
 {
   Py_XDECREF(self->dict);
@@ -167,6 +172,58 @@ std::shared_ptr<AbstractNode> PyOpenSCADObjectToNodeMulti(PyObject *objs,PyObjec
   return result;
 }
 
+std::string python_hierdump(const std::shared_ptr<AbstractNode> &node)
+{
+  std::string dump = node->toString();	
+  auto children = node->getChildren();
+  if(children.size() < 1) dump += ";";
+  else if(children.size() < 2) dump += python_hierdump(children[0]);
+  else {
+   dump += "{ ";	  
+   for(int i=0;i<children.size();i++) dump += python_hierdump(children[i]);
+   dump += " }";	  
+  }
+
+  return dump;
+}
+void python_build_hashmap(const std::shared_ptr<AbstractNode> &node)
+{
+  PyObject *maindict = PyModule_GetDict(pythonMainModule);
+  PyObject *key, *value;
+  Py_ssize_t pos = 0;
+  std::string code=python_hierdump(node);
+  while (PyDict_Next(maindict, &pos, &key, &value)) {
+    if(value->ob_type != &PyOpenSCADType) continue;
+    std::shared_ptr<AbstractNode> testnode = ((PyOpenSCADObject *) value)->node;
+    if(testnode != node) continue;
+    PyObject* key1 = PyUnicode_AsEncodedString(key, "utf-8", "~");
+    if(key1 == nullptr) continue;
+    const char *key_str =  PyBytes_AS_STRING(key1);
+    if(key_str == nullptr) continue;
+    mapping_name.push_back(key_str);
+    mapping_code.push_back(code);
+    mapping_level.push_back(pos);
+  }  
+  for(const auto &child:node->getChildren()) {
+    python_build_hashmap(child);	  
+  }
+}
+
+void python_retrieve_pyname(const std::shared_ptr<AbstractNode> &node)
+{
+  std::string name;	
+  int level=-1;
+  std::string my_code = python_hierdump(node);
+  for(int i=0;i<mapping_code.size();i++) {
+    if(mapping_code[i] == my_code) {
+      if(level == -1 || level > mapping_level[i]) {	    
+        name=mapping_name[i];	    
+        level=mapping_level[i];	    
+      }	
+    }	    
+  }
+  node->setPyName(name);
+}
 /*
  * converts a python obejct into an integer by all means
  */
@@ -671,10 +728,10 @@ sys.stderr = stderr_bak\n\
 int python__setitem__(PyObject *dict, PyObject *key, PyObject *v);
 PyObject *python__getitem__(PyObject *dict, PyObject *key);
 
-PyObject *python__getattro__(PyObject *dict, PyObject *key)
+PyObject *python__getattro__(PyObject *obj, PyObject *key)
 {
-	PyObject *result=python__getitem__(dict,key);
-	if(result == Py_None || result == nullptr)  result = PyObject_GenericGetAttr(dict,key);
+	PyObject *result=python__getitem__(obj,key);
+	if(result == Py_None || result == nullptr)  result = PyObject_GenericGetAttr(obj,key);
 	return result;
 }
 

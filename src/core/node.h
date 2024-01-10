@@ -67,6 +67,11 @@ public:
 
   std::shared_ptr<const AbstractNode> getNodeByID(int idx, std::deque<std::shared_ptr<const AbstractNode>>& path) const;
   std::shared_ptr<AbstractNode> clone(void);
+#ifdef ENABLE_PYTHON  
+  std::string py_name;
+  void setPyName(const std::string &name);
+  std::string  getPyName(void);
+#endif  
 };
 
 class AbstractIntersectionNode : public AbstractNode

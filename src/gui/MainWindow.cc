@@ -2397,6 +2397,15 @@ void MainWindow::leftClick(QPoint mouse)
   QString str = meas.statemachine(mouse);
   if(str.size() > 0) {
     this->qglview->measure_state = MEASURE_IDLE;
+    if(str.startsWith("I:")) {
+      this->activeEditor->insert(QString(str.toStdString().c_str()+2));
+      this->qglview->selected_obj.clear();
+      this->qglview->shown_obj.clear();
+      this->qglview->update();
+      this->qglview->measure_state = MEASURE_IDLE;
+      this->qglview->handle_mode=false;
+      return;
+    }
     QMenu resultmenu(this);
     auto action = resultmenu.addAction(str);
     connect(action, SIGNAL(triggered()), this, SLOT(measureFinished()));
