@@ -35,6 +35,7 @@
 #include "Feature.h"
 
 #include "CGALRenderer.h"
+#include "CGALRenderUtils.h"
 #ifdef ENABLE_CGAL
 #include "CGAL_OGL_VBOPolyhedron.h"
 #include "CGALHybridPolyhedron.h"
@@ -46,7 +47,6 @@
 //#include "Preferences.h"
 
 CGALRenderer::CGALRenderer(const std::shared_ptr<const class Geometry>& geom)
-  : last_render_state(Feature::ExperimentalVxORenderers.is_enabled()) // FIXME: this is temporary to make switching between renderers seamless.
 {
   this->addGeometry(geom);
   PRINTD("CGALRenderer::CGALRenderer() -> createPolyhedrons()");
@@ -102,25 +102,13 @@ void CGALRenderer::createPolyhedrons()
 {
   PRINTD("createPolyhedrons");
   this->polyhedrons.clear();
-
-  if (!Feature::ExperimentalVxORenderers.is_enabled()) {
-    for (const auto& N : this->nefPolyhedrons) {
-      auto p = new CGAL_OGL_Polyhedron(*this->colorscheme);
-      CGAL::OGL::Nef3_Converter<CGAL_Nef_polyhedron3>::convert_to_OGLPolyhedron(*N->p3, p);
-      // CGAL_NEF3_MARKED_FACET_COLOR <- CGAL_FACE_BACK_COLOR
-      // CGAL_NEF3_UNMARKED_FACET_COLOR <- CGAL_FACE_FRONT_COLOR
-      p->init();
-      this->polyhedrons.push_back(std::shared_ptr<CGAL_OGL_Polyhedron>(p));
-    }
-  } else {
-    for (const auto& N : this->nefPolyhedrons) {
-      auto p = new CGAL_OGL_VBOPolyhedron(*this->colorscheme);
-      CGAL::OGL::Nef3_Converter<CGAL_Nef_polyhedron3>::convert_to_OGLPolyhedron(*N->p3, p);
-      // CGAL_NEF3_MARKED_FACET_COLOR <- CGAL_FACE_BACK_COLOR
-      // CGAL_NEF3_UNMARKED_FACET_COLOR <- CGAL_FACE_FRONT_COLOR
-      p->init();
-      this->polyhedrons.push_back(std::shared_ptr<CGAL_OGL_Polyhedron>(p));
-    }
+  for (const auto& N : this->nefPolyhedrons) {
+    auto p = new CGAL_OGL_VBOPolyhedron(*this->colorscheme);
+    CGAL::OGL::Nef3_Converter<CGAL_Nef_polyhedron3>::convert_to_OGLPolyhedron(*N->p3, p);
+    // CGAL_NEF3_MARKED_FACET_COLOR <- CGAL_FACE_BACK_COLOR
+    // CGAL_NEF3_UNMARKED_FACET_COLOR <- CGAL_FACE_FRONT_COLOR
+    p->init();
+    this->polyhedrons.push_back(std::shared_ptr<CGAL_OGL_Polyhedron>(p));
   }
   PRINTD("createPolyhedrons() end");
 }
@@ -233,9 +221,7 @@ void CGALRenderer::prepare(bool /*showfaces*/, bool /*showedges*/, const shaderi
   PRINTD("prepare()");
   if (!polyset_states.size()) createPolySets();
 #ifdef ENABLE_CGAL
-  if (!this->nefPolyhedrons.empty() &&
-      (this->polyhedrons.empty() || Feature::ExperimentalVxORenderers.is_enabled() != last_render_state)) // FIXME: this is temporary to make switching between renderers seamless.
-    createPolyhedrons();
+  if (!this->nefPolyhedrons.empty() && this->polyhedrons.empty()) createPolyhedrons();
 #endif
 
   PRINTD("prepare() end");
@@ -244,23 +230,16 @@ void CGALRenderer::prepare(bool /*showfaces*/, bool /*showedges*/, const shaderi
 void CGALRenderer::draw(bool showfaces, bool showedges, const shaderinfo_t * /*shaderinfo*/) const
 {
   PRINTD("draw()");
-  if (!Feature::ExperimentalVxORenderers.is_enabled()) {
-    for (const auto& polyset : this->polysets) {
-      PRINTD("draw() polyset");
-      if (polyset->getDimension() == 2) {
-        // Draw 2D polygons
-        glDisable(GL_LIGHTING);
-        setColor(ColorMode::CGAL_FACE_2D_COLOR);
+  // grab current state to restore after
+  GLfloat current_point_size, current_line_width;
+  GLboolean origVertexArrayState = glIsEnabled(GL_VERTEX_ARRAY);
+  GLboolean origNormalArrayState = glIsEnabled(GL_NORMAL_ARRAY);
+  GLboolean origColorArrayState = glIsEnabled(GL_COLOR_ARRAY);
 
-        for (const auto& polygon : polyset->indices) {
-          glBegin(GL_POLYGON);
-          for (const auto& ind : polygon) {
-            Vector3d p=polyset->vertices[ind];		  
-            glVertex3d(p[0], p[1], 0);
-          }
-          glEnd();
-        }
+  GL_CHECKD(glGetFloatv(GL_POINT_SIZE, &current_point_size));
+  GL_CHECKD(glGetFloatv(GL_LINE_WIDTH, &current_line_width));
 
+#if 0
         // Draw 2D edges
         glDisable(GL_DEPTH_TEST);
 
@@ -297,11 +276,25 @@ void CGALRenderer::draw(bool showfaces, bool showedges, const shaderinfo_t * /*s
     if (!origVertexArrayState) glDisableClientState(GL_VERTEX_ARRAY);
     if (!origNormalArrayState) glDisableClientState(GL_NORMAL_ARRAY);
     if (!origColorArrayState) glDisableClientState(GL_COLOR_ARRAY);
+#endif
+  for (const auto& polyset : polyset_states) {
+    if (polyset) polyset->draw();
   }
+#if 0
+
+  // restore states
+  GL_TRACE("glPointSize(%d)", current_point_size);
+  GL_CHECKD(glPointSize(current_point_size));
+  GL_TRACE("glLineWidth(%d)", current_line_width);
+  GL_CHECKD(glLineWidth(current_line_width));
+
+  if (!origVertexArrayState) glDisableClientState(GL_VERTEX_ARRAY);
+  if (!origNormalArrayState) glDisableClientState(GL_NORMAL_ARRAY);
+  if (!origColorArrayState) glDisableClientState(GL_COLOR_ARRAY);
+#endif
 
 #ifdef ENABLE_CGAL
   for (const auto& p : this->getPolyhedrons()) {
-    *const_cast<bool *>(&last_render_state) = Feature::ExperimentalVxORenderers.is_enabled(); // FIXME: this is temporary to make switching between renderers seamless.
     if (showfaces) p->set_style(SNC_BOUNDARY);
     else p->set_style(SNC_SKELETON);
     p->draw(showfaces && showedges);
@@ -327,27 +320,6 @@ BoundingBox CGALRenderer::getBoundingBox() const
     bbox.extend(ps->getBoundingBox());
   }
   return bbox;
-}
-double calculateLinePointDistance(const Vector3d &l1, const Vector3d &l2, const Vector3d &pt, double & dist_lat) {
-    Vector3d d = (l2 - l1).normalized();
-    dist_lat = (pt-l1).dot(d);
-    return (l1 + d * dist_lat-pt).norm();
-}
-
-double calculateLineLineDistance(const Vector3d &l1b, const Vector3d &l1e, const Vector3d &l2b, const Vector3d &l2e, double &dist_lat)
-{
-	double d;
-	Vector3d v1=l1e-l1b;
-	Vector3d v2=l2e-l2b;
-	Vector3d n=v1.cross(v2);
-	if(n.norm() == 0) {
-		return calculateLinePointDistance(l1b,l1e,l2b,d);
-	}
-	double t=n.norm();
-	n.normalize();
-    	d=n.dot(l1b-l2b);
-	dist_lat=(v2.cross(n)).dot(l2b-l1b)/t;
-	return d;
 }
 
 std::vector<SelectedObject> CGALRenderer::findModelObject(Vector3d near_pt, Vector3d far_pt,int mouse_x, int mouse_y, double tolerance) {

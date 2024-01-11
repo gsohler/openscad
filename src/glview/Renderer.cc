@@ -147,7 +147,7 @@ std::string Renderer::loadShaderSource(const std::string& name) {
   return buffer.str();
 }
 
-Renderer::csgmode_e Renderer::get_csgmode(const bool highlight_mode, const bool background_mode, const OpenSCADOperator type) const {
+Renderer::csgmode_e Renderer::get_csgmode(const bool highlight_mode, const bool background_mode, const OpenSCADOperator type) {
   int csgmode = highlight_mode ? CSGMODE_HIGHLIGHT : (background_mode ? CSGMODE_BACKGROUND : CSGMODE_NORMAL);
   if (type == OpenSCADOperator::DIFFERENCE) csgmode |= CSGMODE_DIFFERENCE_FLAG;
   return csgmode_e(csgmode);
@@ -242,7 +242,7 @@ static void set_texture_coord(const Vector3d &pt,const Vector3d &norm, double tf
       } 
       glTexCoord2f(xt/tf, yt/tf);
 }
-
+#if 0
 static void draw_triangle(const Renderer::shaderinfo_t *shaderinfo, const Vector3d& p0, const Vector3d& p1, const Vector3d& p2,
                           bool e0, bool e1, bool e2, double z, bool mirror, int textureind)
 {
@@ -305,7 +305,7 @@ static void draw_tri(const Vector3d& p0, const Vector3d& p1, const Vector3d& p2,
   glVertex3d(p2[0], p2[1], p2[2] + z);
   if (mirror) glVertex3d(p1[0], p1[1], p1[2] + z);
 }
-
+#if 0
 static void gl_draw_triangle(const Renderer::shaderinfo_t *shaderinfo, const Vector3d& p0, const Vector3d& p1, const Vector3d& p2, bool e0, bool e1, bool e2, double z, bool mirrored, int textureind)
 {
   double ax = p1[0] - p0[0], bx = p1[0] - p2[0];
@@ -325,7 +325,6 @@ static void gl_draw_triangle(const Renderer::shaderinfo_t *shaderinfo, const Vec
     draw_tri(p0, p1, p2, z, mirrored);
   }
 }
-
 void Renderer::render_surface(const PolySet& ps, csgmode_e csgmode, const Transform3d& m, int textureind, const shaderinfo_t *shaderinfo) const
 {
   PRINTD("Renderer render");
@@ -482,6 +481,8 @@ void Renderer::render_edges(const PolySet& ps, csgmode_e csgmode) const
   }
   glEnable(GL_LIGHTING);
 }
+#endif
+#endif
 
 std::vector<SelectedObject> Renderer::findModelObject(Vector3d near_pt, Vector3d far_pt, int mouse_x, int mouse_y, double tolerance) { return std::vector<SelectedObject>(); }
 #else //NULLGL
@@ -490,13 +491,10 @@ Renderer::Renderer() : colorscheme(nullptr) {}
 void Renderer::resize(int /*w*/, int /*h*/) {}
 bool Renderer::getColor(Renderer::ColorMode colormode, Color4f& col) const { return false; }
 std::string Renderer::loadShaderSource(const std::string& name) { return ""; }
-Renderer::csgmode_e Renderer::get_csgmode(const bool highlight_mode, const bool background_mode, const OpenSCADOperator type) const { return {}; }
-void Renderer::setColor(const float color[4], const int &textureInd, const shaderinfo_t *shaderinfo) const {}
-Color4f Renderer::setColor(ColorMode colormode, const float color[4], const int &textureInd, const shaderinfo_t *shaderinfo) const { return {}; }
+void Renderer::setColor(const float color[4], const shaderinfo_t *shaderinfo) const {}
+Color4f Renderer::setColor(ColorMode colormode, const float color[4], const shaderinfo_t *shaderinfo) const { return {}; }
 void Renderer::setColor(ColorMode colormode, const shaderinfo_t *shaderinfo) const {}
 void Renderer::setColorScheme(const ColorScheme& cs) {}
-void Renderer::render_surface(const PolySet& ps, csgmode_e csgmode, const Transform3d& m, const shaderinfo_t *shaderinfo) const {}
-void Renderer::render_edges(const PolySet& ps, csgmode_e csgmode) const {}
 std::vector<SelectedObject> Renderer::findModelObject(Vector3d near_pt, Vector3d far_pt, int mouse_x, int mouse_y, double tolerance) { return std::vector<SelectedObject>(); }
 
 #endif //NULLGL
