@@ -239,48 +239,9 @@ void CGALRenderer::draw(bool showfaces, bool showedges, const shaderinfo_t * /*s
   GL_CHECKD(glGetFloatv(GL_POINT_SIZE, &current_point_size));
   GL_CHECKD(glGetFloatv(GL_LINE_WIDTH, &current_line_width));
 
-#if 0
-        // Draw 2D edges
-        glDisable(GL_DEPTH_TEST);
-
-        glLineWidth(2);
-        setColor(ColorMode::CGAL_EDGE_2D_COLOR);
-        this->render_edges(*polyset, CSGMODE_NONE);
-        glEnable(GL_DEPTH_TEST);
-      } else {
-        // Draw 3D polygons
-        setColor(ColorMode::MATERIAL);
-        this->render_surface(*polyset, CSGMODE_NORMAL, Transform3d::Identity(), 0,nullptr);
-      }
-    }
-  } else {
-    // grab current state to restore after
-    GLfloat current_point_size, current_line_width;
-    GLboolean origVertexArrayState = glIsEnabled(GL_VERTEX_ARRAY);
-    GLboolean origNormalArrayState = glIsEnabled(GL_NORMAL_ARRAY);
-    GLboolean origColorArrayState = glIsEnabled(GL_COLOR_ARRAY);
-
-    GL_CHECKD(glGetFloatv(GL_POINT_SIZE, &current_point_size));
-    GL_CHECKD(glGetFloatv(GL_LINE_WIDTH, &current_line_width));
-
-    for (const auto& polyset : polyset_states) {
-      if (polyset) polyset->draw();
-    }
-
-    // restore states
-    GL_TRACE("glPointSize(%d)", current_point_size);
-    GL_CHECKD(glPointSize(current_point_size));
-    GL_TRACE("glLineWidth(%d)", current_line_width);
-    GL_CHECKD(glLineWidth(current_line_width));
-
-    if (!origVertexArrayState) glDisableClientState(GL_VERTEX_ARRAY);
-    if (!origNormalArrayState) glDisableClientState(GL_NORMAL_ARRAY);
-    if (!origColorArrayState) glDisableClientState(GL_COLOR_ARRAY);
-#endif
   for (const auto& polyset : polyset_states) {
     if (polyset) polyset->draw();
   }
-#if 0
 
   // restore states
   GL_TRACE("glPointSize(%d)", current_point_size);
@@ -291,7 +252,6 @@ void CGALRenderer::draw(bool showfaces, bool showedges, const shaderinfo_t * /*s
   if (!origVertexArrayState) glDisableClientState(GL_VERTEX_ARRAY);
   if (!origNormalArrayState) glDisableClientState(GL_NORMAL_ARRAY);
   if (!origColorArrayState) glDisableClientState(GL_COLOR_ARRAY);
-#endif
 
 #ifdef ENABLE_CGAL
   for (const auto& p : this->getPolyhedrons()) {

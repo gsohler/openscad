@@ -8,12 +8,6 @@
 #include <cmath>
 #include <cstdio>
 #include "TextureNode.h"
-#ifdef _WIN32
-#include <GL/wglew.h>
-#elif !defined(__APPLE__)
-#include <GL/glxew.h>
-#endif
-
 #ifdef ENABLE_OPENCSG
 #include <opencsg.h>
 #endif
@@ -196,7 +190,6 @@ void GLView::paintGL()
       showObject(sel,eyedir);
     }
   }  
-
   glDisable(GL_LIGHTING);
   if (showaxes) GLView::showSmallaxes(axescolor);
 }
@@ -431,7 +424,7 @@ void GLView::showCrosshairs(const Color4f& col)
 
 void GLView::showObject(const SelectedObject &obj, const Vector3d &eyedir)
 {
-  auto vd = cam.zoomValue()/150.0;
+  auto vd = cam.zoomValue()/200.0;
   switch(obj.type) {
     case SELECTION_POINT:
     case SELECTION_HANDLE:	    

@@ -153,7 +153,7 @@ void LegacyCGALRenderer::draw(bool showfaces, bool showedges, const shaderinfo_t
     } else {
       // Draw 3D polygons
       setColor(ColorMode::MATERIAL);
-      render_surface(*polyset, CSGMODE_NORMAL, Transform3d::Identity(), 0);
+      render_surface(*polyset, CSGMODE_NORMAL, Transform3d::Identity(), 0, nullptr);
     }
   }
 
