@@ -106,14 +106,14 @@ void ThrownTogetherRenderer::draw(bool /*showfaces*/, bool showedges, const Rend
     glUseProgram(0);
   }
 }
-#if 0
+
 void ThrownTogetherRenderer::renderChainObject(const CSGChainObject& csgobj, bool showedges,
                                                const Renderer::shaderinfo_t *shaderinfo,
                                                bool highlight_mode, bool background_mode,
                                                bool fberror, OpenSCADOperator type) const
 {
-  if (this->geomVisitMark[std::make_pair(csgobj.leaf->geom.get(), &csgobj.leaf->matrix)]++ > 0) return;
-  const auto *ps = dynamic_cast<const PolySet *>(csgobj.leaf->geom.get());
+  if (this->geomVisitMark[std::make_pair(csgobj.leaf->polyset.get(), &csgobj.leaf->matrix)]++ > 0) return;
+  const auto ps = csgobj.leaf->polyset;
   if (!ps) return;
 
   const Color4f& c = csgobj.leaf->color;
@@ -142,7 +142,7 @@ void ThrownTogetherRenderer::renderChainObject(const CSGChainObject& csgobj, boo
   }
   glPopMatrix();
 }
-#endif
+
 
 void ThrownTogetherRenderer::renderCSGProducts(const std::shared_ptr<CSGProducts>& products, bool showedges,
                                                const Renderer::shaderinfo_t *shaderinfo,
