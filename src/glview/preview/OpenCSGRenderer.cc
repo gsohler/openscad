@@ -34,28 +34,6 @@
 
 #ifdef ENABLE_OPENCSG
 
-class OpenCSGPrim : public OpenCSG::Primitive
-{
-public:
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-  OpenCSGPrim(OpenCSG::Operation operation, unsigned int convexity, const OpenCSGRenderer& renderer) :
-    OpenCSG::Primitive(operation, convexity), renderer(renderer) { }
-  std::shared_ptr<const PolySet> geom;
-  Transform3d m;
-  Renderer::csgmode_e csgmode{Renderer::CSGMODE_NONE};
-
-  void render() override {
-    if (geom) {
-      glPushMatrix();
-      glMultMatrixd(m.data());
-      renderer.render_surface(*geom, csgmode, m,0);
-      glPopMatrix();
-    }
-  }
-private:
-  const OpenCSGRenderer& renderer;
-};
-
 class OpenCSGVBOPrim : public OpenCSG::Primitive
 {
 public:
@@ -101,33 +79,7 @@ void OpenCSGRenderer::prepare(bool /*showfaces*/, bool /*showedges*/, const shad
 void OpenCSGRenderer::draw(bool /*showfaces*/, bool showedges, const shaderinfo_t *shaderinfo) const
 {
   if (!shaderinfo && showedges) shaderinfo = &getShader();
-// TODO hier vershwindet texture stuff
-  if (!Feature::ExperimentalVxORenderers.is_enabled()) {
-    if (this->root_products_) {
-      renderCSGProducts(this->root_products_, showedges, shaderinfo, false, false);
-    }
-    if (this->background_products_) {
-      renderCSGProducts(this->background_products_, showedges, shaderinfo, false, true);
-    }
-    if (this->highlights_products_) {
-      renderCSGProducts(this->highlights_products_, showedges, shaderinfo, true, false);
-    }
-  } else {
-    renderCSGVBOProducts(showedges, shaderinfo);
-  }
-}
-
-// Primitive for rendering using OpenCSG
-OpenCSGPrim *OpenCSGRenderer::createCSGPrimitive(const CSGChainObject& csgobj, OpenCSG::Operation operation, bool highlight_mode, bool background_mode, OpenSCADOperator type) const
-{
-  auto *prim = new OpenCSGPrim(operation, csgobj.leaf->polyset->getConvexity(), *this);
-  std::shared_ptr<const PolySet> ps = csgobj.leaf->polyset;
-  if (ps) {
-    prim->geom = ps;
-  }
-  prim->m = csgobj.leaf->matrix;
-  prim->csgmode = get_csgmode(highlight_mode, background_mode, type);
-  return prim;
+  renderCSGVBOProducts(showedges, shaderinfo);
 }
 
 // Primitive for drawing using OpenCSG
@@ -333,114 +285,7 @@ void OpenCSGRenderer::createCSGVBOProducts(const CSGProducts& products, const Re
     GL_CHECKD(glBindBuffer(GL_ARRAY_BUFFER, 0));
 
     vertex_array.createInterleavedVBOs();
-    vbo_vertex_products_.emplace_back(std::make_unique<OpenCSGVBOProduct>(
-                                       std::move(primitives), std::move(vertex_states)));
-  }
-#endif // ENABLE_OPENCSG
-}
-
-void OpenCSGRenderer::renderCSGProducts(const std::shared_ptr<CSGProducts>& products, bool showedges,
-                                        const Renderer::shaderinfo_t *shaderinfo,
-                                        bool highlight_mode, bool background_mode) const
-{
-#ifdef ENABLE_OPENCSG
-  for (const auto& product : products->products) {
-    std::vector<OpenCSG::Primitive *> primitives;
-    for (const auto& csgobj : product.intersections) {
-      if (csgobj.leaf->polyset) primitives.push_back(createCSGPrimitive(csgobj, OpenCSG::Intersection, highlight_mode, background_mode, OpenSCADOperator::INTERSECTION));
-    }
-    for (const auto& csgobj : product.subtractions) {
-      if (csgobj.leaf->polyset) primitives.push_back(createCSGPrimitive(csgobj, OpenCSG::Subtraction, highlight_mode, background_mode, OpenSCADOperator::DIFFERENCE));
-    }
-    if (primitives.size() > 1) {
-      OpenCSG::render(primitives);
-      GL_CHECKD(glDepthFunc(GL_EQUAL));
-    }
-
-    if (shaderinfo && shaderinfo->progid) {
-      if (shaderinfo->type != EDGE_RENDERING || (shaderinfo->type == EDGE_RENDERING && showedges)) {
-        glUniform1f(shaderinfo->data.csg_rendering.texturefactor, 0.0);
-	GL_CHECKD(glUseProgram(shaderinfo->progid));
-      }
-    }
-
-    for (const auto& csgobj : product.intersections) {
-      const auto ps = csgobj.leaf->polyset;
-      if (!ps) continue;
-
-      if (shaderinfo && shaderinfo->type == Renderer::SELECT_RENDERING) {
-	int identifier = csgobj.leaf->index;
-	GL_CHECKD(glUniform3f(shaderinfo->data.select_rendering.identifier,
-			      ((identifier >> 0) & 0xff) / 255.0f, ((identifier >> 8) & 0xff) / 255.0f,
-			      ((identifier >> 16) & 0xff) / 255.0f));
-         glUniform1f(shaderinfo->data.csg_rendering.texturefactor, 0.0);
-      }
-
-      const Color4f& c = csgobj.leaf->color;
-        const int& ti = csgobj.leaf->textureind;
-      csgmode_e csgmode = get_csgmode(highlight_mode, background_mode);
-
-      ColorMode colormode = ColorMode::NONE;
-      if (highlight_mode) {
-	colormode = ColorMode::HIGHLIGHT;
-      } else if (background_mode) {
-	colormode = ColorMode::BACKGROUND;
-      } else {
-	colormode = ColorMode::MATERIAL;
-      }
-
-      glPushMatrix();
-      glMultMatrixd(csgobj.leaf->matrix.data());
-
-      const Color4f color = setColor(colormode, c.data(), ti, shaderinfo);
-      if (color[3] == 1.0f) {
-	// object is opaque, draw normally
-	render_surface(*ps, csgmode, csgobj.leaf->matrix, ti, shaderinfo);
-      } else {
-	// object is transparent, so draw rear faces first.  Issue #1496
-	glEnable(GL_CULL_FACE);
-	glCullFace(GL_FRONT);
-	render_surface(*ps, csgmode, csgobj.leaf->matrix, ti, shaderinfo);
-	glCullFace(GL_BACK);
-	render_surface(*ps, csgmode, csgobj.leaf->matrix, ti, shaderinfo);
-	glDisable(GL_CULL_FACE);
-      }
-
-      glPopMatrix();
-    }
-    for (const auto& csgobj : product.subtractions) {
-      const auto ps = csgobj.leaf->polyset;
-      if (!ps) continue;
-
-      const Color4f& c = csgobj.leaf->color;
-        const int& ti = csgobj.leaf->textureind;
-      csgmode_e csgmode = get_csgmode(highlight_mode, background_mode, OpenSCADOperator::DIFFERENCE);
-
-      ColorMode colormode = ColorMode::NONE;
-      if (highlight_mode) {
-	colormode = ColorMode::HIGHLIGHT;
-      } else if (background_mode) {
-	colormode = ColorMode::BACKGROUND;
-      } else {
-	colormode = ColorMode::CUTOUT;
-      }
-
-      (void) setColor(colormode, c.data(), ti, shaderinfo);
-      glPushMatrix();
-      glMultMatrixd(csgobj.leaf->matrix.data());
-      // negative objects should only render rear faces
-      glEnable(GL_CULL_FACE);
-      glCullFace(GL_FRONT);
-      render_surface(*ps, csgmode, csgobj.leaf->matrix, ti, shaderinfo);
-      glDisable(GL_CULL_FACE);
-
-      glPopMatrix();
-    }
-
-    if (shaderinfo) glUseProgram(0);
-    for (auto& p : primitives) delete p;
-    glDepthFunc(GL_LEQUAL);
-    //vbo_vertex_products_.emplace_back(std::make_unique<OpenCSGVBOProduct>(std::move(primitives), std::move(vertex_states)));
+    vbo_vertex_products_.emplace_back(std::make_unique<OpenCSGVBOProduct>(std::move(primitives), std::move(vertex_states)));
   }
 #endif // ENABLE_OPENCSG
 }
