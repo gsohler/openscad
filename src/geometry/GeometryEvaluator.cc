@@ -395,7 +395,6 @@ std::vector<IndexedFace> mergetriangles(const std::vector<IndexedFace> triangles
 
 			norm_map[norm]=norm_ind;
 		} else norm_ind = norm_map[norm];
-//		printf("polygon %d push to %d\n",i,norm_ind);
 		triangles_sorted[norm_ind].push_back(triangles[i]);
 	}
 
@@ -523,7 +522,7 @@ std::shared_ptr<PolySet> offset3D(const std::shared_ptr<const PolySet> &ps,doubl
 					xind=indexes[i];
 				}
 			}
-			if(xind == -1) { printf("a\n"); break; }
+			if(xind == -1)  break;
 
 			// find closest  normal to ydir
 			for(int i=0;i<indexes.size();i++) {
@@ -532,7 +531,7 @@ std::shared_ptr<PolySet> offset3D(const std::shared_ptr<const PolySet> &ps,doubl
 					yind=indexes[i];
 				}
 			}
-			if(yind == -1) {  break; }
+			if(yind == -1)  break; 
 
 			// find closest  normal to zdir
 			for(int i=0;i<indexes.size();i++) {
@@ -541,7 +540,7 @@ std::shared_ptr<PolySet> offset3D(const std::shared_ptr<const PolySet> &ps,doubl
 					zind=indexes[i];
 				}
 			}
-			if(zind == -1) {  break; }
+			if(zind == -1) break;
 			
 			// now calculate the new pt
 			if(cut_face_face_face(
@@ -549,19 +548,18 @@ std::shared_ptr<PolySet> offset3D(const std::shared_ptr<const PolySet> &ps,doubl
 						ps->vertices[i]  +faceNormal[yind]*off  , faceNormal[yind], 
 						ps->vertices[i]  +faceNormal[zind]*off  , faceNormal[zind], 
 						newpt)){ printf("d\n");  break; }
-//			if(debug) printf("x y z ind is %d/%d/%d\n",xind, yind, zind);
 			valid=1;
 		} while(0);
 		if(!valid)
 		{
 			Vector3d dir={0,0,0};
-			printf("Emergency cut calculation for %g/%g/%g\n",ps->vertices[i][0],ps->vertices[i][1],ps->vertices[i][2]);
 			for(int j=0;j<indexes.size();j++)
 				dir += faceNormal[j];
 			newpt  = ps->vertices[i] + off* dir.normalized();
 		}
 		pointListNew.push_back(newpt);
 	}
+
 	// -------------------------------
 	// Map all points and assemble
 	// -------------------------------
@@ -1117,16 +1115,6 @@ Response GeometryEvaluator::visit(State& state, const OffsetNode& node)
       auto mutableGeom = res.asMutableGeometry();
       if (mutableGeom) mutableGeom->setConvexity(1);
       geom = mutableGeom;
-/*      
-      if (const auto polygon = applyToChildren2D(node, OpenSCADOperator::UNION)) {
-        // ClipperLib documentation: The formula for the number of steps in a full
-        // circular arc is ... Pi / acos(1 - arc_tolerance / abs(delta))
-        double n = Calc::get_fragments_from_r(std::abs(node.delta), node.fn, node.fs, node.fa);
-        double arc_tolerance = std::abs(node.delta) * (1 - cos_degrees(180 / n));
-        geom = ClipperUtils::applyOffset(*polygon, node.delta, node.join_type, node.miter_limit, arc_tolerance);
-        assert(geom);
-      }
-*/      
     } else {
       geom = smartCacheGet(node, false);
     }
@@ -1171,11 +1159,7 @@ Response GeometryEvaluator::visit(State& state, const LeafNode& node)
 {
   if (state.isPrefix()) {
     std::shared_ptr<const Geometry> geom;
-    if (
-#ifdef ENABLE_PYTHON
-      python_active ||
-#endif
-      !isSmartCached(node)) {
+    if (!isSmartCached(node)) {
       geom = node.createGeometry();
       assert(geom);
       if (const auto polygon = std::dynamic_pointer_cast<const Polygon2d>(geom)) {
