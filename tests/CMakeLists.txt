@@ -835,6 +835,7 @@ list(APPEND SCADFILES_WITH_GREEN_FACES
   ${TEST_SCAD_DIR}/3D/features/highlight-modifier.scad
   ${TEST_SCAD_DIR}/3D/features/highlight-modifier2.scad
   ${TEST_SCAD_DIR}/3D/features/minkowski3-erosion.scad
+  ${TEST_SCAD_DIR}/3D/features/minkowski3-difference-test.scad
   ${TEST_SCAD_DIR}/3D/features/render-tests.scad
   ${TEST_SCAD_DIR}/3D/issues/issue1105.scad
   ${TEST_SCAD_DIR}/3D/issues/issue1105b.scad
@@ -1285,6 +1286,11 @@ set_tests_properties(
   # This may work with fast-csg, but will fail with both CGAL and Manifold
   cgalpngtest_linear_extrude-scale-zero-tests
   csgpngtest_linear_extrude-scale-zero-tests
+
+  # CGAL sometimes fail to union minkowski convex decompositions, causing visual differences
+  # in rendering.
+  cgalpngtest_minkowski3-difference-test
+  csgpngtest_minkowski3-difference-test
 
   PROPERTIES DISABLED TRUE
 )
