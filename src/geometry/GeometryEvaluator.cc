@@ -58,6 +58,11 @@ GeometryEvaluator::GeometryEvaluator(const Tree& tree) : tree(tree) { }
 
 /*!
    Set allownef to false to force the result to _not_ be a Nef polyhedron
+
+   There are some guarantees on the returned geometry:
+   * 2D and 3D geometry cannot be mixed; we will return either _only_ 2D or _only_ 3D geometries
+   * PolySet geometries are always 3D. 2D Polysets are only created for special-purpose rendering operations downstream from here.
+   * Needs validation: Implementation-specific geometries shouldn't be mixed (Nef polyhedron, Manifold, CGAL Hybrid polyhedrons)
  */
 std::shared_ptr<const Geometry> GeometryEvaluator::evaluateGeometry(const AbstractNode& node,
                                                                bool allownef)
@@ -1690,7 +1695,7 @@ static std::unique_ptr<Geometry> extrudePolygon(const LinearExtrudeNode& node, c
   boost::tribool isConvex{poly.is_convex()};
   // Twist or non-uniform scale makes convex polygons into unknown polyhedrons
   if (isConvex && non_linear) isConvex = unknown;
-  PolySetBuilder builder(0,0,3,isConvex);
+  PolySetBuilder builder(0, 0, 3, isConvex);
   builder.setConvexity(node.convexity);
   if (node.height <= 0) return std::make_unique<PolySet>(3);
 

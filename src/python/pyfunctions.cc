@@ -1235,7 +1235,7 @@ PyObject *python_output_core(PyObject *obj)
      PyObject* value1 = PyUnicode_AsEncodedString(key, "utf-8", "~");
      const char *value_str =  PyBytes_AS_STRING(value1);
      sel.p1 = Vector3d(raw(0,3),raw(1,3),raw(2,3));
-     sel.type=SELECTION_HANDLE;
+     sel.type=SelectionType::SELECTION_HANDLE;
      sel.name=varname+"."+value_str;
      python_result_handle.push_back(sel);
 

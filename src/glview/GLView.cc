@@ -426,8 +426,8 @@ void GLView::showObject(const SelectedObject &obj, const Vector3d &eyedir)
 {
   auto vd = cam.zoomValue()/200.0;
   switch(obj.type) {
-    case SELECTION_POINT:
-    case SELECTION_HANDLE:	    
+    case SelectionType::SELECTION_POINT:
+    case SelectionType::SELECTION_HANDLE:
     {
       double n=1/sqrt(3);
       // create an octaeder	   
@@ -451,7 +451,7 @@ void GLView::showObject(const SelectedObject &obj, const Vector3d &eyedir)
       glEnd();
      }
      break;	
-   case SELECTION_LINE:
+   case SelectionType::SELECTION_LINE:
      {
 	Vector3d diff=obj.p2-obj.p1;
 	Vector3d wdir=eyedir.cross(diff).normalized()*vd/2.0;
