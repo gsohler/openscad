@@ -89,12 +89,23 @@ static void draw_triangle(const Renderer::shaderinfo_t *shaderinfo, const Vector
 }
 #endif // ifdef ENABLE_OPENCSG
 
-static void draw_tri(const Vector3d& p0, const Vector3d& p1, const Vector3d& p2, double z, bool mirror)
+static void draw_tri(const Vector3d& p0, const Vector3d& p1, const Vector3d& p2, double z, bool mirror, int textureind)
 {
+  Vector3d norm=(p1-p0).cross(p2-p0).normalized();
+  double tf=10.0;
+  if(textureind > 0 && textureind  <= textures.size()) tf=textures[textureind-1].uvscale;
+  set_texture_coord(p0,norm,tf);
   glVertex3d(p0[0], p0[1], p0[2] + z);
-  if (!mirror) glVertex3d(p1[0], p1[1], p1[2] + z);
+  if (!mirror) {
+  	set_texture_coord(p1,norm,tf);
+	  glVertex3d(p1[0], p1[1], p1[2] + z);
+  }
+  set_texture_coord(p2,norm,tf);
   glVertex3d(p2[0], p2[1], p2[2] + z);
-  if (mirror) glVertex3d(p1[0], p1[1], p1[2] + z);
+  if (mirror){
+  	set_texture_coord(p1,norm,tf);
+	glVertex3d(p1[0], p1[1], p1[2] + z);
+  }
 }
 
 static void gl_draw_triangle(const Renderer::shaderinfo_t *shaderinfo, const Vector3d& p0, const Vector3d& p1, const Vector3d& p2, bool e0, bool e1, bool e2, double z, bool mirrored, int textureind)
@@ -113,22 +124,23 @@ static void gl_draw_triangle(const Renderer::shaderinfo_t *shaderinfo, const Vec
   } else
 #endif
   {
-    draw_tri(p0, p1, p2, z, mirrored);
+    draw_tri(p0, p1, p2, z, mirrored, textureind);
   }
 }
 
-void render_surface(const PolySet& ps, const Transform3d& m, int textureind, const Renderer::shaderinfo_t *shaderinfo)
+void render_surface(const PolySet& ps, const Transform3d& m, int textureind,  const Renderer::shaderinfo_t *shaderinfo)
 {
   PRINTD("render_surface");
   bool mirrored = m.matrix().determinant() < 0;
-
+  bool draw_edge=true;
+  if(textureind > 0) draw_edge=0;
   for (const auto& poly : ps.indices) {
     glBegin(GL_TRIANGLES);
     if (poly.size() == 3) {
-      gl_draw_triangle(shaderinfo, ps.vertices[poly.at(0)], ps.vertices[poly.at(1)], ps.vertices[poly.at(2)], true, true, true, 0, mirrored, textureind);
+      gl_draw_triangle(shaderinfo, ps.vertices[poly.at(0)], ps.vertices[poly.at(1)], ps.vertices[poly.at(2)], draw_edge, draw_edge, draw_edge, 0, mirrored, textureind);
     } else if (poly.size() == 4) {
-      gl_draw_triangle(shaderinfo, ps.vertices[poly.at(0)], ps.vertices[poly.at(1)], ps.vertices[poly.at(3)], false, true, true, 0, mirrored, textureind);
-      gl_draw_triangle(shaderinfo, ps.vertices[poly.at(2)], ps.vertices[poly.at(3)], ps.vertices[poly.at(1)], false, true, true, 0, mirrored, textureind);
+      gl_draw_triangle(shaderinfo, ps.vertices[poly.at(0)], ps.vertices[poly.at(1)], ps.vertices[poly.at(3)], false, draw_edge, draw_edge, 0, mirrored, textureind);
+      gl_draw_triangle(shaderinfo, ps.vertices[poly.at(2)], ps.vertices[poly.at(3)], ps.vertices[poly.at(1)], false, draw_edge, draw_edge, 0, mirrored, textureind);
     } else {
       Vector3d center = Vector3d::Zero();
       for (const auto& point : poly) {
@@ -136,7 +148,7 @@ void render_surface(const PolySet& ps, const Transform3d& m, int textureind, con
       }
       center /= poly.size();
       for (size_t j = 1; j <= poly.size(); ++j) {
-        gl_draw_triangle(shaderinfo, center, ps.vertices[poly.at(j - 1)], ps.vertices[poly.at(j % poly.size())], true, false, false, 0, mirrored, textureind);
+        gl_draw_triangle(shaderinfo, center, ps.vertices[poly.at(j - 1)], ps.vertices[poly.at(j % poly.size())], draw_edge, false, false, 0, mirrored, textureind);
       }
     }
     glEnd();
