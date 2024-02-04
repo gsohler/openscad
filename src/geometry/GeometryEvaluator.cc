@@ -639,7 +639,9 @@ double offset3D_angle(const Vector3d &refdir, const Vector3d &edgedir, const Vec
 	c=refdir.dot(edgedir);
 	s=tmp.norm();
 	if(tmp.dot(facenorm) < 0) s=-s;
-	return atan2(s,c)*180/3.1415926;
+	double ang=atan2(s,c)*180/3.1415926;
+	if(ang < 0) ang += 360;
+	return ang;
 }
 
 void offset3D_calculateNefInteract(const std::vector<Vector4d> &faces, std::vector<IndexedFace> &faceinds,int selfind,  int newind) {
@@ -673,7 +675,17 @@ void offset3D_calculateNefInteract(const std::vector<Vector4d> &faces, std::vect
 	// now insert newind in the right place
 	IndexedFace faceindsnew;
 	for(int j=0;j<faceinds[selfind].size();j++) {
-		if(angle < angles[j]) {
+		if(fabs(angle-angles[j]) < 0.001) {
+			printf("Angle equal selfind=%d \n",selfind);
+			// wer schneidet mehr ein: faceinds[selfind][j]  oder newind
+			// Testpunkt ist punkt auf selfind
+			Vector3d testpt=faces[selfind].head<3>() * faces[selfind][3];
+			int presind=faceinds[selfind][j];
+			double pres_dist = testpt.dot(faces[presind].head<3>())-faces[presind][3];
+			double new_dist = testpt.dot(faces[newind].head<3>())-faces[newind][3];
+			if(pres_dist > new_dist) { printf("disregard new one\n"); angle=1e9; } // keep it, never insert it
+			else { faceindsnew.push_back(newind);  printf("use new one\n"); angle=1e9; continue; } // insert new one instead							    
+		} else if(angle < angles[j]) {
 			faceindsnew.push_back(newind);
 			angle=1e9;
 		}
@@ -772,7 +784,7 @@ std::vector<std::shared_ptr<PolySet>>  offset3D_decompose(const std::vector<Vect
 		for(int i=0;i<indices.size();i++)
 		{
 			if(faces_included.count(i) == 0) {
-				printf("Chosen to start with %d\n",i);
+//				printf("Chosen to start with %d\n",i);
 				oppind=i;
 				valid=true;
 				faces_done.clear();
@@ -853,6 +865,7 @@ v:				faces_done.push_back(oppind);
 			}
 			if(j == normals.size()) normals.push_back(norm);
 		}
+		printf("Normals\n");
 		for(int i=0;i<normals.size();i++)
 		{
 			printf("%g/%g/%g/%g\n",normals[i][0],normals[i][1], normals[i][2], normals[i][3]);
@@ -1291,7 +1304,7 @@ void  offset3D_reindex(const std::vector<Vector3d> &vertices, std::vector<Indexe
   vertices_.copy(std::back_inserter(verticesNew));
 }
 
-std::shared_ptr<PolySet> offset3D(const std::shared_ptr<const PolySet> &ps,double off) {
+std::shared_ptr<PolySet> offset3D_convex(const std::shared_ptr<const PolySet> &ps,double off) {
   printf("Running offset3D %d polygons\n",ps->indices.size());
 //  if(off == 0) return ps;
   std::vector<Vector3d> verticesNew;
@@ -1301,10 +1314,9 @@ std::shared_ptr<PolySet> offset3D(const std::shared_ptr<const PolySet> &ps,doubl
   if(off > 0) { // upsize
     // TODO decomposition and assemble	
     std::vector<IndexedFace> indicesNew;
-    std::vector<std::shared_ptr<PolySet>> decomposed =  offset3D_decompose(ps->vertices, ps->indices);
-    printf("decompose results is %d\n",decomposed.size());
+//    std::vector<std::shared_ptr<PolySet>> decomposed =  offset3D_decompose(ps->vertices, ps->indices);
+//    printf("decompose results is %d\n",decomposed.size());
 
-/*
     printf("Remove OverlapPoints\n");
     std::vector<IndexedFace> indicesX = offset3D_removeOverPoints(ps->vertices, ps->indices,0);
 
@@ -1327,8 +1339,6 @@ std::shared_ptr<PolySet> offset3D(const std::shared_ptr<const PolySet> &ps,doubl
     offset_result->vertices = verticesNew;
     offset_result->indices = indicesNew;
     return std::shared_ptr<PolySet>(offset_result);
-*/    
-    return decomposed[1];
   } else {
     printf("Downsize %g\n",off);	  
 
@@ -1376,6 +1386,33 @@ std::shared_ptr<PolySet> offset3D(const std::shared_ptr<const PolySet> &ps,doubl
     return std::shared_ptr<PolySet>(offset_result);
   }
 }
+std::shared_ptr<Geometry> offset3D(const std::shared_ptr<const PolySet> &ps,double off) {
+  bool enabled=false; // geht mit 4faces
+		     // geht nicht mit boxes, segfault
+		     // sphere proigram error
+		     // singlepoint prog error
+  if(!enabled) return offset3D_convex(ps, off);
+
+  std::vector<std::shared_ptr<PolySet>> decomposed =  offset3D_decompose(ps->vertices, ps->indices);
+  printf("Decomposed into %d parts\n",decomposed.size());
+  if(decomposed.size() == 0) {
+    PolySet *offset_result =  new PolySet(3, /* convex */ true);
+    return std::shared_ptr<PolySet>(offset_result);
+  }
+  if(decomposed.size() == 1) {
+  	return offset3D_convex(decomposed[0], off);
+  }
+  auto N = std::make_shared<ManifoldGeometry>();
+  for(int i=0;i<decomposed.size();i++)
+  {
+  	auto term = ManifoldUtils::createMutableManifoldFromGeometry(offset3D_convex(decomposed[i], off));
+//  	auto term = ManifoldUtils::createMutableManifoldFromGeometry(decomposed[i]);
+	if(i == 0) N = term;
+	else *N += *term;	
+  }
+  return N;
+}
+
 /*!
    Applies the operator to all child nodes of the given node.
 
@@ -1470,7 +1507,7 @@ GeometryEvaluator::ResultObject GeometryEvaluator::applyToChildren3D(const Abstr
     } else if (std::shared_ptr<const CGAL_Nef_polyhedron> nef = std::dynamic_pointer_cast<const CGAL_Nef_polyhedron>(geom)) {
       const CGAL_Nef_polyhedron nefcont=*(nef.get());
       std::shared_ptr<PolySet> ps = CGALUtils::createPolySetFromNefPolyhedron3(*(nefcont.p3));
-      std::shared_ptr<PolySet> ps_offset =  offset3D(ps,offNode->delta);
+      std::shared_ptr<Geometry> ps_offset =  offset3D(ps,offNode->delta);
       geom = std::move(ps_offset);
       return geom;
     } else if (const auto hybrid = std::dynamic_pointer_cast<const CGALHybridPolyhedron>(geom)) { // TODO
