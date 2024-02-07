@@ -1843,7 +1843,7 @@ PyObject *python_oo_path_extrude(PyObject *obj, PyObject *args, PyObject *kwargs
   double fn=-1, fa=-1, fs=-1;
 
   char * kwlist[] ={"path","xdir","convexity","origin","scale","twist","closed","fn","fa","fs",NULL};
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OO!|O!iOOOOOddd", kwlist, 
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O!|O!iOOOOOddd", kwlist,
 			  &PyList_Type, &path, &PyList_Type,&xdir, &convexity, &origin, &scale, &twist, &closed, &allow_intersect, &fn,&fs,&fs))
   {
         PyErr_SetString(PyExc_TypeError,"error during parsing\n");
@@ -3055,6 +3055,7 @@ PyMethodDef PyOpenSCADMethods[] = {
 
   OO_METHOD_ENTRY(linear_extrude,"Linear_extrude Object")	
   OO_METHOD_ENTRY(rotate_extrude,"Rotate_extrude Object")	
+  OO_METHOD_ENTRY(path_extrude,"Path_extrude Object")
 
   OO_METHOD_ENTRY(resize,"Resize Object")	
 
