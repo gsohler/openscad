@@ -898,7 +898,6 @@ PyObject *python_oo_mirror(PyObject *obj, PyObject *args, PyObject *kwargs)
 
   PyObject *val_v = NULL;
   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O", kwlist,
-                                   &obj,
                                    &val_v)) {
     PyErr_SetString(PyExc_TypeError, "Error during parsing mirror(object, vec3)");
     return NULL;
