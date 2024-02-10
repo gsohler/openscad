@@ -2889,7 +2889,6 @@ static std::unique_ptr<Geometry> extrudePolygon(const PathExtrudeNode& node, con
 				std::reverse(polygon.begin(), polygon.end());
 			}
 		}
-		builder.appendPoly(ps_face->indices.size());
 		for (auto &p3d : ps_face->indices) { 
 			std::vector<Vector2d> p2d;
 			for(int i=0;i<p3d.size();i++) {
@@ -2897,11 +2896,11 @@ static std::unique_ptr<Geometry> extrudePolygon(const PathExtrudeNode& node, con
 				p2d.push_back(Vector2d(pt[0],pt[1]));
 			}
 			std::vector<Vector3d> newprof = calculate_path_profile(&vec_x, &vec_y,(i == 0)?curPt:nextPt,  p2d);
+			builder.appendPoly(newprof.size());
 			for(Vector3d pt: newprof) {
 				builder.appendVertex(builder.vertexIndex(pt));
 			}
 		}
-		builder.append(*ps_face);
 	}
 
 	vec_x_last = vec_x.normalized();
