@@ -141,6 +141,7 @@ std::shared_ptr<AbstractNode> find_root_tag(const std::shared_ptr<AbstractNode>&
 
   return rootTag;
 }
+#ifdef ENABLE_PYTHON
 void AbstractNode::setPyName(const std::string &name)
 {
   this->py_name=name;		
@@ -149,5 +150,6 @@ std::string  AbstractNode::getPyName(void)
 {
   return this->py_name;	
 }
+#endif
 
 
