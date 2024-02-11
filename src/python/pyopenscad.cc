@@ -728,10 +728,10 @@ sys.stderr = stderr_bak\n\
 int python__setitem__(PyObject *dict, PyObject *key, PyObject *v);
 PyObject *python__getitem__(PyObject *dict, PyObject *key);
 
-PyObject *python__getattro__(PyObject *obj, PyObject *key)
+PyObject *python__getattro__(PyObject *dict, PyObject *key)
 {
-	PyObject *result=python__getitem__(obj,key);
-	if(result == Py_None || result == nullptr)  result = PyObject_GenericGetAttr(obj,key);
+	PyObject *result=python__getitem__(dict,key);
+	if(result == Py_None || result == nullptr)  result = PyObject_GenericGetAttr(dict,key);
 	return result;
 }
 
