@@ -2813,7 +2813,7 @@ PyObject *python_str(PyObject *self) {
 	else
 		sprintf(str,"Invalid OpenSCAD Object");
 
-	return PyUnicode_FromStringAndSize(str,strlen(str)+1);
+	return PyUnicode_FromStringAndSize(str,strlen(str));
 }
 
 PyObject *python_add_parameter(PyObject *self, PyObject *args, PyObject *kwargs, ImportType type)
