@@ -645,7 +645,7 @@ double offset3D_angle(const Vector3d &refdir, const Vector3d &edgedir, const Vec
 }
 
 void offset3D_calculateNefInteract(const std::vector<Vector4d> &faces, std::vector<IndexedFace> &faceinds,int selfind,  int newind) {
-	printf("Interact selfind is %d, newind=%d\n",selfind, newind);
+//	printf("Interact selfind is %d, newind=%d\n=====================\n",selfind, newind);
 	if(faces[selfind].head<3>().dot(faces[newind].head<3>()) < -0.99999) return;
 	if(faceinds[selfind].size() == 0) {
 		faceinds[selfind].push_back(newind); 
@@ -654,6 +654,7 @@ void offset3D_calculateNefInteract(const std::vector<Vector4d> &faces, std::vect
 
 	// calculate the angles of the cuts and find out position of newind
 	// calculate refedge
+	double angdiff;
 	Vector3d facenorm=faces[selfind].head<3>();
 	Vector3d refdir=facenorm.cross(faces[faceinds[selfind][0]].head<3>()).normalized();
 //	printf("norm is %g/%g/%g\n",facenorm[0], facenorm[1], facenorm[2]);
@@ -667,84 +668,125 @@ void offset3D_calculateNefInteract(const std::vector<Vector4d> &faces, std::vect
 		edgedir=facenorm.cross(faces[faceinds[selfind][j]].head<3>()).normalized();
 		angle=offset3D_angle(refdir, edgedir, facenorm);
 		angles.push_back(angle);
-		printf("Edge %d angle=%g\n",faceinds[selfind][j],angle);				
 	}
 	edgedir=facenorm.cross(faces[newind].head<3>()).normalized();
 	angle=offset3D_angle(refdir, edgedir, facenorm);
-	printf("New Ang is %g\n",angle);
 
 	Vector3d d1, p1, d2, p2, d3, p3, cutpt;
 
 	d1=faces[selfind].head<3>();
 	p1=d1*faces[selfind][3];
+	d3=faces[faceinds[selfind][n-1]].head<3>(); 
+	p3=d2*faces[faceinds[selfind][n-1]][3];
 
 	// now insert newind in the right place
 	IndexedFace faceindsnew;
 	for(int j=0;j<n;j++) {
+		p2=p3;
+		d2=d3;
+		d3=faces[faceinds[selfind][j]].head<3>();
+		p3=d3*faces[faceinds[selfind][j]][3];
 		if(fabs(angle-angles[j]) < 0.001) {
-			printf("Angle equal selfind=%d \n",selfind);
 			// wer schneidet mehr ein: faceinds[selfind][j]  oder newind
 			// Testpunkt ist punkt auf selfind
 			Vector3d testpt=faces[selfind].head<3>() * faces[selfind][3];
 			int presind=faceinds[selfind][j];
 			double pres_dist = testpt.dot(faces[presind].head<3>())-faces[presind][3];
 			double new_dist = testpt.dot(faces[newind].head<3>())-faces[newind][3];
-			if(pres_dist > new_dist) { printf("disregard new one\n"); angle=1e9; } // keep it, never insert it
-			else { faceindsnew.push_back(newind);  printf("use new one\n"); angle=1e9; continue; } // insert new one instead							    
+			if(pres_dist > new_dist) { angle=1e9; } // keep it, never insert it
+			else { faceindsnew.push_back(newind);  angles[j]=angle; angle=1e9; continue; } // insert new one instead							    
 		} else if(angle < angles[j]) {
-			// TODO  hier chnittpunkt und above rechnen
-			//angles[j-1, j]
-			if(j >= 2) {
-				int jp=(j+n-1)%n;
-				double angdiff=angles[j]-angles[jp];
-				if(angdiff < 0) angdiff += 360;
-				if(angdiff < 180) {
-					d2=faces[faceinds[selfind][jp]].head<3>(); // TODO vorieges verwenden
-					p2=d2*faces[faceinds[selfind][jp]][3];
-					d3=faces[faceinds[selfind][j]].head<3>();
-					p3=d3*faces[faceinds[selfind][j]][3];
-					if(cut_face_face_face( p1, d1, p2, d2, p3, d3, cutpt)) printf("Problem during cut!\n");
-					else {
-						double off=cutpt.dot(faces[newind].head<3>())-faces[newind][3];
-						if(off < 0) { printf("Skipping Point!\n"); continue; }
-					}
+			int jp=(j+n-1)%n;
+			bool insert=true;
+			double angdiff=angles[j]-angles[jp];
+			if(angdiff < 0) angdiff += 360;
+			if(angdiff < 180) {
+				if(cut_face_face_face( p1, d1, p2, d2, p3, d3, cutpt)) printf("Problem during cut!\n");
+				else {
+					double off=cutpt.dot(faces[newind].head<3>())-faces[newind][3];
+					if(off < 1e-6) insert=false; 
 				}
 			}
-			faceindsnew.push_back(newind); 
+			if(insert) {
+				faceindsnew.push_back(newind); 
+				angles.insert(angles.begin()+j,angle);
+			}
 			angle=1e9;
 		}
 		faceindsnew.push_back(faceinds[selfind][j]);
 	}
 	if(angle < 1e9){
 		do {
-			double angdiff=angles[0]-angles[n-1];
+			angdiff=angles[0]-angles[n-1];
 			if(angdiff < 0) angdiff += 360;
 			if(angdiff < 180) {
-				d2=faces[faceinds[selfind][n-1]].head<3>(); // TODO vorieges verwenden
-				p2=d2*faces[faceinds[selfind][n-1]][3]; // TODO code doppelt mit oben
+				d2=d3; 
+				p2=p3; // TODO code doppelt mit oben
 				d3=faces[faceinds[selfind][0]].head<3>();
 				p3=d3*faces[faceinds[selfind][0]][3];
 				if(cut_face_face_face( p1, d1, p2, d2, p3, d3, cutpt)) printf("Problem during cut!\n");
 				else {
 					double off=cutpt.dot(faces[newind].head<3>())-faces[newind][3];
-					printf("Adding %d, off=%g\n",newind, off);
 					if(off < 0) {
-					       	printf("Skipping Point!\n");
 						break;
 				       	}
 				}
 			}
 			faceindsnew.push_back(newind);
+			angles.push_back(angle);
 		}
 		while(0);		
 	}					     
+	n=faceindsnew.size();
+	// TODO newind richti speichern
+	int insertpos=-1;
+	for(int i=0;i<faceindsnew.size();i++)
+		if(faceindsnew[i] == newind) insertpos=i;
+	if(insertpos != -1 ) {
+		while(n >= 3) {
+			int ind1pos=(insertpos+1)%n;
+			int ind2pos=(insertpos+2)%n;
+			angdiff=angles[ind2pos]-angles[insertpos];
+			if(angdiff < 0) angdiff += 360;
+			if(angdiff > 180) break;
+			d2=faces[faceindsnew[ind1pos]].head<3>();
+			p2=d2*faces[faceindsnew[ind1pos]][3];
+			d3=faces[faceindsnew[ind2pos]].head<3>();
+			p3=d3*faces[faceindsnew[ind2pos]][3];
+			if(cut_face_face_face( p1, d1, p2, d2, p3, d3, cutpt)) printf("Problem during cut!\n");
+			double off=cutpt.dot(faces[newind].head<3>())-faces[newind][3];
+			if(off > -1e-6) {
+				faceindsnew.erase(faceindsnew.begin()+ind1pos);
+				angles.erase(angles.begin()+ind1pos);
+				if(ind1pos < insertpos) insertpos--;	
+				n--;
+			} else break;
+		};
+		while(n >= 3) {
+			int ind1pos=(insertpos+n-1)%n;
+			int ind2pos=(insertpos+n-2)%n;
+			angdiff=angles[insertpos]-angles[ind2pos];
+			if(angdiff < 0) angdiff += 360;
+			if(angdiff > 180) break;
+			d2=faces[faceindsnew[ind1pos]].head<3>();
+			p2=d2*faces[faceindsnew[ind1pos]][3];
+			d3=faces[faceindsnew[ind2pos]].head<3>();
+			p3=d3*faces[faceindsnew[ind2pos]][3];
+			if(cut_face_face_face( p1, d1, p2, d2, p3, d3, cutpt)) printf("Problem during cut!\n");
+			double off=cutpt.dot(faces[newind].head<3>())-faces[newind][3];
+			if(off > -1e-6) {
+				faceindsnew.erase(faceindsnew.begin()+ind1pos); 
+				angles.erase(angles.begin()+ind1pos);
+				if(ind1pos < insertpos) insertpos--;	
+				n--;
+			} else break;
+		};
+	}
 	faceinds[selfind] = faceindsnew;
-
-
-	// TODO neues edge kann andere eliminiren(above) , eine reihe eliminieren
-	// TODO new edge kann andere nur streifen, kann gaenzlich egal sein, wenn es zu weit weg ist
 }
-void offset3D_calculateNefPolyhedron(const std::vector<Vector4d> &faces,std::vector<Vector3d> &vertices, std::vector<IndexedFace> & indices,int debug)
+
+
+void offset3D_calculateNefPolyhedron(const std::vector<Vector4d> &faces,std::vector<Vector3d> &vertices, std::vector<IndexedFace> & indices,int debug) // TODO weg
 {
 	int i;
 	std::vector<IndexedFace> nef_db;
@@ -759,7 +801,6 @@ void offset3D_calculateNefPolyhedron(const std::vector<Vector4d> &faces,std::vec
 			offset3D_calculateNefInteract(faces, nef_db,j, i);
 			offset3D_calculateNefInteract(faces, nef_db, orgsize,j);
 		}
-		if(i >= debug) break;
 	}
 	// Now dump the NEF db
 	printf("NEF DB\n");
@@ -796,6 +837,59 @@ void offset3D_calculateNefPolyhedron(const std::vector<Vector4d> &faces,std::vec
 	}
 	vertices_.copy(std::back_inserter(vertices));
 }
+#include <CGAL/Exact_integer.h>
+#include <CGAL/Extended_homogeneous.h>
+#include <CGAL/Nef_polyhedron_3.h>
+#include "CGAL/boost/graph/convert_nef_polyhedron_to_polygon_mesh.h"
+//#include <cassert>
+typedef CGAL::Extended_homogeneous<CGAL::Exact_integer>  Kernel;
+//typedef CGAL::Exact_predicates_inexact_constructions_kernel Kernel;
+
+typedef CGAL::Nef_polyhedron_3<Kernel>  Nef_polyhedron;
+typedef Kernel::Plane_3  Plane_3;
+typedef Kernel::Point_3                                     Point_3;
+typedef CGAL::Surface_mesh<Point_3> Surface_mesh;
+
+
+void offset3D_calculateNefPolyhedron_cgal(const std::vector<Vector4d> &faces,std::vector<Vector3d> &vertices, std::vector<IndexedFace> & indices,int debug) {
+  printf("1\n");
+  Nef_polyhedron N1(Plane_3( 1, 0, 0,-1));
+  Nef_polyhedron N2(Plane_3(-1, 0, 0,-1));
+  Nef_polyhedron N3(Plane_3( 0, 1, 0,-1));
+  Nef_polyhedron N4(Plane_3( 0,-1, 0,-1));
+  Nef_polyhedron N5(Plane_3( 0, 0, 1,-1));
+  Nef_polyhedron N6(Plane_3( 0, 0,-1,-1));
+  printf("x\n");
+  Nef_polyhedron Cube = N1 * N2 * N3 * N4 * N5 * N6;
+  printf("y\n");
+  Surface_mesh resultMesh;	
+  printf("a\n");
+  CGAL::convert_nef_polyhedron_to_polygon_mesh (Cube, resultMesh, true);
+  printf("b\n");
+  printf("size = %d\n",resultMesh.number_of_faces());
+
+  vertices.clear();
+ for (auto  vd : resultMesh.vertices()){
+    const auto &v = resultMesh.point(vd);
+    Vector3d pt(
+    	CGAL::to_double(v.x()),
+    	CGAL::to_double(v.y()),
+    	CGAL::to_double(v.z()));
+    vertices.push_back(pt);
+    printf("%g %g %g\n",pt[0], pt[1], pt[2]);
+  }
+
+  for (const auto& f : resultMesh.faces()) {
+    IndexedFace fi;	  
+    for (auto vd : vertices_around_face(resultMesh.halfedge(f), resultMesh)) {
+      fi.push_back(vd);	    
+      printf("%d ",vd);	    
+    }
+    indices.push_back(fi);
+    printf("\n");
+  }
+
+}
 
 std::vector<std::shared_ptr<PolySet>>  offset3D_decompose(std::shared_ptr<const PolySet> ps,int debug)
 {
@@ -825,7 +919,6 @@ std::vector<std::shared_ptr<PolySet>>  offset3D_decompose(std::shared_ptr<const 
 			edge_db[stub]=i;
 		}
 	}
-	// TODO display all iteresting faces
 	for(int i=0;i<ps->indices.size();i++) {
 		auto &face = ps->indices[i];
 		bool valid=true;
@@ -920,30 +1013,11 @@ std::vector<std::shared_ptr<PolySet>>  offset3D_decompose(std::shared_ptr<const 
 								printf(" not valid for pt %d, norm= %g/%g/%g/%g\n",j, faces_norm[j][0],faces_norm[j][1],faces_norm[j][2], faces_norm[j][3]);
 							}
 							else if(off > -1e-3) {
-//								if(newfaceind == 9) {
-//									printf("edge test i=%d\n",i);
-//									printf("ps is %g/%g/%g\n",pt[0], pt[1], pt[2]);
-//									printf("center is %g/%g/%g\n",centerpt[0], centerpt[1], centerpt[2]);
-//									printf("norm is %g/%g/%g\n",faces_norm[j][0], faces_norm[j][1], faces_norm[j][2]);
-//								}
 								if((centerpt-pt).dot(faces_norm[j].head<3>()) > 0) valid1=false;
 							}
 						}
 						if(valid1) valid=true;
 					}
-//					for(int i=0;valid && i<ps->indices.size();i++)  // TODO besser
-//					{
-//						if(faces_included.count(i) > 0) { // TODO muss irendwie aktiviert werden
-//							auto &tri = ps->indices[i]; 
-//							valid1=false;
-//							for(int j=0;!valid1 && j<tri.size();j++) {
-//								Vector3d pt = ps->vertices[tri[j]];
-//								double off=pt.dot(newface_norm.head<3>())-newface_norm[3];
-//								if(off < 1e-3) valid1=true;
-//							}
-//							if(valid1) valid=false;
-//						}
-//					}
 				}
 v:				faces_done.push_back(newfaceind);
 				printf("face is %d, valid = %d registering new faces\n", newfaceind,valid);
@@ -991,7 +1065,6 @@ v:				faces_done.push_back(newfaceind);
 			printf("%d ",faces_convex[i]);
 		}
 		printf("\n");
-		// TODO calculate normals
 		std::vector<Vector4d> normals;
 		std::vector<Vector4d> faces_normals;
 		for(int i=0;i<faces_convex.size();i++)
@@ -1009,7 +1082,6 @@ v:				faces_done.push_back(newfaceind);
 			if(j == normals.size()) normals.push_back(norm);
 		}
 		
-		// TODO set convex only to those which remain
 		for(int i=0;i<faces_normals.size();i++) {
 //			printf("Checking face %d\n",faces_convex[i]);
 			for(int j=0;j<normals.size();j++) {
@@ -1038,6 +1110,7 @@ v:				faces_done.push_back(newfaceind);
 			std::vector<Vector3d> vertices1;
 			std::vector<IndexedFace> indices1;
 			offset3D_calculateNefPolyhedron(normals, vertices1, indices1,debug);					
+//			offset3D_calculateNefPolyhedron_cgal(normals, vertices1, indices1,debug);					
 
 			PolySet *decomposed =  new PolySet(3,  true);
 			decomposed->vertices = vertices1;
@@ -1068,7 +1141,6 @@ v:				faces_done.push_back(newfaceind);
 		}
 //		if(results.size() >=2) return results;
 */		
-		if(results.size() >= 5) return results; // TODO fix
 	}
 	return results;
 }
@@ -1501,7 +1573,6 @@ std::shared_ptr<Geometry> offset3D_convex(const std::shared_ptr<const PolySet> &
   std::vector<intList>  pointToFaceInds, pointToFacePos;
   if(off > 0) { // upsize
     std::vector<std::shared_ptr<PolySet>> decomposed =  offset3D_decompose(ps,(int) off);
-/*    
     printf("%d decompose results\n",decomposed.size());
     //
     auto N = std::make_shared<ManifoldGeometry>();
@@ -1534,8 +1605,6 @@ std::shared_ptr<Geometry> offset3D_convex(const std::shared_ptr<const PolySet> &
       else *N += *term;	
     }
     return N;
-*/    
-    return decomposed[0];
   } else {
     printf("Downsize %g\n",off);	  
 
