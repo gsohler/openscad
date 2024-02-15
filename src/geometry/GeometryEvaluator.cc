@@ -786,7 +786,7 @@ void offset3D_calculateNefInteract(const std::vector<Vector4d> &faces, std::vect
 }
 
 
-void offset3D_calculateNefPolyhedron(const std::vector<Vector4d> &faces,std::vector<Vector3d> &vertices, std::vector<IndexedFace> & indices,int debug) // TODO weg
+void offset3D_calculateNefPolyhedron(const std::vector<Vector4d> &faces,std::vector<Vector3d> &vertices, std::vector<IndexedFace> & indices)
 {
 	int i;
 	std::vector<IndexedFace> nef_db;
@@ -851,7 +851,7 @@ typedef Kernel::Point_3                                     Point_3;
 typedef CGAL::Surface_mesh<Point_3> Surface_mesh;
 
 
-void offset3D_calculateNefPolyhedron_cgal(const std::vector<Vector4d> &faces,std::vector<Vector3d> &vertices, std::vector<IndexedFace> & indices,int debug) {
+void offset3D_calculateNefPolyhedron_cgal(const std::vector<Vector4d> &faces,std::vector<Vector3d> &vertices, std::vector<IndexedFace> & indices) {
   printf("1\n");
   Nef_polyhedron N1(Plane_3( 1, 0, 0,-1));
   Nef_polyhedron N2(Plane_3(-1, 0, 0,-1));
@@ -891,21 +891,13 @@ void offset3D_calculateNefPolyhedron_cgal(const std::vector<Vector4d> &faces,std
 
 }
 
-std::vector<std::shared_ptr<PolySet>>  offset3D_decompose(std::shared_ptr<const PolySet> ps,int debug)
+std::vector<std::shared_ptr<PolySet>>  offset3D_decompose(std::shared_ptr<const PolySet> ps)
 {
-	int count=0;
-	printf("Debug is %d\n",debug);
 	std::vector<std::shared_ptr<PolySet>> results;
 	if(ps->indices.size() == 0) return results;
-	std::vector<int> faces_done; // for one result
-	std::vector<int> faces_convex; // for one result
+
+
 	std::unordered_set<int> faces_included;
-
-	std::vector<Vector4d> faces_norm;
-
-	std::vector<int> faces_todo_face;
-	std::vector<int> faces_todo_edge;
-	Vector4d newface_norm;
 	//
 	// edge db aufbauen
 	std::unordered_map<TriCombineStub, int, boost::hash<TriCombineStub> > edge_db; // edge -> face
@@ -931,31 +923,34 @@ std::vector<std::shared_ptr<PolySet>>  offset3D_decompose(std::shared_ptr<const 
 
 	}
 
-	int newfaceind;
-	bool valid, valid1;
-	int debug_active=0;
+	int count=0;
 	while(1) {
+		int newfaceind=-1;
+		std::vector<int> faces_done; // for one result
+		std::vector<int> faces_convex; // for one result
+		std::vector<Vector4d> faces_norm;
+		std::vector<int> faces_todo_face;
+		std::vector<int> faces_todo_edge;
 		for(int i=0;i<ps->indices.size();i++)
 		{
 			if(faces_included.count(i) == 0) {
 				printf("New Round,Chosen to start with %d\n",i);
 				newfaceind=i;
-				newface_norm = offset3D_normal(ps->vertices, ps->indices[newfaceind]);
-				valid=true;
-				faces_done.clear();
-				faces_convex.clear();
-				faces_norm.clear();
-				faces_todo_face.clear();
-				faces_todo_edge.clear();
-				debug_active  = 0; // (i != 0)?1:0;
-				goto v; // start with success // TODO weg und dafuer code doppelt
 			}
 		}
-		printf("%d resulsts\n",results.size());
-		return results;
+		if(newfaceind == -1) {
+			printf("%d resulsts\n",results.size());
+			return results;
+		}
 
-		while(faces_todo_face.size() > 0) {
+		while(faces_todo_face.size() > 0 || newfaceind != -1) {
+			bool valid=false;
+			if(newfaceind != -1){
+				valid=true;
+		       	}
+			else
 			{
+				newfaceind=-1;
 				int faceind=faces_todo_face[0];
 				int edgeind=faces_todo_edge[0];
 //				printf("Doing Face %d/%d | %d in queue \n",faceind, edgeind,faces_todo_face.size());
@@ -964,97 +959,72 @@ std::vector<std::shared_ptr<PolySet>>  offset3D_decompose(std::shared_ptr<const 
 				int n = ps->indices[faceind].size();
 				stub.ind1=ps->indices[faceind][(edgeind+1)%n];	 
 				stub.ind2=ps->indices[faceind][edgeind];	
-			}
-			faces_todo_face.erase(faces_todo_face.begin());
-			faces_todo_edge.erase(faces_todo_edge.begin());
-			if(edge_db.count(stub) > 0) {
+				faces_todo_face.erase(faces_todo_face.begin());
+				faces_todo_edge.erase(faces_todo_edge.begin());
+				if(edge_db.count(stub) == 0) continue;
 				newfaceind=edge_db[stub];
-//				printf("newfaceind is %d \n",newfaceind);
-//				{
-//					auto &d = ps->indices[newfaceind];
-//					for(int j=0;j<d.size();j++)
-//						printf("%g/%g/%g ",ps->vertices[d[j]][0],ps->vertices[d[j]][1], ps->vertices[d[j]][2]);
-//					printf("\n");
-//				}
 
-
-				if(find(faces_done.begin(), faces_done.end(), newfaceind) != faces_done.end()){
-//					printf("already done\n");
-					continue;
-				}	
+				if(find(faces_done.begin(), faces_done.end(), newfaceind) != faces_done.end()) { newfaceind=-1;  continue; }
+				
 				// check if all pts of opp+_ind are below all planes
-				{
-					auto &newface = ps->indices[newfaceind]; // neue face die vielleicht dazu kommt
-					newface_norm = offset3D_normal(ps->vertices, newface);
-					int no = newface.size();
-					printf("Checking face %d :%d vertices against %d faces\n",newfaceind, no, faces_norm.size());
-
-//					//  valid if newface is planar to an existing face
-//					for(int j=0;!valid && j<  faces_norm.size();j++) {
-//						if(faces_norm[j].head<3>().dot(newface_norm.head<3>()) > 0.999 &&
- //                                                 fabs(newface_norm[3] - faces_norm[j][3]) < 0.001){
-//							valid=true;
-//						}
-//					}
-
-					// new face is valid if any of its points is will inside all existing faces
-					valid=false; 
-					Vector3d centerpt(0,0,0);
-					for(int i=0;i<no;i++) centerpt += ps->vertices[newface[i]];
-					centerpt /= no;
-
-					for(int i=0;!valid &&  i<no;i++) {
-						Vector3d pt=ps->vertices[newface[i]];
-						valid1=true;
-						for(int j=0;valid1 && j<faces_norm.size();j++) {
-							double off=pt.dot(faces_norm[j].head<3>())-faces_norm[j][3];
-							if(off > 1e-3) {
-								valid1=false;
-								printf(" not valid for pt %d, norm= %g/%g/%g/%g\n",j, faces_norm[j][0],faces_norm[j][1],faces_norm[j][2], faces_norm[j][3]);
-							}
-							else if(off > -1e-3) {
-								if((centerpt-pt).dot(faces_norm[j].head<3>()) > 0) valid1=false;
-							}
-						}
-						if(valid1) valid=true;
-					}
-				}
-v:				faces_done.push_back(newfaceind);
-				printf("face is %d, valid = %d registering new faces\n", newfaceind,valid);
-				for(int i=0;i<ps->indices[newfaceind].size();i++) {
-					faces_todo_face.push_back(newfaceind);
-					faces_todo_edge.push_back(i);
-				}
-				if(valid){
-					int n=faces_convex.size();
-					for(int i=0;i<n;i++) {
-						auto &tri = ps->indices[faces_convex[i]]; // bestehednde
-						// if tri is completely outside of new tri, skip it
-						bool valid1=true;
-						for(int j=0;j<tri.size();j++) {
-							Vector3d pt = ps->vertices[tri[j]];
-							double off=pt.dot(newface_norm.head<3>())-newface_norm[3];
-							if(off < 1e-3) valid1=false;
-						}
-						if(valid1) {
-							printf("Kicking out %d\n",faces_convex[i]);
-							printf("agressor is %g/%g/%g/%g norm ind is %d\n",newface_norm[0],newface_norm[1],newface_norm[2],newface_norm[3],i);
-							faces_norm.erase(faces_norm.begin()+i);
-							faces_convex.erase(faces_convex.begin()+i);
-							i--;
-							n--;
-						}
-					}
-					printf("adding  %g/%g/%g/%g as ind %d\n",newface_norm[0],newface_norm[1],newface_norm[2],newface_norm[3],faces_norm.size());
-					faces_norm.push_back(newface_norm);
-					faces_convex.push_back(newfaceind);
-				}
-				if(debug_active) {
-					count++;
-					if(count >= debug) break;
-				}
+				auto &newface = ps->indices[newfaceind]; // neue face die vielleicht dazu kommt
+				int no = newface.size();
+				printf("Checking face %d :%d vertices against %d faces\n",newfaceind, no, faces_norm.size());
 	
-			} 
+				// new face is valid if any of its points is will inside all existing faces
+				valid=false; 
+				Vector3d centerpt(0,0,0);
+				for(int i=0;i<no;i++) centerpt += ps->vertices[newface[i]];
+				centerpt /= no;
+
+				for(int i=0;!valid &&  i<no;i++) {
+					Vector3d pt=ps->vertices[newface[i]];
+					bool valid1=true;
+					for(int j=0;valid1 && j<faces_norm.size();j++) {
+						double off=pt.dot(faces_norm[j].head<3>())-faces_norm[j][3];
+						if(off > 1e-3) {
+							valid1=false;
+							printf(" not valid for pt %d, norm= %g/%g/%g/%g\n",j, faces_norm[j][0],faces_norm[j][1],faces_norm[j][2], faces_norm[j][3]);
+						}
+						else if(off > -1e-3) {
+							if((centerpt-pt).dot(faces_norm[j].head<3>()) > 0) valid1=false;
+						}
+					}
+					if(valid1) valid=true;
+				}
+			}
+			faces_done.push_back(newfaceind);
+//			printf("face is %d, valid = %d registering new faces\n", newfaceind,valid);
+			for(int i=0;i<ps->indices[newfaceind].size();i++) {
+				faces_todo_face.push_back(newfaceind);
+				faces_todo_edge.push_back(i);
+			}
+			if(valid){
+				int n=faces_convex.size();
+				Vector4d newface_norm = offset3D_normal(ps->vertices, ps->indices[newfaceind]);
+				for(int i=0;i<n;i++) {
+					auto &tri = ps->indices[faces_convex[i]]; // bestehednde
+					// if tri is completely outside of new tri, skip it
+					bool valid1=true;
+					for(int j=0;j<tri.size();j++) {
+						Vector3d pt = ps->vertices[tri[j]];
+						double off=pt.dot(newface_norm.head<3>())-newface_norm[3];
+						if(off < 1e-3) valid1=false;
+					}
+					if(valid1) {
+						printf("Kicking out %d\n",faces_convex[i]);
+						printf("agressor is %g/%g/%g/%g norm ind is %d\n",newface_norm[0],newface_norm[1],newface_norm[2],newface_norm[3],i);
+						faces_norm.erase(faces_norm.begin()+i);
+						faces_convex.erase(faces_convex.begin()+i);
+						i--;
+						n--;
+					}
+				}
+				printf("adding  %g/%g/%g/%g as ind %d\n",newface_norm[0],newface_norm[1],newface_norm[2],newface_norm[3],faces_norm.size());
+				faces_norm.push_back(newface_norm);
+				faces_convex.push_back(newfaceind);
+			}
+			newfaceind=-1;	
 		}
 	
 		std::vector<IndexedFace> result;
@@ -1100,47 +1070,18 @@ v:				faces_done.push_back(newfaceind);
 			printf("%g/%g/%g/%g\n",normals[i][0],normals[i][1], normals[i][2], normals[i][3]);
 		}
 
-		if(debug_active) {
-			PolySet *decomposed1 =  new PolySet(3,  true);
-			decomposed1->vertices = ps->vertices;
-			decomposed1->indices = result;
-			results.push_back( std::shared_ptr<PolySet>(decomposed1));
-		} else {
 
-			std::vector<Vector3d> vertices1;
-			std::vector<IndexedFace> indices1;
-			offset3D_calculateNefPolyhedron(normals, vertices1, indices1,debug);					
-//			offset3D_calculateNefPolyhedron_cgal(normals, vertices1, indices1,debug);					
+		std::vector<Vector3d> vertices1;
+		std::vector<IndexedFace> indices1;
+		offset3D_calculateNefPolyhedron(normals, vertices1, indices1);					
+//		offset3D_calculateNefPolyhedron_cgal(normals, vertices1, indices1,debug);					
 
-			PolySet *decomposed =  new PolySet(3,  true);
-			decomposed->vertices = vertices1;
-			decomposed->indices = indices1;
-			results.push_back( std::shared_ptr<PolySet>(decomposed));
-		}
+		PolySet *decomposed =  new PolySet(3,  true);
+		decomposed->vertices = vertices1;
+		decomposed->indices = indices1;
+		results.push_back( std::shared_ptr<PolySet>(decomposed));
 		printf("========================\n");
 		printf("Faces included size is %d\n",faces_included.size());
-/*		
-		if(results.size() == 2) {
-			// TODO debug disp[lay, faces, which are not yet included in any output
-			results.clear();
-
-			std::vector<IndexedFace> indices1;
-			for(int i=0;i<ps->indices.size();i++) {
-				if(faces_included.count(i) == 0) {
-					indices1.push_back(ps->indices[i]);
-					printf("missed index is %d\n",i);
-				}
-			}
-
-			PolySet *decomposed =  new PolySet(3,  true);
-			decomposed->vertices = ps->vertices;
-			decomposed->indices = indices1;
-			results.push_back( std::shared_ptr<PolySet>(decomposed));
-			return results;
-
-		}
-//		if(results.size() >=2) return results;
-*/		
 	}
 	return results;
 }
@@ -1572,7 +1513,7 @@ std::shared_ptr<Geometry> offset3D_convex(const std::shared_ptr<const PolySet> &
   std::vector<Vector4d> normals;
   std::vector<intList>  pointToFaceInds, pointToFacePos;
   if(off > 0) { // upsize
-    std::vector<std::shared_ptr<PolySet>> decomposed =  offset3D_decompose(ps,(int) off);
+    std::vector<std::shared_ptr<PolySet>> decomposed =  offset3D_decompose(ps);
     printf("%d decompose results\n",decomposed.size());
     //
     auto N = std::make_shared<ManifoldGeometry>();
@@ -1659,7 +1600,7 @@ std::shared_ptr<Geometry> offset3D(const std::shared_ptr<const PolySet> &ps,doub
 		     // singlepoint prog error
   if(!enabled) return offset3D_convex(ps, off);
 
-  std::vector<std::shared_ptr<PolySet>> decomposed =  offset3D_decompose(ps,(int) off);
+  std::vector<std::shared_ptr<PolySet>> decomposed =  offset3D_decompose(ps);
   printf("Decomposed into %d parts\n",decomposed.size());
   if(decomposed.size() == 0) {
     PolySet *offset_result =  new PolySet(3, /* convex */ true);
