@@ -279,8 +279,11 @@ void VBORenderer::create_surface(const PolySet& ps, VertexArray& vertex_array,
     elements_offset = vertex_array.elementsOffset();
     vertex_array.elementsMap().clear();
   }
-
+  //Color4f color_eff;
+  //int ind=0;
   for (const auto& poly : ps.indices) {
+//    color_eff = color;
+//    if(ind < ps.matindex.size()) color_eff=ps.mat[ps.matindex[ind]].color;
     if (poly.size() == 3) {
       Vector3d p0 = uniqueMultiply(vert_mult_map, ps.vertices[poly.at(0)], m);
       Vector3d p1 = uniqueMultiply(vert_mult_map, ps.vertices[poly.at(1)], m);
@@ -316,6 +319,7 @@ void VBORenderer::create_surface(const PolySet& ps, VertexArray& vertex_array,
         triangle_count++;
       }
     }
+ //   ind++;
   }
 
   GLenum elements_type = 0;
