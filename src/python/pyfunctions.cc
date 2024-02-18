@@ -171,9 +171,8 @@ PyObject *python_cylinder(PyObject *self, PyObject *args, PyObject *kwargs)
   DECLARE_INSTANCE
   auto node = std::make_shared<CylinderNode>(instance);
 
-  char *kwlist[] = {"h", "r", "r1", "r2", "d", "d1", "d2", "center", "fn", "fa", "fs", NULL};
+  char *kwlist[] = {"h", "r1", "r2", "center",  "d", "d1", "d2", "fn", "fa", "fs", NULL};
   double h = NAN;
-  double r = NAN;
   double r1 = NAN;
   double r2 = NAN;
   double d = NAN;
@@ -186,7 +185,7 @@ PyObject *python_cylinder(PyObject *self, PyObject *args, PyObject *kwargs)
   double vr1 = 1, vr2 = 1, vh = 1;
 
 
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|dddddddOddd", kwlist, &h, &r, &r1, &r2, &d, &d1, &d2, &center, &fn, &fa, &fs)) {
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|dddOddddddd", kwlist, &h, &r1, &r2, &center, &d, &d1, &d2,  &fn, &fa, &fs)) {
     PyErr_SetString(PyExc_TypeError, "Error during parsing cylinder(h,r|r1+r2|d1+d2)");
     return NULL;
   }
@@ -197,10 +196,6 @@ PyObject *python_cylinder(PyObject *self, PyObject *args, PyObject *kwargs)
   }
   vh = h;
 
-  if(!isnan(r) && r <= 0) {
-    PyErr_SetString(PyExc_TypeError, "Cylinder r must be positive");
-    return NULL;
-  }
   if(!isnan(d) && d <= 0) {
     PyErr_SetString(PyExc_TypeError, "Cylinder r must be positive");
     return NULL;
@@ -224,10 +219,10 @@ PyObject *python_cylinder(PyObject *self, PyObject *args, PyObject *kwargs)
 
   if (!isnan(r1) && !isnan(r2)) {
     vr1 = r1; vr2 = r2;
+  } else if (!isnan(r1) && isnan(r2)) {
+    vr1 = r1; vr2 = r1;
   } else if (!isnan(d1) && !isnan(d2)) {
     vr1 = d1 / 2.0; vr2 = d2 / 2.0;
-  } else if (!isnan(r)) {
-    vr1 = r; vr2 = r;
   } else if (!isnan(d)) {
     vr1 = d / 2.0; vr2 = d / 2.0;
   }
