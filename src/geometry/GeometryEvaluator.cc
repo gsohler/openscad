@@ -41,7 +41,6 @@
 #include <CGAL/Point_2.h>
 #endif
 #ifdef ENABLE_MANIFOLD
-#include "ManifoldGeometry.h"
 #include "manifoldutils.h"
 #endif
 
