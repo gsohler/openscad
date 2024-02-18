@@ -143,10 +143,10 @@ std::unique_ptr<const Geometry> CubeNode::createGeometry() const
       {2, 0, 4, 6}, // left
   };
 
- // Material red;
- // red.color=Color4f(1,0,0);
- // ps->mat.push_back(red);
- // for(int i=0;i<ps->indices.size();i++) ps->matindex.push_back(0);
+  Material red;
+  red.color=Color4f(255,0,0);
+  ps->mat.push_back(red);
+  for(int i=0;i<ps->indices.size();i++) ps->matind.push_back(0);
   return ps;
 }
 
@@ -230,10 +230,10 @@ std::unique_ptr<const Geometry> SphereNode::createGeometry() const
     polyset->indices.back().push_back(num_rings * num_fragments - i - 1);
   }
 
-  //Material green;
-  //green.color=Color4f(0,1,0);
-  //polyset->mat.push_back(green);
-  //for(int i=0;i<polyset->indices.size();i++) polyset->matindex.push_back(0);
+  Material green;
+  green.color=Color4f(0,255,0);
+  polyset->mat.push_back(green);
+  for(int i=0;i<polyset->indices.size();i++) polyset->matind.push_back(0);
 
   return polyset;
 }
@@ -315,10 +315,10 @@ std::unique_ptr<const Geometry> CylinderNode::createGeometry() const
     }
   }
 
-  //Material blue;
-  //blue.color=Color4f(0,0,1);
-  //polyset->mat.push_back(blue);
-  //for(int i=0;i<polyset->indices.size();i++) polyset->matindex.push_back(0);
+  Material blue;
+  blue.color=Color4f(0,0,255);
+  polyset->mat.push_back(blue);
+  for(int i=0;i<polyset->indices.size();i++) polyset->matind.push_back(0);
 
   return polyset;
 }

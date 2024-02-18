@@ -10,6 +10,12 @@
 #include <string>
 class PolySetBuilder;
 
+class Material
+{
+  public:	
+  Color4f color;
+};
+
 class PolySet : public Geometry
 {
   friend class PolySetBuilder;	
@@ -17,6 +23,8 @@ public:
   VISITABLE_GEOMETRY();
   PolygonIndices indices;
   std::vector<Vector3d> vertices;
+  std::vector<int> matind;
+  std::vector<Material> mat;
 
   PolySet(unsigned int dim, boost::tribool convex = unknown);
 

@@ -279,17 +279,17 @@ void VBORenderer::create_surface(const PolySet& ps, VertexArray& vertex_array,
     elements_offset = vertex_array.elementsOffset();
     vertex_array.elementsMap().clear();
   }
-  //Color4f color_eff;
-  //int ind=0;
+  Color4f color_eff;
+  int ind=0;
   for (const auto& poly : ps.indices) {
-//    color_eff = color;
-//    if(ind < ps.matindex.size()) color_eff=ps.mat[ps.matindex[ind]].color;
+    color_eff = color;
+    if(ind < ps.matind.size()) color_eff=ps.mat[ps.matind[ind]].color;
     if (poly.size() == 3) {
       Vector3d p0 = uniqueMultiply(vert_mult_map, ps.vertices[poly.at(0)], m);
       Vector3d p1 = uniqueMultiply(vert_mult_map, ps.vertices[poly.at(1)], m);
       Vector3d p2 = uniqueMultiply(vert_mult_map, ps.vertices[poly.at(2)], m);
 
-      create_triangle(vertex_array, color, p0, p1, p2,
+      create_triangle(vertex_array, color_eff, p0, p1, p2,
                       0, 0, poly.size(), 3, false, mirrored);
       triangle_count++;
     } else if (poly.size() == 4) {
@@ -298,9 +298,9 @@ void VBORenderer::create_surface(const PolySet& ps, VertexArray& vertex_array,
       Vector3d p2 = uniqueMultiply(vert_mult_map, ps.vertices[poly.at(2)], m);
       Vector3d p3 = uniqueMultiply(vert_mult_map, ps.vertices[poly.at(3)], m);
 
-      create_triangle(vertex_array, color, p0, p1, p3,
+      create_triangle(vertex_array, color_eff, p0, p1, p3,
                       0, 0, poly.size(), 3, false, mirrored);
-      create_triangle(vertex_array, color, p2, p3, p1,
+      create_triangle(vertex_array, color_eff, p2, p3, p1,
                       1, 0, poly.size(), 3, false, mirrored);
       triangle_count += 2;
     } else {
@@ -314,12 +314,12 @@ void VBORenderer::create_surface(const PolySet& ps, VertexArray& vertex_array,
         Vector3d p1 = uniqueMultiply(vert_mult_map, ps.vertices[poly.at(i % poly.size())], m);
         Vector3d p2 = uniqueMultiply(vert_mult_map, ps.vertices[poly.at(i - 1)], m);
 
-        create_triangle(vertex_array, color, p0, p2, p1,
+        create_triangle(vertex_array, color_eff, p0, p2, p1,
                         i - 1, 0, poly.size(), 3, false, mirrored);
         triangle_count++;
       }
     }
- //   ind++;
+    ind++;
   }
 
   GLenum elements_type = 0;

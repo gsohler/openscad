@@ -108,6 +108,7 @@ template std::shared_ptr<ManifoldGeometry> createMutableManifoldFromSurfaceMesh(
 
 std::shared_ptr<ManifoldGeometry> createMutableManifoldFromPolySet(const PolySet& ps)
 {
+#if 0	
 #ifdef ENABLE_CGAL
   PolySet psq(ps);
   std::vector<Vector3d> points3d;
@@ -144,6 +145,30 @@ std::shared_ptr<ManifoldGeometry> createMutableManifoldFromPolySet(const PolySet
   return createMutableManifoldFromSurfaceMesh(m);
 #else
   return std::make_shared<ManifoldGeometry>();
+#endif
+#else
+  auto ps_tri = PolySetUtils::tessellate_faces(ps);
+  manifold::Mesh mesh;
+
+  mesh.vertPos.resize(ps_tri->vertices.size());
+  for(int i=0;i<ps_tri->vertices.size();i++) {
+    Vector3d pt=ps_tri->vertices[i];
+    mesh.vertPos[i] = glm::vec3((float) pt[0], (float) pt[1], (float) pt[2]);
+  }
+
+  mesh.triVerts.reserve(ps_tri->indices.size()); 
+  for(int i=0;i<ps_tri->indices.size();i++) {		
+    auto &tri = ps_tri->indices[i];	  
+    mesh.triVerts.emplace_back(tri[0], tri[1], tri[2]);
+    // TODO use ps_tri->mat_ind[i];
+  }
+  auto mani = std::make_shared<manifold::Manifold>(std::move(mesh));
+  if (mani->Status() != Error::NoError) {
+    LOG(message_group::Error,
+        "[manifold] Surface_mesh -> Manifold conversion failed: %1$s", 
+        ManifoldUtils::statusToString(mani->Status()));
+  }
+  return std::make_shared<ManifoldGeometry>(mani);
 #endif
 }
 
