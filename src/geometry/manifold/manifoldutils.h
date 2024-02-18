@@ -4,6 +4,7 @@
 #include "enums.h"
 #include "ManifoldGeometry.h"
 #include "manifold.h"
+#include "Material.h"
 
 class PolySet;
 
@@ -19,8 +20,8 @@ namespace ManifoldUtils {
   /*! If the PolySet isn't trusted, use createMutableManifoldFromPolySet which will triangulate and reorient it. */
   std::shared_ptr<manifold::Manifold> trustedPolySetToManifold(const PolySet& ps);
 
-  std::shared_ptr<ManifoldGeometry> createMutableManifoldFromPolySet(const PolySet& ps);
-  std::shared_ptr<ManifoldGeometry> createMutableManifoldFromGeometry(const std::shared_ptr<const Geometry>& geom);
+  std::shared_ptr<ManifoldGeometry> createMutableManifoldFromPolySet(std::vector<Material> &mat, const PolySet& ps);
+  std::shared_ptr<ManifoldGeometry> createMutableManifoldFromGeometry(std::vector<Material> &mat, const std::shared_ptr<const Geometry>& geom);
 
   template <class TriangleMesh>
   std::shared_ptr<ManifoldGeometry> createMutableManifoldFromSurfaceMesh(const TriangleMesh& mesh);

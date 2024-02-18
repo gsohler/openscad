@@ -11,6 +11,7 @@
 #endif
 #include "PolySetUtils.h"
 #include "PolySet.h"
+#include "Material.h"
 
 using Error = manifold::Manifold::Error;
 
@@ -106,7 +107,7 @@ template std::shared_ptr<ManifoldGeometry> createMutableManifoldFromSurfaceMesh(
 template std::shared_ptr<ManifoldGeometry> createMutableManifoldFromSurfaceMesh(const CGAL_DoubleMesh &tm);
 #endif
 
-std::shared_ptr<ManifoldGeometry> createMutableManifoldFromPolySet(const PolySet& ps)
+std::shared_ptr<ManifoldGeometry> createMutableManifoldFromPolySet(std::vector<Material> &mat, const PolySet& ps)
 {
 #if 0	
 #ifdef ENABLE_CGAL
@@ -159,10 +160,28 @@ std::shared_ptr<ManifoldGeometry> createMutableManifoldFromPolySet(const PolySet
   mesh.triVerts.reserve(ps_tri->indices.size()); 
   for(int i=0;i<ps_tri->indices.size();i++) {		
     auto &tri = ps_tri->indices[i];	  
+    assert(tri.size() == 3);
     mesh.triVerts.emplace_back(tri[0], tri[1], tri[2]);
-    // TODO use ps_tri->mat_ind[i];
   }
-  auto mani = std::make_shared<manifold::Manifold>(std::move(mesh));
+  manifold::MeshGL meshgl(mesh);
+  std::vector<unsigned int> matind;
+  for(auto ind: ps_tri->matind) {
+    int found=-1;	    
+    for(int j=0;j<mat.size();j++) {
+      if(mat[j].color == ps_tri->mat[ind].color) // TODO fix
+        found=j;
+    }
+    if(found == -1) {
+      found=mat.size();
+      mat.push_back(ps_tri->mat[ind]); 	 
+    }
+    matind.push_back(found);	  
+  }
+  meshgl.faceID = matind;
+//  printf("input id is \n");
+//  for(int i=0;i<matind.size();i++)
+//	  printf("%d: %d\n",i,matind[i]);
+  auto mani = std::make_shared<manifold::Manifold>(std::move(meshgl));
   if (mani->Status() != Error::NoError) {
     LOG(message_group::Error,
         "[manifold] Surface_mesh -> Manifold conversion failed: %1$s", 
@@ -172,14 +191,14 @@ std::shared_ptr<ManifoldGeometry> createMutableManifoldFromPolySet(const PolySet
 #endif
 }
 
-std::shared_ptr<ManifoldGeometry> createMutableManifoldFromGeometry(const std::shared_ptr<const Geometry>& geom) {
+std::shared_ptr<ManifoldGeometry> createMutableManifoldFromGeometry(std::vector<Material> &mat, const std::shared_ptr<const Geometry>& geom) {
   if (auto mani = std::dynamic_pointer_cast<const ManifoldGeometry>(geom)) {
     return std::make_shared<ManifoldGeometry>(*mani);
   }
 
   auto ps = PolySetUtils::getGeometryAsPolySet(geom);
   if (ps) {
-    return createMutableManifoldFromPolySet(*ps);
+    return createMutableManifoldFromPolySet(mat, *ps);
   }
   
   return nullptr;
