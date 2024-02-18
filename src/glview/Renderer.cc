@@ -115,8 +115,10 @@ Renderer::Renderer()
   renderer_shader.data.csg_rendering.tex1 = glGetUniformLocation(edgeshader_prog, "tex1"); //4 
   renderer_shader.data.csg_rendering.texturefactor = glGetUniformLocation(edgeshader_prog, "textureFactor"); // 5
   renderer_shader.data.csg_rendering.barycentric = glGetAttribLocation(edgeshader_prog, "barycentric"); // 6
-  glUniform1f(renderer_shader.data.csg_rendering.texturefactor , 0.0);
-  glUniform1i(renderer_shader.data.csg_rendering.tex1 , 0);
+  if(textures.size() > 0) { // TODO prevent bug, segfault
+    glUniform1f(renderer_shader.data.csg_rendering.texturefactor , 0.0);
+    glUniform1i(renderer_shader.data.csg_rendering.tex1 , 0);
+  }
 
   PRINTD("Renderer() end");
 }
