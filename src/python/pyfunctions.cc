@@ -171,7 +171,7 @@ PyObject *python_cylinder(PyObject *self, PyObject *args, PyObject *kwargs)
   DECLARE_INSTANCE
   auto node = std::make_shared<CylinderNode>(instance);
 
-  char *kwlist[] = {"h", "r", "r1", "r2", "d", "d1", "d2", "center", "fn", "fa", "fs", NULL};
+  char *kwlist[] = {"h", "r1", "r2", "center",  "r", "d", "d1", "d2", "fn", "fa", "fs", NULL};
   double h = NAN;
   double r = NAN;
   double r1 = NAN;
@@ -186,7 +186,7 @@ PyObject *python_cylinder(PyObject *self, PyObject *args, PyObject *kwargs)
   double vr1 = 1, vr2 = 1, vh = 1;
 
 
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|dddddddOddd", kwlist, &h, &r, &r1, &r2, &d, &d1, &d2, &center, &fn, &fa, &fs)) {
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|dddOdddddddd", kwlist, &h, &r1, &r2, &center, &r, &d, &d1, &d2,  &fn, &fa, &fs)) {
     PyErr_SetString(PyExc_TypeError, "Error during parsing cylinder(h,r|r1+r2|d1+d2)");
     return NULL;
   }
@@ -197,12 +197,8 @@ PyObject *python_cylinder(PyObject *self, PyObject *args, PyObject *kwargs)
   }
   vh = h;
 
-  if(!isnan(r) && r <= 0) {
-    PyErr_SetString(PyExc_TypeError, "Cylinder r must be positive");
-    return NULL;
-  }
   if(!isnan(d) && d <= 0) {
-    PyErr_SetString(PyExc_TypeError, "Cylinder r must be positive");
+    PyErr_SetString(PyExc_TypeError, "Cylinder d must be positive");
     return NULL;
   }
   if(!isnan(r1) && r1 < 0) {
@@ -224,6 +220,8 @@ PyObject *python_cylinder(PyObject *self, PyObject *args, PyObject *kwargs)
 
   if (!isnan(r1) && !isnan(r2)) {
     vr1 = r1; vr2 = r2;
+  } else if (!isnan(r1) && isnan(r2)) {
+    vr1 = r1; vr2 = r1;
   } else if (!isnan(d1) && !isnan(d2)) {
     vr1 = d1 / 2.0; vr2 = d2 / 2.0;
   } else if (!isnan(r)) {
@@ -708,41 +706,43 @@ PyObject *python_matrix_rot(PyObject *mat, Matrix3d rotvec)
 }
 
 
-PyObject *python_rotate_sub(PyObject *obj, Vector3d rot)
+PyObject *python_rotate_sub(PyObject *obj, Vector3d vec3, double angle)
 {
-  PyObject *child_dict;
-  double sx = 0, sy = 0, sz = 0;
-  double cx = 1, cy = 1, cz = 1;
-  double a = 0.0;
-  bool ok = true;
-//    const auto& vec_a = val_a.toVector();
-  if(rot[2] != 0) {
-    a = rot[2];
-    sz = sin_degrees(a);
-    cz = cos_degrees(a);
-  }
-  if(rot[1] != 0) {
-    a = rot[1];
-    sy = sin_degrees(a);
-    cy = cos_degrees(a);
-  }
-  if(rot[0] != 0) {
-    a = rot[0];
-    sx = sin_degrees(a);
-    cx = cos_degrees(a);
-  }
-
   Matrix3d M;
-  M << cy * cz,  cz *sx *sy - cx * sz,   cx *cz *sy + sx * sz,
-    cy *sz,  cx *cz + sx * sy * sz,  -cz * sx + cx * sy * sz,
-    -sy,       cy *sx,                  cx *cy;
-  
+  if(isnan(angle)) {	
+    double sx = 0, sy = 0, sz = 0;
+    double cx = 1, cy = 1, cz = 1;
+    double a = 0.0;
+    bool ok = true;
+    if(vec3[2] != 0) {
+      a = vec3[2];
+      sz = sin_degrees(a);
+      cz = cos_degrees(a);
+    }
+    if(vec3[1] != 0) {
+      a = vec3[1];
+      sy = sin_degrees(a);
+      cy = cos_degrees(a);
+    }
+    if(vec3[0] != 0) {
+      a = vec3[0];
+      sx = sin_degrees(a);
+      cx = cos_degrees(a);
+    }
+
+    M << cy * cz,  cz *sx *sy - cx * sz,   cx *cz *sy + sx * sz,
+      cy *sz,  cx *cz + sx * sy * sz,  -cz * sx + cx * sy * sz,
+      -sy,       cy *sx,                  cx *cy;
+  } else {
+    M = angle_axis_degrees(angle, vec3);
+  }
   PyObject *mat = python_matrix_rot(obj, M);
   if(mat != nullptr) return mat;
 
   DECLARE_INSTANCE
   auto node = std::make_shared<TransformNode>(instance, "rotate");
 
+  PyObject *child_dict;
   std::shared_ptr<AbstractNode> child = PyOpenSCADObjectToNodeMulti(obj, &child_dict);
   if (child == NULL) {
     PyErr_SetString(PyExc_TypeError, "Invalid type for Object in rotate");
@@ -765,27 +765,31 @@ PyObject *python_rotate_sub(PyObject *obj, Vector3d rot)
   return pyresult;
 }
 
-PyObject *python_rotate_core(PyObject *obj, PyObject *val_a, float val_v)
+PyObject *python_rotate_core(PyObject *obj, PyObject *val_a, PyObject *val_v)
 {
-  Vector3d rot(0,0,0);
-  if (PyList_Check(val_a) && PyList_Size(val_a) > 0) {
-    if(PyList_Size(val_a) >= 1) rot[0]= PyFloat_AsDouble(PyList_GetItem(val_a, 0));
-    if(PyList_Size(val_a) >= 2) rot[1]= PyFloat_AsDouble(PyList_GetItem(val_a, 1));
-    if(PyList_Size(val_a) >= 3) rot[2]= PyFloat_AsDouble(PyList_GetItem(val_a, 2));
-    return python_rotate_sub(obj, rot);
+  Vector3d vec3(0,0,0);
+  double angle;
+  if (PyList_Check(val_a) && val_v == nullptr) {
+    if(PyList_Size(val_a) >= 1) vec3[0]= PyFloat_AsDouble(PyList_GetItem(val_a, 0));
+    if(PyList_Size(val_a) >= 2) vec3[1]= PyFloat_AsDouble(PyList_GetItem(val_a, 1));
+    if(PyList_Size(val_a) >= 3) vec3[2]= PyFloat_AsDouble(PyList_GetItem(val_a, 2));
+    return python_rotate_sub(obj, vec3, NAN);
+  } else if (!python_numberval(val_a,&angle) && PyList_Check(val_v) && PyList_Size(val_v) == 3) {
+    vec3[0]= PyFloat_AsDouble(PyList_GetItem(val_v, 0));
+    vec3[1]= PyFloat_AsDouble(PyList_GetItem(val_v, 1));
+    vec3[2]= PyFloat_AsDouble(PyList_GetItem(val_v, 2));
+    return python_rotate_sub(obj, vec3, angle);
   }
   return obj;
 }
 
 PyObject *python_rotate(PyObject *self, PyObject *args, PyObject *kwargs)
 {
-  char *kwlist[] = {"obj", "a", "v", NULL};
-  PyObject *val_a = NULL;
-  PyObject *obj = NULL;
-  float val_v = 0;
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OO!|f", kwlist,
-                                   &obj,
-                                   &PyList_Type, &val_a, &val_v)) {
+  char *kwlist[] = {"obj", "a", "v", nullptr};
+  PyObject *val_a = nullptr;
+  PyObject *val_v = nullptr;
+  PyObject *obj = nullptr;
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OO|O", kwlist, &obj, &val_a, &val_v)) {
     PyErr_SetString(PyExc_TypeError, "Error during parsing rotate(object, vec3)");
     return NULL;
   }
@@ -794,11 +798,10 @@ PyObject *python_rotate(PyObject *self, PyObject *args, PyObject *kwargs)
 
 PyObject *python_oo_rotate(PyObject *obj, PyObject *args, PyObject *kwargs)
 {
-  char *kwlist[] = {"a", "v", NULL};
-  PyObject *val_a = NULL;
-  float val_v = 0;
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O!|f", kwlist,
-                                   &PyList_Type, &val_a, &val_v)) {
+  char *kwlist[] = {"a", "v", nullptr};
+  PyObject *val_a = nullptr;
+  PyObject *val_v = nullptr;
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|O", kwlist, &val_a, &val_v)) {
     PyErr_SetString(PyExc_TypeError, "Error during parsing rotate(object, vec3)");
     return NULL;
   }
@@ -1004,7 +1007,7 @@ PyObject *python_dir_sub_core(PyObject *obj, double arg, int mode)
       case 7: rot = Vector3d(0,arg,0); break;
       case 8: rot = Vector3d(0,0,arg); break;
     }		       
-    return python_rotate_sub(obj, rot);
+    return python_rotate_sub(obj, rot, NAN);
   }
 }
 
