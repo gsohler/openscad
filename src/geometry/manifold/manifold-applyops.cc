@@ -45,6 +45,7 @@ std::shared_ptr<const ManifoldGeometry> applyOperator3DManifold(const Geometry::
       }
       continue;
     }
+
     // Initialize N with first expected geometric object
     if (!foundFirst) {
       N = chN;

@@ -42,6 +42,7 @@
 #include <iterator>
 #include <memory>
 #include <sstream>
+#include "Renderer.h"
 using namespace boost::assign; // bring 'operator+=()' into scope
 
 #define F_MINIMUM 0.01
@@ -143,9 +144,10 @@ std::unique_ptr<const Geometry> CubeNode::createGeometry() const
       {2, 0, 4, 6}, // left
   };
 
-  Material red;
-  red.color=Color4f(255,0,0);
-  ps->mat.push_back(red);
+  Material matcolor;
+  auto cs = ColorMap::inst()->defaultColorScheme();
+  matcolor.color = ColorMap::getColor(cs, RenderColor::OPENCSG_FACE_FRONT_COLOR);
+  ps->mat.push_back(matcolor);
   for(int i=0;i<ps->indices.size();i++) ps->matind.push_back(0);
   return ps;
 }
@@ -229,10 +231,10 @@ std::unique_ptr<const Geometry> SphereNode::createGeometry() const
   for (int i = 0; i < num_fragments; ++i) {
     polyset->indices.back().push_back(num_rings * num_fragments - i - 1);
   }
-
-  Material green;
-  green.color=Color4f(0,255,0);
-  polyset->mat.push_back(green);
+  Material matcolor;
+  auto cs = ColorMap::inst()->defaultColorScheme();
+  matcolor.color = ColorMap::getColor(cs, RenderColor::OPENCSG_FACE_FRONT_COLOR);
+  polyset->mat.push_back(matcolor);
   for(int i=0;i<polyset->indices.size();i++) polyset->matind.push_back(0);
 
   return polyset;
@@ -314,10 +316,10 @@ std::unique_ptr<const Geometry> CylinderNode::createGeometry() const
       polyset->indices.back().push_back(num_fragments+i);
     }
   }
-
-  Material blue;
-  blue.color=Color4f(0,0,255);
-  polyset->mat.push_back(blue);
+  Material matcolor;
+  auto cs = ColorMap::inst()->defaultColorScheme();
+  matcolor.color = ColorMap::getColor(cs, RenderColor::OPENCSG_FACE_FRONT_COLOR);
+  polyset->mat.push_back(matcolor);
   for(int i=0;i<polyset->indices.size();i++) polyset->matind.push_back(0);
 
   return polyset;
@@ -424,6 +426,13 @@ std::unique_ptr<const Geometry> PolyhedronNode::createGeometry() const
   p->indices=this->faces;
   for (auto &poly : p->indices)
     std::reverse(poly.begin(),poly.end());
+
+  Material matcolor;
+  auto cs = ColorMap::inst()->defaultColorScheme();
+  matcolor.color = ColorMap::getColor(cs, RenderColor::OPENCSG_FACE_FRONT_COLOR);
+  p->mat.push_back(matcolor);
+  for(int i=0;i<p->indices.size();i++) p->matind.push_back(0);
+
   return p;
 }
 

@@ -644,20 +644,10 @@ std::string evaluatePython(const std::string & code)
   PyObject *pyExcValue = nullptr;
   PyObject *pyExcTraceback = nullptr;
   /* special python code to catch errors from stdout and stderr and make them available in OpenSCAD console */
-  printf("Start eval\n");
   if(!pythonMainModuleInitialized)
 	  return "Python not initialized";
   const char *python_init_code="\
 import sys\n\
-class InputFeeder:\n\
-   def __init__(self):\n\
-      self.data = ''\n\
-   def feed(data):\n\
-     self.data += data\n\
-   def read(self):\n\
-      return self.data\n\
-   def flush(self):\n\
-      pass\n\
 class OutputCatcher:\n\
    def __init__(self):\n\
       self.data = ''\n\
@@ -665,18 +655,14 @@ class OutputCatcher:\n\
       self.data = self.data + stuff\n\
    def flush(self):\n\
       pass\n\
-feeder_in = InputFeeder()\n\
 catcher_out = OutputCatcher()\n\
 catcher_err = OutputCatcher()\n\
-stdin_bak=sys.stdin\n\
 stdout_bak=sys.stdout\n\
 stderr_bak=sys.stderr\n\
-sys.stdin = feeder_in\n\
 sys.stdout = catcher_out\n\
 sys.stderr = catcher_err\n\
 ";
   const char *python_exit_code="\
-sys.stdin = stdin_bak\n\
 sys.stdout = stdout_bak\n\
 sys.stderr = stderr_bak\n\
 ";
@@ -731,7 +717,7 @@ sys.stderr = stderr_bak\n\
       error += std::to_string(line_num);
       Py_XDECREF(pyExcTraceback);
     }
-    printf("end eval\n");
+
     return error;
 }
 /*

@@ -9,6 +9,7 @@
 #include "LinearExtrudeNode.h"
 #include "PathExtrudeNode.h"
 #include "RoofNode.h"
+#include "ColorNode.h"
 #include "roof_ss.h"
 #include "roof_vd.h"
 #include "RotateExtrudeNode.h"
@@ -21,6 +22,7 @@
 #include "ClipperUtils.h"
 #include "PolySetUtils.h"
 #include "PolySet.h"
+#include "Renderer.h"
 #include "PolySetBuilder.h"
 #include "calc.h"
 #include "printutils.h"
@@ -2040,6 +2042,37 @@ Response GeometryEvaluator::visit(State& state, const AbstractNode& node)
 }
 
 /*!
+   Custom nodes are handled here => implicit union
+ */
+
+Response GeometryEvaluator::visit(State& state, const ColorNode& node)
+{
+  if (state.isPrefix()) {
+    if (isSmartCached(node)) return Response::PruneTraversal;
+    state.setPreferNef(true); // Improve quality of CSG by avoiding conversion loss
+  }
+  if (state.isPostfix()) {
+    std::shared_ptr<const Geometry> geom;
+    if (!isSmartCached(node)) {
+      ResultObject res = applyToChildren(node, OpenSCADOperator::UNION);
+      auto mutableGeom = res.asMutableGeometry();
+      if(std::shared_ptr<PolySet> ps = std::dynamic_pointer_cast<PolySet>(mutableGeom)) {
+        for(auto &mat: ps->mat) mat.color = node.color;		  
+	Material col;
+	col.color = node.color;
+	for(;ps->mat.size () < ps->indices.size();) ps->mat.push_back(col);
+        geom = mutableGeom;
+      }
+    } else {
+      geom = smartCacheGet(node, state.preferNef());
+    }
+    addToParent(state, node, geom);
+    node.progress_report();
+  }
+  return Response::ContinueTraversal;
+}
+
+/*!
    Pass children to parent without touching them. Used by e.g. for loops
  */
 Response GeometryEvaluator::visit(State& state, const ListNode& node)
@@ -2919,7 +2952,14 @@ static std::unique_ptr<Geometry> extrudePolygon(const LinearExtrudeNode& node, c
     builder.append(*ps_top);
   }
 }
-  return builder.build();
+  auto ps = builder.build();
+  Material matcolor;
+  auto cs = ColorMap::inst()->defaultColorScheme();
+  matcolor.color = ColorMap::getColor(cs, RenderColor::OPENCSG_FACE_FRONT_COLOR);
+  ps->mat.push_back(matcolor);
+  for(int i=0;i<ps->indices.size();i++) ps->matind.push_back(0);
+  
+  return ps;
 }
 
 static std::unique_ptr<Geometry> extrudePolygon(const PathExtrudeNode& node, const Polygon2d& poly)
@@ -3119,7 +3159,14 @@ static std::unique_ptr<Geometry> extrudePolygon(const PathExtrudeNode& node, con
   if(intersect == true && node.allow_intersect == false) {
   	return std::unique_ptr<PolySet>();
   }
-  return builder.build();
+  auto ps = builder.build();
+  Material matcolor;
+  auto cs = ColorMap::inst()->defaultColorScheme();
+  matcolor.color = ColorMap::getColor(cs, RenderColor::OPENCSG_FACE_FRONT_COLOR);
+  ps->mat.push_back(matcolor);
+  for(int i=0;i<ps->indices.size();i++) ps->matind.push_back(0);
+  return ps;
+
 }
 
 /*!
@@ -3374,7 +3421,13 @@ static std::unique_ptr<Geometry> rotatePolygon(const RotateExtrudeNode& node, co
     }
   }
   }
-  return builder.build();
+  auto ps = builder.build();
+  Material matcolor;
+  auto cs = ColorMap::inst()->defaultColorScheme();
+  matcolor.color = ColorMap::getColor(cs, RenderColor::OPENCSG_FACE_FRONT_COLOR);
+  ps->mat.push_back(matcolor);
+  for(int i=0;i<ps->indices.size();i++) ps->matind.push_back(0);
+  return ps;
 }
 
 /*!

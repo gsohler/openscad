@@ -3,6 +3,7 @@
 #include "PolySetBuilder.h"
 #include "printutils.h"
 #include "AST.h"
+#include "Renderer.h"
 
 #include <fstream>
 #include <boost/predef.h>
@@ -194,5 +195,13 @@ std::unique_ptr<PolySet> import_stl(const std::string& filename, const Location&
         "STL format not recognized in '%1$s'.", filename);
     return std::make_unique<PolySet>(3);
   }
-  return builder.build();
+
+  auto p =builder.build();
+  Material matcolor;
+  auto cs = ColorMap::inst()->defaultColorScheme();
+  matcolor.color = ColorMap::getColor(cs, RenderColor::OPENCSG_FACE_FRONT_COLOR);
+  p->mat.push_back(matcolor);
+  for(int i=0;i<p->indices.size();i++) p->matind.push_back(0);
+  return p;
+
 }
