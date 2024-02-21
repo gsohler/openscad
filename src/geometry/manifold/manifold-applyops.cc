@@ -27,8 +27,11 @@ std::shared_ptr<const ManifoldGeometry> applyOperator3DManifold(const Geometry::
   bool foundFirst = false;
 
   std::vector<Material> matnew;
+  std::vector<std::vector<unsigned int>> matinds_org;
   for (const auto& item : children) {
-    std::shared_ptr<ManifoldGeometry> chN = item.second ? createMutableManifoldFromGeometry(matnew, item.second) : nullptr;
+    std::vector<unsigned int> matind_org;	  
+    std::shared_ptr<ManifoldGeometry> chN = item.second ? createMutableManifoldFromGeometry(matnew, matind_org, item.second) : nullptr;
+    matinds_org.push_back(matind_org);
 
     // Intersecting something with nothing results in nothing
     if (!chN || chN->isEmpty()) {
@@ -68,9 +71,8 @@ std::shared_ptr<const ManifoldGeometry> applyOperator3DManifold(const Geometry::
     if (item.first) item.first->progress_report();
   }
   N->mat=matnew;
-  printf("End matew size is %d\n",matnew.size());
-  for(int i=0;i<N->mat.size();i++)
-    printf("%g/%g/%g\n",N->mat[i].color[0], N->mat[i].color[1], N->mat[i].color[2]);
+  N->matinds_org = matinds_org;
+
   return N;
 }
 

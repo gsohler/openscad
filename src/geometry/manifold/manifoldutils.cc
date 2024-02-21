@@ -107,7 +107,7 @@ template std::shared_ptr<ManifoldGeometry> createMutableManifoldFromSurfaceMesh(
 template std::shared_ptr<ManifoldGeometry> createMutableManifoldFromSurfaceMesh(const CGAL_DoubleMesh &tm);
 #endif
 
-std::shared_ptr<ManifoldGeometry> createMutableManifoldFromPolySet(std::vector<Material> &mat, const PolySet& ps)
+std::shared_ptr<ManifoldGeometry> createMutableManifoldFromPolySet(std::vector<Material> &mat, std::vector<unsigned int> &matind, const PolySet& ps)
 {
 #if 0	
 #ifdef ENABLE_CGAL
@@ -164,7 +164,6 @@ std::shared_ptr<ManifoldGeometry> createMutableManifoldFromPolySet(std::vector<M
     mesh.triVerts.emplace_back(tri[0], tri[1], tri[2]);
   }
   manifold::MeshGL meshgl(mesh);
-  std::vector<unsigned int> matind;
   for(auto ind: ps_tri->matind) {
     int found=-1;	    
     for(int j=0;j<mat.size();j++) {
@@ -177,10 +176,6 @@ std::shared_ptr<ManifoldGeometry> createMutableManifoldFromPolySet(std::vector<M
     }
     matind.push_back(found);	  
   }
-  meshgl.faceID = matind;
-//  printf("input id is \n");
-//  for(int i=0;i<matind.size();i++)
-//	  printf("%d: %d\n",i,matind[i]);
   auto mani = std::make_shared<manifold::Manifold>(std::move(meshgl));
   if (mani->Status() != Error::NoError) {
     LOG(message_group::Error,
@@ -191,14 +186,14 @@ std::shared_ptr<ManifoldGeometry> createMutableManifoldFromPolySet(std::vector<M
 #endif
 }
 
-std::shared_ptr<ManifoldGeometry> createMutableManifoldFromGeometry(std::vector<Material> &mat, const std::shared_ptr<const Geometry>& geom) {
+std::shared_ptr<ManifoldGeometry> createMutableManifoldFromGeometry(std::vector<Material> &mat, std::vector<unsigned int> &orgmatind, const std::shared_ptr<const Geometry>& geom) {
   if (auto mani = std::dynamic_pointer_cast<const ManifoldGeometry>(geom)) {
     return std::make_shared<ManifoldGeometry>(*mani);
   }
 
   auto ps = PolySetUtils::getGeometryAsPolySet(geom);
   if (ps) {
-    return createMutableManifoldFromPolySet(mat, *ps);
+    return createMutableManifoldFromPolySet(mat, orgmatind, *ps);
   }
   
   return nullptr;

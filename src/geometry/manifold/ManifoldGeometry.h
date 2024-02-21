@@ -56,6 +56,7 @@ public:
 
   const manifold::Manifold& getManifold() const;
   std::vector<Material> mat;
+  std::vector<std::vector<unsigned int>> matinds_org;
 
 private:
   std::shared_ptr<manifold::Manifold> manifold_;

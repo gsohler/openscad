@@ -1544,7 +1544,8 @@ std::shared_ptr<Geometry> offset3D_convex(const std::shared_ptr<const PolySet> &
       sub_result->indices = indicesNew;
 
       std::vector<Material> mat_dum;
-      auto term = ManifoldUtils::createMutableManifoldFromGeometry(mat_dum,std::shared_ptr<PolySet>(sub_result));
+      std::vector<unsigned int> matind_dum;
+      auto term = ManifoldUtils::createMutableManifoldFromGeometry(mat_dum,matind_dum, std::shared_ptr<PolySet>(sub_result));
 //  	auto term = ManifoldUtils::createMutableManifoldFromGeometry(decomposed[i]);
       if(i == 0) N = term;
       else *N += *term;	
@@ -1618,9 +1619,10 @@ std::shared_ptr<Geometry> offset3D(const std::shared_ptr<const PolySet> &ps,doub
   }
   auto N = std::make_shared<ManifoldGeometry>();
   std::vector<Material> mat_dum;
+  std::vector<unsigned int> matind_dum;
   for(int i=0;i<decomposed.size();i++)
   {
-  	auto term = ManifoldUtils::createMutableManifoldFromGeometry(mat_dum, offset3D_convex(decomposed[i], off));
+  	auto term = ManifoldUtils::createMutableManifoldFromGeometry(mat_dum, matind_dum, offset3D_convex(decomposed[i], off));
 //  	auto term = ManifoldUtils::createMutableManifoldFromGeometry(decomposed[i]);
 	if(i == 0) N = term;
 	else *N += *term;	
