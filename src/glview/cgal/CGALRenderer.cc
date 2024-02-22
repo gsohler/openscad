@@ -171,7 +171,7 @@ void CGALRenderer::createPolySetStates() {
 
     // Create 3D polygons
     getColor(ColorMode::MATERIAL, color);
-    this->create_surface(*polyset, vertex_array, CSGMODE_NORMAL,
+    this->create_surface(*polyset, vertex_array, CSGMODE_USEMATIND,
                          Transform3d::Identity(), color);
   }
 

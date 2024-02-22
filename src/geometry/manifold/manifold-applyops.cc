@@ -73,7 +73,6 @@ std::shared_ptr<const ManifoldGeometry> applyOperator3DManifold(const Geometry::
   }
   N->mat=matnew;
   N->matinds_org = matinds_org;
-
   return N;
 }
 

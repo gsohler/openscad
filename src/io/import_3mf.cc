@@ -309,6 +309,9 @@ std::unique_ptr<Geometry> import_3mf(const std::string& filename, const Location
     PRINTDB("%s: mesh %d, vertex count: %lu, triangle count: %lu", filename.c_str() % mesh_idx % vertex_count % triangle_count);
 
     PolySetBuilder builder(0,triangle_count);
+    sLib3MFTriangleProperties tri_prop;
+    std::vector<Material> mat;
+    std::vector<unsigned int> matind;
     for (Lib3MF_uint64 idx = 0; idx < triangle_count; ++idx) {
       Lib3MF::sTriangle triangle = object->GetTriangle(idx);
 
@@ -318,12 +321,30 @@ std::unique_ptr<Geometry> import_3mf(const std::string& filename, const Location
         Lib3MF::sPosition vertex = object->GetVertex(triangle.m_Indices[i]);
         builder.appendVertex(Vector3d(vertex.m_Coordinates[0], vertex.m_Coordinates[1], vertex.m_Coordinates[2]));
       }
+      if(mat.size() == 0) { // TODO improve alg
+        std::vector<Lib3MF_uint32> all_prop;
+        Lib3MF::PBaseMaterialGroup matgroup = model->GetBaseMaterialGroupByID(1);
+        matgroup->GetAllPropertyIDs(all_prop);
+        for(int i=0;i<all_prop.size();i++)
+        {
+          Material m;	    
+          Lib3MF::sColor col = matgroup->GetDisplayColor(all_prop[i]);
+          wrapper->ColorToFloatRGBA(col, m.color[0], m.color[1], m.color[2], m.color[3]);
+          mat.push_back(m);
+        }
+      }
+
+      object->GetTriangleProperties(idx, tri_prop);
+      matind.push_back(tri_prop.m_PropertyIDs[0]-1); // TODO add map ?
     }
 
     if (first_mesh) {
       meshes.push_back(builder.build());
+//      meshes[meshes.size()-1]->mat = mats;
     } else {
       first_mesh = builder.build();
+      first_mesh->mat= mat;
+      first_mesh->matind= matind;
     }
     mesh_idx++;
     has_next = object_it->MoveNext();
