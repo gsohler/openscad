@@ -312,6 +312,27 @@ std::unique_ptr<Geometry> import_3mf(const std::string& filename, const Location
     sLib3MFTriangleProperties tri_prop;
     std::vector<Material> mat;
     std::vector<unsigned int> matind;
+    // read in all materials
+    printf("search base material\n");
+    Lib3MF::PBaseMaterialGroupIterator basematerial_it = model->GetBaseMaterialGroups();
+//     class CBaseMaterialGroupIterator : public CResourceIterator {
+// typedef std::shared_ptr<CResource> PResource;
+// class CBaseMaterialGroup : public CResource 
+    while (true) {
+      if(!basematerial_it->MoveNext()) break;
+      printf("BaseMaterial found!\n");
+      std::shared_ptr<Lib3MF::CResource> cr = basematerial_it->GetCurrent();
+      std::shared_ptr<Lib3MF::CBaseMaterialGroup> mat = std::dynamic_pointer_cast<Lib3MF::CBaseMaterialGroup>(cr);
+      if(mat != nullptr) {
+	      printf("worked\n");
+      } else printf("Pointer cast not working\n");
+//      if(basematerialgroup != nullptr) {
+//        std::vector<Lib3MF_uint32> all_prop;
+//        basematerialgroup->GetAllPropertyIDs(all_prop);
+//	printf("%d props found!\n");
+//      }	
+    }  
+    printf("done\n");
     for (Lib3MF_uint64 idx = 0; idx < triangle_count; ++idx) {
       Lib3MF::sTriangle triangle = object->GetTriangle(idx);
 

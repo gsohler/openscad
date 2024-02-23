@@ -38,6 +38,7 @@
 #include "Builtins.h"
 #include "handle_dep.h"
 #include "PolySetBuilder.h"
+#include "Renderer.h"
 
 
 
@@ -55,10 +56,10 @@
 
 using namespace libfive;
 
+// #define FAKE
 std::unique_ptr<const Geometry> FrepNode::createGeometry() const
 {
 	PolySetBuilder builder(0,0,3,true);
-	std::unique_ptr<Mesh> mesh=NULL;
 	libfive::Region<3> reg(
 			{this->x1, this->y1, this->z1}, 
 			{this->x2, this->y2, this->z2});
@@ -75,56 +76,57 @@ std::unique_ptr<const Geometry> FrepNode::createGeometry() const
 		// TODO fidget rein
 #ifdef FAKE
 	builder.appendPoly(3);
-	builder.appendVertex(-0.500000, -0.500000, -0.500000);
-	builder.appendVertex(-0.500000, -0.500000, 3.500000);
-	builder.appendVertex(-0.500000, 3.500000, 3.500000);
+	builder.appendVertex(Vector3d(-0.500000, -0.500000, -0.500000));
+	builder.appendVertex(Vector3d(-0.500000, -0.500000, 3.500000));
+	builder.appendVertex(Vector3d(-0.500000, 3.500000, 3.500000));
 	builder.appendPoly(3);
-	builder.appendVertex(-0.500000, -0.500000, -0.500000);
-	builder.appendVertex(-0.500000, 3.500000, 3.500000);
-	builder.appendVertex(-0.500000, 3.500000, -0.500000);
+	builder.appendVertex(Vector3d(-0.500000, -0.500000, -0.500000));
+	builder.appendVertex(Vector3d(-0.500000, 3.500000, 3.500000));
+	builder.appendVertex(Vector3d(-0.500000, 3.500000, -0.500000));
 	builder.appendPoly(3);
-	builder.appendVertex(3.500000, -0.500000, -0.500000);
-	builder.appendVertex(3.500000, 3.500000, -0.500000);
-	builder.appendVertex(3.500000, 3.500000, 3.500000);
+	builder.appendVertex(Vector3d(3.500000, -0.500000, -0.500000));
+	builder.appendVertex(Vector3d(3.500000, 3.500000, -0.500000));
+	builder.appendVertex(Vector3d(3.500000, 3.500000, 3.500000));
 	builder.appendPoly(3);
-	builder.appendVertex(3.500000, -0.500000, -0.500000);
-	builder.appendVertex(3.500000, 3.500000, 3.500000);
-	builder.appendVertex(3.500000, -0.500000, 3.500000);
+	builder.appendVertex(Vector3d(3.500000, -0.500000, -0.500000));
+	builder.appendVertex(Vector3d(3.500000, 3.500000, 3.500000));
+	builder.appendVertex(Vector3d(3.500000, -0.500000, 3.500000));
 	builder.appendPoly(3);
-	builder.appendVertex(-0.500000, -0.500000, -0.500000);
-	builder.appendVertex(3.500000, -0.500000, -0.500000);
-	builder.appendVertex(3.500000, -0.500000, 3.500000);
+	builder.appendVertex(Vector3d(-0.500000, -0.500000, -0.500000));
+	builder.appendVertex(Vector3d(3.500000, -0.500000, -0.500000));
+	builder.appendVertex(Vector3d(3.500000, -0.500000, 3.500000));
 	builder.appendPoly(3);
-	builder.appendVertex(-0.500000, -0.500000, -0.500000);
-	builder.appendVertex(3.500000, -0.500000, 3.500000);
-	builder.appendVertex(-0.500000, -0.500000, 3.500000);
+	builder.appendVertex(Vector3d(-0.500000, -0.500000, -0.500000));
+	builder.appendVertex(Vector3d(3.500000, -0.500000, 3.500000));
+	builder.appendVertex(Vector3d(-0.500000, -0.500000, 3.500000));
 	builder.appendPoly(3);
-	builder.appendVertex(-0.500000, 3.500000, -0.500000);
-	builder.appendVertex(-0.500000, 3.500000, 3.500000);
-	builder.appendVertex(3.500000, 3.500000, 3.500000);
+	builder.appendVertex(Vector3d(-0.500000, 3.500000, -0.500000));
+	builder.appendVertex(Vector3d(-0.500000, 3.500000, 3.500000));
+	builder.appendVertex(Vector3d(3.500000, 3.500000, 3.500000));
 	builder.appendPoly(3);
-	builder.appendVertex(-0.500000, 3.500000, -0.500000);
-	builder.appendVertex(3.500000, 3.500000, 3.500000);
-	builder.appendVertex(3.500000, 3.500000, -0.500000);
+	builder.appendVertex(Vector3d(-0.500000, 3.500000, -0.500000));
+	builder.appendVertex(Vector3d(3.500000, 3.500000, 3.500000));
+	builder.appendVertex(Vector3d(3.500000, 3.500000, -0.500000));
 	builder.appendPoly(3);
-	builder.appendVertex(-0.500000, -0.500000, -0.500000);
-	builder.appendVertex(-0.500000, 3.500000, -0.500000);
-	builder.appendVertex(3.500000, 3.500000, -0.500000);
+	builder.appendVertex(Vector3d(-0.500000, -0.500000, -0.500000));
+	builder.appendVertex(Vector3d(-0.500000, 3.500000, -0.500000));
+	builder.appendVertex(Vector3d(3.500000, 3.500000, -0.500000));
 	builder.appendPoly(3);
-	builder.appendVertex(-0.500000, -0.500000, -0.500000);
-	builder.appendVertex(3.500000, 3.500000, -0.500000);
-	builder.appendVertex(3.500000, -0.500000, -0.500000);
+	builder.appendVertex(Vector3d(-0.500000, -0.500000, -0.500000));
+	builder.appendVertex(Vector3d(3.500000, 3.500000, -0.500000));
+	builder.appendVertex(Vector3d(3.500000, -0.500000, -0.500000));
 	builder.appendPoly(3);
-	builder.appendVertex(-0.500000, -0.500000, 3.500000);
-	builder.appendVertex(3.500000, -0.500000, 3.500000);
-	builder.appendVertex(3.500000, 3.500000, 3.500000);
+	builder.appendVertex(Vector3d(-0.500000, -0.500000, 3.500000));
+	builder.appendVertex(Vector3d(3.500000, -0.500000, 3.500000));
+	builder.appendVertex(Vector3d(3.500000, 3.500000, 3.500000));
 	builder.appendPoly(3);
-	builder.appendVertex(-0.500000, -0.500000, 3.500000);
-	builder.appendVertex(3.500000, 3.500000, 3.500000);
-	builder.appendVertex(-0.500000, 3.500000, 3.500000);
+	builder.appendVertex(Vector3d(-0.500000, -0.500000, 3.500000));
+	builder.appendVertex(Vector3d(3.500000, 3.500000, 3.500000));
+	builder.appendVertex(Vector3d(-0.500000, 3.500000, 3.500000));
 #else		
-                mesh = Mesh::render(*tree[0], reg ,settings);
-		if(mesh != NULL) {
+	{
+		const std::shared_ptr<const Mesh> mesh = Mesh::render(*tree[0], reg ,settings);
+		if(mesh != nullptr) {
 			libfive_tri t;
 			for (const auto& t : mesh->branes)
 			{
@@ -135,15 +137,29 @@ std::unique_ptr<const Geometry> FrepNode::createGeometry() const
 				}
 			}
 		}
+	}
 #endif		
 	} else if(exp->ob_type == &PyFunction_Type) {
-		printf("Python Function!\n");
-		mesh = NULL;
-	} else { printf("xxx\n"); }
+	} else {  }
 #endif	
 	auto p = builder.build();
+	Material matcolor;
+	auto cs = ColorMap::inst()->defaultColorScheme();
+	matcolor.color = ColorMap::getColor(cs, RenderColor::OPENCSG_FACE_FRONT_COLOR);
+	p->mat.push_back(matcolor);
+	for(int i=0;i<p->indices.size();i++) p->matind.push_back(0);
 	return p;
 }
+
+std::string FrepNode::toString() const  {
+	std::vector<Tree *> tv = PyLibFiveObjectToTree(this->expression);
+	std::ostringstream stream;
+	stream << "sdf( " ;
+	for(int i=0;i<tv.size();i++) stream << *(tv[i]);
+	stream << ")";
+	return  stream.str();
+}
+
 
 
 // polyset to SDF converter
@@ -520,5 +536,7 @@ PyObject *ifrep(const std::shared_ptr<const PolySet> &ps)
   evalCalled=0;
   return PyLibFiveObjectFromTree(&PyLibFiveType,oc);		  
 }
+
+
 #endif
 
