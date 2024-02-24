@@ -48,7 +48,9 @@
 #include <QOpenGLContext>
 #endif
 #include "OpenCSGWarningDialog.h"
+#ifdef ENABLE_PYTHON
 #include <python_public.h>
+#endif
 #include <math.h>
 
 #include <cstdio>
@@ -542,6 +544,7 @@ std::vector<SelectedObject> QGLView::findObject(int mouse_x,int mouse_y)
 
   Vector3d testpt(0,0,0);
   double tolerance=cam.zoomValue()/300;
+#ifdef ENABLE_PYTHON  
   if(handle_mode) {
     std::vector<SelectedObject> results;
     double dist_near;
@@ -566,6 +569,7 @@ std::vector<SelectedObject> QGLView::findObject(int mouse_x,int mouse_y)
     }
     return results;
   }
+#endif    
 
   std::vector<SelectedObject> result;
   auto renderer = this->getRenderer();
