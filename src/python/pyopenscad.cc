@@ -244,6 +244,23 @@ int python_numberval(PyObject *number, double *result)
   return 1;
 }
 
+std::vector<int>  python_intlistval(PyObject *list)
+{
+  std::vector<int> result;	
+  PyObject *item;
+  if( PyLong_Check(list)) {
+    result.push_back(PyLong_AsLong(list));
+  }
+  if( PyList_Check(list)) {
+    for(int i=0;i<PyList_Size(list); i++) {
+      item = PyList_GetItem(list, i);	    
+      if( PyLong_Check(item)) {
+        result.push_back(PyLong_AsLong(item));
+      }
+    }	    
+  }
+  return result;
+}
 /*
  * Tries to extract an 3D vector out of a python list
  */

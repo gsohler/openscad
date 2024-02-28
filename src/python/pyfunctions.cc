@@ -47,6 +47,7 @@ extern bool parse(SourceFile *& file, const std::string& text, const std::string
 #include "PathExtrudeNode.h"
 #include "PullNode.h"
 #include "OversampleNode.h"
+#include "DebugNode.h"
 #include "CgalAdvNode.h"
 #include "CsgOpNode.h"
 #include "ColorNode.h"
@@ -1486,6 +1487,35 @@ PyObject *python_oo_oversample(PyObject *obj, PyObject *args, PyObject *kwargs)
   return python_oversample_core(obj,n,round);
 }
 
+PyObject *python_debug_core(PyObject *obj, std::vector<int> faces)
+{
+  PyObject *dummydict;
+  std::shared_ptr<AbstractNode> child = PyOpenSCADObjectToNodeMulti(obj, &dummydict);
+  if (child == NULL) {
+    PyErr_SetString(PyExc_TypeError, "Invalid type for  Object in debug \n");
+    return NULL;
+  }
+
+  DECLARE_INSTANCE
+  auto node = std::make_shared<DebugNode>(instance);
+  node->children.push_back(child);
+  node->faces = faces;
+  return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
+}
+
+PyObject *python_debug(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+  int n=2;
+  char *kwlist[] = {"obj", "faces",NULL};
+  PyObject *obj = NULL;
+  PyObject *faces= NULL;
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|O", kwlist, &obj,&faces)) {
+    PyErr_SetString(PyExc_TypeError, "error duing parsing\n");
+    return NULL;
+  }
+  std::vector<int> intfaces = python_intlistval(faces);
+  return python_debug_core(obj,intfaces);
+}
 PyObject *rotate_extrude_core(PyObject *obj, char *layer, int convexity, double scale, double angle, PyObject *twist, PyObject *origin, PyObject *offset, double fn, double fa, double fs)
 {
   DECLARE_INSTANCE
@@ -3016,6 +3046,7 @@ PyMethodDef PyOpenSCADFunctions[] = {
   {"texture", (PyCFunction) python_texture, METH_VARARGS | METH_KEYWORDS, "Include a texture."},
   {"mesh", (PyCFunction) python_mesh, METH_VARARGS | METH_KEYWORDS, "exports mesh."},
   {"oversample", (PyCFunction) python_oversample, METH_VARARGS | METH_KEYWORDS, "oversample."},
+  {"debug", (PyCFunction) python_debug, METH_VARARGS | METH_KEYWORDS, "debug a face."},
 
   {"group", (PyCFunction) python_group, METH_VARARGS | METH_KEYWORDS, "Group Object."},
   {"render", (PyCFunction) python_render, METH_VARARGS | METH_KEYWORDS, "Render Object."},

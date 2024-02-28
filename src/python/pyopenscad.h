@@ -37,6 +37,7 @@ int python_more_obj(std::vector<std::shared_ptr<AbstractNode>>& children, PyObje
 Outline2d python_getprofile(void *cbfunc, int fn, double arg);
 double python_doublefunc(void *cbfunc, double arg);
 std::shared_ptr<AbstractNode> python_modulefunc(const ModuleInstantiation *module,const std::shared_ptr<const Context> &context, int *modulefound);
+std::vector<int> python_intlistval(PyObject *list);
 
 Value python_functionfunc(const FunctionCall *call,const std::shared_ptr<const Context> &context);
 int python_vectorval(PyObject *vec, double *x, double *y, double *z, double *w=NULL);

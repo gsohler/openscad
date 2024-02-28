@@ -2059,8 +2059,11 @@ Response GeometryEvaluator::visit(State& state, const ColorNode& node)
       if(std::shared_ptr<PolySet> ps = std::dynamic_pointer_cast<PolySet>(mutableGeom)) {
         for(auto &mat: ps->mat) mat.color = node.color;		  
 	Material col;
-	col.color = node.color;
-	for(;ps->mat.size () < ps->indices.size();) ps->mat.push_back(col);
+        geom = mutableGeom;
+      }
+      if(std::shared_ptr<ManifoldGeometry> mani = std::dynamic_pointer_cast<ManifoldGeometry>(mutableGeom)) {
+        for(auto &mat: mani->mat) mat.color = node.color;		  
+	Material col;
         geom = mutableGeom;
       }
     } else {
