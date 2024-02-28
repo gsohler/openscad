@@ -11,7 +11,9 @@
 #ifdef ENABLE_OPENCSG
 #include <opencsg.h>
 #endif
+#ifdef ENABLE_PYTHON
 #include <python_public.h>
+#endif
 
 GLView::GLView()
 {
@@ -184,12 +186,14 @@ void GLView::paintGL()
   for (const SelectedObject obj: this->shown_obj) {
     showObject(obj,eyedir);
   }
+#ifdef ENABLE_PYTHON 
   if(this->handle_mode) {
     glColor3f(0,0,1);
     for (const SelectedObject sel: python_result_handle) {
       showObject(sel,eyedir);
     }
   }  
+#endif  
   glDisable(GL_LIGHTING);
   if (showaxes) GLView::showSmallaxes(axescolor);
 }

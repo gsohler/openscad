@@ -395,13 +395,15 @@ int cmdline(const CommandLine& cmd)
 	  }
   }
 
+  std::string text_py=text;
   if(python_active) {
-    auto fulltext_py = text;
-    initPython(0.0);
-    auto error  = evaluatePython(fulltext_py);
-    if(error.size() > 0) LOG(error.c_str());
+    if(cmd.animate_frames == 0) {
+      initPython(0.0);
+      auto error  = evaluatePython(text_py);
+      finishPython();
+      if(error.size() > 0) LOG(error.c_str());
+    }
     text ="\n";
-    finishPython();
   }
 #endif	  
   text += "\n\x03\n" + commandline_commands;
@@ -448,6 +450,14 @@ int cmdline(const CommandLine& cmd)
     // export the requested number of animated frames
     for (unsigned frame = 0; frame < cmd.animate_frames; ++frame) {
       render_variables.time = frame * (1.0 / cmd.animate_frames);
+#ifdef ENABLE_PYTHON      
+    if(python_active) {
+      initPython(render_variables.time);
+      auto error  = evaluatePython(text_py);
+      if(error.size() > 0) LOG(error.c_str());
+      finishPython();
+    }
+#endif  
 
       std::ostringstream oss;
       oss << std::setw(5) << std::setfill('0') << frame;
@@ -464,6 +474,7 @@ int cmdline(const CommandLine& cmd)
       CommandLine frame_cmd = cmd;
       frame_cmd.output_file = frame_str;
 
+      printf("Exortng %d\b",frame);
       int r = do_export(frame_cmd, render_variables, export_format, root_file);
       if (r != 0) {
         return r;
