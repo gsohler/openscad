@@ -32,6 +32,7 @@
 #include "LinearExtrudeNode.h"
 #include "PathExtrudeNode.h"
 #include "PullNode.h"
+#include "DebugNode.h"
 #include "OversampleNode.h"
 #include "CgalAdvNode.h"
 #include "CsgOpNode.h"
@@ -56,6 +57,7 @@ NodeCloneFunc(CircleNode)
 NodeCloneFunc(PolygonNode)
 NodeCloneFunc(TransformNode)
 NodeCloneFunc(PullNode)
+NodeCloneFunc(DebugNode)
 NodeCloneFunc(ColorNode)
 NodeCloneFunc(OversampleNode)
 NodeCloneFunc(RotateExtrudeNode)
@@ -84,6 +86,7 @@ std::shared_ptr<AbstractNode> AbstractNode::clone(void)
 	NodeCloneUse(PolygonNode)
 	NodeCloneUse(TransformNode)
 	NodeCloneUse(PullNode)
+	NodeCloneUse(DebugNode)
 	NodeCloneUse(ColorNode)
 	NodeCloneUse(OversampleNode)
 	NodeCloneUse(RotateExtrudeNode)

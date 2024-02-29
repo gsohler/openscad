@@ -35,6 +35,7 @@ public:
   Response visit(State& state, const PathExtrudeNode& node) override;
   Response visit(State& state, const RotateExtrudeNode& node) override;
   Response visit(State& state, const PullNode& node) override;
+  Response visit(State& state, const DebugNode& node) override;
 #if defined(ENABLE_EXPERIMENTAL) && defined(ENABLE_CGAL)
   Response visit(State& state, const RoofNode& node) override;
 #endif

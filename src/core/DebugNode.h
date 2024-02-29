@@ -1,27 +1,15 @@
 #pragma once
 
 #include "node.h"
-#include "Value.h"
-#include <linalg.h>
-#include "PolySet.h"
+#include "Geometry.h"
 
-class DebugNode : public LeafNode
+class DebugNode : public AbstractPolyNode
 {
 public:
-  DebugNode(const ModuleInstantiation *mi) : LeafNode(mi) {}
-  std::string toString() const override
-  {
-    std::ostringstream stream;
-    stream << "debugnode( faces = ";
-    for(int i=0;i<faces.size();i++) {
-      stream << faces[i] ;
-      stream << " ";
-    }
-    stream << ")";
-    return  stream.str();
+  VISITABLE();
+  DebugNode(const ModuleInstantiation *mi) : AbstractPolyNode(mi) {
   }
+  std::string toString() const override;
   std::string name() const override { return "debug"; }
-  std::unique_ptr<const Geometry> createGeometry() const override;
   std::vector<int>  faces;
 };
-
