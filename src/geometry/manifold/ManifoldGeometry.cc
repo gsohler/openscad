@@ -110,7 +110,6 @@ std::shared_ptr<const PolySet> ManifoldGeometry::toPolySet() const {
         static_cast<int>(mesh.triVerts[i+1]),
         static_cast<int>(mesh.triVerts[i+2])});
   ps->mat = this->mat;
-
   ps->matind.clear();
   for(int i=0;i<mesh.runIndex.size()-1;i++) {
     for(int j=mesh.runIndex[i];j<mesh.runIndex[i+1];j+=3) {

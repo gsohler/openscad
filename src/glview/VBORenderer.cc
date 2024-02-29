@@ -37,7 +37,6 @@
 VBORenderer::VBORenderer()
   : Renderer()
 {
-	printf("VBOREND start end\n");
 }
 
 void VBORenderer::resize(int w, int h)

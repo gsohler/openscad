@@ -2012,10 +2012,6 @@ void GeometryEvaluator::addToParent(const State& state,
 {
   this->visitedchildren.erase(node.index());
   if (state.parent()) {
-    printf("AddToParent \n");	  
-        if(std::shared_ptr<const PolySet> ps = std::dynamic_pointer_cast<const PolySet>(geom)) {
-	      printf("is polyset1 %d %d \n",ps->indices.size(), ps->matind.size());
- 	}	
     this->visitedchildren[state.parent()->index()].push_back(std::make_pair(node.shared_from_this(), geom));
   } else {
     // Root node
@@ -2218,15 +2214,10 @@ Response GeometryEvaluator::visit(State& state, const RenderNode& node)
  */
 Response GeometryEvaluator::visit(State& state, const LeafNode& node)
 {
-  printf("GeomtryEvaluator:visit state=%d\n",state);	
   if (state.isPrefix()) {
     std::shared_ptr<const Geometry> geom;
     if (!isSmartCached(node)) {
       geom = node.createGeometry();
-      printf("leave visit\n");
-        if(std::shared_ptr<const PolySet> ps = std::dynamic_pointer_cast<const PolySet>(geom)) {
-	      printf("is polyset2 %d %d \n",ps->indices.size(), ps->matind.size());
- 	}	
       assert(geom);
       if (const auto polygon = std::dynamic_pointer_cast<const Polygon2d>(geom)) {
         if (!polygon->isSanitized()) {
@@ -2234,16 +2225,11 @@ Response GeometryEvaluator::visit(State& state, const LeafNode& node)
         }
       }
     } else {
-      printf("get from cache\n");	    
-      geom = smartCacheGet(node, false); // state.preferNef());
+      geom = smartCacheGet(node, state.preferNef());
     }
-        if(std::shared_ptr<const PolySet> ps = std::dynamic_pointer_cast<const PolySet>(geom)) {
-	      printf("is polyset3 %d %d \n",ps->indices.size(), ps->matind.size());
- 	}	
     addToParent(state, node, geom);
     node.progress_report();
   }
-  printf("GEomtryEvaluar return\n");
   return Response::PruneTraversal;
 }
 
@@ -3615,15 +3601,15 @@ static std::unique_ptr<PolySet> debugObject(const DebugNode& node, const PolySet
   matcolor.color = Color4f(255,0,0,255);
   matind = psx->mat.size();
   psx->mat.push_back(matcolor);    
-  for(int i=0;i<psx->mat.size();i++)
-   printf("%g/%g/%g/%g\n",psx->mat[i].color[0],psx->mat[i].color[1],psx->mat[i].color[2],psx->mat[i].color[3]);
+//  for(int i=0;i<psx->mat.size();i++)
+//   printf("%g/%g/%g/%g\n",psx->mat[i].color[0],psx->mat[i].color[1],psx->mat[i].color[2],psx->mat[i].color[3]);
   for(int i=0;i<node.faces.size();i++) {
    int ind=node.faces[i];
    if(ind >= 0 && ind<psx->matind.size())
     psx->matind[ind] = matind;
   }
-  for(int i=0;i<psx->matind.size();i++) printf("%d ",psx->matind[i]);
-  printf("\n");
+//  for(int i=0;i<psx->matind.size();i++) printf("%d ",psx->matind[i]);
+//  printf("\n");
 
   printf("Created debug\n");
   return psx;
@@ -3631,17 +3617,14 @@ static std::unique_ptr<PolySet> debugObject(const DebugNode& node, const PolySet
 
 Response GeometryEvaluator::visit(State& state, const DebugNode& node)
 {
-	printf("debug visit\n");
   std::shared_ptr<const Geometry> newgeom;
   std::shared_ptr<const Geometry> geom = applyToChildren3D(node, OpenSCADOperator::UNION).constptr();
-  printf("geom is %p\n",geom);
   if (geom) {
     std::shared_ptr<const PolySet> ps=nullptr;
     if(std::shared_ptr<const ManifoldGeometry> mani = std::dynamic_pointer_cast<const ManifoldGeometry>(geom)) 
       ps=mani->toPolySet();
     else ps = std::dynamic_pointer_cast<const PolySet>(geom);
     if(ps != nullptr) {
-      printf("is polyset\n");	     
       std::unique_ptr<Geometry> ps_pulled =  debugObject(node,ps.get());
       newgeom = std::move(ps_pulled);
       addToParent(state, node, newgeom);

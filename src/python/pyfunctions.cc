@@ -1516,6 +1516,20 @@ PyObject *python_debug(PyObject *self, PyObject *args, PyObject *kwargs)
   std::vector<int> intfaces = python_intlistval(faces);
   return python_debug_core(obj,intfaces);
 }
+
+PyObject *python_oo_debug(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+  int n=2;
+  char *kwlist[] = {"faces",NULL};
+  PyObject *faces= NULL;
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|O", kwlist, &faces)) {
+    PyErr_SetString(PyExc_TypeError, "error duing parsing\n");
+    return NULL;
+  }
+  std::vector<int> intfaces = python_intlistval(faces);
+  return python_debug_core(self,intfaces);
+}
+
 PyObject *rotate_extrude_core(PyObject *obj, char *layer, int convexity, double scale, double angle, PyObject *twist, PyObject *origin, PyObject *offset, double fn, double fa, double fs)
 {
   DECLARE_INSTANCE
@@ -3094,6 +3108,7 @@ PyMethodDef PyOpenSCADMethods[] = {
 
   OO_METHOD_ENTRY(mesh, "Mesh Object")	
   OO_METHOD_ENTRY(oversample,"Oversample Object")	
+  OO_METHOD_ENTRY(debug,"Debug Object Faces")	
   OO_METHOD_ENTRY(align,"Align Object to another")	
 
   OO_METHOD_ENTRY(highlight,"Highlight Object")	
