@@ -514,7 +514,9 @@ std::shared_ptr<const Geometry> GeometryUtils::getBackendSpecificGeometry(const 
 #if ENABLE_MANIFOLD
   if (Feature::ExperimentalManifold.is_enabled()) {
     if (const auto ps = std::dynamic_pointer_cast<const PolySet>(geom)) {
-      return ManifoldUtils::createManifoldFromPolySet(*ps);
+      std::vector<Material> mat;
+      std::vector<unsigned int> matind;
+      return ManifoldUtils::createManifoldFromPolySet(mat, matind, *ps);
     } else if (auto mani = std::dynamic_pointer_cast<const ManifoldGeometry>(geom)) {
       return geom;
     } else {
