@@ -22,7 +22,7 @@ Location getLocation(const std::shared_ptr<const AbstractNode>& node)
  */
 std::shared_ptr<const ManifoldGeometry> applyOperator3DManifold(const Geometry::Geometries& children, OpenSCADOperator op)
 {
-  auto N = std::make_shared<ManifoldGeometry>();
+  std::shared_ptr<ManifoldGeometry> geom;
 
   bool foundFirst = false;
 
@@ -30,50 +30,50 @@ std::shared_ptr<const ManifoldGeometry> applyOperator3DManifold(const Geometry::
   std::vector<std::vector<unsigned int>> matinds_org;
   for (const auto& item : children) {
     std::vector<unsigned int> matind_org;	  
-    std::shared_ptr<ManifoldGeometry> chN = item.second ? createMutableManifoldFromGeometry(matnew, matind_org, item.second) : nullptr;
+    std::shared_ptr<const ManifoldGeometry> chN = item.second ? createManifoldFromGeometry(matnew, matind_org, item.second) : nullptr;
     matinds_org.push_back(matind_org);
 
     // Intersecting something with nothing results in nothing
     if (!chN || chN->isEmpty()) {
       if (op == OpenSCADOperator::INTERSECTION) {
-        N = nullptr;
+        geom = nullptr;
         break;
       }
       if (op == OpenSCADOperator::DIFFERENCE && !foundFirst) {
-        N = nullptr;
+        geom = nullptr;
         break;
       }
       continue;
     }
 
-    // Initialize N with first expected geometric object
+    // Initialize geom with first expected geometric object
     if (!foundFirst) {
-      N = chN;
+      geom = std::make_shared<ManifoldGeometry>(*chN);
       foundFirst = true;
       continue;
     }
 
     switch (op) {
     case OpenSCADOperator::UNION:
-      *N += *chN;
+      *geom = *geom + *chN;
       break;
     case OpenSCADOperator::INTERSECTION:
-      *N *= *chN;
+      *geom = *geom * *chN;
       break;
     case OpenSCADOperator::DIFFERENCE:
-      *N -= *chN;
+      *geom = *geom - *chN;
       break;
     case OpenSCADOperator::MINKOWSKI:
-      N->minkowski(*chN);
+      *geom = geom->minkowski(*chN);
       break;
     default:
       LOG(message_group::Error, "Unsupported CGAL operator: %1$d", static_cast<int>(op));
     }
     if (item.first) item.first->progress_report();
   }
-  N->mat=matnew;
-  N->matinds_org = matinds_org;
-  return N;
+  geom->mat=matnew;
+  geom->matinds_org = matinds_org;
+  return geom;
 }
 
 };  // namespace ManifoldUtils

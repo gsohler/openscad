@@ -17,14 +17,14 @@ namespace ManifoldUtils {
 
   const char* statusToString(manifold::Manifold::Error status);
 
-  /*! If the PolySet isn't trusted, use createMutableManifoldFromPolySet which will triangulate and reorient it. */
+  /*! If the PolySet isn't trusted, use createManifoldFromPolySet which will triangulate and reorient it. */
   std::shared_ptr<manifold::Manifold> trustedPolySetToManifold(const PolySet& ps);
 
-  std::shared_ptr<ManifoldGeometry> createMutableManifoldFromPolySet(std::vector<Material> &mat, std::vector<unsigned int> &matind_org, const PolySet& ps);
-  std::shared_ptr<ManifoldGeometry> createMutableManifoldFromGeometry(std::vector<Material> &mat, std::vector<unsigned int> &matind_org, const std::shared_ptr<const Geometry>& geom);
+  std::shared_ptr<const ManifoldGeometry> createManifoldFromPolySet(std::vector<Material> &mat, std::vector<unsigned int> &matind_org, const PolySet& ps);
+  std::shared_ptr<const ManifoldGeometry> createManifoldFromGeometry(std::vector<Material> &mat, std::vector<unsigned int> &matind_org, const std::shared_ptr<const Geometry>& geom);
 
   template <class TriangleMesh>
-  std::shared_ptr<ManifoldGeometry> createMutableManifoldFromSurfaceMesh(const TriangleMesh& mesh);
+  std::shared_ptr<const ManifoldGeometry> createManifoldFromSurfaceMesh(const TriangleMesh& mesh);
 
   std::shared_ptr<const ManifoldGeometry> applyOperator3DManifold(const Geometry::Geometries& children, OpenSCADOperator op);
 

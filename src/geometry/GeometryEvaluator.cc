@@ -884,9 +884,9 @@ void offset3D_calculateNefPolyhedron_cgal(const std::vector<Vector4d> &faces,std
 
 }
 
-std::vector<std::shared_ptr<PolySet>>  offset3D_decompose(std::shared_ptr<const PolySet> ps)
+std::vector<std::shared_ptr<const PolySet>>  offset3D_decompose(std::shared_ptr<const PolySet> ps)
 {
-	std::vector<std::shared_ptr<PolySet>> results;
+	std::vector<std::shared_ptr<const PolySet>> results;
 	if(ps->indices.size() == 0) return results;
 
 
@@ -1072,7 +1072,7 @@ std::vector<std::shared_ptr<PolySet>>  offset3D_decompose(std::shared_ptr<const 
 		PolySet *decomposed =  new PolySet(3,  true);
 		decomposed->vertices = vertices1;
 		decomposed->indices = indices1;
-		results.push_back( std::shared_ptr<PolySet>(decomposed));
+		results.push_back( std::shared_ptr<const PolySet>(decomposed));
 		printf("========================\n");
 		printf("Faces included size is %d\n",faces_included.size());
 	}
@@ -1511,7 +1511,7 @@ void  offset3D_reindex(const std::vector<Vector3d> &vertices, std::vector<Indexe
 #endif  
 }
 
-std::shared_ptr<Geometry> offset3D_convex(const std::shared_ptr<const PolySet> &ps,double off) {
+std::shared_ptr<const Geometry> offset3D_convex(const std::shared_ptr<const PolySet> &ps,double off) {
   printf("Running offset3D %d polygons\n",ps->indices.size());
 //  if(off == 0) return ps;
   std::vector<Vector3d> verticesNew;
@@ -1519,10 +1519,10 @@ std::shared_ptr<Geometry> offset3D_convex(const std::shared_ptr<const PolySet> &
   std::vector<Vector4d> normals;
   std::vector<intList>  pointToFaceInds, pointToFacePos;
   if(off > 0 && 0) { // upsize
-    std::vector<std::shared_ptr<PolySet>> decomposed =  offset3D_decompose(ps);
+    std::vector<std::shared_ptr<const PolySet>> decomposed =  offset3D_decompose(ps);
     printf("%d decompose results\n",decomposed.size());
     //
-    auto N = std::make_shared<ManifoldGeometry>();
+    std::shared_ptr<ManifoldGeometry> geom = nullptr;
     for(int i=0;i<decomposed.size();i++) {													   
       auto &ps = decomposed[i];	  
 
@@ -1548,12 +1548,12 @@ std::shared_ptr<Geometry> offset3D_convex(const std::shared_ptr<const PolySet> &
 
       std::vector<Material> mat_dum;
       std::vector<unsigned int> matind_dum;
-      auto term = ManifoldUtils::createMutableManifoldFromGeometry(mat_dum,matind_dum, std::shared_ptr<PolySet>(sub_result));
-//  	auto term = ManifoldUtils::createMutableManifoldFromGeometry(decomposed[i]);
-      if(i == 0) N = term;
-      else *N += *term;	
+      std::shared_ptr<const ManifoldGeometry> term = ManifoldUtils::createManifoldFromGeometry(mat_dum, matind_dum, std::shared_ptr<const PolySet>(sub_result));
+//    std::shared_ptr<const ManifoldGeometry> term = ManifoldUtils::createManifoldFromGeometry(mat_dum, matind_dum, decomposed[i]);
+      if(i == 0) geom = std::make_shared<ManifoldGeometry>(*term);
+      else *geom = *geom + *term;	
     }
-    return N;
+    return geom;
   } else {
     printf("Downsize %g\n",off);	  
 
@@ -1603,7 +1603,7 @@ std::shared_ptr<Geometry> offset3D_convex(const std::shared_ptr<const PolySet> &
   }
 }
 
-std::shared_ptr<Geometry> offset3D(const std::shared_ptr<const PolySet> &ps,double off) {
+std::shared_ptr<const Geometry> offset3D(const std::shared_ptr<const PolySet> &ps,double off) {
   bool enabled=true; // geht mit 4faces
 		     // geht  mit boxes
 		     // sphere proigram error
@@ -1611,7 +1611,7 @@ std::shared_ptr<Geometry> offset3D(const std::shared_ptr<const PolySet> &ps,doub
   if(!enabled) return offset3D_convex(ps, off);
 
 
-  std::vector<std::shared_ptr<PolySet>> decomposed =  offset3D_decompose(ps);
+  std::vector<std::shared_ptr<const PolySet>> decomposed =  offset3D_decompose(ps);
   printf("Decomposed into %d parts\n",decomposed.size());
   if(decomposed.size() == 0) {
     PolySet *offset_result =  new PolySet(3, /* convex */ true);
@@ -1620,17 +1620,17 @@ std::shared_ptr<Geometry> offset3D(const std::shared_ptr<const PolySet> &ps,doub
   if(decomposed.size() == 1) {
   	return offset3D_convex(decomposed[0], off);
   }
-  auto N = std::make_shared<ManifoldGeometry>();
   std::vector<Material> mat_dum;
   std::vector<unsigned int> matind_dum;
+  std::shared_ptr<ManifoldGeometry> geom = nullptr;
   for(int i=0;i<decomposed.size();i++)
   {
-  	auto term = ManifoldUtils::createMutableManifoldFromGeometry(mat_dum, matind_dum, offset3D_convex(decomposed[i], off));
-//  	auto term = ManifoldUtils::createMutableManifoldFromGeometry(decomposed[i]);
-	if(i == 0) N = term;
-	else *N += *term;	
+  	std::shared_ptr<const ManifoldGeometry>term = ManifoldUtils::createManifoldFromGeometry(mat_dum, matind_dum, offset3D_convex(decomposed[i], off));
+//  	std::shared_ptr<const ManifoldGeometry> term = ManifoldUtils::createMutableManifoldFromGeometry(mat_dum, matind_dum, decomposed[i]);
+        if(i == 0) geom = std::make_shared<ManifoldGeometry>(*term);
+        else *geom = *geom + *term;	
   }
-  return N;
+  return geom;
 }
 
 /*!
@@ -1727,7 +1727,7 @@ GeometryEvaluator::ResultObject GeometryEvaluator::applyToChildren3D(const Abstr
     } else if (std::shared_ptr<const CGAL_Nef_polyhedron> nef = std::dynamic_pointer_cast<const CGAL_Nef_polyhedron>(geom)) {
       const CGAL_Nef_polyhedron nefcont=*(nef.get());
       std::shared_ptr<PolySet> ps = CGALUtils::createPolySetFromNefPolyhedron3(*(nefcont.p3));
-      std::shared_ptr<Geometry> ps_offset =  offset3D(ps,offNode->delta);
+      std::shared_ptr<const Geometry> ps_offset =  offset3D(ps,offNode->delta);
       geom = std::move(ps_offset);
       return geom;
     } else if (const auto hybrid = std::dynamic_pointer_cast<const CGALHybridPolyhedron>(geom)) { // TODO

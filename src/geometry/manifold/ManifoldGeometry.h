@@ -48,6 +48,17 @@ public:
   void operator-=(ManifoldGeometry& other);
   /*! In-place minkowksi operation. */
   void minkowski(ManifoldGeometry& other);
+
+  /*! union. */
+  ManifoldGeometry operator+(const ManifoldGeometry& other) const;
+  /*! intersection. */
+  ManifoldGeometry operator*(const ManifoldGeometry& other) const;
+  /*! difference. */
+  ManifoldGeometry operator-(const ManifoldGeometry& other) const;
+  /*! minkowksi operation. */
+  ManifoldGeometry minkowski(const ManifoldGeometry& other) const;
+
+
   void transform(const Transform3d& mat) override;
   void resize(const Vector3d& newsize, const Eigen::Matrix<bool, 3, 1>& autosize) override;
 
@@ -59,5 +70,5 @@ public:
   std::vector<std::vector<unsigned int>> matinds_org;
 
 private:
-  std::shared_ptr<manifold::Manifold> manifold_;
+  std::shared_ptr<const manifold::Manifold> manifold_;
 };
