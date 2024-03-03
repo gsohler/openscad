@@ -106,6 +106,9 @@ void exportFile(const std::shared_ptr<const Geometry>& root_geom, std::ostream& 
   case FileFormat::NEF3:
     export_nef3(root_geom, output);
     break;
+  case FileFormat::PS:
+    export_ps(root_geom, output);
+    break;
 #endif
   default:
     assert(false && "Unknown file format");

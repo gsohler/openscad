@@ -226,6 +226,8 @@ QAction *getExport3DAction(const MainWindow *mainWindow) {
     return mainWindow->fileActionExportAMF;
   } else if (format == "3MF") {
     return mainWindow->fileActionExport3MF;
+  } else if (format == "PS") {
+    return mainWindow->fileActionExportFoldable;
   } else {
     return nullptr;
   }
@@ -239,6 +241,8 @@ QAction *getExport2DAction(const MainWindow *mainWindow) {
     return mainWindow->fileActionExportSVG;
   } else if (format == "PDF") {
     return mainWindow->fileActionExportPDF;
+  } else if (format == "PS") {
+    return mainWindow->fileActionExportFoldable;
   } else {
     return nullptr;
   }
@@ -482,6 +486,7 @@ MainWindow::MainWindow(const QStringList& filenames)
   connect(this->fileActionExportOBJ, SIGNAL(triggered()), this, SLOT(actionExportOBJ()));
   connect(this->fileActionExportOFF, SIGNAL(triggered()), this, SLOT(actionExportOFF()));
   connect(this->fileActionExportWRL, SIGNAL(triggered()), this, SLOT(actionExportWRL()));
+  connect(this->fileActionExportFoldable, SIGNAL(triggered()), this, SLOT(actionExportFoldable()));
   connect(this->fileActionExportAMF, SIGNAL(triggered()), this, SLOT(actionExportAMF()));
   connect(this->fileActionExportDXF, SIGNAL(triggered()), this, SLOT(actionExportDXF()));
   connect(this->fileActionExportSVG, SIGNAL(triggered()), this, SLOT(actionExportSVG()));
@@ -2798,6 +2803,11 @@ void MainWindow::actionExportOFF()
 void MainWindow::actionExportWRL()
 {
   actionExport(FileFormat::WRL, "WRL", ".wrl", 3);
+}
+
+void MainWindow::actionExportFoldable()
+{
+  actionExport(FileFormat::PS, "PS", ".ps", 3);
 }
 
 void MainWindow::actionExportAMF()
