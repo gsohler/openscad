@@ -50,7 +50,6 @@ typedef struct
 typedef struct
 {
   std::vector<Vector2d> pt;
-  Vector2d m;
   int done;
 } plateS;
 
@@ -81,7 +80,7 @@ Vector2d pointrecht(Vector2d x)
 
 
 
-int plot_try(std::vector<Vector2d> &lines,std::vector<fillS> &fills,int n,int a,double edgelen,Vector2d px,Vector2d py,Vector2d pm,std::vector<plateS> &plate,std::vector<Vector3d> vertices, std::vector<IndexedFace> indices, double *xofs,double *yofs,double a4b,double a4h,double rand,int destport,int bestend)
+int plot_try(std::vector<Vector2d> &lines,std::vector<fillS> &fills,int n,int destplate,double edgelen,Vector2d px,Vector2d py,Vector2d pm,std::vector<plateS> &plate,std::vector<Vector3d> vertices, std::vector<IndexedFace> indices, double *xofs,double *yofs,double a4b,double a4h,double rand,int destedge,int bestend)
 {
   int i;
   double xmax,xmin,ymax,ymin;
@@ -89,34 +88,45 @@ int plot_try(std::vector<Vector2d> &lines,std::vector<fillS> &fills,int n,int a,
   int success=1;
 
 // TODO indexedFace[a]
+// mapping 3d polygon to 2D space
+// x vector is from destoport ...
+  printf("destedge  is %d\n",destedge);
+  int n1=indices[destplate].size();
+  int i0=indices[destplate][(destedge+n1-1)%n1];
+  int i1=indices[destplate][(destedge+0)%n1];
+  int i2=indices[destplate][(destedge+1)%n1];
+  Vector3d pt=vertices[i1];
+  Vector3d xdir=(vertices[i2]-pt).normalized();
+  Vector3d zdir=(xdir.cross(vertices[i0]-pt)).normalized();
+  Vector3d ydir=(zdir.cross(xdir)).normalized();
 
+  pt=(vertices[i1]+vertices[i2])/2;
+  Matrix4d mat;
+  mat <<  xdir[0], ydir[0], zdir[0], pt[0],
+	  xdir[1], ydir[1], zdir[1], pt[1],
+	  xdir[2], ydir[2], zdir[2], pt[2],
+	  0      , 0      , 0      , 1;
 
-  for(i=0;i<n;i++) // TODO wird obsolet
-  {
-    p1=px*COS(360.0*((double)i-destport-0.5)/(double)n)+py*SIN(360.0*((double)i-destport-0.5)/(double)n);
-    p1=p1*edgelen/2.0/SIN(180.0/n);
-    p1=p1+pm;
-    plate[a].pt[i]=p1;
-  }
-  plate[a].m=pm;
+   Matrix4d invmat = mat.inverse();	  
+
+   printf("px %g/%g\n",px[0],px[1]);
+   printf("py %g/%g\n",py[0],py[1]);
+   printf("pm %g/%g\n",pm[0],pm[1]);
+   for(int i=0;i<n1;i++) {
+      Vector3d pt = vertices[indices[destplate][(destedge+i)%n1]];
+  //    printf("orgpt %g/%g/%g\n",pt[0], pt[1], pt[2]);
+      Vector4d pt4(pt[0], pt[1], pt[2], 1);
+      pt4 = invmat * pt4 ;
+      printf("newpt %g/%g/%g/%g\n",pt4[0], pt4[1], pt4[2], pt4[3]);      
+      plate[destplate].pt[i]=px*pt4[0] + py*pt4[1]+pm;
+   }
   fillS newfill;
-  for(i=0;i<n;i++)
+  for(i=0;i<n1;i++)
   {
-    newfill.pt.push_back(plate[a].pt[i]);
-    lines.push_back(plate[a].pt[i]);
-    lines.push_back(plate[a].pt[(i+1)%n]);
+    lines.push_back(plate[destplate].pt[i]);
+    lines.push_back(plate[destplate].pt[(i+1)%n1]);
+    printf("lines size is %d\n",lines.size());
   }
-  newfill.color=n;
-  fills.push_back(newfill);
-  if(a == bestend)
-  {
-    for(i=0;i<n;i++)
-    {
-//      lines.push_back(plate[a].pt[i]);
-//      lines.push_back(plate[a].m);
-    }
-  }
-  //  if ueberlapp success=0;
   xmin=lines[0][0];
   xmax=lines[0][0];
   ymin=lines[0][1];
@@ -171,16 +181,15 @@ void export_ps(const std::shared_ptr<const Geometry>& geom, std::ostream& output
 
   platex.n=4;
   eder.pol.push_back(platex);
-  platex.n=5;
+  platex.n=4;
   eder.pol.push_back(platex);
 
-  connS cx; cx.p1=0; cx.f1=0; cx.p2=1; cx.f2=0;  
+  connS cx; cx.p1=1; cx.f1=0; cx.p2=0; cx.f2=0;  
   eder.con.push_back(cx);
   // TODO eder->pol -> indices
   // kannten -> connections
 
   // TODO find 1st face
-  // TODO project face to 2D
   std::vector<Vector2d> lines,linesorg; // final postscript lines
   std::vector<fillS> fills,fillsorg; // final postscript fills
   std::vector<labelS> label; // final postscript lavels
@@ -216,7 +225,7 @@ void export_ps(const std::shared_ptr<const Geometry>& geom, std::ostream& output
     for(j=0;j<eder.pol[i].n;j++)
 	plate[i].pt.push_back(pt);
   }
-  for(i=0;i<eder.pol.size();i++) eder.con[i].done=0;	 
+  for(i=0;i<eder.con.size();i++) eder.con[i].done=0;	 
 
   output << "%!PS-Adobe-2.0\n";
   output << "%%Orientation: Portrait\n";
@@ -245,7 +254,7 @@ void export_ps(const std::shared_ptr<const Geometry>& geom, std::ostream& output
 
           if(lines.size()  ==  0)
           {
-            pm[0]=0; pm[1]=0;  px=pm; py=pm; px[0]=1; py[1]=1;
+            pm[0]=0; pm[1]=0;  px=pm; px[0]=1; py=pointrecht(px);
 	    // TODO muss wissen, wo platzieren
             success =plot_try(lines,fills,n,a,edgelen,px,py,pm,plate,ps->vertices, faces, &xofs,&yofs,paperwidth,paperheight,rand+lasche,0,bestend);
 
@@ -261,50 +270,49 @@ void export_ps(const std::shared_ptr<const Geometry>& geom, std::ostream& output
           }
           else
           {
-            for(b=0;b<eder.pol.size() && drawn == 0;b++)
+            for(i=0;i<eder.con.size() && drawn == 0;i++)
             {
-
-              if(plate[b].done  == 1)
-              {
-                n1=eder.pol[b].n;
-                for(c=0;c<n1 && drawn == 0;c++)
+	      printf("a\n");	    
+	      if(eder.con[i].done) continue;	    
+              int p1=-1, p2=-1, f1=-1, f2=-1;
+              if(plate[eder.con[i].p1].done == 1 && plate[eder.con[i].p2].done == 0)
+	      {
+                p1=eder.con[i].p1; f1=eder.con[i].f1;
+                p2=eder.con[i].p2; f2=eder.con[i].f2;				    
+	      }
+              if(plate[eder.con[i].p1].done == 0 && plate[eder.con[i].p2].done == 1)
+	      {
+                p2=eder.con[i].p1; f2=eder.con[i].f1;
+                p1=eder.con[i].p2; f1=eder.con[i].f2;				    
+	      }
+	      if(p1 != -1) 
+	      {
+	        // draw p1:f1 -> p2:f2
+	        int n1=plate[p1].pt.size();
+	        Vector2d pt1=plate[p1].pt[f1];
+	        Vector2d pt2=plate[p1].pt[(f1+1)%n1];
+	        Vector2d px=(pt1-pt2).normalized();
+	        Vector2d py=pointrecht(px);
+	        Vector2d pm=(pt1+pt2)/2;
+                success =plot_try(lines,fills,0,p2,0,px,py,pm,plate,ps->vertices, faces, &xofs,&yofs,paperwidth,paperheight,rand+lasche,f2,bestend);
+//                if(b == bestend)
+//                {
+//                  if(polybesttouch == 0) polybesttouch=1; else success=0;
+//                }
+	        printf("success=%d\n",success);
+                if(success == 1)
                 {
-                  for(d=0;d<eder.con.size() && drawn == 0;d++)
-                  {
-                    if(eder.con[d].p1 == b && eder.con[d].f1 == c && eder.con[d].p2 == a)
-                    {
-                      // try putting a to b:c removecon=d
-                      p1=plate[b].pt[c];
-                      p2=plate[b].pt[(c+1)%n1];
-                      py=p2-p1;
-                      py.normalize();
-                      px=pointrecht(py);
-                      pm=(p1+p2)*0.5;
-                      px=-px;
-                      py=-py;
-                      pm=pm+px*-edgelen/2/TAN(180.0/(double)n);
-		                
-                      success =plot_try(lines,fills,n,a,edgelen,px,py,pm,plate,ps->vertices, faces, &xofs,&yofs,paperwidth,paperheight,rand+lasche,eder.con[d].f2,bestend);
-                      if(b == bestend)
-                      {
-                        if(polybesttouch == 0) polybesttouch=1; else success=0;
-                      }
-                      if(success == 1)
-                      {
-                        plate[a].done=1; drawn=1;
-                        eder.con[d].done=1;
-                        cont=1;
-                      } 
-                      else
-                      {
-                        lines=linesorg;
-                        fills=fillsorg;
-                        xofs=xofsorg;
-                        yofs=yofsorg;
-                      } 
-                    }
-                  }
-                }
+                  plate[a].done=1; drawn=1;
+                  eder.con[d].done=1;
+                  cont=1;
+                } 
+                else
+                {
+                  lines=linesorg;
+                  fills=fillsorg;
+                  xofs=xofsorg;
+                  yofs=yofsorg;
+                }		  
               }
             }
           }
