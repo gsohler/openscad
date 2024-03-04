@@ -140,6 +140,7 @@ struct ExportFileFormatOptions {
     {"echo", FileFormat::ECHO},
     {"png", FileFormat::PNG},
     {"pdf", FileFormat::PDF},
+    {"ps", FileFormat::PS},
   };
 };
 

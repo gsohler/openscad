@@ -57,6 +57,7 @@ return format == FileFormat::ASCIISTL ||
   format == FileFormat::AMF ||
   format == FileFormat::_3MF ||
   format == FileFormat::NEFDBG ||
+  format == FileFormat::PS ||
   format == FileFormat::NEF3;
 }
 
