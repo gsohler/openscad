@@ -26,7 +26,15 @@
 #include "export.h"
 
 #include "PolySet.h"
+#include "ManifoldGeometry.h"
+#include "CGALHybridPolyhedron.h"
+#include "CGAL_Nef_polyhedron.h"
+#include "cgalutils.h"
 #include "PolySetUtils.h"
+#include <unordered_map>
+#include "boost-utils.h"
+#include <hash.h>
+
 
 typedef struct
 {
@@ -64,7 +72,6 @@ int plot_try(int destplate,Vector2d px,Vector2d py,Vector2d pm,std::vector<plate
   Vector2d p1;
   int success=1;
 
-//  printf("destedge  is %d\n",destedge);
   int n=faces[destplate].size();
   int i0=faces[destplate][(destedge+n-1)%n];
   int i1=faces[destplate][(destedge+0)%n];
@@ -73,7 +80,6 @@ int plot_try(int destplate,Vector2d px,Vector2d py,Vector2d pm,std::vector<plate
   Vector3d xdir=(vertices[i2]-pt).normalized();
   Vector3d zdir=(xdir.cross(vertices[i0]-pt)).normalized();
   Vector3d ydir=(zdir.cross(xdir)).normalized();
-
   pt=(vertices[i1]+vertices[i2])/2;
   Matrix4d mat;
   mat <<  xdir[0], ydir[0], zdir[0], pt[0],
@@ -85,10 +91,9 @@ int plot_try(int destplate,Vector2d px,Vector2d py,Vector2d pm,std::vector<plate
 
   plate[destplate].pt.clear();
   for(int i=0;i<n;i++) {
-    Vector3d pt = vertices[faces[destplate][(destedge+i)%n]];
+    Vector3d pt = vertices[faces[destplate][i]];
     Vector4d pt4(pt[0], pt[1], pt[2], 1);
     pt4 = invmat * pt4 ;
-    printf("newpt %g/%g/%g/%g\n",pt4[0], pt4[1], pt4[2], pt4[3]);      
     plate[destplate].pt.push_back(px*pt4[0] + py*pt4[1]+pm);
   }
   for(i=0;i<n;i++) {
@@ -118,9 +123,43 @@ std::vector<IndexedFace> mergetriangles(const std::vector<IndexedFace> polygons,
 
 std::vector<Vector4d> offset3D_normals(const std::vector<Vector3d> &vertices, const std::vector<IndexedFace> &faces);
 
+
+class EdgeDbStub
+{
+        public:
+                int ind1, ind2, ind3 ;
+                int operator==(const EdgeDbStub ref)
+                {
+                        if(this->ind1 == ref.ind1 && this->ind2 == ref.ind2) return 1;
+                        return 0;
+                }
+};
+
+unsigned int hash_value(const EdgeDbStub& r) {
+        unsigned int i;
+        i=r.ind1 |(r.ind2<<16) ;
+        return i;
+}
+
+int operator==(const EdgeDbStub &t1, const EdgeDbStub &t2) 
+{
+        if(t1.ind1 == t2.ind1 && t1.ind2 == t2.ind2) return 1;
+        return 0;
+}
+
 void export_ps(const std::shared_ptr<const Geometry>& geom, std::ostream& output)
 {
-  std::shared_ptr<const PolySet> ps = std::dynamic_pointer_cast<const PolySet>(geom);
+  std::shared_ptr<const PolySet> ps=nullptr;
+  std::shared_ptr<const ManifoldGeometry> mani = std::dynamic_pointer_cast<const ManifoldGeometry>(geom);
+  std::shared_ptr<const CGALHybridPolyhedron> cgal = std::dynamic_pointer_cast<const CGALHybridPolyhedron>(geom);
+  std::shared_ptr<const CGAL_Nef_polyhedron> nef = std::dynamic_pointer_cast<const CGAL_Nef_polyhedron>(geom);
+  if(mani != nullptr) ps=mani->toPolySet();	  
+  else if(cgal != nullptr) printf("cgal\n");
+  else if(nef != nullptr){
+         auto root_N = *nef; 	  
+	 ps = CGALUtils::createPolySetFromNefPolyhedron3(*(root_N.p3));
+  }
+  else ps = std::dynamic_pointer_cast<const PolySet>(geom);
   if(ps == nullptr) {
     printf("Dont have PolySet\n");	  
     return;
@@ -136,22 +175,68 @@ void export_ps(const std::shared_ptr<const Geometry>& geom, std::ostream& output
   double factor=72.0/25.4;
   int pages=0;
   int polsdone=0,polstodo;
+  //
+  // create edge database
+  
+  EdgeDbStub stub;                                                    
+//  std::unordered_map<EdgeDbStub, int, boost::hash<EdgeDbStub> > edge_db;  
+  //std::unordered_map<EdgeDbStub, int> edge_db;  
+  //
 
+  for(i=0;i<faces.size();i++)
+  {
+    IndexedFace &face=faces[i];
+    int n=face.size();
+    for(j=0;j<n;j++){
+      stub.ind1=face[j];
+      stub.ind2=face[(j+1)%n];
+//      edge_db[stub]=i;
+    }
+  }
   std::vector<connS> con;
-
   connS cx;
- 
-  cx.p1=0; cx.f1=0; cx.p2=1; cx.f2=0;  
-  con.push_back(cx);
 
-  cx.p1=0; cx.f1=1; cx.p2=2; cx.f2=0;  
-  con.push_back(cx);
-  // TODO eder->pol -> indices
+  for(i=0;i<faces.size();i++)
+  {
+    IndexedFace &face=faces[i];
+    int n=face.size();
+    for(j=0;j<n;j++){
+      int i1=face[j];
+      int i2=face[(j+1)%n];
+      if(i2 < i1) continue;
+
+      // TODO stupid workaround
+      int oppface=-1;
+      int opppos;
+      for(int k=0;oppface == -1 && k<faces.size();k++)
+      {
+        IndexedFace &face1=faces[k];
+        int n1=face1.size();
+        for(int l=0;oppface == -1 && l<n1;l++){
+          int I1=face1[l];
+          int I2=face1[(l+1)%n1];
+	  if(i1 == I2 && i2 == I1) {
+		  oppface=k;
+		  opppos=l;
+	  }
+	}
+      }	
+      printf("%d/%d -> %d/%d\n",i,j,oppface,opppos);
+      cx.p1=i; cx.f1=j; cx.p2=oppface; cx.f2=opppos;  
+      con.push_back(cx);
+
+      //i,j, was ist gegnueber
+    }
+
+  }
+
+
+ 
+
   // kannten -> connections
 
   std::vector<Vector2d> lines,linesorg; // final postscript lines
   std::vector<labelS> label; // final postscript labels
-
 
   double xofs,yofs;
   double xofsorg,yofsorg;
@@ -195,7 +280,6 @@ void export_ps(const std::shared_ptr<const Geometry>& geom, std::ostream& output
       drawn=0;
       if(lines.size()  ==  0)
       {
-        printf("goto start\n");	      
         for(i=0;i<faces.size()  && drawn == 0;i++)
         {
           if(plate[i].done == 0 )
@@ -251,8 +335,7 @@ void export_ps(const std::shared_ptr<const Geometry>& geom, std::ostream& output
 //                {
 //                  if(polybesttouch == 0) polybesttouch=1; else success=0;
 //                }
-            printf("success=%d\n",success);
-            if(success == 1)
+            if(success == 1 )
             {
               plate[p2].done=1; drawn=1;
               con[i].done=1;
@@ -316,7 +399,7 @@ void export_ps(const std::shared_ptr<const Geometry>& geom, std::ostream& output
               labelS lnew;
               lnew.pt=p1;
               sprintf(lnew.text,"%d",num/2+1);
-              lnew.rot=ATAN(py[0],py[1]);
+              lnew.rot=atan2(py[1],py[0])*180.0/3.1415;
               label.push_back(lnew);
             } 
           }
@@ -355,6 +438,7 @@ void export_ps(const std::shared_ptr<const Geometry>& geom, std::ostream& output
     pages++;
     lines.clear();
     label.clear();
+    break;
   }
   return;
 }
