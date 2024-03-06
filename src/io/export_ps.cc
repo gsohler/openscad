@@ -26,15 +26,19 @@
 #include "export.h"
 
 #include "PolySet.h"
-#include "ManifoldGeometry.h"
-#include "CGALHybridPolyhedron.h"
-#include "CGAL_Nef_polyhedron.h"
 #include "cgalutils.h"
 #include "PolySetUtils.h"
 #include <unordered_map>
 #include "boost-utils.h"
 #include <hash.h>
 
+
+typedef struct
+{
+ Vector2d p1;
+ Vector2d p2;
+ int dashed=0;
+} lineS;
 
 typedef struct
 {
@@ -47,6 +51,8 @@ typedef struct
 typedef struct
 {
   std::vector<Vector2d> pt;
+  std::vector<Vector2d> pt_l1;
+  std::vector<Vector2d> pt_l2;
   int done;
 } plateS;
 
@@ -87,7 +93,7 @@ int point_in_polygon(const std::vector<Vector2d> &pol, const Vector2d &pt)
   return cuts&1;
 }
 
-int plot_try(int destplate,Vector2d px,Vector2d py,Vector2d pm,std::vector<plateS> &plate,std::vector<Vector3d> vertices, std::vector<IndexedFace> faces, std::vector<Vector2d> &lines,double &xofs,double &yofs,double a4b,double a4h,double rand,int destedge,int bestend)
+int plot_try(int refplate, int destplate,Vector2d px,Vector2d py,Vector2d pm,std::vector<plateS> &plate,std::vector<Vector3d> vertices, std::vector<IndexedFace> faces, std::vector<lineS> &lines,double &xofs,double &yofs,double a4b,double a4h,double rand,int destedge,int bestend, double lasche)
 {
   int i;
   double xmax,xmin,ymax,ymin;
@@ -95,12 +101,22 @@ int plot_try(int destplate,Vector2d px,Vector2d py,Vector2d pm,std::vector<plate
   int success=1;
 
   int n=faces[destplate].size();
+  Vector3d totalnorm(0,0,0);
+  for(int i=0;i<n;i++) {
+    int i0=faces[destplate][(i+n-1)%n];
+    int i1=faces[destplate][(i+0)%n];
+    int i2=faces[destplate][(i+1)%n];
+    Vector3d dir1=(vertices[i2]-vertices[i1]).normalized();
+    Vector3d dir2=(vertices[i0]-vertices[i1]).normalized();
+    totalnorm += dir1.cross(dir2);
+  }
   int i0=faces[destplate][(destedge+n-1)%n];
   int i1=faces[destplate][(destedge+0)%n];
   int i2=faces[destplate][(destedge+1)%n];
   Vector3d pt=vertices[i1];
   Vector3d xdir=(vertices[i2]-pt).normalized();
-  Vector3d zdir=(xdir.cross(vertices[i0]-pt)).normalized();
+  Vector3d zdir=(xdir.cross(vertices[i0]-pt)).normalized(); 
+  if(totalnorm.dot(zdir) < 0) zdir=-zdir; // fix concave edge							    
   Vector3d ydir=(zdir.cross(xdir)).normalized();
   pt=(vertices[i1]+vertices[i2])/2;
   Matrix4d mat;
@@ -112,34 +128,64 @@ int plot_try(int destplate,Vector2d px,Vector2d py,Vector2d pm,std::vector<plate
   Matrix4d invmat = mat.inverse();	  
 
   plate[destplate].pt.clear();
+  plate[destplate].pt_l1.clear();
+  plate[destplate].pt_l2.clear();
   for(int i=0;i<n;i++) {
     Vector3d pt = vertices[faces[destplate][i]];
     Vector4d pt4(pt[0], pt[1], pt[2], 1);
     pt4 = invmat * pt4 ;
     plate[destplate].pt.push_back(px*pt4[0] + py*pt4[1]+pm);
   }
-  for(int j=0;j<plate.size();j++) {
-    if(j == destplate) continue;
-    if(plate[j].done != 1) continue;
-    for(int i=0;i<n;i++) {
-      Vector2d &pt = plate[destplate].pt[i];
-      if(point_in_polygon(plate[j].pt,pt)) success=0;
+  // nun laschen planen
+  for(int i=0;i<n;i++) {
+  	  
+    py=plate[destplate].pt[(i+1)%n]-plate[destplate].pt[i];
+    double maxl=py.norm();
+    double lasche_eff=lasche;
+    if(lasche_eff > py.norm()/2.0) lasche_eff=py.norm()/2.0;
+    py.normalize();
+    px=pointrecht(py);
+    px=-px;
+    plate[destplate].pt_l1.push_back(plate[destplate].pt[i]+(px+py)*lasche_eff);
+    py=-py;
+    plate[destplate].pt_l2.push_back(plate[destplate].pt[(i+1)%n]+(px+py)*lasche_eff);
+  }
+  //
+  for(int j=0;j<plate.size();j++) { // kollision mit anderen platten
+    if(j == destplate) continue; // nicht mit sich selbst
+    if(plate[j].done != 1) continue; // und nicht wenn sie nicht existiert
+    for(int i=0;i<n;i++) { 
+      if(point_in_polygon(plate[j].pt,plate[destplate].pt[i])) success=0;
+      if(j == refplate && i == destedge) {} // joker
+      else
+      {
+	// jede neue lasche
+        if(point_in_polygon(plate[j].pt,plate[destplate].pt_l1[i])) success=0; 
+        if(point_in_polygon(plate[j].pt,plate[destplate].pt_l2[i])) success=0;
+      }  
     }
   }
   for(i=0;i<n;i++) {
-    lines.push_back(plate[destplate].pt[i]);
-    lines.push_back(plate[destplate].pt[(i+1)%n]);
+    lineS line;
+    line.p1=plate[destplate].pt[i]; 
+    line.p2=plate[destplate].pt[(i+1)%n];
+    line.dashed=0;
+    lines.push_back(line);
   }
-  xmin=lines[0][0];
-  xmax=lines[0][0];
-  ymin=lines[0][1];
-  ymax=lines[0][1];
+  xmin=lines[0].p1[0];
+  xmax=lines[0].p1[0];
+  ymin=lines[0].p1[1];
+  ymax=lines[0].p1[1];
   for(i=0;i<lines.size();i++)
   {
-    if(lines[i][0] < xmin) xmin=lines[i][0];
-    if(lines[i][0] > xmax) xmax=lines[i][0];
-    if(lines[i][1] < ymin) ymin=lines[i][1];
-    if(lines[i][1] > ymax) ymax=lines[i][1];
+    if(lines[i].p1[0] < xmin) xmin=lines[i].p1[0];
+    if(lines[i].p1[0] > xmax) xmax=lines[i].p1[0];
+    if(lines[i].p1[1] < ymin) ymin=lines[i].p1[1];
+    if(lines[i].p1[1] > ymax) ymax=lines[i].p1[1];
+    if(lines[i].p2[0] < xmin) xmin=lines[i].p2[0];
+    if(lines[i].p2[0] > xmax) xmax=lines[i].p2[0];
+    if(lines[i].p2[1] < ymin) ymin=lines[i].p2[1];
+    if(lines[i].p2[1] > ymax) ymax=lines[i].p2[1];
   }
   xofs=(a4b-xmax+xmin)/2.0-xmin;
   yofs=(a4h-ymax+ymin)/2.0-ymin;
@@ -179,17 +225,7 @@ int operator==(const EdgeDbStub &t1, const EdgeDbStub &t2)
 
 void export_ps(const std::shared_ptr<const Geometry>& geom, std::ostream& output)
 {
-  std::shared_ptr<const PolySet> ps=nullptr;
-  std::shared_ptr<const ManifoldGeometry> mani = std::dynamic_pointer_cast<const ManifoldGeometry>(geom);
-  std::shared_ptr<const CGALHybridPolyhedron> cgal = std::dynamic_pointer_cast<const CGALHybridPolyhedron>(geom);
-  std::shared_ptr<const CGAL_Nef_polyhedron> nef = std::dynamic_pointer_cast<const CGAL_Nef_polyhedron>(geom);
-  if(mani != nullptr) ps=mani->toPolySet();	  
-  else if(cgal != nullptr) printf("cgal\n");
-  else if(nef != nullptr){
-         auto root_N = *nef; 	  
-	 ps = CGALUtils::createPolySetFromNefPolyhedron3(*(root_N.p3));
-  }
-  else ps = std::dynamic_pointer_cast<const PolySet>(geom);
+  std::shared_ptr<const PolySet> ps= PolySetUtils::getGeometryAsPolySet(geom);
   if(ps == nullptr) {
     printf("Dont have PolySet\n");	  
     return;
@@ -251,7 +287,7 @@ void export_ps(const std::shared_ptr<const Geometry>& geom, std::ostream& output
 	  }
 	}
       }	
-      printf("%d/%d -> %d/%d\n",i,j,oppface,opppos);
+//      printf("%d/%d -> %d/%d\n",i,j,oppface,opppos);
       cx.p1=i; cx.f1=j; cx.p2=oppface; cx.f2=opppos;  
       con.push_back(cx);
 
@@ -260,12 +296,15 @@ void export_ps(const std::shared_ptr<const Geometry>& geom, std::ostream& output
 
   }
 
+  std::sort(con.begin(), con.end(), [ps, faces](const connS &a, const connS &b ) {
+    int na=faces[a.p1].size();		  
+    int nb=faces[a.p1].size();		  
+    double da= (ps->vertices[faces[a.p1][a.f1]] - ps->vertices[faces[a.p1][(a.f1+1)%na]]).norm();
+    double db= (ps->vertices[faces[b.p1][b.f1]] - ps->vertices[faces[b.p1][(b.f1+1)%nb]]).norm();
+    return(da>db)?1:0;
+		  });
 
- 
-
-  // kannten -> connections
-
-  std::vector<Vector2d> lines,linesorg; // final postscript lines
+  std::vector<lineS> lines,linesorg; // final postscript lines
   std::vector<labelS> label; // final postscript labels
 
   double xofs,yofs;
@@ -300,7 +339,7 @@ void export_ps(const std::shared_ptr<const Geometry>& geom, std::ostream& output
   output << "/Times-Roman findfont " << lasche*2 << " scalefont setfont 0.1 setlinewidth\n";
   while(polsdone < polstodo)
   {
-    printf("one round\n");	 
+//    printf("one round\n");	 
     // ein blatt designen
     polybesttouch=0;
     cont=1;
@@ -321,10 +360,16 @@ void export_ps(const std::shared_ptr<const Geometry>& geom, std::ostream& output
 
             pm[0]=0; pm[1]=0;  px=pm; px[0]=1; py=pointrecht(px);
 
-            success =plot_try(i,px,py,pm,plate,ps->vertices, faces, lines, xofs,yofs,paperwidth,paperheight,rand+lasche,0,bestend);
+            success =plot_try(-1, i,px,py,pm,plate,ps->vertices, faces, lines, xofs,yofs,paperwidth,paperheight,rand+lasche,0,bestend, lasche);
 
 
-            if(success  ==  1)  {  plate[i].done=1;  cont=1; drawn=1; printf("Set done %d\n",i); }  
+            if(success  ==  1)
+	    {
+              printf("Successfully placed plate %d px=%g/%g, py=%g/%g\n",i,px[0], px[1], py[0], py[1]);		    
+              plate[i].done=1;
+	      cont=1; 
+	      drawn=1;
+	    }  
             else
             {
               lines=linesorg;
@@ -364,14 +409,16 @@ void export_ps(const std::shared_ptr<const Geometry>& geom, std::ostream& output
 	    xofsorg=xofs;
 	    yofsorg=yofs;
 
-            success =plot_try(p2,px,py,pm,plate,ps->vertices, faces, lines, xofs,yofs,paperwidth,paperheight,rand+lasche,f2,bestend);
+            success =plot_try(p1, p2,px,py,pm,plate,ps->vertices, faces, lines, xofs,yofs,paperwidth,paperheight,rand+lasche,f2,bestend,lasche);
 //                if(b == bestend)
 //                {
 //                  if(polybesttouch == 0) polybesttouch=1; else success=0;
 //                }
             if(success == 1 )
             {
-              plate[p2].done=1; drawn=1;
+              printf("Successfully placed plate %d px=%g/%g, py=%g/%g\n",p2,px[0], px[1], py[0], py[1]);		    
+              plate[p2].done=1;
+	      drawn=1;
               con[i].done=1;
               cont=1;
             } 
@@ -393,13 +440,17 @@ void export_ps(const std::shared_ptr<const Geometry>& geom, std::ostream& output
       printf("Was not able to fit something onto the page!\n");
       exit(1);
     }
-    for(i=0;i<faces.size();i++) //polygone
+    labelS lnew;
+    for(i=0;i<plate.size();i++)  // plates
     {
       if(plate[i].done == 1)
       {
+        printf("Lasche Plate %d\n",i);	      
         int n=plate[i].pt.size();	      
-        for(j=0;j<n;j++) // faces
+	Vector2d mean(0,0);
+        for(j=0;j<n;j++) // pts
         {
+          mean += plate[i].pt[j];		
           glue=0;
           for(k=0;k<con.size();k++) // connections
           {
@@ -408,34 +459,28 @@ void export_ps(const std::shared_ptr<const Geometry>& geom, std::ostream& output
           }
           if(glue != 0)
           {
-            py=plate[i].pt[(j+1)%n]-plate[i].pt[j];
-	    double maxl=py.norm();
-            double lasche_eff=lasche;
-	    if(lasche_eff > py.norm()/2.0) lasche_eff=py.norm()/2.0;
-            py.normalize();
-            px=pointrecht(py);
-            px=px*glue;
-            p1=plate[i].pt[j]+(px+py)*lasche_eff;
-            py=-py;
-            p2=plate[i].pt[(j+1)%n]+(px+py)*lasche_eff;
+            p1=plate[i].pt_l1[j];
+            p2=plate[i].pt_l2[j];
 
 	    if(glue < 0) { // nur aussenkannte
-	      lines.push_back(plate[i].pt[j]);
-              lines.push_back(p1);
-
-	      lines.push_back(p1);
-              lines.push_back(p2);
-
-	      lines.push_back(p2);
-              lines.push_back(plate[i].pt[(j+1)%n]);
+              lineS line;
+	      line.dashed=0;
+	      line.p1=plate[i].pt[j]; line.p2=p1; lines.push_back(line);
+	      line.p1=p1; line.p2=p2; lines.push_back(line);
+	      line.p1=p2; line.p2=plate[i].pt[(j+1)%n]; lines.push_back(line);
+	      line.p1=plate[i].pt[(j+1)%n]; line.p2=plate[i].pt[j]; lines.push_back(line);
 	    }
 
             if(plate[other ].done != 1) //if the connection is not to the same page
             {
               p1=(plate[i].pt[j]+ plate[i].pt[(j+1)%n])*0.5;
-              p1=p1+px*lasche*(0.5-0.27*glue);
+
+              py=plate[i].pt[(j+1)%n]-plate[i].pt[j]; // entlang der kante
+              py.normalize();
+              px=pointrecht(py);
+
+//              p1=p1+px*lasche*(0.5-0.27*glue);
               p1=p1+py*lasche*-0.35;
-              labelS lnew;
               lnew.pt=p1;
               sprintf(lnew.text,"%d",num);
               lnew.rot=atan2(py[1],py[0])*180.0/3.1415;
@@ -443,6 +488,11 @@ void export_ps(const std::shared_ptr<const Geometry>& geom, std::ostream& output
             } 
           }
         }
+        lnew.pt=p1;
+        sprintf(lnew.text,"%d",i);
+        lnew.pt = mean / n;
+        lnew.rot=0;
+        label.push_back(lnew);
       }
     }
     for(i=0;i<faces.size();i++)
@@ -453,17 +503,29 @@ void export_ps(const std::shared_ptr<const Geometry>& geom, std::ostream& output
         polsdone++;  
       }
     }
-    // doppelte in lines loeschen
+    for(int i=0;i<lines.size()-1;i++) {
+      auto &line1 = lines[i];	     
+      for(int j=i+1;j<lines.size();j++) {
+        auto &line2 = lines[j];
+        if((line1.p1 - line2.p2).norm() < 1e-3 && (line1.p2 - line2.p1).norm() < 1e-3 ) {
+          line1.dashed=1;
+          lines.erase(lines.begin()+j);
+          break;	  
+	}
+      }
+    }
+    // doppelte in lines loesche//n
     output << "%%Page: " << pages+1 << "\n";
 
-    printf("line size is %d\n",lines.size());	
+//    printf("line size is %d\n",lines.size());	
     output << "0 0 0 setrgbcolor\n";
-    for(i=0;i<lines.size();i+=2)
+    for(i=0;i<lines.size();i++)
     {
+      if(lines[i].dashed) output << "[2.5 2] 0 setdash\n";
+      else output << "[3 0 ] 0 setdash\n";
       output << "newpath\n";
-      output << (xofs+lines[i+0][0])*factor << " " << (yofs+lines[i+0][1])*factor << " moveto\n";
-      output << (xofs+lines[i+1][0])*factor << " " << (yofs+lines[i+1][1])*factor << " lineto\n";
-  output << "[2.5 2] 0 setdash\n";  // TODO nur bei doppelten linen
+      output << (xofs+lines[i].p1[0])*factor << " " << (yofs+lines[i].p1[1])*factor << " moveto\n";
+      output << (xofs+lines[i].p2[0])*factor << " " << (yofs+lines[i].p2[1])*factor << " lineto\n";
       output << "stroke\n";
     }
     for(i=0;i<label.size();i++)

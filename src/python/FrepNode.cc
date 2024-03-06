@@ -58,7 +58,11 @@ using namespace libfive;
 std::unique_ptr<const Geometry> FrepNode::createGeometry() const
 {
 	PolySetBuilder builder(0,0,3,true);
+#ifdef LIBFIVE_IS_SHARED	
+	std::shared_ptr<Mesh> mesh=NULL;
+#else	
 	std::unique_ptr<Mesh> mesh=NULL;
+#endif	
 	libfive::Region<3> reg(
 			{this->x1, this->y1, this->z1}, 
 			{this->x2, this->y2, this->z2});
