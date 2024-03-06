@@ -65,6 +65,28 @@ Vector2d pointrecht(Vector2d x)
  return y;
 }
 
+int point_in_polygon(const std::vector<Vector2d> &pol, const Vector2d &pt) 
+{
+  // polygons are clockwise	
+  int cuts=0;
+  int n=pol.size();
+  for(int i=0;i<n;i++) {
+    Vector2d p1=pol[i];
+    Vector2d p2=pol[(i+1)%n];
+    if(fabs(p1[1]-p2[1]) > 1e-9){
+      if(pt[1] < p1[1] && pt[1] > p2[1]) {
+        double x=p1[0]+(p2[0]-p1[0])*(pt[1]-p1[1])/(p2[1]-p1[1]);
+        if(x > pt[0]) cuts++;
+      }
+      if(pt[1] < p2[1] && pt[1] > p1[1]) {
+        double x=p1[0]+(p2[0]-p1[0])*(pt[1]-p1[1])/(p2[1]-p1[1]);
+        if(x > pt[0]) cuts++;
+      }
+    }      
+  }
+  return cuts&1;
+}
+
 int plot_try(int destplate,Vector2d px,Vector2d py,Vector2d pm,std::vector<plateS> &plate,std::vector<Vector3d> vertices, std::vector<IndexedFace> faces, std::vector<Vector2d> &lines,double &xofs,double &yofs,double a4b,double a4h,double rand,int destedge,int bestend)
 {
   int i;
@@ -95,6 +117,14 @@ int plot_try(int destplate,Vector2d px,Vector2d py,Vector2d pm,std::vector<plate
     Vector4d pt4(pt[0], pt[1], pt[2], 1);
     pt4 = invmat * pt4 ;
     plate[destplate].pt.push_back(px*pt4[0] + py*pt4[1]+pm);
+  }
+  for(int j=0;j<plate.size();j++) {
+    if(j == destplate) continue;
+    if(plate[j].done != 1) continue;
+    for(int i=0;i<n;i++) {
+      Vector2d &pt = plate[destplate].pt[i];
+      if(point_in_polygon(plate[j].pt,pt)) success=0;
+    }
   }
   for(i=0;i<n;i++) {
     lines.push_back(plate[destplate].pt[i]);
@@ -267,7 +297,7 @@ void export_ps(const std::shared_ptr<const Geometry>& geom, std::ostream& output
   output << "%!PS-Adobe-2.0\n";
   output << "%%Orientation: Portrait\n";
   output << "%%DocumentMedia: " << paperformat << " " << paperwidth*factor << " " << paperheight * factor << "\n";
-  output << "/Times-Roman findfont " << lasche*2 << " scalefont setfont\n";
+  output << "/Times-Roman findfont " << lasche*2 << " scalefont setfont 0.1 setlinewidth\n";
   while(polsdone < polstodo)
   {
     printf("one round\n");	 
@@ -330,6 +360,10 @@ void export_ps(const std::shared_ptr<const Geometry>& geom, std::ostream& output
             Vector2d px=(pt1-pt2).normalized();
             Vector2d py=pointrecht(px);
             Vector2d pm=(pt1+pt2)/2;
+	    linesorg=lines;
+	    xofsorg=xofs;
+	    yofsorg=yofs;
+
             success =plot_try(p2,px,py,pm,plate,ps->vertices, faces, lines, xofs,yofs,paperwidth,paperheight,rand+lasche,f2,bestend);
 //                if(b == bestend)
 //                {
@@ -375,21 +409,26 @@ void export_ps(const std::shared_ptr<const Geometry>& geom, std::ostream& output
           if(glue != 0)
           {
             py=plate[i].pt[(j+1)%n]-plate[i].pt[j];
+	    double maxl=py.norm();
+            double lasche_eff=lasche;
+	    if(lasche_eff > py.norm()/2.0) lasche_eff=py.norm()/2.0;
             py.normalize();
             px=pointrecht(py);
             px=px*glue;
-            p1=plate[i].pt[j]+(px+py)*lasche;
+            p1=plate[i].pt[j]+(px+py)*lasche_eff;
             py=-py;
-            p2=plate[i].pt[(j+1)%n]+(px+py)*lasche;
+            p2=plate[i].pt[(j+1)%n]+(px+py)*lasche_eff;
 
-            lines.push_back(plate[i].pt[j]);
-            lines.push_back(p1);
+	    if(glue < 0) { // nur aussenkannte
+	      lines.push_back(plate[i].pt[j]);
+              lines.push_back(p1);
 
-            lines.push_back(p1);
-            lines.push_back(p2);
+	      lines.push_back(p1);
+              lines.push_back(p2);
 
-            lines.push_back(p2);
-            lines.push_back(plate[i].pt[(j+1)%n]);
+	      lines.push_back(p2);
+              lines.push_back(plate[i].pt[(j+1)%n]);
+	    }
 
             if(plate[other ].done != 1) //if the connection is not to the same page
             {
@@ -398,7 +437,7 @@ void export_ps(const std::shared_ptr<const Geometry>& geom, std::ostream& output
               p1=p1+py*lasche*-0.35;
               labelS lnew;
               lnew.pt=p1;
-              sprintf(lnew.text,"%d",num/2+1);
+              sprintf(lnew.text,"%d",num);
               lnew.rot=atan2(py[1],py[0])*180.0/3.1415;
               label.push_back(lnew);
             } 
@@ -424,11 +463,12 @@ void export_ps(const std::shared_ptr<const Geometry>& geom, std::ostream& output
       output << "newpath\n";
       output << (xofs+lines[i+0][0])*factor << " " << (yofs+lines[i+0][1])*factor << " moveto\n";
       output << (xofs+lines[i+1][0])*factor << " " << (yofs+lines[i+1][1])*factor << " lineto\n";
+  output << "[2.5 2] 0 setdash\n";  // TODO nur bei doppelten linen
       output << "stroke\n";
     }
     for(i=0;i<label.size();i++)
     {
-      output << "%f %f moveto\n",(xofs+label[i].pt[0])*factor,(yofs+label[i].pt[1])*factor;
+      output << (xofs+label[i].pt[0])*factor << " " << (yofs+label[i].pt[1])*factor << " moveto\n";
       output << "gsave " << label[i].rot << " rotate ( " << label[i].text << " ) show grestore \n";
     }
     output << "10 10 moveto\n";
@@ -438,7 +478,6 @@ void export_ps(const std::shared_ptr<const Geometry>& geom, std::ostream& output
     pages++;
     lines.clear();
     label.clear();
-    break;
   }
   return;
 }
