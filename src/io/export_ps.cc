@@ -50,9 +50,10 @@ typedef struct
 
 typedef struct
 {
-  std::vector<Vector2d> pt;
-  std::vector<Vector2d> pt_l1;
-  std::vector<Vector2d> pt_l2;
+  std::vector<Vector2d> pt; // actual points
+  std::vector<Vector2d> pt_l1; // leap starts
+  std::vector<Vector2d> pt_l2; // leap ends
+  std::vector<Vector2d> bnd; // Complete boundary representing points and leps
   int done;
 } plateS;
 
@@ -92,8 +93,15 @@ int point_in_polygon(const std::vector<Vector2d> &pol, const Vector2d &pt)
   }
   return cuts&1;
 }
+int edge_outwards(std::vector<connS> &con, int plate, int face) {
+  int outwards=0;
+  for(int k=0;k<con.size();k++)	{
+  if(con[k].p2 == plate && con[k].f2 == face) outwards=1;		
+  }
+  return outwards;
+}
 
-int plot_try(int refplate, int destplate,Vector2d px,Vector2d py,Vector2d pm,std::vector<plateS> &plate,std::vector<Vector3d> vertices, std::vector<IndexedFace> faces, std::vector<lineS> &lines,double &xofs,double &yofs,double a4b,double a4h,double rand,int destedge,int bestend, double lasche)
+int plot_try(int refplate, int destplate,Vector2d px,Vector2d py,Vector2d pm,std::vector<plateS> &plate,std::vector<connS> &con, std::vector<Vector3d> vertices, std::vector<IndexedFace> faces, std::vector<lineS> &lines,double &xofs,double &yofs,double a4b,double a4h,double rand,int destedge,int bestend, double lasche)
 {
   int i;
   double xmax,xmin,ymax,ymin;
@@ -150,21 +158,52 @@ int plot_try(int refplate, int destplate,Vector2d px,Vector2d py,Vector2d pm,std
     py=-py;
     plate[destplate].pt_l2.push_back(plate[destplate].pt[(i+1)%n]+(px+py)*lasche_eff);
   }
+  // create complete view of bnd
+  plate[destplate].bnd.clear();
+  for(int i=0;i<n;i++) {
+    plate[destplate].bnd.push_back(plate[destplate].pt[i]);
+    if(edge_outwards(con, destplate, i)) {
+      plate[destplate].bnd.push_back(plate[destplate].pt_l1[i]);
+      plate[destplate].bnd.push_back(plate[destplate].pt_l2[i]);
+    }
+  }
   //
+  // check if new points collide with some existing boundaries
+
   for(int j=0;j<plate.size();j++) { // kollision mit anderen platten
     if(j == destplate) continue; // nicht mit sich selbst
     if(plate[j].done != 1) continue; // und nicht wenn sie nicht existiert
     for(int i=0;i<n;i++) { 
-      if(point_in_polygon(plate[j].pt,plate[destplate].pt[i])) success=0;
+      if(point_in_polygon(plate[j].bnd,plate[destplate].pt[i])) success=0; // alle neue punkte
       if(j == refplate && i == destedge) {} // joker
       else
       {
-	// jede neue lasche
-        if(point_in_polygon(plate[j].pt,plate[destplate].pt_l1[i])) success=0; 
+	// jede neue lasche wenn sie auswaerts geht
+	// plate destplate, pt i
+//        if(edge_outwards(con, destplate, i) ) {
+        if(point_in_polygon(plate[j].pt,plate[destplate].pt_l1[i])) success=0; // alle neue laschen
         if(point_in_polygon(plate[j].pt,plate[destplate].pt_l2[i])) success=0;
+//	}  
       }  
     }
   }
+  //
+  // check if any existing  points collide new boudnary
+  for(int j=0;j<plate.size();j++) { // kollision mit anderen platten
+    if(j == destplate) continue; // nicht mit sich selbst
+    if(plate[j].done != 1) continue; // und nicht wenn sie nicht existiert
+    int n=plate[j].pt.size();
+    for(int i=0;i<n;i++) {
+      if(point_in_polygon(plate[destplate].pt,plate[j].pt[i])) {
+//        success=0; TODO activate
+//	if(success) {
+//rintf("playe %d pt %d hit		
+//	}
+      }
+    }
+    // TODO laschen der bestehenden auch
+  }
+
   for(i=0;i<n;i++) {
     lineS line;
     line.p1=plate[destplate].pt[i]; 
@@ -235,7 +274,7 @@ void export_ps(const std::shared_ptr<const Geometry>& geom, std::ostream& output
   std::vector<IndexedFace> faces = mergetriangles(ps->indices, normals,newNormals, ps->vertices);
 
   int i,j,k, glue,num,cont,success,drawn,other;
-  double lasche=5.0;
+  double lasche=10.0;
   double rand=5.0;
   const char *paperformat="A4";
   double factor=72.0/25.4;
@@ -360,12 +399,12 @@ void export_ps(const std::shared_ptr<const Geometry>& geom, std::ostream& output
 
             pm[0]=0; pm[1]=0;  px=pm; px[0]=1; py=pointrecht(px);
 
-            success =plot_try(-1, i,px,py,pm,plate,ps->vertices, faces, lines, xofs,yofs,paperwidth,paperheight,rand+lasche,0,bestend, lasche);
+            success =plot_try(-1, i,px,py,pm,plate,con, ps->vertices, faces, lines, xofs,yofs,paperwidth,paperheight,rand+lasche,0,bestend, lasche);
 
 
             if(success  ==  1)
 	    {
-              printf("Successfully placed plate %d px=%g/%g, py=%g/%g\n",i,px[0], px[1], py[0], py[1]);		    
+//              printf("Successfully placed plate %d px=%g/%g, py=%g/%g\n",i,px[0], px[1], py[0], py[1]);		    
               plate[i].done=1;
 	      cont=1; 
 	      drawn=1;
@@ -409,14 +448,14 @@ void export_ps(const std::shared_ptr<const Geometry>& geom, std::ostream& output
 	    xofsorg=xofs;
 	    yofsorg=yofs;
 
-            success =plot_try(p1, p2,px,py,pm,plate,ps->vertices, faces, lines, xofs,yofs,paperwidth,paperheight,rand+lasche,f2,bestend,lasche);
+            success =plot_try(p1, p2,px,py,pm,plate,con, ps->vertices, faces, lines, xofs,yofs,paperwidth,paperheight,rand+lasche,f2,bestend,lasche);
 //                if(b == bestend)
 //                {
 //                  if(polybesttouch == 0) polybesttouch=1; else success=0;
 //                }
             if(success == 1 )
             {
-              printf("Successfully placed plate %d px=%g/%g, py=%g/%g\n",p2,px[0], px[1], py[0], py[1]);		    
+//              printf("Successfully placed plate %d px=%g/%g, py=%g/%g\n",p2,px[0], px[1], py[0], py[1]);		    
               plate[p2].done=1;
 	      drawn=1;
               con[i].done=1;
@@ -445,7 +484,6 @@ void export_ps(const std::shared_ptr<const Geometry>& geom, std::ostream& output
     {
       if(plate[i].done == 1)
       {
-        printf("Lasche Plate %d\n",i);	      
         int n=plate[i].pt.size();	      
 	Vector2d mean(0,0);
         for(j=0;j<n;j++) // pts
@@ -479,7 +517,7 @@ void export_ps(const std::shared_ptr<const Geometry>& geom, std::ostream& output
               py.normalize();
               px=pointrecht(py);
 
-//              p1=p1+px*lasche*(0.5-0.27*glue);
+              p1=p1+px*lasche*(0.5+0.27*glue);
               p1=p1+py*lasche*-0.35;
               lnew.pt=p1;
               sprintf(lnew.text,"%d",num);
@@ -488,11 +526,11 @@ void export_ps(const std::shared_ptr<const Geometry>& geom, std::ostream& output
             } 
           }
         }
-        lnew.pt=p1;
-        sprintf(lnew.text,"%d",i);
-        lnew.pt = mean / n;
-        lnew.rot=0;
-        label.push_back(lnew);
+//        lnew.pt=p1; // for DEBUG only
+//        sprintf(lnew.text,"%d",i);
+//        lnew.pt = mean / n;
+//        lnew.rot=0;
+//        label.push_back(lnew);
       }
     }
     for(i=0;i<faces.size();i++)
