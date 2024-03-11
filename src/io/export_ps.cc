@@ -31,6 +31,9 @@
 #include <unordered_map>
 #include "boost-utils.h"
 #include <hash.h>
+#include <cairo.h>
+#include <cairo-pdf.h>
+
 
 
 typedef struct
@@ -47,6 +50,21 @@ typedef struct
  char text[10];
 } labelS;
 
+typedef struct
+{
+  double xofs, yofs;	
+  std::vector<lineS> lines;	
+  std::vector<labelS> label;
+} sheetS;
+
+typedef struct
+{
+  double lasche;	
+  double rand;
+  const char *paperformat;
+  double paperwidth,paperheight;
+  int bestend;
+} plotSettingsS;
 
 typedef struct
 {
@@ -101,7 +119,7 @@ int edge_outwards(std::vector<connS> &con, int plate, int face) {
   return outwards;
 }
 
-int plot_try(int refplate, int destplate,Vector2d px,Vector2d py,Vector2d pm,std::vector<plateS> &plate,std::vector<connS> &con, std::vector<Vector3d> vertices, std::vector<IndexedFace> faces, std::vector<lineS> &lines,double &xofs,double &yofs,double a4b,double a4h,double rand,int destedge,int bestend, double lasche)
+int plot_try(int refplate, int destplate,Vector2d px,Vector2d py,Vector2d pm,std::vector<plateS> &plate,std::vector<connS> &con, std::vector<Vector3d> vertices, std::vector<IndexedFace> faces, sheetS &sheet,int destedge, plotSettingsS plot_s)
 {
   int i;
   double xmax,xmin,ymax,ymin;
@@ -149,7 +167,7 @@ int plot_try(int refplate, int destplate,Vector2d px,Vector2d py,Vector2d pm,std
   	  
     py=plate[destplate].pt[(i+1)%n]-plate[destplate].pt[i];
     double maxl=py.norm();
-    double lasche_eff=lasche;
+    double lasche_eff=plot_s.lasche;
     if(lasche_eff > py.norm()/2.0) lasche_eff=py.norm()/2.0;
     py.normalize();
     px=pointrecht(py);
@@ -201,7 +219,6 @@ int plot_try(int refplate, int destplate,Vector2d px,Vector2d py,Vector2d pm,std
 //	}
       }
     }
-    // TODO laschen der bestehenden auch
   }
 
   for(i=0;i<n;i++) {
@@ -209,26 +226,26 @@ int plot_try(int refplate, int destplate,Vector2d px,Vector2d py,Vector2d pm,std
     line.p1=plate[destplate].pt[i]; 
     line.p2=plate[destplate].pt[(i+1)%n];
     line.dashed=0;
-    lines.push_back(line);
+    sheet.lines.push_back(line);
   }
-  xmin=lines[0].p1[0];
-  xmax=lines[0].p1[0];
-  ymin=lines[0].p1[1];
-  ymax=lines[0].p1[1];
-  for(i=0;i<lines.size();i++)
+  xmin=sheet.lines[0].p1[0];
+  xmax=sheet.lines[0].p1[0];
+  ymin=sheet.lines[0].p1[1];
+  ymax=sheet.lines[0].p1[1];
+  for(i=0;i<sheet.lines.size();i++)
   {
-    if(lines[i].p1[0] < xmin) xmin=lines[i].p1[0];
-    if(lines[i].p1[0] > xmax) xmax=lines[i].p1[0];
-    if(lines[i].p1[1] < ymin) ymin=lines[i].p1[1];
-    if(lines[i].p1[1] > ymax) ymax=lines[i].p1[1];
-    if(lines[i].p2[0] < xmin) xmin=lines[i].p2[0];
-    if(lines[i].p2[0] > xmax) xmax=lines[i].p2[0];
-    if(lines[i].p2[1] < ymin) ymin=lines[i].p2[1];
-    if(lines[i].p2[1] > ymax) ymax=lines[i].p2[1];
+    if(sheet.lines[i].p1[0] < xmin) xmin=sheet.lines[i].p1[0];
+    if(sheet.lines[i].p1[0] > xmax) xmax=sheet.lines[i].p1[0];
+    if(sheet.lines[i].p1[1] < ymin) ymin=sheet.lines[i].p1[1];
+    if(sheet.lines[i].p1[1] > ymax) ymax=sheet.lines[i].p1[1];
+    if(sheet.lines[i].p2[0] < xmin) xmin=sheet.lines[i].p2[0];
+    if(sheet.lines[i].p2[0] > xmax) xmax=sheet.lines[i].p2[0];
+    if(sheet.lines[i].p2[1] < ymin) ymin=sheet.lines[i].p2[1];
+    if(sheet.lines[i].p2[1] > ymax) ymax=sheet.lines[i].p2[1];
   }
-  xofs=(a4b-xmax+xmin)/2.0-xmin;
-  yofs=(a4h-ymax+ymin)/2.0-ymin;
-  if(xofs+xmin < rand || yofs+ymin < rand) success=0 ;
+  sheet.xofs=(plot_s.paperwidth-xmax+xmin)/2.0-xmin;
+  sheet.yofs=(plot_s.paperheight-ymax+ymin)/2.0-ymin;
+  if(sheet.xofs+xmin < plot_s.rand || sheet.yofs+ymin < plot_s.rand) success=0 ;
   return success;
 }
 
@@ -262,24 +279,20 @@ int operator==(const EdgeDbStub &t1, const EdgeDbStub &t2)
         return 0;
 }
 
-void export_ps(const std::shared_ptr<const Geometry>& geom, std::ostream& output)
+std::vector<sheetS> sheets_combine(std::vector<sheetS> sheets)
 {
-  std::shared_ptr<const PolySet> ps= PolySetUtils::getGeometryAsPolySet(geom);
-  if(ps == nullptr) {
-    printf("Dont have PolySet\n");	  
-    return;
-  }
+  return sheets;	// TODO impl
+}
+
+std::vector<sheetS> fold_3d(std::shared_ptr<const PolySet> ps, const plotSettingsS &plot_s)
+{
   std::vector<Vector4d> normals=offset3D_normals(ps->vertices, ps->indices);
   std::vector<Vector4d> newNormals;
   std::vector<IndexedFace> faces = mergetriangles(ps->indices, normals,newNormals, ps->vertices);
 
   int i,j,k, glue,num,cont,success,drawn,other;
-  double lasche=10.0;
-  double rand=5.0;
-  const char *paperformat="A4";
-  double factor=72.0/25.4;
-  int pages=0;
   int polsdone=0,polstodo;
+
   //
   // create edge database
   
@@ -337,19 +350,15 @@ void export_ps(const std::shared_ptr<const Geometry>& geom, std::ostream& output
 
   std::sort(con.begin(), con.end(), [ps, faces](const connS &a, const connS &b ) {
     int na=faces[a.p1].size();		  
-    int nb=faces[a.p1].size();		  
+    int nb=faces[b.p1].size();		  
     double da= (ps->vertices[faces[a.p1][a.f1]] - ps->vertices[faces[a.p1][(a.f1+1)%na]]).norm();
     double db= (ps->vertices[faces[b.p1][b.f1]] - ps->vertices[faces[b.p1][(b.f1+1)%nb]]).norm();
     return(da>db)?1:0;
 		  });
 
-  std::vector<lineS> lines,linesorg; // final postscript lines
-  std::vector<labelS> label; // final postscript labels
+//  std::vector<lineS> lines,linesorg; // final postscript lines
 
-  double xofs,yofs;
-  double xofsorg,yofsorg;
   Vector2d px,py,p1,p2,pm;
-  int bestend=0; // TODO besser
   std::vector<plateS> plate; // faces in final placement
   int polybesttouch;
 
@@ -357,9 +366,6 @@ void export_ps(const std::shared_ptr<const Geometry>& geom, std::ostream& output
 
   bestend=reorder_edges(eder);
 */ 
-  double paperwidth,paperheight;
-  if(strcmp(paperformat,"A4") == 0) { paperheight=298; paperwidth=210; }
-  else {paperheight=420; paperwidth=298;}
 
   polstodo=faces.size(); 
 
@@ -372,34 +378,29 @@ void export_ps(const std::shared_ptr<const Geometry>& geom, std::ostream& output
   }
   for(i=0;i<con.size();i++) con[i].done=0;	 
 
-  output << "%!PS-Adobe-2.0\n";
-  output << "%%Orientation: Portrait\n";
-  output << "%%DocumentMedia: " << paperformat << " " << paperwidth*factor << " " << paperheight * factor << "\n";
-  output << "/Times-Roman findfont " << lasche*2 << " scalefont setfont 0.1 setlinewidth\n";
+  std::vector<sheetS> sheets;
   while(polsdone < polstodo)
   {
 //    printf("one round\n");	 
     // ein blatt designen
     polybesttouch=0;
     cont=1;
+    sheetS sheet, sheetorg;
     while(cont == 1)
     {
       cont=0;
       drawn=0;
-      if(lines.size()  ==  0)
+      if(sheet.lines.size()  ==  0)
       {
         for(i=0;i<faces.size()  && drawn == 0;i++)
         {
           if(plate[i].done == 0 )
           {
             success=0;
-            linesorg=lines;
-            xofsorg=xofs;
-            yofsorg=yofs;
-
+            sheetorg=sheet;
             pm[0]=0; pm[1]=0;  px=pm; px[0]=1; py=pointrecht(px);
 
-            success =plot_try(-1, i,px,py,pm,plate,con, ps->vertices, faces, lines, xofs,yofs,paperwidth,paperheight,rand+lasche,0,bestend, lasche);
+            success =plot_try(-1, i,px,py,pm,plate,con, ps->vertices, faces, sheet, 0, plot_s);
 
 
             if(success  ==  1)
@@ -411,9 +412,7 @@ void export_ps(const std::shared_ptr<const Geometry>& geom, std::ostream& output
 	    }  
             else
             {
-              lines=linesorg;
-              xofs=xofsorg;
-              yofs=yofsorg;
+              sheet=sheetorg;
             }  
           }
 	}
@@ -444,11 +443,9 @@ void export_ps(const std::shared_ptr<const Geometry>& geom, std::ostream& output
             Vector2d px=(pt1-pt2).normalized();
             Vector2d py=pointrecht(px);
             Vector2d pm=(pt1+pt2)/2;
-	    linesorg=lines;
-	    xofsorg=xofs;
-	    yofsorg=yofs;
+	    sheetorg=sheet;
 
-            success =plot_try(p1, p2,px,py,pm,plate,con, ps->vertices, faces, lines, xofs,yofs,paperwidth,paperheight,rand+lasche,f2,bestend,lasche);
+            success =plot_try(p1, p2,px,py,pm,plate,con, ps->vertices, faces, sheet, f2, plot_s);
 //                if(b == bestend)
 //                {
 //                  if(polybesttouch == 0) polybesttouch=1; else success=0;
@@ -463,9 +460,7 @@ void export_ps(const std::shared_ptr<const Geometry>& geom, std::ostream& output
             } 
             else
             {
-              lines=linesorg;
-              xofs=xofsorg;
-              yofs=yofsorg;
+              sheet=sheetorg;
             }		  
           }
         }
@@ -474,7 +469,7 @@ void export_ps(const std::shared_ptr<const Geometry>& geom, std::ostream& output
 //----------------------------------- Alles fertigstellen
 
     // nachtraegliche laschenzeichnung
-    if(lines.size() == 0)
+    if(sheet.lines.size() == 0)
     {
       printf("Was not able to fit something onto the page!\n");
       exit(1);
@@ -503,10 +498,10 @@ void export_ps(const std::shared_ptr<const Geometry>& geom, std::ostream& output
 	    if(glue < 0) { // nur aussenkannte
               lineS line;
 	      line.dashed=0;
-	      line.p1=plate[i].pt[j]; line.p2=p1; lines.push_back(line);
-	      line.p1=p1; line.p2=p2; lines.push_back(line);
-	      line.p1=p2; line.p2=plate[i].pt[(j+1)%n]; lines.push_back(line);
-	      line.p1=plate[i].pt[(j+1)%n]; line.p2=plate[i].pt[j]; lines.push_back(line);
+	      line.p1=plate[i].pt[j]; line.p2=p1; sheet.lines.push_back(line);
+	      line.p1=p1; line.p2=p2; sheet.lines.push_back(line);
+	      line.p1=p2; line.p2=plate[i].pt[(j+1)%n]; sheet.lines.push_back(line);
+	      line.p1=plate[i].pt[(j+1)%n]; line.p2=plate[i].pt[j]; sheet.lines.push_back(line);
 	    }
 
             if(plate[other ].done != 1) //if the connection is not to the same page
@@ -517,12 +512,12 @@ void export_ps(const std::shared_ptr<const Geometry>& geom, std::ostream& output
               py.normalize();
               px=pointrecht(py);
 
-              p1=p1+px*lasche*(0.5+0.27*glue);
-              p1=p1+py*lasche*-0.35;
+              p1=p1+px*plot_s.lasche*(0.5+0.27*glue);
+              p1=p1+py*plot_s.lasche*-0.35;
               lnew.pt=p1;
               sprintf(lnew.text,"%d",num);
               lnew.rot=atan2(py[1],py[0])*180.0/3.1415;
-              label.push_back(lnew);
+              sheet.label.push_back(lnew);
             } 
           }
         }
@@ -541,44 +536,129 @@ void export_ps(const std::shared_ptr<const Geometry>& geom, std::ostream& output
         polsdone++;  
       }
     }
-    for(int i=0;i<lines.size()-1;i++) {
-      auto &line1 = lines[i];	     
-      for(int j=i+1;j<lines.size();j++) {
-        auto &line2 = lines[j];
+    for(int i=0;i<sheet.lines.size()-1;i++) {
+      auto &line1 = sheet.lines[i];	     
+      for(int j=i+1;j<sheet.lines.size();j++) {
+        auto &line2 = sheet.lines[j];
         if((line1.p1 - line2.p2).norm() < 1e-3 && (line1.p2 - line2.p1).norm() < 1e-3 ) {
           line1.dashed=1;
-          lines.erase(lines.begin()+j);
+          sheet.lines.erase(sheet.lines.begin()+j);
           break;	  
 	}
       }
     }
+    sheets.push_back(sheet);
+  }
+  return sheets_combine(sheets);
+}
+
+
+void output_ps(std::ostream &output, std::vector<sheetS> &sheets, const plotSettingsS & plot_s)
+{
+  double factor=72.0/25.4;
+  output << "%!PS-Adobe-2.0\n";
+  output << "%%Orientation: Portrait\n";
+  output << "%%DocumentMedia: " << plot_s.paperformat << " " << plot_s.paperwidth*factor << " " << plot_s.paperheight * factor << "\n";
+  output << "/Times-Roman findfont " << plot_s.lasche*2 << " scalefont setfont 0.1 setlinewidth\n";
+
+  int pages=0;
+  for(auto &sheet : sheets)
+  {  
     // doppelte in lines loesche//n
     output << "%%Page: " << pages+1 << "\n";
 
-//    printf("line size is %d\n",lines.size());	
+//    printf("line size is %d\n",sheet.lines.size());	
     output << "0 0 0 setrgbcolor\n";
-    for(i=0;i<lines.size();i++)
+    for(int i=0;i<sheet.lines.size();i++)
     {
-      if(lines[i].dashed) output << "[2.5 2] 0 setdash\n";
+      if(sheet.lines[i].dashed) output << "[2.5 2] 0 setdash\n";
       else output << "[3 0 ] 0 setdash\n";
       output << "newpath\n";
-      output << (xofs+lines[i].p1[0])*factor << " " << (yofs+lines[i].p1[1])*factor << " moveto\n";
-      output << (xofs+lines[i].p2[0])*factor << " " << (yofs+lines[i].p2[1])*factor << " lineto\n";
+      output << (sheet.xofs+sheet.lines[i].p1[0])*factor << " " << (sheet.yofs+sheet.lines[i].p1[1])*factor << " moveto\n";
+      output << (sheet.xofs+sheet.lines[i].p2[0])*factor << " " << (sheet.yofs+sheet.lines[i].p2[1])*factor << " lineto\n";
       output << "stroke\n";
     }
-    for(i=0;i<label.size();i++)
+    for(int i=0;i<sheet.label.size();i++)
     {
-      output << (xofs+label[i].pt[0])*factor << " " << (yofs+label[i].pt[1])*factor << " moveto\n";
-      output << "gsave " << label[i].rot << " rotate ( " << label[i].text << " ) show grestore \n";
+      output << (sheet.xofs+sheet.label[i].pt[0])*factor << " " << (sheet.yofs+sheet.label[i].pt[1])*factor << " moveto\n";
+      output << "gsave " << sheet.label[i].rot << " rotate ( " << sheet.label[i].text << " ) show grestore \n";
     }
     output << "10 10 moveto\n";
     std::string filename="a.ps"; // TODO weg
     output << "( " << filename << "/" << pages+1 << ") show \n";
     output << "showpage\n";
     pages++;
-    lines.clear();
-    label.clear();
   }
   return;
 }
 
+
+void export_ps(const std::shared_ptr<const Geometry>& geom, std::ostream& output)
+{
+  std::shared_ptr<const PolySet> ps= PolySetUtils::getGeometryAsPolySet(geom);
+  if(ps == nullptr) {
+    printf("Dont have PolySet\n");	  
+    return;
+  }
+  plotSettingsS plot_s;
+  plot_s.lasche=10.0;
+  plot_s.rand=5.0;
+  plot_s.paperformat="A4";
+  plot_s.bestend=0; // TODO besser
+  if(strcmp(plot_s.paperformat, "A4") == 0) { plot_s.paperheight=298; plot_s.paperwidth=210; }
+  else {plot_s.paperheight=420; plot_s.paperwidth=298;}
+
+  std::vector<sheetS> sheets = fold_3d(ps, plot_s);
+  output_ps(output, sheets,plot_s);
+}
+
+
+void output_pdf(cairo_t *cr, std::vector<sheetS> &sheets, const plotSettingsS & plot_s) {
+  double factor=72.0/25.4;
+//  output << "%!PS-Adobe-2.0\n";
+//  output << "%%Orientation: Portrait\n";
+//  output << "%%DocumentMedia: " << plot_s.paperformat << " " << plot_s.paperwidth*factor << " " << plot_s.paperheight * factor << "\n";
+//  output << "/Times-Roman findfont " << plot_s.lasche*2 << " scalefont setfont 0.1 setlinewidth\n";
+
+  int pages=0;
+  for(auto &sheet : sheets)
+  {  
+  //  output << "%%Page: " << pages+1 << "\n";
+
+    cairo_set_source_rgba(cr, 0,0,0,1);
+    for(int i=0;i<sheet.lines.size();i++)
+    {
+//      if(sheet.lines[i].dashed) output << "[2.5 2] 0 setdash\n";
+//      else output << "[3 0 ] 0 setdash\n";
+      cairo_move_to(cr, (sheet.xofs+sheet.lines[i].p1[0])*factor, (sheet.yofs+sheet.lines[i].p1[1])*factor);
+      cairo_line_to(cr, (sheet.xofs+sheet.lines[i].p2[0])*factor, (sheet.yofs+sheet.lines[i].p2[1]));
+      cairo_stroke(cr);
+    }
+    for(int i=0;i<sheet.label.size();i++)
+    {
+       cairo_move_to( cr, (sheet.xofs+sheet.label[i].pt[0])*factor  , (sheet.yofs+sheet.label[i].pt[1])*factor );
+       cairo_show_text(cr, sheet.label[i].text);
+//      output << (sheet.xofs+sheet.label[i].pt[0])*factor << " " << (sheet.yofs+sheet.label[i].pt[1])*factor << " moveto\n";
+//      output << "gsave " << sheet.label[i].rot << " rotate ( " << sheet.label[i].text << " ) show grestore \n";
+    }
+//    output << "10 10 moveto\n"; // TODO move as label, aber kenne seitenzahlnicht
+//    std::string filename="a.ps"; // TODO weg
+//    output << "( " << filename << "/" << pages+1 << ") show \n";
+    cairo_show_page(cr);
+    pages++;
+  }
+  return;
+}
+
+void draw_fold_geom(std::shared_ptr<const PolySet> & ps, cairo_t *cr ){
+  plotSettingsS plot_s;
+  plot_s.lasche=10.0;
+  plot_s.rand=5.0;
+  plot_s.paperformat="A4";
+  plot_s.bestend=0; // TODO besser
+  if(strcmp(plot_s.paperformat, "A4") == 0) { plot_s.paperheight=298; plot_s.paperwidth=210; }
+  else {plot_s.paperheight=420; plot_s.paperwidth=298;}
+  std::vector<sheetS> sheets = fold_3d(ps, plot_s);
+  output_pdf(cr, sheets,plot_s);
+
+}
