@@ -33,7 +33,7 @@ void draw_text(const char *text, cairo_t *cr, double x, double y, double fontSiz
   cairo_set_font_size(cr, fontSize);
   cairo_move_to(cr, x, y);
   cairo_save(cr);
-  cairo_rotate(cr, angle*3.14/180.0);
+  cairo_rotate(cr, angle*M_PI/180.0);
   cairo_show_text(cr, text);
   cairo_restore(cr);
 
@@ -149,7 +149,9 @@ void draw_axes(cairo_t *cr, double left, double right, double bottom, double top
 
 
 // Draws a single 2D polygon.
-void draw_geom(const Polygon2d& poly, cairo_t *cr ){
+void draw_geom(const Polygon2d& poly, cairo_t *cr, double tcX, double tcY ){
+  cairo_save(cr);	
+  cairo_translate(cr, tcX, tcY);  // Center page on geometry; // TODO dies nicht fuer foldable
   for (const auto& o : poly.outlines()) {
     if (o.vertices.empty()) {
       continue;
@@ -168,10 +170,11 @@ void draw_geom(const Polygon2d& poly, cairo_t *cr ){
     cairo_line_to(cr, mm_to_points(p0.x()), mm_to_points(-p0.y()));
 
   }
+  cairo_restore(cr);	
 }
 
 
-void draw_geom(const std::shared_ptr<const PolySet> & ps, cairo_t *cr ){
+void draw_geom(const std::shared_ptr<const PolySet> & ps, cairo_t *cr){
   plotSettingsS plot_s;
   plot_s.lasche=10.0;
   plot_s.rand=5.0;
@@ -196,16 +199,16 @@ void draw_geom(const std::shared_ptr<const PolySet> & ps, cairo_t *cr ){
     {
       if(sheet.lines[i].dashed) cairo_set_dash(cr, dashes,2,0);
       else cairo_set_dash(cr,solid, 2, 0);
-      cairo_move_to(cr, sheet.lines[i].p1[0]*factor, sheet.lines[i].p1[1]*factor);
-      cairo_line_to(cr, sheet.lines[i].p2[0]*factor, sheet.lines[i].p2[1]*factor);
+      cairo_move_to(cr, (sheet.xofs+sheet.lines[i].p1[0])*factor, (sheet.yofs+sheet.lines[i].p1[1])*factor);
+      cairo_line_to(cr, (sheet.xofs+sheet.lines[i].p2[0])*factor, (sheet.yofs+sheet.lines[i].p2[1])*factor);
       cairo_stroke(cr);
     }
     for(int i=0;i<sheet.label.size();i++)
     {
-       draw_text(sheet.label[i].text, cr,  sheet.label[i].pt[0]*factor, sheet.label[i].pt[1]*factor,plot_s.lasche, sheet.label[i].rot+180 ); // TODO fix  rot
+       draw_text(sheet.label[i].text, cr,  (sheet.xofs+sheet.label[i].pt[0])*factor, (sheet.yofs+sheet.label[i].pt[1])*factor,plot_s.lasche, sheet.label[i].rot ); // TODO fix  rot
     }
     char tmp[20];
-    sprintf(tmp,"%s %d","a.ps",pages+1);
+    sprintf(tmp,"%s/%d","a.ps",pages+1);
     draw_text(tmp, cr, 10,10, plot_s.lasche, 0.0); // TODO pos falsch
     cairo_show_page(cr);
     pages++;
@@ -213,15 +216,15 @@ void draw_geom(const std::shared_ptr<const PolySet> & ps, cairo_t *cr ){
   return;
 }
 // Main entry:  draw geometry that consists of 2D polygons.  Walks the tree...
-void draw_geom(const std::shared_ptr<const Geometry>& geom, cairo_t *cr){
+void draw_geom(const std::shared_ptr<const Geometry>& geom, cairo_t *cr, double tcX, double tcY){
   if (const auto geomlist = std::dynamic_pointer_cast<const GeometryList>(geom)) { // iterate
     for (const auto& item : geomlist->getChildren()) {
-      draw_geom(item.second, cr);
+      draw_geom(item.second, cr, tcX, tcY);
     }
   } else if (const auto poly = PolySetUtils::getGeometryAsPolySet(geom)) {
     draw_geom(poly, cr);
   } else if (const auto poly = std::dynamic_pointer_cast<const Polygon2d>(geom)) { // geometry that can be drawn.
-    draw_geom(*poly, cr);
+    draw_geom(*poly, cr, tcX, tcY);
   } else {
     assert(false && "Export as PDF for this geometry type is not supported");
   }
@@ -310,11 +313,10 @@ if (exportInfo.options==nullptr) {
 
   cairo_t *cr = cairo_create(surface);
   // Note Y axis + is DOWN.  Drawings have to invert Y, but these translations account for that.
-  cairo_translate(cr, tcX, tcY);  // Center page on geometry;
 
   cairo_set_source_rgba(cr, 0., 0., 0., 1.0); // Set black line, opaque
   cairo_set_line_width(cr, 1);  // 1 point width.
-  draw_geom(geom, cr);
+  draw_geom(geom, cr, tcX, tcY);
   cairo_stroke(cr);
     
     // Set Annotations
