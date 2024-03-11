@@ -2719,7 +2719,7 @@ bool MainWindow::canExport(unsigned int dim)
     }
   }
 
-  if (this->root_geom->getDimension() != dim) {
+  if (this->root_geom->getDimension() != dim && dim != 0) {
     LOG(message_group::UI_Error, "Current top level object is not a %1$dD object.", dim);
     clearCurrentOutput();
     return false;
@@ -2867,7 +2867,7 @@ settings.setValue("exportPdfOpts/showScaleMsg",exportPdfDialog->getShowScaleMsg(
 settings.setValue("exportPdfOpts/showGrid",exportPdfDialog->getShowGrid());
 settings.setValue("exportPdfOpts/gridSize",exportPdfDialog->getGridSize());
 
-actionExport(FileFormat::PDF, "PDF", ".pdf", 2, &exportPdfOptions);
+actionExport(FileFormat::PDF, "PDF", ".pdf", 0, &exportPdfOptions);
 
 }
 
