@@ -422,7 +422,8 @@ bool offset3D_pointInPolygon(const std::vector<Vector3d> &vert, const IndexedFac
 
 using Eigen::Vector4d;
 
-std::vector<IndexedFace> mergetriangles(const std::vector<IndexedFace> polygons,const std::vector<Vector4d> normals,std::vector<Vector4d> &newNormals, const std::vector<Vector3d> &vert) 
+Vector4d offset3D_normal(const std::vector<Vector3d> &vertices,const IndexedFace &pol);
+std::vector<IndexedFace> mergetriangles(const std::vector<IndexedFace> polygons,const std::vector<Vector4d> normals,std::vector<Vector4d> &newNormals, std::vector<int> &faceParents, const std::vector<Vector3d> &vert) 
 {
 	int i,j,k;
 	int n;
@@ -491,11 +492,28 @@ std::vector<IndexedFace> mergetriangles(const std::vector<IndexedFace> polygons,
 	// now merge the polygons in all buckets independly
 	std::vector<IndexedFace> indices;
 	newNormals.clear();
+	faceParents.clear();
 	for(int i=0;i<polygons_sorted.size();i++ ) {
 		indexedFaceList indices_sub = stl_tricombine(polygons_sorted[i]);
+		int off=indices.size();
 		for(int j=0;j<indices_sub.size();j++) {
 			indices.push_back(indices_sub[j]);
 			newNormals.push_back(norm_list[i]);
+			Vector4d loc_norm = offset3D_normal(vert,indices_sub[j]);
+			if(norm_list[i].head<3>().dot(loc_norm.head<3>()) > 0) 
+				faceParents.push_back(-1); 
+			else {
+				int par=-1;
+				for(int k=0;k< indices_sub.size();k++)
+				{
+					if(k == j) continue;
+					if(offset3D_pointInPolygon(vert, indices_sub[k],indices_sub[j][0])) {
+						par=k;
+					}
+				}
+				assert(par != -1);
+				faceParents.push_back(par+off);
+			}			
 		}
 	}
 
@@ -1531,7 +1549,8 @@ std::shared_ptr<const Geometry> offset3D_convex(const std::shared_ptr<const Poly
 
       printf("Merge Triangles %d %d\n",indicesNew.size(), faceNormal.size());
       std::vector<Vector4d> newNormals;
-      indicesNew  = mergetriangles(indicesNew,faceNormal,newNormals, ps->vertices );
+      std::vector<int> faceParents;
+      indicesNew  = mergetriangles(indicesNew,faceNormal,newNormals, faceParents, ps->vertices );
 
       printf("Remove Colinear Points\n");
       offset3D_RemoveColinear(ps->vertices, indicesNew,pointToFaceInds, pointToFacePos);
@@ -1571,7 +1590,8 @@ std::shared_ptr<const Geometry> offset3D_convex(const std::shared_ptr<const Poly
       normals = offset3D_normals(vertices, indices);
 
       printf("Merge OP\n");
-      indicesNew  = mergetriangles(indices,normals,newNormals, vertices ); 
+      std::vector<int> faceParents;
+      indicesNew  = mergetriangles(indices,normals,newNormals, faceParents, vertices ); 
       normals = newNormals;									   
       indices = indicesNew;									       
 

@@ -174,7 +174,8 @@ void draw_geom(const Polygon2d& poly, cairo_t *cr, double tcX, double tcY ){
 }
 
 
-void draw_geom(const std::shared_ptr<const PolySet> & ps, cairo_t *cr){
+void draw_geom(const std::shared_ptr<const PolySet> & ps, cairo_t *cr, double pdfX, double pdfY){
+  double factor=72.0/25.4;
   plotSettingsS plot_s;
   plot_s.lasche=10.0;
   plot_s.rand=5.0;
@@ -182,9 +183,12 @@ void draw_geom(const std::shared_ptr<const PolySet> & ps, cairo_t *cr){
   plot_s.bestend=0; // TODO besser
   if(strcmp(plot_s.paperformat, "A4") == 0) { plot_s.paperheight=298; plot_s.paperwidth=210; }
   else {plot_s.paperheight=420; plot_s.paperwidth=298;}
+//  printf("%g -> %g\n",plot_s.paperheight, pdfY);
+//  printf("%g -> %g\n",plot_s.paperwidth, pdfX);
+  plot_s.paperheight=pdfY / factor;
+  plot_s.paperwidth=pdfX / factor;
   std::vector<sheetS> sheets = fold_3d(ps, plot_s);
 
-  double factor=72.0/25.4;
   cairo_set_line_width(cr, 0.1);
   // TODO use pdf settings
 //  output << "/Times-Roman findfont " << plot_s.lasche*2 << " scalefont setfont 0.1 setlinewidth\n";
@@ -216,13 +220,13 @@ void draw_geom(const std::shared_ptr<const PolySet> & ps, cairo_t *cr){
   return;
 }
 // Main entry:  draw geometry that consists of 2D polygons.  Walks the tree...
-void draw_geom(const std::shared_ptr<const Geometry>& geom, cairo_t *cr, double tcX, double tcY){
+void draw_geom(const std::shared_ptr<const Geometry>& geom, cairo_t *cr, double pdfX,double pdfY, double tcX, double tcY){
   if (const auto geomlist = std::dynamic_pointer_cast<const GeometryList>(geom)) { // iterate
     for (const auto& item : geomlist->getChildren()) {
-      draw_geom(item.second, cr, tcX, tcY);
+      draw_geom(item.second, cr, pdfX, pdfY, tcX, tcY);
     }
   } else if (const auto poly = PolySetUtils::getGeometryAsPolySet(geom)) {
-    draw_geom(poly, cr);
+    draw_geom(poly, cr, pdfX, pdfY);
   } else if (const auto poly = std::dynamic_pointer_cast<const Polygon2d>(geom)) { // geometry that can be drawn.
     draw_geom(*poly, cr, tcX, tcY);
   } else {
@@ -316,7 +320,7 @@ if (exportInfo.options==nullptr) {
 
   cairo_set_source_rgba(cr, 0., 0., 0., 1.0); // Set black line, opaque
   cairo_set_line_width(cr, 1);  // 1 point width.
-  draw_geom(geom, cr, tcX, tcY);
+  draw_geom(geom, cr, pdfX, pdfY, tcX, tcY);
   cairo_stroke(cr);
     
     // Set Annotations
