@@ -15,7 +15,7 @@ typedef struct
 
 typedef struct
 {
-  double xofs, yofs;	
+  Vector2d min,max;
   std::vector<lineS> lines;	
   std::vector<labelS> label;
 } sheetS;

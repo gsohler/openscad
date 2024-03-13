@@ -53,18 +53,22 @@ void output_ps(std::ostream &output, std::vector<sheetS> &sheets, const plotSett
 
 //    printf("line size is %d\n",sheet.lines.size());	
     output << "0 0 0 setrgbcolor\n";
+    double xofs = (plot_s.paperwidth-sheet.max[0]+sheet.min[0])/2.0-sheet.min[0];
+    double yofs = (plot_s.paperheight-sheet.max[1]+sheet.min[1])/2.0-sheet.min[1];
+
     for(int i=0;i<sheet.lines.size();i++)
     {
+
       if(sheet.lines[i].dashed) output << "[2.5 2] 0 setdash\n";
       else output << "[3 0 ] 0 setdash\n";
       output << "newpath\n";
-      output << (sheet.xofs+sheet.lines[i].p1[0])*factor << " " << (sheet.yofs+sheet.lines[i].p1[1])*factor << " moveto\n";
-      output << (sheet.xofs+sheet.lines[i].p2[0])*factor << " " << (sheet.yofs+sheet.lines[i].p2[1])*factor << " lineto\n";
+      output << (xofs+sheet.lines[i].p1[0])*factor << " " << (yofs+sheet.lines[i].p1[1])*factor << " moveto\n";
+      output << (xofs+sheet.lines[i].p2[0])*factor << " " << (yofs+sheet.lines[i].p2[1])*factor << " lineto\n";
       output << "stroke\n";
     }
     for(int i=0;i<sheet.label.size();i++)
     {
-      output << (sheet.xofs+sheet.label[i].pt[0])*factor << " " << (sheet.yofs+sheet.label[i].pt[1])*factor << " moveto\n";
+      output << (xofs+sheet.label[i].pt[0])*factor << " " << (yofs+sheet.label[i].pt[1])*factor << " moveto\n";
       output << "gsave " << sheet.label[i].rot << " rotate ( " << sheet.label[i].text << " ) show grestore \n";
     }
     output << "10 10 moveto\n";
