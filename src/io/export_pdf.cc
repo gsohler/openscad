@@ -212,7 +212,7 @@ void draw_geom(const std::shared_ptr<const PolySet> & ps, cairo_t *cr, double pd
     }
     for(int i=0;i<sheet.label.size();i++)
     {
-       draw_text(sheet.label[i].text, cr,  (xofs+sheet.label[i].pt[0])*factor, (yofs+sheet.label[i].pt[1])*factor,plot_s.lasche, sheet.label[i].rot ); // TODO fix  rot
+       draw_text(sheet.label[i].text, cr,  (xofs+sheet.label[i].pt[0])*factor, (yofs+sheet.label[i].pt[1])*factor,sheet.label[i].size, sheet.label[i].rot ); // TODO fix  rot
     }
     char tmp[20];
     sprintf(tmp,"%s/%d","a.ps",pages+1);

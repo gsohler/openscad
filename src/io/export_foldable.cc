@@ -296,7 +296,7 @@ doubleList create_radExtent(sheetS &sheet)
       if(res[0] > ext) ext=res[0];
     }
     extent.push_back(ext);	  
-    printf("%g %g\n",i*30.0, ext);
+//    printf("%g %g\n",i*30.0, ext);
 
   }
   return extent;
@@ -307,19 +307,21 @@ std::vector<sheetS> sheets_combine(std::vector<sheetS> sheets, const plotSetting
   for(auto &sheet : sheets) {
       sheet_extent.push_back(create_radExtent(sheet));	    
   }
-
+  printf("sheets_combine\n");
   std::vector<sheetS> combined;
   std::vector<doubleList> combined_extent;	
   for(int i=0;i<sheets.size();i++) {
+    printf(".\n");	  
     bool success=false;
     // try to combine new with all existing sheets
     for(int j=0;!success && j<combined.size();j++) {
       for(int k=0;!success && k<12;k++) { // all 12 angles
         // calculate relative distplacement
-	double disp=sheet_extent[j][k] + sheet_extent[i][(k+6)%12]+5;				      
+	double disp=combined_extent[j][k] + sheet_extent[i][(k+6)%12]+5;				      
 	Vector2d dispv=Vector2d(disp*cos(k*M_PI/6.0), disp*sin(k*M_PI/6.0));
 	// create combined
-	sheetS Union=sheets[j];
+	sheetS Union=combined[j];
+	int orglen=Union.lines.size();
 	sheetS &ref = sheets[i];
 	for(int l=0;l<ref.lines.size();l++) {
           lineS newL=ref.lines[l];
@@ -335,12 +337,20 @@ std::vector<sheetS> sheets_combine(std::vector<sheetS> sheets, const plotSetting
 	doubleList Union_extent = create_radExtent(Union);
         if(plot_s.paperwidth-(Union.max[0]-Union.min[0]) < 2*plot_s.rand) continue;
         if(plot_s.paperheight-(Union.max[1]-Union.min[1]) < 2*plot_s.rand)continue;
-	printf("%d -> %d, ang %d would be good\n",i, j, k);
-	success=true;
-	// TODO collision check
-	if(success) {
-          combined[j]=Union;	
+	Vector2d res;
+	bool collision=false;
+	for(int l=0;!collision && l<orglen;l++) {
+          lineS &l1 = Union.lines[l];		
+          for(int m=orglen;!collision && m<Union.lines.size();m++) {
+            lineS l2 = Union.lines[m];		  
+            if(cut_line_line(l1.p1, l1.p2-l1.p1, l2.p1, l2.p2-l2.p1, res)) continue;	    
+              if(res[0] > 0 && res[0] < 1 && res[1] > 0 && res[1] < 1) collision=true;		  
+          }		  
 	}
+	if(collision == true) continue;
+	success=true;
+        combined[j]=Union;	
+	combined_extent[j]=create_radExtent(Union);	    
       }	      
     }
     if(!success) {
@@ -588,14 +598,17 @@ std::vector<sheetS> fold_3d(std::shared_ptr<const PolySet> ps, const plotSetting
               p1=(plate[i].pt[j]+ plate[i].pt[(j+1)%n])*0.5;
 
               py=plate[i].pt[(j+1)%n]-plate[i].pt[j]; // entlang der kante
+              double lasche_eff = plot_s.lasche;		    
+	      if(lasche_eff > py.norm()/2) lasche_eff=py.norm()/2;
               py.normalize();
               px=pointrecht(py);
 
-              p1=p1+px*plot_s.lasche*(0.5-0.27);
-              p1=p1+py*plot_s.lasche*-0.35;
+              p1=p1+px*lasche_eff*(0.5-0.27);
+              p1=p1+py*lasche_eff*-0.35;
               lnew.pt=p1;
               sprintf(lnew.text,"%d",num);
               lnew.rot=atan2(py[1],py[0])*180.0/3.1415;
+	      lnew.size = lasche_eff;
               sheet.label.push_back(lnew);
             } 
           }

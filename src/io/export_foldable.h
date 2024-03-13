@@ -10,6 +10,7 @@ typedef struct
 {
  Vector2d pt;
  double rot;
+ double size;
  char text[10];
 } labelS;
 
