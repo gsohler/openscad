@@ -307,6 +307,11 @@ std::vector<sheetS> sheets_combine(std::vector<sheetS> sheets, const plotSetting
   for(auto &sheet : sheets) {
       sheet_extent.push_back(create_radExtent(sheet));	    
   }
+ // const char *debugstr = getenv("DEBUG");
+ // int debug=0;
+ // if(debugstr != NULL) {
+	//  sscanf(debugstr,"%d",&debug);
+ // }
   printf("sheets_combine\n");
   std::vector<sheetS> combined;
   std::vector<doubleList> combined_extent;	
@@ -318,7 +323,7 @@ std::vector<sheetS> sheets_combine(std::vector<sheetS> sheets, const plotSetting
       for(int k=0;!success && k<12;k++) { // all 12 angles
         // calculate relative distplacement
 	double disp=combined_extent[j][k] + sheet_extent[i][(k+6)%12]+5;				      
-	Vector2d dispv=Vector2d(disp*cos(k*M_PI/6.0), disp*sin(k*M_PI/6.0));
+	Vector2d dispv=Vector2d(disp*cos(k*M_PI/6.0), disp*sin(k*M_PI/6.0))+(combined[j].min+combined[j].max)/2.0-(sheets[i].min+sheets[i].max)/2.0; // +srcmid -dstmid
 	// create combined
 	sheetS Union=combined[j];
 	int orglen=Union.lines.size();
