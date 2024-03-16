@@ -66,9 +66,9 @@ int point_in_polygon(const std::vector<Vector2d> &pol, const Vector2d &pt)
   }
   return cuts&1;
 }
-int edge_outwards(std::vector<connS> &con, int plate, int face) {
+int edge_outwards(std::vector<connS> &con, unsigned int plate, unsigned int face) {
   int outwards=0;
-  for(int k=0;k<con.size();k++)	{
+  for(unsigned int k=0;k<con.size();k++)	{
   if(con[k].p2 == plate && con[k].f2 == face) outwards=1;		
   }
   return outwards;
@@ -91,7 +91,7 @@ void calc_platepoints(plateS &plate, IndexedFace &face, const std::vector<Vector
   for(int i=0;i<n;i++) {
   	  
     py=plate.pt[(i+1)%n]-plate.pt[i];
-    double maxl=py.norm();
+//    double maxl=py.norm();
     double lasche_eff=plot_s.lasche;
     if(lasche_eff > py.norm()/2.0) lasche_eff=py.norm()/2.0;
     py.normalize();
@@ -103,14 +103,14 @@ void calc_platepoints(plateS &plate, IndexedFace &face, const std::vector<Vector
   }
 }
 
-int plot_try(int refplate, int destplate,Vector2d px,Vector2d py,Vector2d pm,std::vector<plateS> &plate,std::vector<connS> &con, std::vector<Vector3d> vertices, std::vector<IndexedFace> faces, std::vector<int> &faceParent, sheetS &sheet,int destedge, plotSettingsS plot_s)
+int plot_try(unsigned int refplate,unsigned  int destplate,Vector2d px,Vector2d py,Vector2d pm,std::vector<plateS> &plate,std::vector<connS> &con, std::vector<Vector3d> vertices, std::vector<IndexedFace> faces, std::vector<int> &faceParent, sheetS &sheet,unsigned int destedge, plotSettingsS plot_s)
 {
-  int i;
+  unsigned int i;
   Vector2d p1;
   int success=1;
-  int n=faces[destplate].size();
+  unsigned int n=faces[destplate].size();
   Vector3d totalnorm(0,0,0);
-  for(int i=0;i<n;i++) {
+  for(unsigned int i=0;i<n;i++) {
     int i0=faces[destplate][(i+n-1)%n];
     int i1=faces[destplate][(i+0)%n];
     int i2=faces[destplate][(i+1)%n];
@@ -136,13 +136,13 @@ int plot_try(int refplate, int destplate,Vector2d px,Vector2d py,Vector2d pm,std
   Matrix4d invmat = mat.inverse();	  
 
   calc_platepoints(plate[destplate], faces[destplate], vertices, invmat, pm, px, py, plot_s);
-  for(int j=0;j<faceParent.size();j++){
-    if(faceParent[j] == destplate) calc_platepoints(plate[j], faces[j], vertices, invmat, pm, px, py, plot_s);
+  for(unsigned int j=0;j<faceParent.size();j++){
+    if(faceParent[j] == (int) destplate) calc_platepoints(plate[j], faces[j], vertices, invmat, pm, px, py, plot_s);
   }
 
   // create complete view of bnd
   plate[destplate].bnd.clear();
-  for(int i=0;i<n;i++) {
+  for(unsigned int i=0;i<n;i++) {
     plate[destplate].bnd.push_back(plate[destplate].pt[i]);
     if(edge_outwards(con, destplate, i)) {
       plate[destplate].bnd.push_back(plate[destplate].pt_l1[i]);
@@ -152,10 +152,10 @@ int plot_try(int refplate, int destplate,Vector2d px,Vector2d py,Vector2d pm,std
   //
   // check if new points collide with some existing boundaries
 
-  for(int j=0;j<plate.size();j++) { // kollision mit anderen platten
+  for(unsigned int j=0;j<plate.size();j++) { // kollision mit anderen platten
     if(j == destplate) continue; // nicht mit sich selbst
     if(plate[j].done != 1) continue; // und nicht wenn sie nicht existiert
-    for(int i=0;i<n;i++) { 
+    for(unsigned int i=0;i<n;i++) { 
       if(point_in_polygon(plate[j].bnd,plate[destplate].pt[i])) success=0; // alle neue punkte
       if(j == refplate && i == destedge) {} // joker
       else
@@ -163,28 +163,26 @@ int plot_try(int refplate, int destplate,Vector2d px,Vector2d py,Vector2d pm,std
 	// jede neue lasche wenn sie auswaerts geht
 	// plate destplate, pt i
 //        if(edge_outwards(con, destplate, i) ) {
-        if(point_in_polygon(plate[j].pt,plate[destplate].pt_l1[i])) success=0; // alle neue laschen
-        if(point_in_polygon(plate[j].pt,plate[destplate].pt_l2[i])) success=0;
+        //if(point_in_polygon(plate[j].pt,plate[destplate].pt_l1[i])) success=0; // alle neue laschen
+        //if(point_in_polygon(plate[j].pt,plate[destplate].pt_l2[i])) success=0;
 //	}  
       }  
     }
   }
   //
-  // check if any existing  points collide new boudnary
-  for(int j=0;j<plate.size();j++) { // kollision mit anderen platten
+  // check of any old points collide with  the new boundary
+  for(unsigned int j=0;j<plate.size();j++) { // kollision mit anderen platten
     if(j == destplate) continue; // nicht mit sich selbst
     if(plate[j].done != 1) continue; // und nicht wenn sie nicht existiert
-    int n=plate[j].pt.size();
-    for(int i=0;i<n;i++) {
-      if(point_in_polygon(plate[destplate].pt,plate[j].pt[i])) {
-//        success=0; TODO activate
-//	if(success) {
-//rintf("playe %d pt %d hit		
-//	}
+    unsigned int n=plate[j].pt.size();
+    for(unsigned int i=0;i<n;i++) {
+      if(j == refplate) continue;
+      for(unsigned int i=0;i<plate[j].pt.size();i++) {
+        if(point_in_polygon(plate[destplate].pt,plate[j].pt[i]))  success=0;
       }
     }
   }
-
+// TODO page3 und 4 auch zusammen fassen
   for(i=0;i<n;i++) {
     lineS line;
     line.p1=plate[destplate].pt[i]; 
@@ -192,8 +190,8 @@ int plot_try(int refplate, int destplate,Vector2d px,Vector2d py,Vector2d pm,std
     line.dashed=0;
     sheet.lines.push_back(line);
   }
-  for(int j=0;j<faceParent.size();j++){
-    if(faceParent[j] == destplate) {
+  for(unsigned int j=0;j<faceParent.size();j++){
+    if(faceParent[j] == (int) destplate) {
       int n1=plate[j].pt.size();	    
       lineS line;
       for(int i=0;i<n1;i++) {
@@ -271,7 +269,7 @@ doubleList create_radExtent(sheetS &sheet)
   int i;
   doubleList extent;
 
-  for(i=0;i<sheet.lines.size();i++)
+  for(unsigned i=0;i<sheet.lines.size();i++)
   {
     for(int j=0;j<2;j++) {
       if(i == 0 || sheet.lines[i].p1[j] < sheet.min[j]) sheet.min[j]=sheet.lines[i].p1[j];
@@ -284,11 +282,11 @@ doubleList create_radExtent(sheetS &sheet)
   Vector2d mid=Vector2d( (sheet.min[0]+sheet.max[0])/2.0, (sheet.min[1]+sheet.max[1])/2.0);
   Vector2d res;
   for(i=0;i<12;i++) {
-    double ang=i*M_PI/6.0;	  
+    double ang=i*G_PI/6.0;	  
     Vector2d dir(+cos(ang),sin(ang));		    
     // find farthest cutpoint in this direction
     double ext=0;
-    for(int j=0;j<sheet.lines.size();j++)
+    for(unsigned int j=0;j<sheet.lines.size();j++)
     {
       if(cut_line_line(mid, dir, sheet.lines[j].p1, sheet.lines[j].p2-sheet.lines[j].p1, res)) continue;	    
       if(res[1] < 0 || res[1] > 1) continue; // no hit		     
@@ -307,34 +305,34 @@ std::vector<sheetS> sheets_combine(std::vector<sheetS> sheets, const plotSetting
   for(auto &sheet : sheets) {
       sheet_extent.push_back(create_radExtent(sheet));	    
   }
- // const char *debugstr = getenv("DEBUG");
- // int debug=0;
- // if(debugstr != NULL) {
-	//  sscanf(debugstr,"%d",&debug);
- // }
-  printf("sheets_combine\n");
+//  const char *debugstr = getenv("DEBUG"); // TODO geht mit DEBUGX anders ?
+//  int debug=0;
+//  if(debugstr != NULL) {
+//	  sscanf(debugstr,"%d",&debug);
+//  }
+  printf("sheets_combine src sheets is %ld\n",sheets.size());
   std::vector<sheetS> combined;
   std::vector<doubleList> combined_extent;	
-  for(int i=0;i<sheets.size();i++) {
+  for(unsigned int i=0;i<sheets.size();i++) {
     printf(".\n");	  
     bool success=false;
     // try to combine new with all existing sheets
-    for(int j=0;!success && j<combined.size();j++) {
+    for(unsigned int j=0;!success && j<combined.size();j++) {
       for(int k=0;!success && k<12;k++) { // all 12 angles
         // calculate relative distplacement
 	double disp=combined_extent[j][k] + sheet_extent[i][(k+6)%12]+5;				      
-	Vector2d dispv=Vector2d(disp*cos(k*M_PI/6.0), disp*sin(k*M_PI/6.0))+(combined[j].min+combined[j].max)/2.0-(sheets[i].min+sheets[i].max)/2.0; // +srcmid -dstmid
+	Vector2d dispv=Vector2d(disp*cos(k*G_PI/6.0), disp*sin(k*G_PI/6.0))+(combined[j].min+combined[j].max)/2.0-(sheets[i].min+sheets[i].max)/2.0;
 	// create combined
 	sheetS Union=combined[j];
 	int orglen=Union.lines.size();
 	sheetS &ref = sheets[i];
-	for(int l=0;l<ref.lines.size();l++) {
+	for(unsigned int l=0;l<ref.lines.size();l++) {
           lineS newL=ref.lines[l];
           newL.p1 += dispv;
           newL.p2 += dispv;
 	  Union.lines.push_back(newL);
 	} 
-	for(int l=0;l<ref.label.size();l++) {
+	for(unsigned int l=0;l<ref.label.size();l++) {
           labelS newL=ref.label[l];
           newL.pt += dispv;
 	  Union.label.push_back(newL);
@@ -346,7 +344,7 @@ std::vector<sheetS> sheets_combine(std::vector<sheetS> sheets, const plotSetting
 	bool collision=false;
 	for(int l=0;!collision && l<orglen;l++) {
           lineS &l1 = Union.lines[l];		
-          for(int m=orglen;!collision && m<Union.lines.size();m++) {
+          for(unsigned int m=orglen;!collision && m<Union.lines.size();m++) {
             lineS l2 = Union.lines[m];		  
             if(cut_line_line(l1.p1, l1.p2-l1.p1, l2.p1, l2.p2-l2.p1, res)) continue;	    
               if(res[0] > 0 && res[0] < 1 && res[1] > 0 && res[1] < 1) collision=true;		  
@@ -356,11 +354,13 @@ std::vector<sheetS> sheets_combine(std::vector<sheetS> sheets, const plotSetting
 	success=true;
         combined[j]=Union;	
 	combined_extent[j]=create_radExtent(Union);	    
+	printf("%d fits next to %d with angle %d\n",i,j,k*30);
       }	      
     }
     if(!success) {
       combined.push_back(sheets[i]);	  
       combined_extent.push_back(sheet_extent[i]);
+      printf("new page %ld for %d\n",combined.size(),i);
     }
   }
   return combined;	
@@ -368,6 +368,15 @@ std::vector<sheetS> sheets_combine(std::vector<sheetS> sheets, const plotSetting
 
 extern Vector4d offset3D_normal(const std::vector<Vector3d> &vertices, const IndexedFace &pol); // TODO move function
 
+void debug_conn(std::vector<connS> &con,std::vector<IndexedFace> &faces, const std::vector<Vector3d> &vertices) {
+  for(unsigned int i=0;i<con.size();i++)
+  {
+    auto &a = con[i];
+    int n=faces[a.p1].size();		  
+    double da= (vertices[faces[a.p1][a.f1]] - vertices[faces[a.p1][(a.f1+1)%n]]).norm();
+    printf("Con %d:done=%d length=%g  %d:%d ->%d:%d \n",i,con[i].done, da, con[i].p1, con[i].f1, con[i].p2, con[i].f2);
+  }
+}
 std::vector<sheetS> fold_3d(std::shared_ptr<const PolySet> ps, const plotSettingsS &plot_s)
 {
   	
@@ -375,8 +384,9 @@ std::vector<sheetS> fold_3d(std::shared_ptr<const PolySet> ps, const plotSetting
   std::vector<Vector4d> newNormals;
   std::vector<int> faceParents;
   std::vector<IndexedFace> faces = mergetriangles(ps->indices, normals,newNormals, faceParents, ps->vertices);
-  int i,j,k, glue,num,cont,success,drawn,other;
-  int polsdone=0,polstodo;
+  unsigned int i,j,k;
+  int  glue,num,cont,success,drawn,other;
+  int facesdone=0,facestodo;
 //  for(int i=0;i<faces.size();i++)
 //  {
 //	printf("%d %g/%g/%g/%g par=%d\n",i, newNormals[i][0], newNormals[i][1], newNormals[i][2], newNormals[i][3], faceParents[i]);
@@ -385,28 +395,29 @@ std::vector<sheetS> fold_3d(std::shared_ptr<const PolySet> ps, const plotSetting
   //
   // create edge database
   
-  EdgeDbStub stub;                                                    
+//  EdgeDbStub stub;                                                    
 //  std::unordered_map<EdgeDbStub, int, boost::hash<EdgeDbStub> > edge_db;  
   //std::unordered_map<EdgeDbStub, int> edge_db;  
   //
 
-  for(i=0;i<faces.size();i++)
+  for(unsigned i=0;i<faces.size();i++)
   {
     IndexedFace &face=faces[i];
-    int n=face.size();
+    unsigned int n=face.size();
     for(j=0;j<n;j++){
-      stub.ind1=face[j];
-      stub.ind2=face[(j+1)%n];
+//      stub.ind1=face[j];
+//      stub.ind2=face[(j+1)%n];
 //      edge_db[stub]=i;
     }
   }
   std::vector<connS> con;
   connS cx;
+  cx.done=0;
 
-  for(i=0;i<faces.size();i++)
+  for(unsigned i=0;i<faces.size();i++)
   {
     IndexedFace &face=faces[i];
-    int n=face.size();
+    unsigned int n=face.size();
     for(j=0;j<n;j++){
       int i1=face[j];
       int i2=face[(j+1)%n];
@@ -415,7 +426,7 @@ std::vector<sheetS> fold_3d(std::shared_ptr<const PolySet> ps, const plotSetting
       // TODO stupid workaround
       int oppface=-1;
       int opppos;
-      for(int k=0;oppface == -1 && k<faces.size();k++)
+      for(unsigned int k=0;oppface == -1 && k<faces.size();k++)
       {
         IndexedFace &face1=faces[k];
         int n1=face1.size();
@@ -449,31 +460,33 @@ std::vector<sheetS> fold_3d(std::shared_ptr<const PolySet> ps, const plotSetting
 
   Vector2d px,py,p1,p2,pm;
   std::vector<plateS> plate; // faces in final placement
-  int polybesttouch;
+//  int polybesttouch;
 
 /*
 
   bestend=reorder_edges(eder);
 */ 
 
-  polstodo=faces.size();
+  facestodo=faces.size();
 
   plateS newplate;
   newplate.done=0;
 
-  for(i=0;i<faces.size();i++)
-  {
-    plate.push_back(newplate);
-  }
-  for(i=0;i<con.size();i++) con[i].done=0;	 
+  for(i=0;i<faces.size();i++) plate.push_back(newplate);
+
+//  const char *debugstr = getenv("DEBUG");
+//  int debug=0;
+//  if(debugstr != NULL) {
+//	  sscanf(debugstr,"%d",&debug);
+//  }
 
   std::vector<sheetS> sheets;
   int pagenum=0;
-  while(polsdone < polstodo)
+  while(facesdone < facestodo)
   {
-//    printf("one round\n");	 
+//    printf("Restart facesdone=%d\n",facesdone);
     // ein blatt designen
-    polybesttouch=0;
+//    polybesttouch=0;
     cont=1;
     sheetS sheet, sheetorg;
     while(cont == 1)
@@ -482,7 +495,7 @@ std::vector<sheetS> fold_3d(std::shared_ptr<const PolySet> ps, const plotSetting
       drawn=0;
       if(sheet.lines.size()  ==  0)
       {
-        for(i=0;i<faces.size()  && drawn == 0;i++)
+        for(unsigned i=0;i<faces.size()  && drawn == 0;i++)
         {
           if(plate[i].done == 0  && faceParents[i] == -1)
           {
@@ -497,8 +510,13 @@ std::vector<sheetS> fold_3d(std::shared_ptr<const PolySet> ps, const plotSetting
 	    {
 //              printf("Successfully placed plate %d px=%g/%g, py=%g/%g\n",i,px[0], px[1], py[0], py[1]);		    
               plate[i].done=1;
-	      for(int j=0;j<faceParents.size();j++)
-                if(faceParents[j] == i) plate[j].done=1;
+              facesdone++;  
+	      for(unsigned int j=0;j<faceParents.size();j++) {
+                if(faceParents[j] == (int) i) {
+                  plate[j].done=1;
+                  facesdone++;  
+		}  
+	      }
 	      cont=1; 
 	      drawn=1;
 	    }  
@@ -546,8 +564,13 @@ std::vector<sheetS> fold_3d(std::shared_ptr<const PolySet> ps, const plotSetting
             {
 //              printf("Successfully placed plate %d px=%g/%g, py=%g/%g\n",p2,px[0], px[1], py[0], py[1]);		    
               plate[p2].done=1;
-	      for(int j=0;j<faceParents.size();j++)
-                if(faceParents[j] == p2) plate[j].done=1;		      
+              facesdone++;  
+	      for(unsigned int j=0;j<faceParents.size();j++) {
+                if(faceParents[j] == p2) {
+		  plate[j].done=1;		      
+                  facesdone++;  
+		}
+	      }	
 	      drawn=1;
               con[i].done=1;
               cont=1;
@@ -566,14 +589,14 @@ std::vector<sheetS> fold_3d(std::shared_ptr<const PolySet> ps, const plotSetting
     if(sheet.lines.size() == 0)
     {
       printf("Was not able to fit something onto the page!\n");
-      exit(1);
+      return sheets;
     }
     labelS lnew;
     for(i=0;i<plate.size();i++)  // plates
     {
       if(plate[i].done == 1)
       {
-        int n=plate[i].pt.size();	      
+        unsigned int n=plate[i].pt.size();	      
 	Vector2d mean(0,0);
         for(j=0;j<n;j++) // pts
         {
@@ -635,12 +658,11 @@ std::vector<sheetS> fold_3d(std::shared_ptr<const PolySet> ps, const plotSetting
       if(plate[i].done == 1)
       {
         plate[i].done =2;
-        polsdone++;  
       }
     }
-    for(int i=0;i<sheet.lines.size()-1;i++) {
+    for(unsigned int i=0;i<sheet.lines.size()-1;i++) {
       auto &line1 = sheet.lines[i];	     
-      for(int j=i+1;j<sheet.lines.size();j++) {
+      for(unsigned int j=i+1;j<sheet.lines.size();j++) {
         auto &line2 = sheet.lines[j];
         if((line1.p1 - line2.p2).norm() < 1e-3 && (line1.p2 - line2.p1).norm() < 1e-3 ) {
           line1.dashed=1;

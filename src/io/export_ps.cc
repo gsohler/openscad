@@ -56,7 +56,7 @@ void output_ps(std::ostream &output, std::vector<sheetS> &sheets, const plotSett
     double xofs = (plot_s.paperwidth-sheet.max[0]+sheet.min[0])/2.0-sheet.min[0];
     double yofs = (plot_s.paperheight-sheet.max[1]+sheet.min[1])/2.0-sheet.min[1];
 
-    for(int i=0;i<sheet.lines.size();i++)
+    for(unsigned int i=0;i<sheet.lines.size();i++)
     {
 
       if(sheet.lines[i].dashed) output << "[2.5 2] 0 setdash\n";
@@ -66,7 +66,7 @@ void output_ps(std::ostream &output, std::vector<sheetS> &sheets, const plotSett
       output << (xofs+sheet.lines[i].p2[0])*factor << " " << (yofs+sheet.lines[i].p2[1])*factor << " lineto\n";
       output << "stroke\n";
     }
-    for(int i=0;i<sheet.label.size();i++)
+    for(unsigned int i=0;i<sheet.label.size();i++)
     {
       output << (xofs+sheet.label[i].pt[0])*factor << " " << (yofs+sheet.label[i].pt[1])*factor << " moveto\n";
       output << "gsave " << sheet.label[i].rot << " rotate ( " << sheet.label[i].text << " ) show grestore \n";

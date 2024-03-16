@@ -41,7 +41,7 @@ typedef struct
 
 typedef struct
 {
-  int p1, f1, p2, f2;		
+  unsigned int p1, f1, p2, f2;		
   int done;
 } connS;
 

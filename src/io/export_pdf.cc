@@ -33,7 +33,7 @@ void draw_text(const char *text, cairo_t *cr, double x, double y, double fontSiz
   cairo_set_font_size(cr, fontSize);
   cairo_move_to(cr, x, y);
   cairo_save(cr);
-  cairo_rotate(cr, angle*M_PI/180.0);
+  cairo_rotate(cr, angle*G_PI/180.0);
   cairo_show_text(cr, text);
   cairo_restore(cr);
 
