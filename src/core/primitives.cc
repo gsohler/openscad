@@ -112,7 +112,7 @@ std::unique_ptr<const Geometry> CubeNode::createGeometry() const
     || this->y <= 0 || !std::isfinite(this->y)
     || this->z <= 0 || !std::isfinite(this->z)
     ) {
-    return std::make_unique<PolySet>(3, true);
+    return PolySet::createEmpty();
   }
 
   double x1, x2, y1, y2, z1, z2;
@@ -130,7 +130,7 @@ std::unique_ptr<const Geometry> CubeNode::createGeometry() const
     z2 = this->z;
   }
   int dimension = 3;
-  auto ps = std::make_unique<PolySet>(3, true);
+  auto ps = std::make_unique<PolySet>(3, /*convex*/true);
   for (int i = 0; i < 8; i++) {
     ps->vertices.emplace_back(i & 1 ? x2 : x1, i & 2 ? y2 : y1,
                               i & 4 ? z2 : z1);
@@ -190,7 +190,7 @@ static std::shared_ptr<AbstractNode> builtin_cube(const ModuleInstantiation *ins
 std::unique_ptr<const Geometry> SphereNode::createGeometry() const
 {
   if (this->r <= 0 || !std::isfinite(this->r)) {
-    return std::make_unique<PolySet>(3, true);
+    return PolySet::createEmpty();
   }
 
   auto num_fragments = Calc::get_fragments_from_r(r, fn, fs, fa);
@@ -200,7 +200,7 @@ std::unique_ptr<const Geometry> SphereNode::createGeometry() const
   //  if (num_rings % 2 == 0) num_rings++; // To ensure that the middle ring is at
   //  phi == 0 degrees
 
-  auto polyset = std::make_unique<PolySet>(3, true);
+  auto polyset = std::make_unique<PolySet>(3, /*convex*/true);
   polyset->vertices.reserve(num_rings * num_fragments);
 
   // double offset = 0.5 * ((fragments / 2) % 2);
@@ -274,7 +274,7 @@ std::unique_ptr<const Geometry> CylinderNode::createGeometry() const
     || this->r2 < 0 || !std::isfinite(this->r2)
     || (this->r1 <= 0 && this->r2 <= 0)
     ) {
-    return std::make_unique<PolySet>(3, true);
+    return PolySet::createEmpty();
   }
 
   auto num_fragments = Calc::get_fragments_from_r(std::fmax(this->r1, this->r2), this->fn, this->fs, this->fa);
@@ -288,7 +288,7 @@ std::unique_ptr<const Geometry> CylinderNode::createGeometry() const
     z2 = this->h;
   }
 
-  auto polyset = std::make_unique<PolySet>(3, true);
+  auto polyset = std::make_unique<PolySet>(3, /*convex*/true);
   polyset->vertices.reserve(2 * num_fragments);
 
   generate_circle(std::back_inserter(polyset->vertices), r1, z1, num_fragments);
@@ -420,11 +420,12 @@ std::string PolyhedronNode::toString() const
 
 std::unique_ptr<const Geometry> PolyhedronNode::createGeometry() const
 {
-  auto p = std::make_unique<PolySet>(3);
+  auto p = PolySet::createEmpty();
   p->setConvexity(this->convexity);
   p->vertices=this->points;
   p->indices=this->faces;
-  for (auto &poly : p->indices)
+  bool is_triangular = true;
+  for (auto &poly : p->indices) {
     std::reverse(poly.begin(),poly.end());
 
   Material matcolor;
@@ -432,7 +433,11 @@ std::unique_ptr<const Geometry> PolyhedronNode::createGeometry() const
   matcolor.color = ColorMap::getColor(cs, RenderColor::OPENCSG_FACE_FRONT_COLOR);
   p->mat.push_back(matcolor);
   for(int i=0;i<p->indices.size();i++) p->matind.push_back(0);
-
+    if (is_triangular && poly.size() > 3) {
+      is_triangular = false;
+    }
+  }
+  p->setTriangular(is_triangular);
   return p;
 }
 
@@ -497,6 +502,7 @@ static std::shared_ptr<AbstractNode> builtin_polyhedron(const ModuleInstantiatio
         }
         pointIndexIndex++;
       }
+      // FIXME: Print an error message if < 3 vertices are specified
       if (face.size() >= 3) {
         node->faces.push_back(std::move(face));
       }

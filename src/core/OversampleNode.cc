@@ -67,7 +67,7 @@ void ov_add_poly_round(PolySetBuilder &builder, std::unordered_map<Vector3d, Vec
       weldMap[p]=(weldMap[p]+pnew)/2.0;
     }      
   }
-  builder.appendVertex(builder.vertexIndex(Vector3d(p[0],p[1],p[2])));
+  builder.addVertex(builder.vertexIndex(Vector3d(p[0],p[1],p[2])));
 }
 
 std::unique_ptr<const Geometry> OversampleNode::createGeometry() const
@@ -177,14 +177,14 @@ std::unique_ptr<const Geometry> OversampleNode::createGeometry() const
         if(k != 0) {
           toplast=topcur;
           topcur=topcur+p21;	
-          builder_ov.appendPoly(3);
+          builder_ov.beginPolygon(3);
           ov_add_poly_round(builder_ov, weldMap, botcur,center, r, round1, 0 );
           ov_add_poly_round(builder_ov, weldMap, topcur,center, r, round1 , 0);
           ov_add_poly_round(builder_ov, weldMap, toplast,center, r, round1 , 0);
 	}
 	botlast=botcur;
 	botcur=botlast+p21;
-        builder_ov.appendPoly(3);
+        builder_ov.beginPolygon(3);
         ov_add_poly_round(builder_ov, weldMap, botlast,center, r, round1, j == 0 && k == 0 );
         ov_add_poly_round(builder_ov, weldMap, botcur,center, r, round1, j == 0 && k == this->n-1 );
         ov_add_poly_round(builder_ov, weldMap, topcur,center, r, round1, j == this->n-1 );

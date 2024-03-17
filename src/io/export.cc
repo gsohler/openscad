@@ -57,6 +57,8 @@ return format == FileFormat::ASCIISTL ||
   format == FileFormat::AMF ||
   format == FileFormat::_3MF ||
   format == FileFormat::NEFDBG ||
+  format == FileFormat::PDF ||
+  format == FileFormat::PS ||
   format == FileFormat::NEF3;
 }
 
@@ -105,6 +107,9 @@ void exportFile(const std::shared_ptr<const Geometry>& root_geom, std::ostream& 
     break;
   case FileFormat::NEF3:
     export_nef3(root_geom, output);
+    break;
+  case FileFormat::PS:
+    export_ps(root_geom, output);
     break;
 #endif
   default:
@@ -195,7 +200,9 @@ struct LexographicLess {
 
 std::unique_ptr<PolySet> createSortedPolySet(const PolySet& ps)
 {
-  auto out = std::make_unique<PolySet>(3);
+  auto out = std::make_unique<PolySet>(ps.getDimension(), ps.convexValue());
+  out->setTriangular(ps.isTriangular());
+  out->setConvexity(ps.getConvexity());
 
   std::map<Vector3d, int, LexographicLess> vertexMap;
 

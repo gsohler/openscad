@@ -903,6 +903,8 @@ set(CORE_SOURCES
   src/io/export_obj.cc
   src/io/export_off.cc
   src/io/export_wrl.cc
+  src/io/export_ps.cc
+  src/io/export_foldable.cc
   src/io/export_pdf.cc
   src/io/export_stl.cc
   src/io/export_svg.cc

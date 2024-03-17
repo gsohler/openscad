@@ -17,7 +17,7 @@ public:
   VISITABLE_GEOMETRY();
 
   ManifoldGeometry();
-  ManifoldGeometry(const std::shared_ptr<manifold::Manifold>& object);
+  ManifoldGeometry(const std::shared_ptr<const manifold::Manifold>& object);
   ManifoldGeometry(const ManifoldGeometry& other) = default;
   ManifoldGeometry& operator=(const ManifoldGeometry& other);
 
@@ -39,15 +39,6 @@ public:
 
   template <class Polyhedron>
   [[nodiscard]] std::shared_ptr<Polyhedron> toPolyhedron() const;
-
-  /*! In-place union. */
-  void operator+=(ManifoldGeometry& other);
-  /*! In-place intersection. */
-  void operator*=(ManifoldGeometry& other);
-  /*! In-place difference. */
-  void operator-=(ManifoldGeometry& other);
-  /*! In-place minkowksi operation. */
-  void minkowski(ManifoldGeometry& other);
 
   /*! union. */
   ManifoldGeometry operator+(const ManifoldGeometry& other) const;

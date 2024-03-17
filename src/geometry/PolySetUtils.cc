@@ -56,10 +56,10 @@ std::unique_ptr<PolySet> tessellate_faces(const PolySet& polyset)
   int degeneratePolygons = 0;
   auto result = std::make_unique<PolySet>(3, polyset.convexValue());
   result->setConvexity(polyset.getConvexity());
-  result->isTriangular = true;
+  result->setTriangular(true);
   // ideally this should not require a copy...
-    result->mat=polyset.mat;
-  if (polyset.isTriangular) {
+  result->mat=polyset.mat;
+  if (polyset.isTriangular()) {
     result->vertices = polyset.vertices;
     result->indices = polyset.indices;
     result->matind=polyset.matind;	    
@@ -176,7 +176,7 @@ std::shared_ptr<const PolySet> getGeometryAsPolySet(const std::shared_ptr<const 
       }
       LOG(message_group::Error, "Nef->PolySet failed.");
     }
-    return std::make_unique<PolySet>(3);
+    return PolySet::createEmpty();
   }
   if (auto hybrid = std::dynamic_pointer_cast<const CGALHybridPolyhedron>(geom)) {
     return hybrid->toPolySet();

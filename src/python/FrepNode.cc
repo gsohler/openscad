@@ -60,6 +60,11 @@ using namespace libfive;
 std::unique_ptr<const Geometry> FrepNode::createGeometry() const
 {
 	PolySetBuilder builder(0,0,3,true);
+#ifdef LIBFIVE_IS_SHARED	
+	std::shared_ptr<Mesh> mesh=NULL;
+#else	
+	std::unique_ptr<Mesh> mesh=NULL;
+#endif	
 	libfive::Region<3> reg(
 			{this->x1, this->y1, this->z1}, 
 			{this->x2, this->y2, this->z2});
@@ -75,54 +80,54 @@ std::unique_ptr<const Geometry> FrepNode::createGeometry() const
 		std::vector<Tree *> tree = PyLibFiveObjectToTree(exp);
 		// TODO fidget rein
 #ifdef FAKE
-	builder.appendPoly(3);
-	builder.appendVertex(Vector3d(-0.500000, -0.500000, -0.500000));
-	builder.appendVertex(Vector3d(-0.500000, -0.500000, 3.500000));
-	builder.appendVertex(Vector3d(-0.500000, 3.500000, 3.500000));
-	builder.appendPoly(3);
-	builder.appendVertex(Vector3d(-0.500000, -0.500000, -0.500000));
-	builder.appendVertex(Vector3d(-0.500000, 3.500000, 3.500000));
-	builder.appendVertex(Vector3d(-0.500000, 3.500000, -0.500000));
-	builder.appendPoly(3);
-	builder.appendVertex(Vector3d(3.500000, -0.500000, -0.500000));
-	builder.appendVertex(Vector3d(3.500000, 3.500000, -0.500000));
-	builder.appendVertex(Vector3d(3.500000, 3.500000, 3.500000));
-	builder.appendPoly(3);
-	builder.appendVertex(Vector3d(3.500000, -0.500000, -0.500000));
-	builder.appendVertex(Vector3d(3.500000, 3.500000, 3.500000));
-	builder.appendVertex(Vector3d(3.500000, -0.500000, 3.500000));
-	builder.appendPoly(3);
-	builder.appendVertex(Vector3d(-0.500000, -0.500000, -0.500000));
-	builder.appendVertex(Vector3d(3.500000, -0.500000, -0.500000));
-	builder.appendVertex(Vector3d(3.500000, -0.500000, 3.500000));
-	builder.appendPoly(3);
-	builder.appendVertex(Vector3d(-0.500000, -0.500000, -0.500000));
-	builder.appendVertex(Vector3d(3.500000, -0.500000, 3.500000));
-	builder.appendVertex(Vector3d(-0.500000, -0.500000, 3.500000));
-	builder.appendPoly(3);
-	builder.appendVertex(Vector3d(-0.500000, 3.500000, -0.500000));
-	builder.appendVertex(Vector3d(-0.500000, 3.500000, 3.500000));
-	builder.appendVertex(Vector3d(3.500000, 3.500000, 3.500000));
-	builder.appendPoly(3);
-	builder.appendVertex(Vector3d(-0.500000, 3.500000, -0.500000));
-	builder.appendVertex(Vector3d(3.500000, 3.500000, 3.500000));
-	builder.appendVertex(Vector3d(3.500000, 3.500000, -0.500000));
-	builder.appendPoly(3);
-	builder.appendVertex(Vector3d(-0.500000, -0.500000, -0.500000));
-	builder.appendVertex(Vector3d(-0.500000, 3.500000, -0.500000));
-	builder.appendVertex(Vector3d(3.500000, 3.500000, -0.500000));
-	builder.appendPoly(3);
-	builder.appendVertex(Vector3d(-0.500000, -0.500000, -0.500000));
-	builder.appendVertex(Vector3d(3.500000, 3.500000, -0.500000));
-	builder.appendVertex(Vector3d(3.500000, -0.500000, -0.500000));
-	builder.appendPoly(3);
-	builder.appendVertex(Vector3d(-0.500000, -0.500000, 3.500000));
-	builder.appendVertex(Vector3d(3.500000, -0.500000, 3.500000));
-	builder.appendVertex(Vector3d(3.500000, 3.500000, 3.500000));
-	builder.appendPoly(3);
-	builder.appendVertex(Vector3d(-0.500000, -0.500000, 3.500000));
-	builder.appendVertex(Vector3d(3.500000, 3.500000, 3.500000));
-	builder.appendVertex(Vector3d(-0.500000, 3.500000, 3.500000));
+	builder.beginPolygon(3);
+	builder.addVertex(Vector3d(-0.500000, -0.500000, -0.500000));
+	builder.addVertex(Vector3d(-0.500000, -0.500000, 3.500000));
+	builder.addVertex(Vector3d(-0.500000, 3.500000, 3.500000));
+	builder.beginPolygon(3);
+	builder.addVertex(Vector3d(-0.500000, -0.500000, -0.500000));
+	builder.addVertex(Vector3d(-0.500000, 3.500000, 3.500000));
+	builder.addVertex(Vector3d(-0.500000, 3.500000, -0.500000));
+	builder.beginPolygon(3);
+	builder.addVertex(Vector3d(3.500000, -0.500000, -0.500000));
+	builder.addVertex(Vector3d(3.500000, 3.500000, -0.500000));
+	builder.addVertex(Vector3d(3.500000, 3.500000, 3.500000));
+	builder.beginPolygon(3);
+	builder.addVertex(Vector3d(3.500000, -0.500000, -0.500000));
+	builder.addVertex(Vector3d(3.500000, 3.500000, 3.500000));
+	builder.addVertex(Vector3d(3.500000, -0.500000, 3.500000));
+	builder.beginPolygon(3);
+	builder.addVertex(Vector3d(-0.500000, -0.500000, -0.500000));
+	builder.addVertex(Vector3d(3.500000, -0.500000, -0.500000));
+	builder.addVertex(Vector3d(3.500000, -0.500000, 3.500000));
+	builder.beginPolygon(3);
+	builder.addVertex(Vector3d(-0.500000, -0.500000, -0.500000));
+	builder.addVertex(Vector3d(3.500000, -0.500000, 3.500000));
+	builder.addVertex(Vector3d(-0.500000, -0.500000, 3.500000));
+	builder.beginPolygon(3);
+	builder.addVertex(Vector3d(-0.500000, 3.500000, -0.500000));
+	builder.addVertex(Vector3d(-0.500000, 3.500000, 3.500000));
+	builder.addVertex(Vector3d(3.500000, 3.500000, 3.500000));
+	builder.beginPolygon(3);
+	builder.addVertex(Vector3d(-0.500000, 3.500000, -0.500000));
+	builder.addVertex(Vector3d(3.500000, 3.500000, 3.500000));
+	builder.addVertex(Vector3d(3.500000, 3.500000, -0.500000));
+	builder.beginPolygon(3);
+	builder.addVertex(Vector3d(-0.500000, -0.500000, -0.500000));
+	builder.addVertex(Vector3d(-0.500000, 3.500000, -0.500000));
+	builder.addVertex(Vector3d(3.500000, 3.500000, -0.500000));
+	builder.beginPolygon(3);
+	builder.addVertex(Vector3d(-0.500000, -0.500000, -0.500000));
+	builder.addVertex(Vector3d(3.500000, 3.500000, -0.500000));
+	builder.addVertex(Vector3d(3.500000, -0.500000, -0.500000));
+	builder.beginPolygon(3);
+	builder.addVertex(Vector3d(-0.500000, -0.500000, 3.500000));
+	builder.addVertex(Vector3d(3.500000, -0.500000, 3.500000));
+	builder.addVertex(Vector3d(3.500000, 3.500000, 3.500000));
+	builder.beginPolygon(3);
+	builder.addVertex(Vector3d(-0.500000, -0.500000, 3.500000));
+	builder.addVertex(Vector3d(3.500000, 3.500000, 3.500000));
+	builder.addVertex(Vector3d(-0.500000, 3.500000, 3.500000));
 #else		
 	{
 		const std::shared_ptr<const Mesh> mesh = Mesh::render(*tree[0], reg ,settings);
@@ -130,10 +135,10 @@ std::unique_ptr<const Geometry> FrepNode::createGeometry() const
 			libfive_tri t;
 			for (const auto& t : mesh->branes)
 			{
-				builder.appendPoly(3); 
+				builder.beginPolygon(3); 
 				for(int i=0;i<3;i++)
 				{
-					builder.appendVertex(builder.vertexIndex(Vector3d(mesh->verts[t[i]].x(), mesh->verts[t[i]].y(), mesh->verts[t[i]].z())));
+					builder.addVertex(builder.vertexIndex(Vector3d(mesh->verts[t[i]].x(), mesh->verts[t[i]].y(), mesh->verts[t[i]].z())));
 				}
 			}
 		}

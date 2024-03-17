@@ -17,9 +17,9 @@ Result vector_convert(V const& v) {
 
 }
 
-ManifoldGeometry::ManifoldGeometry() : manifold_(std::make_shared<manifold::Manifold>()) {}
+ManifoldGeometry::ManifoldGeometry() : manifold_(std::make_shared<const manifold::Manifold>()) {}
 
-ManifoldGeometry::ManifoldGeometry(const std::shared_ptr<manifold::Manifold>& mani) : manifold_(mani) {
+ManifoldGeometry::ManifoldGeometry(const std::shared_ptr<const manifold::Manifold>& mani) : manifold_(mani) {
   assert(manifold_);
   if (!manifold_) clear();
 }
@@ -94,21 +94,22 @@ std::string ManifoldGeometry::dump() const {
 std::shared_ptr<const PolySet> ManifoldGeometry::toPolySet() const {
   manifold::MeshGL mesh = getManifold().GetMeshGL();
   auto ps = std::make_shared<PolySet>(3);
-  ps->isTriangular = true;
+  ps->setTriangular(true);
   ps->vertices.reserve(mesh.NumVert());
   ps->indices.reserve(mesh.NumTri());
   ps->setConvexity(convexity);
+
   // first 3 channels are xyz coordinate
   for (size_t i = 0; i < mesh.vertProperties.size(); i += mesh.numProp)
-    ps->vertices.push_back({
+    ps->vertices.emplace_back(
         mesh.vertProperties[i],
-        mesh.vertProperties[i+1],
-        mesh.vertProperties[i+2]});
+        mesh.vertProperties[i + 1],
+        mesh.vertProperties[i + 2]);
   for (size_t i = 0; i < mesh.triVerts.size(); i += 3)
     ps->indices.push_back({
         static_cast<int>(mesh.triVerts[i]),
-        static_cast<int>(mesh.triVerts[i+1]),
-        static_cast<int>(mesh.triVerts[i+2])});
+        static_cast<int>(mesh.triVerts[i + 1]),
+        static_cast<int>(mesh.triVerts[i + 2])});
   ps->mat = this->mat;
   ps->matind.clear();
   for(int i=0;i<mesh.runIndex.size()-1;i++) {
@@ -175,27 +176,15 @@ ManifoldGeometry ManifoldGeometry::operator+(const ManifoldGeometry& other) cons
   return {binOp(*this->manifold_, *other.manifold_, manifold::OpType::Add)};
 }
 
-void ManifoldGeometry::operator+=(ManifoldGeometry& other) {
-  manifold_ = binOp(*this->manifold_, *other.manifold_, manifold::OpType::Add);
-}
-
 ManifoldGeometry ManifoldGeometry::operator*(const ManifoldGeometry& other) const {
   return {binOp(*this->manifold_, *other.manifold_, manifold::OpType::Intersect)};
-}
-
-void ManifoldGeometry::operator*=(ManifoldGeometry& other) {
-  manifold_ = binOp(*this->manifold_, *other.manifold_, manifold::OpType::Intersect);
 }
 
 ManifoldGeometry ManifoldGeometry::operator-(const ManifoldGeometry& other) const {
   return {binOp(*this->manifold_, *other.manifold_, manifold::OpType::Subtract)};
 }
 
-void ManifoldGeometry::operator-=(ManifoldGeometry& other) {
-  manifold_ = binOp(*this->manifold_, *other.manifold_, manifold::OpType::Subtract);
-}
-
-std::shared_ptr<manifold::Manifold> minkowskiOp(const ManifoldGeometry& lhs, const ManifoldGeometry& rhs) {
+std::shared_ptr<ManifoldGeometry> minkowskiOp(const ManifoldGeometry& lhs, const ManifoldGeometry& rhs) {
 // FIXME: How to deal with operation not supported?
 #ifdef ENABLE_CGAL
   auto lhs_nef = std::shared_ptr<CGAL_Nef_polyhedron>(CGALUtils::createNefPolyhedronFromPolySet(*lhs.toPolySet()));
@@ -208,17 +197,17 @@ std::shared_ptr<manifold::Manifold> minkowskiOp(const ManifoldGeometry& lhs, con
   auto ps = PolySetUtils::getGeometryAsPolySet(lhs_nef);
   if (!ps) return {};
   else {
-    return ManifoldUtils::trustedPolySetToManifold(*ps);
+    std::vector<Material> mat;
+    std::vector<unsigned int> matind;
+//    return ManifoldUtils::createManifoldFromGeometry(mat, matind,ps); TODO enable!
+
   }
 #endif
 }
 
-void ManifoldGeometry::minkowski(ManifoldGeometry& other) {
-  manifold_ = minkowskiOp(*this, other);
-}
 
 ManifoldGeometry ManifoldGeometry::minkowski(const ManifoldGeometry& other) const {
-  return {minkowskiOp(*this, other)};
+  return {*minkowskiOp(*this, other)};
 }
 
 void ManifoldGeometry::transform(const Transform3d& mat) {

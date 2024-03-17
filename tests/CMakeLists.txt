@@ -712,7 +712,9 @@ list(APPEND THROWNTOGETHERTEST_FILES ${CGALPNGTEST_FILES} ${PRUNE_TEST})
 
 list(APPEND CGALSTLSANITYTEST_FILES ${TEST_SCAD_DIR}/misc/normal-nan.scad)
 
-list(APPEND EXPORT_STL_TEST_FILES ${TEST_SCAD_DIR}/stl/stl-export.scad)
+list(APPEND EXPORT_STL_TEST_FILES
+  ${TEST_SCAD_DIR}/stl/stl-export.scad
+)
 
 list(APPEND EXPORT_OBJ_TEST_FILES ${TEST_SCAD_DIR}/obj/obj-export.scad)
 list(APPEND EXPORT_OBJ_TEST_FILES ${TEST_SCAD_DIR}/obj/obj-import-export_dodecahedron.scad)
@@ -1069,6 +1071,8 @@ set(FILES_MANIFOLD_CORNER_CASES
   ${TEST_SCAD_DIR}/3D/misc/polyhedron-self-touch-face.scad
   ${TEST_SCAD_DIR}/3D/misc/polyhedron-self-touch-vertex-nonmanifold.scad
   ${TEST_SCAD_DIR}/3D/misc/polyhedron-self-touch-vertex.scad
+  ${TEST_SCAD_DIR}/3D/features/rotate_extrude-touch-edge.scad
+  ${TEST_SCAD_DIR}/3D/features/rotate_extrude-touch-vertex.scad
 )
 add_cmdline_test(3mfpngtest SCRIPT ${EX_IM_PNGTEST_PY} ARGS ${OPENSCAD_ARG} --format=3MF --render=force EXPECTEDDIR 3mfpngtest SUFFIX png FILES ${FILES_MANIFOLD_CORNER_CASES})
 add_cmdline_test(objpngtest SCRIPT ${EX_IM_PNGTEST_PY} ARGS ${OPENSCAD_ARG} --format=OBJ --render=force EXPECTEDDIR 3mfpngtest SUFFIX png FILES ${FILES_MANIFOLD_CORNER_CASES})
@@ -1077,22 +1081,6 @@ add_cmdline_test(stlpngtest SCRIPT ${EX_IM_PNGTEST_PY} ARGS ${OPENSCAD_ARG} --fo
 
 set_tests_properties(
   # Manifold construction error. Probably due to polygon soup strategy
-  3mfpngtest_polyhedron-self-touch-face-nonmanifold
-  3mfpngtest_polyhedron-self-touch-face
-  objpngtest_polyhedron-self-touch-face-nonmanifold
-  objpngtest_polyhedron-self-touch-face
-  offpngtest_polyhedron-self-touch-face-nonmanifold
-  offpngtest_polyhedron-self-touch-face
-  stlpngtest_polyhedron-self-touch-face-nonmanifold
-  stlpngtest_polyhedron-self-touch-face
-	3mfpngtest_polyhedrons-touch-face-nonmanifold
-	3mfpngtest_polyhedrons-touch-face
-	objpngtest_polyhedrons-touch-face-nonmanifold
-	objpngtest_polyhedrons-touch-face
-	offpngtest_polyhedrons-touch-face-nonmanifold
-	offpngtest_polyhedrons-touch-face
-	stlpngtest_polyhedrons-touch-face-nonmanifold
-	stlpngtest_polyhedrons-touch-face
   PROPERTIES DISABLED TRUE
 )
 
@@ -1353,6 +1341,19 @@ if (NOT LIB3MF_FOUND)
     throwntogethertest_import_3mf-tests
     3mfpngtest_cube10
     3mfexport_3mf-export
+    3mfpngtest_tetracyl-slim
+    3mfpngtest_tetracyl-touch-edge
+    3mfpngtest_tetracyl-touch-edge-nonmanifold
+    3mfpngtest_tetracyl-touch-vertex
+    3mfpngtest_tetracyl-touch-vertex-nonmanifold
+    3mfpngtest_polyhedrons-touch-edge-nonmanifold
+    3mfpngtest_polyhedrons-touch-edge
+    3mfpngtest_polyhedrons-touch-vertex-nonmanifold
+    3mfpngtest_polyhedrons-touch-vertex
+    3mfpngtest_polyhedron-self-touch-edge-nonmanifold
+    3mfpngtest_polyhedron-self-touch-edge
+    3mfpngtest_polyhedron-self-touch-vertex-nonmanifold
+    3mfpngtest_polyhedron-self-touch-vertex
     PROPERTIES DISABLED TRUE
   )
 endif(NOT LIB3MF_FOUND)

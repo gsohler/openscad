@@ -277,11 +277,10 @@ Camera get_camera(const po::variables_map& vm)
 #define OPENSCAD_QTGUI 1
 #endif
 
-static bool checkAndExport(const std::shared_ptr<const Geometry>& root_geom, unsigned dimensions,
-                           FileFormat format, const bool is_stdout, const std::string& filename)
+static bool checkAndExport(const std::shared_ptr<const Geometry>& root_geom, FileFormat format, const bool is_stdout, const std::string& filename)
 {
-  if (root_geom->getDimension() != dimensions) {
-    LOG("Current top level object is not a %1$dD object.", dimensions);
+  if (!is2D(format) && !is3D(format)) {
+    LOG("Current top level object is not a %1$dD object.", root_geom->getDimension());
     return false;
   }
   if (root_geom->isEmpty()) {
@@ -588,39 +587,26 @@ int do_export(const CommandLine& cmd, const RenderVariables& render_variables, F
 
       constexpr bool allownef = true;
       root_geom = geomevaluator.evaluateGeometry(*tree.root(), allownef);
-      if (root_geom) {
-        if (cmd.viewOptions.renderer == RenderType::BACKEND_SPECIFIC && root_geom->getDimension() == 3) {
-          if (auto geomlist = std::dynamic_pointer_cast<const GeometryList>(root_geom)) {
-            auto flatlist = geomlist->flatten();
-            for (auto& child : flatlist) {
-              if (child.second->getDimension() == 3) {
-                child.second = GeometryUtils::getBackendSpecificGeometry(child.second);
-              }
+      if (!root_geom) root_geom = std::make_shared<PolySet>(3);
+      if (cmd.viewOptions.renderer == RenderType::BACKEND_SPECIFIC && root_geom->getDimension() == 3) {
+        if (auto geomlist = std::dynamic_pointer_cast<const GeometryList>(root_geom)) {
+          auto flatlist = geomlist->flatten();
+          for (auto& child : flatlist) {
+            if (child.second->getDimension() == 3) {
+              child.second = GeometryUtils::getBackendSpecificGeometry(child.second);
             }
-            root_geom = std::make_shared<GeometryList>(flatlist);
-          } else {
-            root_geom = GeometryUtils::getBackendSpecificGeometry(root_geom);
           }
-          LOG("Converted to backend-specific geometry");
-        }
-      } else {
-        root_geom = std::make_shared<PolySet>(3);
-        if (cmd.viewOptions.renderer == RenderType::BACKEND_SPECIFIC) {
+          root_geom = std::make_shared<GeometryList>(flatlist);
+        } else {
           root_geom = GeometryUtils::getBackendSpecificGeometry(root_geom);
         }
+        LOG("Converted to backend-specific geometry");
       }
     }
-    if (is3D(export_format)) {
-      if (!checkAndExport(root_geom, 3, export_format, cmd.is_stdout, filename_str)) {
-        return 1;
-      }
+    if (!checkAndExport(root_geom,  export_format, cmd.is_stdout, filename_str)) {
+      return 1;
     }
 
-    if (is2D(export_format)) {
-      if (!checkAndExport(root_geom, 2, export_format, cmd.is_stdout, filename_str)) {
-        return 1;
-      }
-    }
 
     if (export_format == FileFormat::PNG) {
       bool success = true;

@@ -1392,7 +1392,8 @@ PyObject *python_mesh_core(PyObject *obj)
   Tree tree(child, "");
   GeometryEvaluator geomevaluator(tree);
   std::shared_ptr<const Geometry> geom = geomevaluator.evaluateGeometry(*tree.root(), true);
-  std::shared_ptr<const PolySet> ps = std::dynamic_pointer_cast<const PolySet>(geom);
+  std::shared_ptr<const PolySet> ps = PolySetUtils::getGeometryAsPolySet(geom);
+  if(ps == nullptr) return Py_None;
 
   // Now create Python Point array
   PyObject *ptarr = PyList_New(ps->vertices.size());  
