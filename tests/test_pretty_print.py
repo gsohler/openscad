@@ -27,7 +27,6 @@
 #
 # 1. why is hash differing
 
-from __future__ import print_function
 
 import string, sys, re, os, hashlib, subprocess, time, platform, html, base64
 
@@ -223,7 +222,7 @@ def findlogfile(builddir):
 
 # --- Templating ---
 
-class Templates(object):
+class Templates:
     html_template = '''<html>
     <head><title>Test run for {sysid}</title>
     <meta charset="utf-8" />
