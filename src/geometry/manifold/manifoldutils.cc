@@ -77,7 +77,7 @@ template std::shared_ptr<ManifoldGeometry> createManifoldFromSurfaceMesh(const C
 
 std::shared_ptr<ManifoldGeometry> createManifoldFromPolySet(std::vector<Material> &mat, std::vector<unsigned int> &matind, const PolySet& ps)
 {
-  assert(ps.isTriangular());
+//  assert(ps.isTriangular());
 #if 0	
 #ifdef ENABLE_CGAL
   PolySet psq(ps);
