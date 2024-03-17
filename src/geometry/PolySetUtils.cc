@@ -53,6 +53,7 @@ std::unique_ptr<Polygon2d> project(const PolySet& ps) {
  */
 std::unique_ptr<PolySet> tessellate_faces(const PolySet& polyset)
 {
+  assert(polyset.indices.size() == polyset.matind.size());
   int degeneratePolygons = 0;
   auto result = std::make_unique<PolySet>(3, polyset.convexValue());
   result->setConvexity(polyset.getConvexity());

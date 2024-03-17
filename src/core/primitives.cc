@@ -433,6 +433,7 @@ std::unique_ptr<const Geometry> PolyhedronNode::createGeometry() const
   matcolor.color = ColorMap::getColor(cs, RenderColor::OPENCSG_FACE_FRONT_COLOR);
   p->mat.push_back(matcolor);
   for(int i=0;i<p->indices.size();i++) p->matind.push_back(0);
+
     if (is_triangular && poly.size() > 3) {
       is_triangular = false;
     }

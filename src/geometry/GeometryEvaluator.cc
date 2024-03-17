@@ -646,7 +646,7 @@ double offset3D_angle(const Vector3d &refdir, const Vector3d &edgedir, const Vec
 	s=tmp.norm();
 	if(tmp.dot(facenorm) < 0) s=-s;
 	double ang=atan2(s,c)*180/3.1415926;
-	if(ang < 0) ang += 360;
+	if(ang < -1e-9) ang += 360;
 	return ang;
 }
 
@@ -920,17 +920,17 @@ std::vector<std::shared_ptr<const PolySet>>  offset3D_decompose(std::shared_ptr<
 			edge_db[stub]=i;
 		}
 	}
-	for(unsigned int i=0;i<ps->indices.size();i++) {
-		auto &face = ps->indices[i];
-		bool valid=true;
-		for(unsigned int j=0;valid && j<face.size();j++) {
-			if(fabs(ps->vertices[face[j]][1]-0.0) > 1e-3) valid=0; // all y coords must be 0
-		}
-		if(valid) {
-			printf("Face %d is interesting\n",i);
-		}
-
-	}
+//	for(int i=0;i<ps->indices.size();i++) {
+//		auto &face = ps->indices[i];
+//		bool valid=true;
+//		for(int j=0;valid && j<face.size();j++) {
+//			if(fabs(ps->vertices[face[j]][1]-0.0) > 1e-3) valid=0; // all y coords must be 0
+//		}
+//		if(valid) {
+//			printf("Face %d is interesting\n",i);
+//		}
+//
+//	}
 
 //	int count=0;
 	while(1) {
@@ -940,6 +940,8 @@ std::vector<std::shared_ptr<const PolySet>>  offset3D_decompose(std::shared_ptr<
 		std::vector<Vector4d> faces_norm;
 		std::vector<int> faces_todo_face;
 		std::vector<int> faces_todo_edge;
+		printf("face included size is %d\n",faces_included.size());
+		int included_orgcount=faces_included.size();
 		for(unsigned int i=0;newfaceind == -1 && i<ps->indices.size();i++)
 		{
 			if(faces_included.count(i) == 0) {

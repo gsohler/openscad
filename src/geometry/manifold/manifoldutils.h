@@ -17,10 +17,7 @@ namespace ManifoldUtils {
 
   const char* statusToString(manifold::Manifold::Error status);
 
-  /*! If the PolySet isn't trusted, use createManifoldFromPolySet which will triangulate and reorient it. */
-  std::shared_ptr<manifold::Manifold> trustedPolySetToManifold(const PolySet& ps);
-
-  std::shared_ptr<const ManifoldGeometry> createManifoldFromPolySet(std::vector<Material> &mat, std::vector<unsigned int> &matind_org, const PolySet& ps);
+  std::shared_ptr<ManifoldGeometry> createManifoldFromPolySet(std::vector<Material> &mat, std::vector<unsigned int> &matind_org, const PolySet& ps);
   std::shared_ptr<const ManifoldGeometry> createManifoldFromGeometry(std::vector<Material> &mat, std::vector<unsigned int> &matind_org, const std::shared_ptr<const Geometry>& geom);
 
   template <class TriangleMesh>

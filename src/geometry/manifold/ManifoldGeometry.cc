@@ -112,7 +112,7 @@ std::shared_ptr<const PolySet> ManifoldGeometry::toPolySet() const {
         static_cast<int>(mesh.triVerts[i + 2])});
   ps->mat = this->mat;
   ps->matind.clear();
-  for(int i=0;i<mesh.runIndex.size()-1;i++) {
+  for(int i=0;i<mesh.runIndex.size();i+=2) {
     for(int j=mesh.runIndex[i];j<mesh.runIndex[i+1];j+=3) {
       ps->matind.push_back(this->matinds_org[i][mesh.faceID[j/3]]); 
     }
@@ -172,19 +172,7 @@ std::shared_ptr<manifold::Manifold> binOp(const manifold::Manifold& lhs, const m
   return std::make_shared<manifold::Manifold>(lhs.Boolean(rhs, opType));
 }
 
-ManifoldGeometry ManifoldGeometry::operator+(const ManifoldGeometry& other) const {
-  return {binOp(*this->manifold_, *other.manifold_, manifold::OpType::Add)};
-}
-
-ManifoldGeometry ManifoldGeometry::operator*(const ManifoldGeometry& other) const {
-  return {binOp(*this->manifold_, *other.manifold_, manifold::OpType::Intersect)};
-}
-
-ManifoldGeometry ManifoldGeometry::operator-(const ManifoldGeometry& other) const {
-  return {binOp(*this->manifold_, *other.manifold_, manifold::OpType::Subtract)};
-}
-
-std::shared_ptr<ManifoldGeometry> minkowskiOp(const ManifoldGeometry& lhs, const ManifoldGeometry& rhs) {
+std::shared_ptr<const ManifoldGeometry> minkowskiOp(const ManifoldGeometry& lhs, const ManifoldGeometry& rhs) {
 // FIXME: How to deal with operation not supported?
 #ifdef ENABLE_CGAL
   auto lhs_nef = std::shared_ptr<CGAL_Nef_polyhedron>(CGALUtils::createNefPolyhedronFromPolySet(*lhs.toPolySet()));
@@ -198,13 +186,23 @@ std::shared_ptr<ManifoldGeometry> minkowskiOp(const ManifoldGeometry& lhs, const
   if (!ps) return {};
   else {
     std::vector<Material> mat;
-    std::vector<unsigned int> matind;
-//    return ManifoldUtils::createManifoldFromGeometry(mat, matind,ps); TODO enable!
-
+    std::vector<unsigned int> matind_org;
+    return ManifoldUtils::createManifoldFromPolySet(mat, matind_org, *ps);
   }
 #endif
 }
 
+ManifoldGeometry ManifoldGeometry::operator+(const ManifoldGeometry& other) const {
+  return {binOp(*this->manifold_, *other.manifold_, manifold::OpType::Add)};
+}
+
+ManifoldGeometry ManifoldGeometry::operator*(const ManifoldGeometry& other) const {
+  return {binOp(*this->manifold_, *other.manifold_, manifold::OpType::Intersect)};
+}
+
+ManifoldGeometry ManifoldGeometry::operator-(const ManifoldGeometry& other) const {
+  return {binOp(*this->manifold_, *other.manifold_, manifold::OpType::Subtract)};
+}
 
 ManifoldGeometry ManifoldGeometry::minkowski(const ManifoldGeometry& other) const {
   return {*minkowskiOp(*this, other)};

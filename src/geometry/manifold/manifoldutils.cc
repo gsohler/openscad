@@ -75,9 +75,10 @@ template std::shared_ptr<ManifoldGeometry> createManifoldFromSurfaceMesh(const C
 template std::shared_ptr<ManifoldGeometry> createManifoldFromSurfaceMesh(const CGAL_DoubleMesh &tm);
 #endif
 
-std::shared_ptr<const ManifoldGeometry> createManifoldFromPolySet(std::vector<Material> &mat, std::vector<unsigned int> &matind, const PolySet& ps)
+std::shared_ptr<ManifoldGeometry> createManifoldFromPolySet(std::vector<Material> &mat, std::vector<unsigned int> &matind, const PolySet& ps)
 {
   assert(ps.isTriangular());
+#if 0	
 #ifdef ENABLE_CGAL
   PolySet psq(ps);
   std::vector<Vector3d> points3d;
@@ -115,8 +116,7 @@ std::shared_ptr<ManifoldGeometry> createManifoldFromPolySet(const PolySet& ps)
   }
   const PolySet& triangle_set = ps.isTriangular() ? ps : *triangulated;
 
-  //auto mani = createManifoldFromTriangularPolySet(triangle_set); TODO activate
-  auto mani = createManifoldFromPolySet(triangle_set);
+  auto mani = createManifoldFromTriangularPolySet(triangle_set);
   if (mani->getManifold().Status() == Error::NoError) {
     return mani;
   }
@@ -129,7 +129,6 @@ std::shared_ptr<ManifoldGeometry> createManifoldFromPolySet(const PolySet& ps)
   // 2. If the PolySet couldn't be converted into a Manifold object, let's try to repair it.
   // We currently have to utilize some CGAL functions to do this.
   {
-  #ifdef ENABLE_CGAL
     PolySet psq(ps);
     std::vector<Vector3d> points3d;
     psq.quantizeVertices(&points3d);
@@ -153,9 +152,8 @@ std::shared_ptr<ManifoldGeometry> createManifoldFromPolySet(const PolySet& ps)
     } else {
       CGALUtils::createMeshFromPolySet(*ps_tri, m);
     }
-    return createManifoldFromSurfaceMesh(m);
-  }
 
+  return createManifoldFromSurfaceMesh(m);
 #else
   return std::make_shared<ManifoldGeometry>();
 #endif
@@ -202,7 +200,7 @@ std::shared_ptr<const ManifoldGeometry> createManifoldFromGeometry(std::vector<M
   if (auto mani = std::dynamic_pointer_cast<const ManifoldGeometry>(geom)) {
     return mani;
   }
-  if (auto ps = PolySetUtils::getGeometryAsPolySet(geom)) {
+  if ( auto ps = PolySetUtils::getGeometryAsPolySet(geom)) {
     return createManifoldFromPolySet(mat, orgmatind, *ps);
   }
   return nullptr;

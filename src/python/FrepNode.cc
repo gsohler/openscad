@@ -128,9 +128,9 @@ std::unique_ptr<const Geometry> FrepNode::createGeometry() const
 	builder.addVertex(Vector3d(-0.500000, -0.500000, 3.500000));
 	builder.addVertex(Vector3d(3.500000, 3.500000, 3.500000));
 	builder.addVertex(Vector3d(-0.500000, 3.500000, 3.500000));
-#else		
+#else	
 	{
-		const std::shared_ptr<const Mesh> mesh = Mesh::render(*tree[0], reg ,settings);
+                mesh = Mesh::render(*tree[0], reg ,settings);
 		if(mesh != nullptr) {
 			libfive_tri t;
 			for (const auto& t : mesh->branes)
