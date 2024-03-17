@@ -2628,7 +2628,7 @@ static Outline2d alterprofile(Outline2d profile,double scalex, double scaley, do
 
 void  append_linear_vertex(PolySetBuilder &builder,const Outline2d *face, int index, double h)
 {
-	builder.appendVertex(builder.vertexIndex(Vector3d(
+	builder.addVertex(builder.vertexIndex(Vector3d(
 			face->vertices[index][0],
 			face->vertices[index][1],
 			h)));
@@ -2637,7 +2637,7 @@ void  append_linear_vertex(PolySetBuilder &builder,const Outline2d *face, int in
 void  append_rotary_vertex(PolySetBuilder &builder,const Outline2d *face, int index, double ang)
 {
 	double a=ang*G_PI / 180.0;
-	builder.appendVertex(builder.vertexIndex(Vector3d(
+	builder.addVertex(builder.vertexIndex(Vector3d(
 			face->vertices[index][0]*cos(a),
 			face->vertices[index][0]*sin(a),
 			face->vertices[index][1])));
@@ -2846,7 +2846,7 @@ static std::unique_ptr<Geometry> extrudePolygon(const LinearExtrudeNode& node, c
   	for (auto& p : ps_bot->indices) {
 	    std::reverse(p.begin(), p.end());
 	}
-	builder.append(*ps_bot);
+	builder.appendPolySet(*ps_bot);
   	for (unsigned int i = 1; i <= slices; i++) {
 		upper_h=i*node.height/slices;
     		upper_scalex = 1 - i * (1 - node.scale_x) / slices;
@@ -2859,12 +2859,12 @@ static std::unique_ptr<Geometry> extrudePolygon(const LinearExtrudeNode& node, c
 		if(lowerFace.vertices.size() == upperFace.vertices.size()) {
 			unsigned int n=lowerFace.vertices.size();
 			for(unsigned int j=0;j<n;j++) {
-				builder.appendPoly(3);
+				builder.beginPolygon(3);
 				append_linear_vertex(builder,&lowerFace,(j+0)%n, lower_h);
 				append_linear_vertex(builder,&lowerFace,(j+1)%n, lower_h);
 				append_linear_vertex(builder,&upperFace,(j+1)%n, upper_h);
 
-				builder.appendPoly(3);
+				builder.beginPolygon(3);
 				append_linear_vertex(builder,&lowerFace,(j+0)%n, lower_h);
 				append_linear_vertex(builder,&upperFace,(j+1)%n, upper_h);
 				append_linear_vertex(builder,&upperFace,(j+0)%n, upper_h);
@@ -2882,7 +2882,7 @@ static std::unique_ptr<Geometry> extrudePolygon(const LinearExtrudeNode& node, c
         topface.addOutline(upperFace);
 	std::unique_ptr<PolySet> ps_top = topface.tessellate();
 	translate_PolySet(*ps_top, Vector3d(0, 0, upper_h));
-	builder.append(*ps_top);
+	builder.appendPolySet(*ps_top);
   }
   else
 #endif  
@@ -3086,14 +3086,14 @@ static std::unique_ptr<Geometry> extrudePolygon(const PathExtrudeNode& node, con
 		}
 		
 		for(unsigned int j=0;j<n;j++) {
-			builder.appendPoly(3);
-			builder.appendVertex( builder.vertexIndex(Vector3d(lastProfile[(j+0)%n][0], lastProfile[(j+0)%n][1], lastProfile[(j+0)%n][2])));
-			builder.appendVertex( builder.vertexIndex(Vector3d(lastProfile[(j+1)%n][0], lastProfile[(j+1)%n][1], lastProfile[(j+1)%n][2])));
-			builder.appendVertex( builder.vertexIndex(Vector3d( curProfile[(j+1)%n][0],  curProfile[(j+1)%n][1],  curProfile[(j+1)%n][2])));
-			builder.appendPoly(3);
-			builder.appendVertex( builder.vertexIndex(Vector3d(lastProfile[(j+0)%n][0], lastProfile[(j+0)%n][1], lastProfile[(j+0)%n][2])));
-			builder.appendVertex( builder.vertexIndex(Vector3d( curProfile[(j+1)%n][0],  curProfile[(j+1)%n][1],  curProfile[(j+1)%n][2])));
-			builder.appendVertex(builder.vertexIndex(Vector3d(  curProfile[(j+0)%n][0],  curProfile[(j+0)%n][1],  curProfile[(j+0)%n][2])));
+			builder.beginPolygon(3);
+			builder.addVertex( builder.vertexIndex(Vector3d(lastProfile[(j+0)%n][0], lastProfile[(j+0)%n][1], lastProfile[(j+0)%n][2])));
+			builder.addVertex( builder.vertexIndex(Vector3d(lastProfile[(j+1)%n][0], lastProfile[(j+1)%n][1], lastProfile[(j+1)%n][2])));
+			builder.addVertex( builder.vertexIndex(Vector3d( curProfile[(j+1)%n][0],  curProfile[(j+1)%n][1],  curProfile[(j+1)%n][2])));
+			builder.beginPolygon(3);
+			builder.addVertex( builder.vertexIndex(Vector3d(lastProfile[(j+0)%n][0], lastProfile[(j+0)%n][1], lastProfile[(j+0)%n][2])));
+			builder.addVertex( builder.vertexIndex(Vector3d( curProfile[(j+1)%n][0],  curProfile[(j+1)%n][1],  curProfile[(j+1)%n][2])));
+			builder.addVertex(builder.vertexIndex(Vector3d(  curProfile[(j+0)%n][0],  curProfile[(j+0)%n][1],  curProfile[(j+0)%n][2])));
 		}
 	}
        if(node.closed == false && (i == 0 || i == m-1)) {
@@ -3114,9 +3114,9 @@ static std::unique_ptr<Geometry> extrudePolygon(const PathExtrudeNode& node, con
 				p2d.push_back(Vector2d(pt[0],pt[1]));
 			}
 			std::vector<Vector3d> newprof = calculate_path_profile(&vec_x, &vec_y,(i == 0)?curPt:nextPt,  p2d);
-			builder.appendPoly(newprof.size());
+			builder.beginPolygon(newprof.size());
 			for(Vector3d pt: newprof) {
-				builder.appendVertex(builder.vertexIndex(pt));
+				builder.addVertex(builder.vertexIndex(pt));
 			}
 		}
 	}
@@ -3286,7 +3286,7 @@ static std::unique_ptr<Geometry> rotatePolygon(const RotateExtrudeNode& node, co
 		std::reverse(p.begin(), p.end());
 		}
 		}
-		builder.append(*ps_last);
+		builder.appendPolySet(*ps_last);
 
 	}
   	for (unsigned int i = 1; i <= fragments; i++) {
@@ -3302,11 +3302,11 @@ static std::unique_ptr<Geometry> rotatePolygon(const RotateExtrudeNode& node, co
 		if(lastFace.vertices.size() == curFace.vertices.size()) {
 			unsigned int n=lastFace.vertices.size();
 			for(unsigned int j=0;j<n;j++) {
-				builder.appendPoly(3);
+				builder.beginPolygon(3);
 				append_rotary_vertex(builder,&lastFace,(j+0)%n, last_ang);
 				append_rotary_vertex(builder,&lastFace,(j+1)%n, last_ang);
 				append_rotary_vertex(builder,&curFace,(j+1)%n, cur_ang);
-				builder.appendPoly(3);
+				builder.beginPolygon(3);
 				append_rotary_vertex(builder,&lastFace,(j+0)%n, last_ang);
 				append_rotary_vertex(builder,&curFace,(j+1)%n, cur_ang);
 				append_rotary_vertex(builder,&curFace,(j+0)%n, cur_ang);
@@ -3328,7 +3328,7 @@ static std::unique_ptr<Geometry> rotatePolygon(const RotateExtrudeNode& node, co
 				std::reverse(p.begin(), p.end());
 			}
 		}
-		builder.append(*ps_cur);
+		builder.appendPolySet(*ps_cur);
 	}
 	  
 }
@@ -3439,10 +3439,10 @@ static int pullObject_calccut(const PullNode &node, Vector3d p1, Vector3d p2,Vec
 }
 static void pullObject_addtri(PolySetBuilder &builder,Vector3d a, Vector3d b, Vector3d c)
 {
-	builder.appendPoly(3);
-	builder.prependVertex(builder.vertexIndex(Vector3d(a[0], a[1], a[2])));
-	builder.prependVertex(builder.vertexIndex(Vector3d(b[0], b[1], b[2])));
-	builder.prependVertex(builder.vertexIndex(Vector3d(c[0], c[1], c[2])));
+	builder.beginPolygon(3);
+	builder.addVertex(builder.vertexIndex(Vector3d(c[0], c[1], c[2])));
+	builder.addVertex(builder.vertexIndex(Vector3d(b[0], b[1], b[2])));
+	builder.addVertex(builder.vertexIndex(Vector3d(a[0], a[1], a[2])));
 }
 static std::unique_ptr<PolySet> pullObject(const PullNode& node, const PolySet *ps)
 {
@@ -3464,9 +3464,9 @@ static std::unique_ptr<PolySet> pullObject(const PullNode& node, const PolySet *
 	  switch(upper)
 	  {
 		  case 0:
-	  		builder.appendPoly(3);
+	  		builder.beginPolygon(3);
 			for(int j=0;j<3;j++) { 
-			        builder.prependVertex(pol[j]);
+			        builder.addVertex(pol[2-j]);
 			}
 			break;
 		  case 1:
@@ -3511,10 +3511,10 @@ static std::unique_ptr<PolySet> pullObject(const PullNode& node, const PolySet *
 			}
 			break;
 		  case 3:
-	  		builder.appendPoly(3);
+	  		builder.beginPolygon(3);
 			for(int j=0;j<3;j++) { 
-				Vector3d pt=ps_tess->vertices[pol[j]]+node.dir;
-			        builder.prependVertex(builder.vertexIndex(Vector3d(pt[0],pt[1], pt[2])));
+				Vector3d pt=ps_tess->vertices[pol[2-j]]+node.dir;
+			        builder.addVertex(builder.vertexIndex(Vector3d(pt[0],pt[1], pt[2])));
 			}
 			break;
 	  }

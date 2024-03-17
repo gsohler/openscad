@@ -69,12 +69,7 @@ class FrepNode : public LeafNode
 {
 public:
   FrepNode(const ModuleInstantiation *mi) : LeafNode(mi) {}
-  std::string toString() const override
-  {
-    std::ostringstream stream;
-    stream << "sdf( " << rand() << ")";
-    return  stream.str();
-  }
+  std::string toString() const override;
   std::string name() const override { return "sdf"; }
   std::unique_ptr<const Geometry> createGeometry() const override;
  #ifdef ENABLE_PYTHON

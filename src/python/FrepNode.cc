@@ -78,64 +78,64 @@ std::unique_ptr<const Geometry> FrepNode::createGeometry() const
 		std::vector<Tree *> tree = PyLibFiveObjectToTree(exp);
 		// TODO fidget rein
 #ifdef FAKE
-	builder.appendPoly(3);
-	builder.appendVertex(-0.500000, -0.500000, -0.500000);
-	builder.appendVertex(-0.500000, -0.500000, 3.500000);
-	builder.appendVertex(-0.500000, 3.500000, 3.500000);
-	builder.appendPoly(3);
-	builder.appendVertex(-0.500000, -0.500000, -0.500000);
-	builder.appendVertex(-0.500000, 3.500000, 3.500000);
-	builder.appendVertex(-0.500000, 3.500000, -0.500000);
-	builder.appendPoly(3);
-	builder.appendVertex(3.500000, -0.500000, -0.500000);
-	builder.appendVertex(3.500000, 3.500000, -0.500000);
-	builder.appendVertex(3.500000, 3.500000, 3.500000);
-	builder.appendPoly(3);
-	builder.appendVertex(3.500000, -0.500000, -0.500000);
-	builder.appendVertex(3.500000, 3.500000, 3.500000);
-	builder.appendVertex(3.500000, -0.500000, 3.500000);
-	builder.appendPoly(3);
-	builder.appendVertex(-0.500000, -0.500000, -0.500000);
-	builder.appendVertex(3.500000, -0.500000, -0.500000);
-	builder.appendVertex(3.500000, -0.500000, 3.500000);
-	builder.appendPoly(3);
-	builder.appendVertex(-0.500000, -0.500000, -0.500000);
-	builder.appendVertex(3.500000, -0.500000, 3.500000);
-	builder.appendVertex(-0.500000, -0.500000, 3.500000);
-	builder.appendPoly(3);
-	builder.appendVertex(-0.500000, 3.500000, -0.500000);
-	builder.appendVertex(-0.500000, 3.500000, 3.500000);
-	builder.appendVertex(3.500000, 3.500000, 3.500000);
-	builder.appendPoly(3);
-	builder.appendVertex(-0.500000, 3.500000, -0.500000);
-	builder.appendVertex(3.500000, 3.500000, 3.500000);
-	builder.appendVertex(3.500000, 3.500000, -0.500000);
-	builder.appendPoly(3);
-	builder.appendVertex(-0.500000, -0.500000, -0.500000);
-	builder.appendVertex(-0.500000, 3.500000, -0.500000);
-	builder.appendVertex(3.500000, 3.500000, -0.500000);
-	builder.appendPoly(3);
-	builder.appendVertex(-0.500000, -0.500000, -0.500000);
-	builder.appendVertex(3.500000, 3.500000, -0.500000);
-	builder.appendVertex(3.500000, -0.500000, -0.500000);
-	builder.appendPoly(3);
-	builder.appendVertex(-0.500000, -0.500000, 3.500000);
-	builder.appendVertex(3.500000, -0.500000, 3.500000);
-	builder.appendVertex(3.500000, 3.500000, 3.500000);
-	builder.appendPoly(3);
-	builder.appendVertex(-0.500000, -0.500000, 3.500000);
-	builder.appendVertex(3.500000, 3.500000, 3.500000);
-	builder.appendVertex(-0.500000, 3.500000, 3.500000);
+	builder.beginPolygon(3);
+	builder.addVertex(Vector3d(-0.500000, -0.500000, -0.500000));
+	builder.addVertex(Vector3d(-0.500000, -0.500000, 3.500000));
+	builder.addVertex(Vector3d(-0.500000, 3.500000, 3.500000));
+	builder.beginPolygon(3);
+	builder.addVertex(Vector3d(-0.500000, -0.500000, -0.500000));
+	builder.addVertex(Vector3d(-0.500000, 3.500000, 3.500000));
+	builder.addVertex(Vector3d(-0.500000, 3.500000, -0.500000));
+	builder.beginPolygon(3);
+	builder.addVertex(Vector3d(3.500000, -0.500000, -0.500000));
+	builder.addVertex(Vector3d(3.500000, 3.500000, -0.500000));
+	builder.addVertex(Vector3d(3.500000, 3.500000, 3.500000));
+	builder.beginPolygon(3);
+	builder.addVertex(Vector3d(3.500000, -0.500000, -0.500000));
+	builder.addVertex(Vector3d(3.500000, 3.500000, 3.500000));
+	builder.addVertex(Vector3d(3.500000, -0.500000, 3.500000));
+	builder.beginPolygon(3);
+	builder.addVertex(Vector3d(-0.500000, -0.500000, -0.500000));
+	builder.addVertex(Vector3d(3.500000, -0.500000, -0.500000));
+	builder.addVertex(Vector3d(3.500000, -0.500000, 3.500000));
+	builder.beginPolygon(3);
+	builder.addVertex(Vector3d(-0.500000, -0.500000, -0.500000));
+	builder.addVertex(Vector3d(3.500000, -0.500000, 3.500000));
+	builder.addVertex(Vector3d(-0.500000, -0.500000, 3.500000));
+	builder.beginPolygon(3);
+	builder.addVertex(Vector3d(-0.500000, 3.500000, -0.500000));
+	builder.addVertex(Vector3d(-0.500000, 3.500000, 3.500000));
+	builder.addVertex(Vector3d(3.500000, 3.500000, 3.500000));
+	builder.beginPolygon(3);
+	builder.addVertex(Vector3d(-0.500000, 3.500000, -0.500000));
+	builder.addVertex(Vector3d(3.500000, 3.500000, 3.500000));
+	builder.addVertex(Vector3d(3.500000, 3.500000, -0.500000));
+	builder.beginPolygon(3);
+	builder.addVertex(Vector3d(-0.500000, -0.500000, -0.500000));
+	builder.addVertex(Vector3d(-0.500000, 3.500000, -0.500000));
+	builder.addVertex(Vector3d(3.500000, 3.500000, -0.500000));
+	builder.beginPolygon(3);
+	builder.addVertex(Vector3d(-0.500000, -0.500000, -0.500000));
+	builder.addVertex(Vector3d(3.500000, 3.500000, -0.500000));
+	builder.addVertex(Vector3d(3.500000, -0.500000, -0.500000));
+	builder.beginPolygon(3);
+	builder.addVertex(Vector3d(-0.500000, -0.500000, 3.500000));
+	builder.addVertex(Vector3d(3.500000, -0.500000, 3.500000));
+	builder.addVertex(Vector3d(3.500000, 3.500000, 3.500000));
+	builder.beginPolygon(3);
+	builder.addVertex(Vector3d(-0.500000, -0.500000, 3.500000));
+	builder.addVertex(Vector3d(3.500000, 3.500000, 3.500000));
+	builder.addVertex(Vector3d(-0.500000, 3.500000, 3.500000));
 #else		
                 mesh = Mesh::render(*tree[0], reg ,settings);
-		if(mesh != NULL) {
+		if(mesh != nullptr) {
 			libfive_tri t;
 			for (const auto& t : mesh->branes)
 			{
-				builder.appendPoly(3); 
+				builder.beginPolygon(3); 
 				for(int i=0;i<3;i++)
 				{
-					builder.appendVertex(builder.vertexIndex(Vector3d(mesh->verts[t[i]].x(), mesh->verts[t[i]].y(), mesh->verts[t[i]].z())));
+					builder.addVertex(builder.vertexIndex(Vector3d(mesh->verts[t[i]].x(), mesh->verts[t[i]].y(), mesh->verts[t[i]].z())));
 				}
 			}
 		}
@@ -148,6 +148,16 @@ std::unique_ptr<const Geometry> FrepNode::createGeometry() const
 	auto p = builder.build();
 	return p;
 }
+
+std::string FrepNode::toString() const  {
+	std::vector<Tree *> tv = PyLibFiveObjectToTree(this->expression);
+	std::ostringstream stream;
+	stream << "sdf( " ;
+	for(int i=0;i<tv.size();i++) stream << *(tv[i]);
+	stream << ")";
+	return  stream.str();
+}
+
 
 
 // polyset to SDF converter
