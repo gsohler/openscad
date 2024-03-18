@@ -75,7 +75,7 @@ template std::shared_ptr<ManifoldGeometry> createManifoldFromSurfaceMesh(const C
 template std::shared_ptr<ManifoldGeometry> createManifoldFromSurfaceMesh(const CGAL_DoubleMesh &tm);
 #endif
 
-std::shared_ptr<ManifoldGeometry> createManifoldFromPolySet(std::vector<Material> &mat, std::vector<unsigned int> &matind, const PolySet& ps)
+std::shared_ptr<ManifoldGeometry> createManifoldFromPolySet(const PolySet& ps)
 {
 //  assert(ps.isTriangular());
 #if 0	
@@ -174,18 +174,6 @@ std::shared_ptr<ManifoldGeometry> createManifoldFromPolySet(const PolySet& ps)
     mesh.triVerts.emplace_back(tri[0], tri[1], tri[2]);
   }
   manifold::MeshGL meshgl(mesh);
-  for(auto ind: ps_tri->matind) {
-    int found=-1;	    
-    for(int j=0;j<mat.size();j++) {
-      if(mat[j].color == ps_tri->mat[ind].color) // TODO fix
-        found=j;
-    }
-    if(found == -1) {
-      found=mat.size();
-      mat.push_back(ps_tri->mat[ind]); 	 
-    }
-    matind.push_back(found);	  
-  }
   auto mani = std::make_shared<manifold::Manifold>(std::move(meshgl));
   if (mani->Status() != Error::NoError) {
     LOG(message_group::Error,
@@ -193,18 +181,20 @@ std::shared_ptr<ManifoldGeometry> createManifoldFromPolySet(const PolySet& ps)
         ManifoldUtils::statusToString(mani->Status()));
   }
   auto res = std::make_shared<ManifoldGeometry>(mani);
+  res->mat = ps_tri->mat;
+  res->matind = ps_tri->matind;
   res->runWeights.clear();
   res->runWeights.push_back(1);
   return res;
 #endif
 }
 
-std::shared_ptr<const ManifoldGeometry> createManifoldFromGeometry(std::vector<Material> &mat, std::vector<unsigned int> &orgmatind, const std::shared_ptr<const Geometry>& geom) {
+std::shared_ptr<const ManifoldGeometry> createManifoldFromGeometry(const std::shared_ptr<const Geometry>& geom) {
   if (auto mani = std::dynamic_pointer_cast<const ManifoldGeometry>(geom)) {
     return mani;
   }
   if ( auto ps = PolySetUtils::getGeometryAsPolySet(geom)) {
-    return createManifoldFromPolySet(mat, orgmatind, *ps);
+    return createManifoldFromPolySet(*ps);
   }
   return nullptr;
 }

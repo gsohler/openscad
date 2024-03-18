@@ -1565,10 +1565,8 @@ std::shared_ptr<const Geometry> offset3D_convex(const std::shared_ptr<const Poly
       sub_result->vertices = verticesNew;
       sub_result->indices = indicesNew;
 
-      std::vector<Material> mat_dum;
-      std::vector<unsigned int> matind_dum;
-      std::shared_ptr<const ManifoldGeometry> term = ManifoldUtils::createManifoldFromGeometry(mat_dum, matind_dum, std::shared_ptr<const PolySet>(sub_result));
-//    std::shared_ptr<const ManifoldGeometry> term = ManifoldUtils::createManifoldFromGeometry(mat_dum, matind_dum, decomposed[i]);
+      std::shared_ptr<const ManifoldGeometry> term = ManifoldUtils::createManifoldFromGeometry( std::shared_ptr<const PolySet>(sub_result));
+//    std::shared_ptr<const ManifoldGeometry> term = ManifoldUtils::createManifoldFromGeometry( decomposed[i]);
       if(i == 0) geom = std::make_shared<ManifoldGeometry>(*term);
       else *geom = *geom + *term;	
     }
@@ -1640,13 +1638,11 @@ std::shared_ptr<const Geometry> offset3D(const std::shared_ptr<const PolySet> &p
   if(decomposed.size() == 1) {
   	return offset3D_convex(decomposed[0], off);
   }
-  std::vector<Material> mat_dum;
-  std::vector<unsigned int> matind_dum;
   std::shared_ptr<ManifoldGeometry> geom = nullptr;
   for(unsigned int i=0;i<decomposed.size();i++)
   {
-  	std::shared_ptr<const ManifoldGeometry>term = ManifoldUtils::createManifoldFromGeometry(mat_dum, matind_dum, offset3D_convex(decomposed[i], off));
-//  	std::shared_ptr<const ManifoldGeometry> term = ManifoldUtils::createMutableManifoldFromGeometry(mat_dum, matind_dum, decomposed[i]);
+  	std::shared_ptr<const ManifoldGeometry>term = ManifoldUtils::createManifoldFromGeometry(offset3D_convex(decomposed[i], off));
+//  	std::shared_ptr<const ManifoldGeometry> term = ManifoldUtils::createMutableManifoldFromGeometry(decomposed[i]);
         if(i == 0) geom = std::make_shared<ManifoldGeometry>(*term);
         else *geom = *geom + *term;	
   }

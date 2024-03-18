@@ -184,9 +184,7 @@ std::shared_ptr<const ManifoldGeometry> minkowskiOp(const ManifoldGeometry& lhs,
   auto ps = PolySetUtils::getGeometryAsPolySet(lhs_nef);
   if (!ps) return {};
   else {
-    std::vector<Material> mat;
-    std::vector<unsigned int> matind_org;
-    return ManifoldUtils::createManifoldFromPolySet(mat, matind_org, *ps);
+    return ManifoldUtils::createManifoldFromPolySet(*ps);
   }
 #endif
 }

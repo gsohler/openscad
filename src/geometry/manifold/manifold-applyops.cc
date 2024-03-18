@@ -25,13 +25,14 @@ std::shared_ptr<ManifoldGeometry> applyOperator3DManifold(const Geometry::Geomet
   std::shared_ptr<ManifoldGeometry> geom;
 
   bool foundFirst = false;
-
+  printf("start csg %d\n",children.size());
   std::vector<Material> matnew;
   std::vector<std::vector<unsigned int>> matinds_org;
   int cnt=0;
   for (const auto& item : children) {
     std::vector<unsigned int> matind_org;	  
-    std::shared_ptr<const ManifoldGeometry> chN = item.second ? createManifoldFromGeometry(matnew, matind_org, item.second) : nullptr;
+    std::shared_ptr<const ManifoldGeometry> chN = item.second ? createManifoldFromGeometry(item.second) : nullptr;
+    printf("op mat=%d matind=%d\n",chN->mat.size(), chN->matind.size());
     for(auto ind: chN->matind) {
       int found=-1;	    
       for(int j=0;j<matnew.size();j++) {
@@ -42,8 +43,10 @@ std::shared_ptr<ManifoldGeometry> applyOperator3DManifold(const Geometry::Geomet
         found=matnew.size();
         matnew.push_back(chN->mat[ind]); 	 
       }
+      printf("%d ",found);
       matind_org.push_back(found);	   
     }
+    printf("\n");
     matinds_org.push_back(matind_org);
 
     // Intersecting something with nothing results in nothing
@@ -95,19 +98,24 @@ std::shared_ptr<ManifoldGeometry> applyOperator3DManifold(const Geometry::Geomet
   int oldind=0;
   int i=0;
   manifold::MeshGL mesh = geom->getManifold().GetMeshGL();
+  printf("ind is ");
+  for(int i=0;i<mesh.runIndex.size();i++) printf("%d ",mesh.runIndex[i]);
+  printf("\n");
   for(int n=0;n<geom->runWeights.size();n++) {
     int step=geom->runWeights[i];	  
     int newind = mesh.runIndex[i+step];	  
     printf("Step %d process from %d to %d, data len is %d\n", n, oldind, newind, matinds_org[n].size());
     for(int j=oldind;j<newind;j+=3) {
       int ind=mesh.faceID[j/3];    
-      if(ind < matinds_org[n].size()) geom->matind.push_back(matinds_org[n][ind]); 
-      else geom->matind.push_back(0); // TODO fix
+      printf("%d ",ind);
+      geom->matind.push_back(matinds_org[n][ind]); 
     }
+    printf("\n");
     oldind=newind;
     i+= step;
   }
   printf("matind %d mat %d\n", geom->matind.size(),geom->mat.size());
+  printf("end csg\n");
 
   return geom;
 }

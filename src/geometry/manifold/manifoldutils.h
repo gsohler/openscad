@@ -16,8 +16,8 @@ namespace ManifoldUtils {
 
   const char* statusToString(manifold::Manifold::Error status);
 
-  std::shared_ptr<ManifoldGeometry> createManifoldFromPolySet(std::vector<Material> &mat, std::vector<unsigned int> &matind_org, const PolySet& ps);
-  std::shared_ptr<const ManifoldGeometry> createManifoldFromGeometry(std::vector<Material> &mat, std::vector<unsigned int> &matind_org, const std::shared_ptr<const Geometry>& geom);
+  std::shared_ptr<ManifoldGeometry> createManifoldFromPolySet(const PolySet& ps);
+  std::shared_ptr<const ManifoldGeometry> createManifoldFromGeometry(const std::shared_ptr<const Geometry>& geom);
 
   template <class TriangleMesh>
   std::shared_ptr<ManifoldGeometry> createManifoldFromSurfaceMesh(const TriangleMesh& mesh);
