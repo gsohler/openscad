@@ -193,7 +193,8 @@ std::shared_ptr<ManifoldGeometry> createManifoldFromPolySet(const PolySet& ps)
         ManifoldUtils::statusToString(mani->Status()));
   }
   auto res = std::make_shared<ManifoldGeometry>(mani);
-  res->runWeight=1;
+  res->runWeights.clear();
+  res->runWeights.push_back(1);
   return res;
 #endif
 }

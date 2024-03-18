@@ -47,6 +47,7 @@ public:
 
   virtual void accept(GeometryVisitor& visitor) const = 0;
   std::vector<Material> mat;
+  std::vector<unsigned int> matind;
 protected:
   int convexity{1};
 };

@@ -32,6 +32,18 @@ std::shared_ptr<ManifoldGeometry> applyOperator3DManifold(const Geometry::Geomet
   for (const auto& item : children) {
     std::vector<unsigned int> matind_org;	  
     std::shared_ptr<const ManifoldGeometry> chN = item.second ? createManifoldFromGeometry(matnew, matind_org, item.second) : nullptr;
+    for(auto ind: chN->matind) {
+      int found=-1;	    
+      for(int j=0;j<matnew.size();j++) {
+        if(matnew[j].color == chN->mat[ind].color) // TODO fix
+          found=j;
+      }
+      if(found == -1) {
+        found=matnew.size();
+        matnew.push_back(chN->mat[ind]); 	 
+      }
+      matind_org.push_back(found);	   
+    }
     matinds_org.push_back(matind_org);
 
     // Intersecting something with nothing results in nothing
@@ -48,17 +60,17 @@ std::shared_ptr<ManifoldGeometry> applyOperator3DManifold(const Geometry::Geomet
     }
 
     // Initialize geom with first expected geometric object
+    int sum=0;
+    for(int add : chN->runWeights)
+      sum += add;
     if (!foundFirst) {
       geom = std::make_shared<ManifoldGeometry>(*chN);
       geom->runWeights.clear();
-      geom->runWeight=0;
-      geom->runWeights.push_back(chN->runWeight);
-      geom->runWeight += chN->runWeight;
+      geom->runWeights.push_back(sum);
       foundFirst = true;
       continue;
     }
-      geom->runWeights.push_back(chN->runWeight);
-      geom->runWeight += chN->runWeight;
+    geom->runWeights.push_back(sum);
 
     switch (op) {
     case OpenSCADOperator::UNION:
@@ -79,7 +91,24 @@ std::shared_ptr<ManifoldGeometry> applyOperator3DManifold(const Geometry::Geomet
     if (item.first) item.first->progress_report();
   }
   geom->mat=matnew;
-  geom->matinds_org = matinds_org;
+  geom->matind.clear();
+  int oldind=0;
+  int i=0;
+  manifold::MeshGL mesh = geom->getManifold().GetMeshGL();
+  for(int n=0;n<geom->runWeights.size();n++) {
+    int step=geom->runWeights[i];	  
+    int newind = mesh.runIndex[i+step];	  
+    printf("Step %d process from %d to %d, data len is %d\n", n, oldind, newind, matinds_org[n].size());
+    for(int j=oldind;j<newind;j+=3) {
+      int ind=mesh.faceID[j/3];    
+      if(ind < matinds_org[n].size()) geom->matind.push_back(matinds_org[n][ind]); 
+      else geom->matind.push_back(0); // TODO fix
+    }
+    oldind=newind;
+    i+= step;
+  }
+  printf("matind %d mat %d\n", geom->matind.size(),geom->mat.size());
+
   return geom;
 }
 

@@ -3,7 +3,6 @@
 
 #include "Geometry.h"
 #include <glm/glm.hpp>
-#include "Material.h"
 
 namespace manifold {
   class Manifold;
@@ -57,8 +56,7 @@ public:
   void foreachVertexUntilTrue(const std::function<bool(const glm::vec3& pt)>& f) const;
 
   const manifold::Manifold& getManifold() const;
-  std::vector<Material> mat;
-  std::vector<std::vector<unsigned int>> matinds_org;
+  std::vector<int> runWeights;
 
 private:
   std::shared_ptr<const manifold::Manifold> manifold_;

@@ -17,7 +17,6 @@ public:
   VISITABLE_GEOMETRY();
   PolygonIndices indices;
   std::vector<Vector3d> vertices;
-  std::vector<unsigned int> matind;
 
   PolySet(unsigned int dim, boost::tribool convex = unknown);
 

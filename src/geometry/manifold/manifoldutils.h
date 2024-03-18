@@ -4,7 +4,6 @@
 #include "enums.h"
 #include "ManifoldGeometry.h"
 #include "manifold.h"
-#include "Material.h"
 
 class PolySet;
 
