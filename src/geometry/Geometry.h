@@ -6,6 +6,7 @@
 #include <memory>
 
 #include "linalg.h"
+#include "Material.h"
 
 class AbstractNode;
 class CGAL_Nef_polyhedron;
@@ -45,6 +46,7 @@ public:
   }
 
   virtual void accept(GeometryVisitor& visitor) const = 0;
+  std::vector<Material> mat;
 protected:
   int convexity{1};
 };

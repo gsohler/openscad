@@ -28,6 +28,7 @@ std::shared_ptr<ManifoldGeometry> applyOperator3DManifold(const Geometry::Geomet
 
   std::vector<Material> matnew;
   std::vector<std::vector<unsigned int>> matinds_org;
+  int cnt=0;
   for (const auto& item : children) {
     std::vector<unsigned int> matind_org;	  
     std::shared_ptr<const ManifoldGeometry> chN = item.second ? createManifoldFromGeometry(matnew, matind_org, item.second) : nullptr;
@@ -49,9 +50,15 @@ std::shared_ptr<ManifoldGeometry> applyOperator3DManifold(const Geometry::Geomet
     // Initialize geom with first expected geometric object
     if (!foundFirst) {
       geom = std::make_shared<ManifoldGeometry>(*chN);
+      geom->runWeights.clear();
+      geom->runWeight=0;
+      geom->runWeights.push_back(chN->runWeight);
+      geom->runWeight += chN->runWeight;
       foundFirst = true;
       continue;
     }
+      geom->runWeights.push_back(chN->runWeight);
+      geom->runWeight += chN->runWeight;
 
     switch (op) {
     case OpenSCADOperator::UNION:

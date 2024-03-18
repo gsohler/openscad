@@ -112,11 +112,21 @@ std::shared_ptr<const PolySet> ManifoldGeometry::toPolySet() const {
         static_cast<int>(mesh.triVerts[i + 2])});
   ps->mat = this->mat;
   ps->matind.clear();
-  for(int i=0;i<mesh.runIndex.size();i+=2) {
-    for(int j=mesh.runIndex[i];j<mesh.runIndex[i+1];j+=3) {
-      ps->matind.push_back(this->matinds_org[i][mesh.faceID[j/3]]); 
+  int oldind=0;
+  int i=0;
+  for(int n=0;n<this->runWeights.size();n++) {
+    int step=this->runWeights[i];	  
+    int newind = mesh.runIndex[i+step];	  
+    printf("Step %d process from %d to %d, data len is %d\n", n, oldind, newind, this->matinds_org[n].size());
+    for(int j=oldind;j<newind;j+=3) {
+      int ind=mesh.faceID[j/3];    
+      if(ind < this->matinds_org[n].size()) ps->matind.push_back(this->matinds_org[n][ind]); 
+      else ps->matind.push_back(0); // TODO fix
     }
+    oldind=newind;
+    i+= step;
   }
+  printf("indices %d matind %d\n",ps->indices.size(), ps->matind.size());
   return ps;
 }
 

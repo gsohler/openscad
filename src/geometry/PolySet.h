@@ -9,7 +9,6 @@
 #include <vector>
 #include <string>
 class PolySetBuilder;
-#include "Material.h"
 
 class PolySet : public Geometry
 {
@@ -19,7 +18,6 @@ public:
   PolygonIndices indices;
   std::vector<Vector3d> vertices;
   std::vector<unsigned int> matind;
-  std::vector<Material> mat;
 
   PolySet(unsigned int dim, boost::tribool convex = unknown);
 

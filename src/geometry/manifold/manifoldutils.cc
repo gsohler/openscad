@@ -192,7 +192,9 @@ std::shared_ptr<ManifoldGeometry> createManifoldFromPolySet(const PolySet& ps)
         "[manifold] Surface_mesh -> Manifold conversion failed: %1$s", 
         ManifoldUtils::statusToString(mani->Status()));
   }
-  return std::make_shared<ManifoldGeometry>(mani);
+  auto res = std::make_shared<ManifoldGeometry>(mani);
+  res->runWeight=1;
+  return res;
 #endif
 }
 
