@@ -577,7 +577,11 @@ void initPython(double time)
     PyConfig config;
     PyConfig_InitPythonConfig(&config);
     char libdir[256];
+#ifdef _WIN32
+    snprintf(libdir, 256, "%s\\..\\libraries\\python\\:.",PlatformUtils::applicationPath().c_str()); /* add libraries/python to python search path */
+#else
     snprintf(libdir, 256, "%s/../libraries/python/:.",PlatformUtils::applicationPath().c_str()); /* add libraries/python to python search path */
+#endif   
     PyConfig_SetBytesString(&config, &config.pythonpath_env, libdir);
     PyStatus status = Py_InitializeFromConfig(&config);
     if (PyStatus_Exception(status)) {
