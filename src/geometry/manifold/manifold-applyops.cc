@@ -8,6 +8,7 @@
 #include "node.h"
 #include "progress.h"
 #include "printutils.h"
+#include "PolySet.h"
 
 namespace ManifoldUtils {
 
@@ -30,9 +31,10 @@ std::shared_ptr<ManifoldGeometry> applyOperator3DManifold(const Geometry::Geomet
   std::vector<std::vector<unsigned int>> matinds_org;
   int cnt=0;
   for (const auto& item : children) {
+    cnt++;	  
     std::vector<unsigned int> matind_org;	  
     std::shared_ptr<const ManifoldGeometry> chN = item.second ? createManifoldFromGeometry(item.second) : nullptr;
-    printf("op mat=%d matind=%d\n",chN->mat.size(), chN->matind.size());
+    printf("op %d matsize=%d matindsize=%d\n",cnt, chN->mat.size(), chN->matind.size());
     for(auto ind: chN->matind) {
       int found=-1;	    
       for(int j=0;j<matnew.size();j++) {
@@ -63,17 +65,11 @@ std::shared_ptr<ManifoldGeometry> applyOperator3DManifold(const Geometry::Geomet
     }
 
     // Initialize geom with first expected geometric object
-    int sum=0;
-    for(int add : chN->runWeights)
-      sum += add;
     if (!foundFirst) {
       geom = std::make_shared<ManifoldGeometry>(*chN);
-      geom->runWeights.clear();
-      geom->runWeights.push_back(sum);
       foundFirst = true;
       continue;
     }
-    geom->runWeights.push_back(sum);
 
     switch (op) {
     case OpenSCADOperator::UNION:
@@ -94,27 +90,65 @@ std::shared_ptr<ManifoldGeometry> applyOperator3DManifold(const Geometry::Geomet
     if (item.first) item.first->progress_report();
   }
   geom->mat=matnew;
-  geom->matind.clear();
-  int oldind=0;
-  int i=0;
-  manifold::MeshGL mesh = geom->getManifold().GetMeshGL();
-  printf("ind is ");
-  for(int i=0;i<mesh.runIndex.size();i++) printf("%d ",mesh.runIndex[i]);
+
+  std::vector<unsigned int> matind;
+  manifold::MeshGL meshgl = geom->getManifold().GetMeshGL();
+
+  printf("runIndex is ");
+  for(int i=0;i<meshgl.runIndex.size();i++) printf("%d ",meshgl.runIndex[i]);
   printf("\n");
-  for(int n=0;n<geom->runWeights.size();n++) {
-    int step=geom->runWeights[i];	  
-    int newind = mesh.runIndex[i+step];	  
-    printf("Step %d process from %d to %d, data len is %d\n", n, oldind, newind, matinds_org[n].size());
+
+  printf("runOriginalID is ");
+  for(int i=0;i<meshgl.runOriginalID.size();i++) printf("%d ",meshgl.runOriginalID[i]);
+  printf("\n");
+
+  int mode=0;
+  if(meshgl.faceID.size() == 36) mode=1;
+
+  for(int i=0;i<meshgl.runIndex.size()-1;i++) {
+    int oldind = meshgl.runIndex[i];	  
+    int newind = meshgl.runIndex[i+1];	  
+    printf("Step %d process from %d to %d, data len is %d\n", i, oldind, newind, matinds_org[i].size());
+    if(newind-oldind != 3*matinds_org[i].size()) printf("wrong\n");
+    printf("faceID ");
     for(int j=oldind;j<newind;j+=3) {
-      int ind=mesh.faceID[j/3];    
+      int ind=meshgl.faceID[j/3];    
       printf("%d ",ind);
-      geom->matind.push_back(matinds_org[n][ind]); 
+      if(mode == 0) matind.push_back(matinds_org[i][ind]); 
+      if(mode == 1) matind.push_back(matinds_org[1-i][ind]); 
     }
     printf("\n");
-    oldind=newind;
-    i+= step;
   }
-  printf("matind %d mat %d\n", geom->matind.size(),geom->mat.size());
+
+  geom->mat = matnew;
+  geom->matind = matind;
+
+
+//  auto mani = std::make_shared<manifold::Manifold>(std::move(meshgl));
+//  geom  = std::make_shared<ManifoldGeometry>(mani);
+
+  const std::shared_ptr<const PolySet> ps = geom->toPolySet(true);
+
+  geom = createManifoldFromPolySet(*ps);
+  printf("finally\n");
+  meshgl = geom->getManifold().GetMeshGL();
+   printf("mat:\n");
+   for(int i=0;i<geom->mat.size();i++)
+	   printf("%d %g/%g/%g\n",i, geom->mat[i].color[0],geom->mat[i].color[1],geom->mat[i].color[2]); 
+   printf("tri:\n");
+   for(int i=0;i<meshgl.triVerts.size();i+=3)
+	   printf("%d %d/%d/%d - %d\n",i/3,
+	static_cast<int>(meshgl.triVerts[i]),
+        static_cast<int>(meshgl.triVerts[i + 1]),
+        static_cast<int>(meshgl.triVerts[i + 2]),
+	geom->matind[meshgl.faceID[i/3]]);
+   printf("Vert:\n");
+   for (int i = 0; i < meshgl.vertProperties.size(); i += meshgl.numProp)
+      printf("%d %g/%g/%g\n",i/3,	   
+        meshgl.vertProperties[i],
+        meshgl.vertProperties[i + 1],
+        meshgl.vertProperties[i + 2]);
+
   printf("end csg\n");
 
   return geom;

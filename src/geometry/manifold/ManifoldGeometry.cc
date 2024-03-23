@@ -91,13 +91,14 @@ std::string ManifoldGeometry::dump() const {
   return out.str();
 }
 
-std::shared_ptr<const PolySet> ManifoldGeometry::toPolySet() const {
+std::shared_ptr<const PolySet> ManifoldGeometry::toPolySet(bool ignore_mapping) const {
   manifold::MeshGL mesh = getManifold().GetMeshGL();
   auto ps = std::make_shared<PolySet>(3);
   ps->setTriangular(true);
   ps->vertices.reserve(mesh.NumVert());
   ps->indices.reserve(mesh.NumTri());
   ps->setConvexity(convexity);
+  printf("Running toPolyset\n");
 
   // first 3 channels are xyz coordinate
   for (size_t i = 0; i < mesh.vertProperties.size(); i += mesh.numProp)
@@ -105,13 +106,16 @@ std::shared_ptr<const PolySet> ManifoldGeometry::toPolySet() const {
         mesh.vertProperties[i],
         mesh.vertProperties[i + 1],
         mesh.vertProperties[i + 2]);
-  for (size_t i = 0; i < mesh.triVerts.size(); i += 3)
+  ps->matind.clear();
+  for (size_t i = 0; i < mesh.triVerts.size(); i += 3){
     ps->indices.push_back({
         static_cast<int>(mesh.triVerts[i]),
         static_cast<int>(mesh.triVerts[i + 1]),
         static_cast<int>(mesh.triVerts[i + 2])});
+    if(ignore_mapping) ps->matind.push_back(this->matind[i/3]);
+    else ps->matind.push_back(this->matind[mesh.faceID[i/3]]);
+  }
   ps->mat = this->mat;
-  ps->matind = this->matind;
   printf("indices %d matind %d mat %d\n",ps->indices.size(), ps->matind.size(),ps->mat.size());
   for(int i=0;i<ps->matind.size();i++) printf("%d ",ps->matind[i]);
   printf("\n");
