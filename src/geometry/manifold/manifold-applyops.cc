@@ -97,25 +97,56 @@ std::shared_ptr<ManifoldGeometry> applyOperator3DManifold(const Geometry::Geomet
   printf("runIndex is ");
   for(int i=0;i<meshgl.runIndex.size();i++) printf("%d ",meshgl.runIndex[i]);
   printf("\n");
+  int cntx=0;
+  for(int i=1;i<meshgl.runIndex.size();i++) {
+	  while(cntx < meshgl.runIndex[i]/3)
+		  printf("%d ",meshgl.faceID[cntx++]);
+	  printf("\n");
+  }
 
   printf("runOriginalID is ");
   for(int i=0;i<meshgl.runOriginalID.size();i++) printf("%d ",meshgl.runOriginalID[i]);
   printf("\n");
 
-  int mode=0;
-  if(meshgl.faceID.size() == 36) mode=1;
+  const std::shared_ptr<const PolySet> psxs = geom->toPolySet(true);
 
+
+  std::vector<int> runMapping ; // insane mapping from runIndex to matinds
+  for(int i=0;i<meshgl.runIndex.size()-1;i++) {
+    int findLen=(meshgl.runIndex[i+1]-meshgl.runIndex[i])/3;
+    int found=-1;
+    printf("findlen %d\n",findLen);
+    for(int j=0;found == -1 &&j<matinds_org.size();j++) {
+	    printf("Compare against %d\n",matinds_org[j].size());
+      if(matinds_org[j].size() == findLen){
+        bool valid=true;	      
+        for(int k=0;valid && k<runMapping.size();k++)
+          if(runMapping[k] == j) valid=false;		
+        if(valid) found=j;	 
+      }
+    }   
+    if(found == -1) {
+	    printf("No mapping found\n");
+    }
+    runMapping.push_back(found);
+  }	  
+
+  printf("mapping %d %d\n",runMapping.size(), matinds_org.size());
+  for(int i=0;i<runMapping.size();i++)
+	  printf("m %d %d\n",i,runMapping[i]);
   for(int i=0;i<meshgl.runIndex.size()-1;i++) {
     int oldind = meshgl.runIndex[i];	  
     int newind = meshgl.runIndex[i+1];	  
     printf("Step %d process from %d to %d, data len is %d\n", i, oldind, newind, matinds_org[i].size());
-    if(newind-oldind != 3*matinds_org[i].size()) printf("wrong\n");
+    if(newind-oldind != 3*matinds_org[i].size()){
+	    printf("wrong\n");
+	    exit(1);
+    }
     printf("faceID ");
     for(int j=oldind;j<newind;j+=3) {
       int ind=meshgl.faceID[j/3];    
       printf("%d ",ind);
-      if(mode == 0) matind.push_back(matinds_org[i][ind]); 
-      if(mode == 1) matind.push_back(matinds_org[1-i][ind]); 
+      matind.push_back(matinds_org[runMapping[i]][ind]); 
     }
     printf("\n");
   }
