@@ -47,6 +47,7 @@ extern bool parse(SourceFile *& file, const std::string& text, const std::string
 #include "PathExtrudeNode.h"
 #include "PullNode.h"
 #include "OversampleNode.h"
+#include "FilletNode.h"
 #include "CgalAdvNode.h"
 #include "CsgOpNode.h"
 #include "ColorNode.h"
@@ -1485,6 +1486,46 @@ PyObject *python_oo_oversample(PyObject *obj, PyObject *args, PyObject *kwargs)
     return NULL;
   }
   return python_oversample_core(obj,n,round);
+}
+
+
+PyObject *python_fillet_core(PyObject *obj, double  r)
+{
+  PyObject *dummydict;
+  std::shared_ptr<AbstractNode> child = PyOpenSCADObjectToNodeMulti(obj, &dummydict);
+  if (child == NULL) {
+    PyErr_SetString(PyExc_TypeError, "Invalid type for  Object in fillet \n");
+    return NULL;
+  }
+
+  DECLARE_INSTANCE
+  auto node = std::make_shared<FilletNode>(instance);
+  node->children.push_back(child);
+  node->r = r;
+  return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
+}
+
+PyObject *python_fillet(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+  double r=1.0;
+  char *kwlist[] = {"obj", "r",NULL};
+  PyObject *obj = NULL;
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "Od", kwlist, &obj,&r)) {
+    PyErr_SetString(PyExc_TypeError, "error duing parsing\n");
+    return NULL;
+  }
+  return python_fillet_core(obj,r);
+}
+
+PyObject *python_oo_fillet(PyObject *obj, PyObject *args, PyObject *kwargs)
+{
+  double r=1.0;
+  char *kwlist[] = {"r",NULL};
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "d", kwlist,&r)) {
+    PyErr_SetString(PyExc_TypeError, "error duing parsing\n");
+    return NULL;
+  }
+  return python_fillet_core(obj,r);
 }
 
 PyObject *rotate_extrude_core(PyObject *obj, char *layer, int convexity, double scale, double angle, PyObject *twist, PyObject *origin, PyObject *offset, double fn, double fa, double fs)
@@ -3017,6 +3058,7 @@ PyMethodDef PyOpenSCADFunctions[] = {
   {"texture", (PyCFunction) python_texture, METH_VARARGS | METH_KEYWORDS, "Include a texture."},
   {"mesh", (PyCFunction) python_mesh, METH_VARARGS | METH_KEYWORDS, "exports mesh."},
   {"oversample", (PyCFunction) python_oversample, METH_VARARGS | METH_KEYWORDS, "oversample."},
+  {"fillet", (PyCFunction) python_fillet, METH_VARARGS | METH_KEYWORDS, "fillet."},
 
   {"group", (PyCFunction) python_group, METH_VARARGS | METH_KEYWORDS, "Group Object."},
   {"render", (PyCFunction) python_render, METH_VARARGS | METH_KEYWORDS, "Render Object."},
@@ -3064,6 +3106,7 @@ PyMethodDef PyOpenSCADMethods[] = {
 
   OO_METHOD_ENTRY(mesh, "Mesh Object")	
   OO_METHOD_ENTRY(oversample,"Oversample Object")	
+  OO_METHOD_ENTRY(fillet,"Fillet Object")	
   OO_METHOD_ENTRY(align,"Align Object to another")	
 
   OO_METHOD_ENTRY(highlight,"Highlight Object")	
