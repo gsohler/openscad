@@ -24,7 +24,7 @@
  *
  */
 
-#include "OversampleNode.h"
+#include "FilletNode.h"
 #include "module.h"
 #include "ModuleInstantiation.h"
 #include "Children.h"
@@ -39,12 +39,14 @@
 #include <sstream>
 
 #include <PolySetUtils.h>
+#include <Tree.h>
 #include <GeometryEvaluator.h>
 #include <boost/functional/hash.hpp>
 #include <hash.h>
+#include <PolySetUtils.h>
 
 
-std::unique_ptr<const Geometry> OversampleNode::createGeometry() const
+std::unique_ptr<const Geometry> FilletNode::createGeometry() const
 {
   if(this->children.size() == 0) {
 	return std::unique_ptr<PolySet>();
@@ -54,8 +56,7 @@ std::unique_ptr<const Geometry> OversampleNode::createGeometry() const
   GeometryEvaluator geomevaluator(tree);
   std::shared_ptr<const Geometry> geom = geomevaluator.evaluateGeometry(*tree.root(), true);
 
-  std::shared_ptr<const PolySet> 
-  std::shared_ptr<const PolySet> ps = getGeometryAsPolySet(geom);
+  std::shared_ptr<const PolySet> ps = PolySetUtils::getGeometryAsPolySet(geom);
   if(ps == nullptr)
 	return std::unique_ptr<PolySet>();
   // tesselate object
