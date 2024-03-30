@@ -1193,7 +1193,7 @@ PyObject *python_pull(PyObject *self, PyObject *args, PyObject *kwargs)
                                    &anchor,
 				   &dir
                                    )) {
-    PyErr_SetString(PyExc_TypeError, "error duing parsing\n");
+    PyErr_SetString(PyExc_TypeError, "error during parsing\n");
     return NULL;
   }
   return python_pull_core(obj, anchor, dir);
@@ -1208,7 +1208,7 @@ PyObject *python_oo_pull(PyObject *obj, PyObject *args, PyObject *kwargs)
                                    &anchor,
 				   &dir
                                    )) {
-    PyErr_SetString(PyExc_TypeError, "error duing parsing\n");
+    PyErr_SetString(PyExc_TypeError, "error during parsing\n");
     return NULL;
   }
   return python_pull_core(obj, anchor, dir);
@@ -1358,7 +1358,7 @@ PyObject *python_color(PyObject *self, PyObject *args, PyObject *kwargs)
                                    &obj,
                                    &colorname, &alpha, &textureind
                                    )) {
-    PyErr_SetString(PyExc_TypeError, "error duing parsing color");
+    PyErr_SetString(PyExc_TypeError, "error during parsing color");
     return NULL;
   }
   return python_color_core(obj, colorname, alpha, textureind);
@@ -1373,7 +1373,7 @@ PyObject *python_oo_color(PyObject *obj, PyObject *args, PyObject *kwargs)
   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|sdi", kwlist,
                                    &colorname, &alpha, &textureind
                                    )) {
-    PyErr_SetString(PyExc_TypeError, "error duing parsing color");
+    PyErr_SetString(PyExc_TypeError, "error during parsing color");
     return NULL;
   }
   return python_color_core(obj, colorname, alpha, textureind);
@@ -1428,7 +1428,7 @@ PyObject *python_mesh(PyObject *self, PyObject *args, PyObject *kwargs)
   char *kwlist[] = {"obj", NULL};
   PyObject *obj = NULL;
   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O", kwlist, &obj)) {
-    PyErr_SetString(PyExc_TypeError, "error duing parsing\n");
+    PyErr_SetString(PyExc_TypeError, "error during parsing\n");
     return NULL;
   }
   return python_mesh_core(obj);
@@ -1438,7 +1438,7 @@ PyObject *python_oo_mesh(PyObject *obj, PyObject *args, PyObject *kwargs)
 {
   char *kwlist[] = { NULL};
   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "", kwlist)) {
-    PyErr_SetString(PyExc_TypeError, "error duing parsing\n");
+    PyErr_SetString(PyExc_TypeError, "error during parsing\n");
     return NULL;
   }
   return python_mesh_core(obj);
@@ -1470,7 +1470,7 @@ PyObject *python_oversample(PyObject *self, PyObject *args, PyObject *kwargs)
   PyObject *obj = NULL;
   PyObject *round= NULL;
   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "Oi|O", kwlist, &obj,&n,&round)) {
-    PyErr_SetString(PyExc_TypeError, "error duing parsing\n");
+    PyErr_SetString(PyExc_TypeError, "error during parsing\n");
     return NULL;
   }
   return python_oversample_core(obj,n,round);
@@ -1482,17 +1482,18 @@ PyObject *python_oo_oversample(PyObject *obj, PyObject *args, PyObject *kwargs)
   char *kwlist[] = {"n","round",NULL};
   PyObject *round= NULL;
   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "i|O", kwlist,&n,&round)) {
-    PyErr_SetString(PyExc_TypeError, "error duing parsing\n");
+    PyErr_SetString(PyExc_TypeError, "error during parsing\n");
     return NULL;
   }
   return python_oversample_core(obj,n,round);
 }
 
 
-PyObject *python_fillet_core(PyObject *obj, double  r)
+PyObject *python_fillet_core(PyObject *obj, double  r, PyObject *sel)
 {
   PyObject *dummydict;
   std::shared_ptr<AbstractNode> child = PyOpenSCADObjectToNodeMulti(obj, &dummydict);
+  std::shared_ptr<AbstractNode> sel1 = PyOpenSCADObjectToNodeMulti(sel, &dummydict);
   if (child == NULL) {
     PyErr_SetString(PyExc_TypeError, "Invalid type for  Object in fillet \n");
     return NULL;
@@ -1501,6 +1502,7 @@ PyObject *python_fillet_core(PyObject *obj, double  r)
   DECLARE_INSTANCE
   auto node = std::make_shared<FilletNode>(instance);
   node->children.push_back(child);
+  node->children.push_back(sel1);
   node->r = r;
   return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
 }
@@ -1508,24 +1510,26 @@ PyObject *python_fillet_core(PyObject *obj, double  r)
 PyObject *python_fillet(PyObject *self, PyObject *args, PyObject *kwargs)
 {
   double r=1.0;
-  char *kwlist[] = {"obj", "r",NULL};
+  char *kwlist[] = {"obj", "r","sel",NULL};
   PyObject *obj = NULL;
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "Od", kwlist, &obj,&r)) {
-    PyErr_SetString(PyExc_TypeError, "error duing parsing\n");
+  PyObject *sel = NULL;
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OdO", kwlist, &obj,&r,&sel)) {
+    PyErr_SetString(PyExc_TypeError, "error during parsing\n");
     return NULL;
   }
-  return python_fillet_core(obj,r);
+  return python_fillet_core(obj,r,sel);
 }
 
 PyObject *python_oo_fillet(PyObject *obj, PyObject *args, PyObject *kwargs)
 {
   double r=1.0;
-  char *kwlist[] = {"r",NULL};
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "d", kwlist,&r)) {
-    PyErr_SetString(PyExc_TypeError, "error duing parsing\n");
+  PyObject *sel;
+  char *kwlist[] = {"r","sel",NULL};
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "dO", kwlist,&r,&sel)) {
+    PyErr_SetString(PyExc_TypeError, "error during parsing\n");
     return NULL;
   }
-  return python_fillet_core(obj,r);
+  return python_fillet_core(obj,r,sel);
 }
 
 PyObject *rotate_extrude_core(PyObject *obj, char *layer, int convexity, double scale, double angle, PyObject *twist, PyObject *origin, PyObject *offset, double fn, double fa, double fs)
@@ -1622,7 +1626,7 @@ PyObject *python_oo_rotate_extrude(PyObject *obj, PyObject *args, PyObject *kwar
 			  &layer, &convexity, &scale, &angle, &twist, &origin, &offset, &fn,&fa,&fs))
    {
 
-    PyErr_SetString(PyExc_TypeError, "error duing parsing\n");
+    PyErr_SetString(PyExc_TypeError, "error during parsing\n");
     return NULL;
   }
   return rotate_extrude_core(obj, layer, convexity, scale, angle, twist, origin, offset, fn, fa,fs);
@@ -1715,7 +1719,7 @@ PyObject *python_linear_extrude(PyObject *self, PyObject *args, PyObject *kwargs
   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|dsiOOOiiOddd", kwlist, 
                                    &obj, &height, &layer, &convexity, &origin, &scale, &center, &slices, &segments, &twist, &fn, &fs, &fs))
    {
-    PyErr_SetString(PyExc_TypeError,"error duing parsing\n");
+    PyErr_SetString(PyExc_TypeError,"error during parsing\n");
     return NULL;
   }
 
@@ -1739,7 +1743,7 @@ PyObject *python_oo_linear_extrude(PyObject *obj, PyObject *args, PyObject *kwar
   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|dsiOOOiiOddd", kwlist, 
                                   &height, &layer, &convexity, &origin, &scale, &center, &slices, &segments, &twist, &fn, &fs, &fs))
    {
-    PyErr_SetString(PyExc_TypeError,"error duing parsing\n");
+    PyErr_SetString(PyExc_TypeError,"error during parsing\n");
     return NULL;
   }
 
@@ -2431,7 +2435,7 @@ PyObject *python_texture(PyObject *self, PyObject *args, PyObject *kwargs)
   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s|f", kwlist,
                                    &texturename,&uv
                                    )) {
-    PyErr_SetString(PyExc_TypeError, "error duing parsing texture");
+    PyErr_SetString(PyExc_TypeError, "error during parsing texture");
     return NULL;
   }
   TextureUV txt(texturename, uv);

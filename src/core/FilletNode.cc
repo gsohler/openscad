@@ -90,21 +90,70 @@ bool list_included(const std::vector<int> &list,int item) {
   if(std::find(list.begin(), list.end(),item) != 	list.end()) return true;
   return false;
 }
-
-
-std::unique_ptr<const Geometry> FilletNode::createGeometry() const
+std::shared_ptr<const PolySet> childToPolySet( std::shared_ptr<AbstractNode> child)
 {
-  if(this->children.size() == 0) {
-	return std::unique_ptr<PolySet>();
-  }
-  std::shared_ptr<AbstractNode> child=this->children[0];
   Tree tree(child, "");
   GeometryEvaluator geomevaluator(tree);
   std::shared_ptr<const Geometry> geom = geomevaluator.evaluateGeometry(*tree.root(), true);
+  std::shared_ptr<const PolySet> ps;
+  return PolySetUtils::getGeometryAsPolySet(geom);
+}
+
+int linsystem( Vector3d v1,Vector3d v2,Vector3d v3,Vector3d pt,Vector3d &res,double *detptr);
+
+
+int point_in_polyhedron(const PolySet & ps, const Vector3d &pt) 
+{
+  // polygons are clockwise     
+  int cuts=0;
+  Vector3d vc(1,0,0);
+  Vector3d res;
+  for(int i=0;i<ps.indices.size();i++) {
+    const IndexedFace &f=ps.indices[i];	  
+    Vector3d va=ps.vertices[f[1]]-ps.vertices[f[0]];
+    Vector3d vb=ps.vertices[f[2]]-ps.vertices[f[0]];
+    printf("fa %g/%g/%g fb %g/%g/%g\n",va[0], va[1], va[2], vb[0], vb[1], vb[2]);
+    if(linsystem(va, vb, vc,pt-ps.vertices[f[0]],res,nullptr)) continue;
+    printf("res %g/%g/%g\n",res[0], res[1], res[2]);
+    if(res[2] < 0) continue;
+    if(res[0] > 0 && res[1] > 0 && res[0]+res[1] <1 ) cuts += 2;
+    if(fabs(res[0]) < 1e-6 && res[1] >0 && res[0]+res[1] < 1) cuts++;
+    if(fabs(res[1]) < 1e-6 && res[0] >0 && res[0]+res[1] < 1) cuts++;
+    if(fabs(res[0]+res[1]-1) < 1e-6 && res[0] > 0 && res[1] > 0) cuts++;
+  }
+  cuts /=2;
+  printf("cuts=%d\n",cuts);
+  return cuts&1;
+}
+
+std::unique_ptr<const Geometry> FilletNode::createGeometry() const
+{
   int bn=11; // bezier points  // odd
-  std::shared_ptr<const PolySet> ps = PolySetUtils::getGeometryAsPolySet(geom);
-  if(ps == nullptr)
+  std::shared_ptr<const PolySet> ps;
+  std::vector<bool> corner_selected ;
+  if(this->children.size() >= 1) {
+    ps = childToPolySet(this->children[0]);
+    if(ps == nullptr)
 	return std::unique_ptr<PolySet>();
+  } else return std::unique_ptr<PolySet>();
+
+  if(this->children.size() >= 2) {
+    std::shared_ptr<const PolySet> sel = childToPolySet(this->children[1]);
+    if(sel != nullptr) {
+      printf("selecting\n");	  
+      auto sel_tess=PolySetUtils::tessellate_faces(*sel);
+      for(int i=0;i<ps->vertices.size();i++) {
+        corner_selected.push_back(point_in_polyhedron(*sel_tess, ps->vertices[i]));
+      }
+    }
+
+  } else {
+      for(int i=0;i<ps->vertices.size();i++) 
+        corner_selected.push_back(true);	      
+  }
+  for(int i=0;i<corner_selected.size();i++)
+	  printf("%d ",corner_selected[i]?1:0);
+  printf("\n");
 
   // Create vertex2face db
   std::vector<intList> polinds, polposs;
@@ -154,19 +203,19 @@ std::unique_ptr<const Geometry> FilletNode::createGeometry() const
   }
   printf("%d edges found\n",edge_db.size());
 
-  std::vector<std::vector<int>> corner_rounds ; // how many round edges in a corner
+  std::vector<std::vector<int>> corner_rounds ; // which rounded edges in a corner
   for(int i=0;i<ps->vertices.size();i++) corner_rounds.push_back(empty);				  
 
   std::vector<SearchReplace> sp;
   // TODO select edges (by overlapping and by intersection , by number)
-  int cnt=0;
+//  int cnt=0;
   for(auto &e: edge_db) {
-    if(cnt == 0 || cnt == 6 || cnt == 7 || cnt == 8 || cnt == 9){
+    if(corner_selected[e.first.ind1] && corner_selected[e.first.ind2])
+    {
       e.second.sel=1;
       corner_rounds[e.first.ind1].push_back(e.first.ind2);
       corner_rounds[e.first.ind2].push_back(e.first.ind1);
     }		      
-    cnt++;
   }
 
 //  for(int i=0;i<corner_rounds.size();i++){
