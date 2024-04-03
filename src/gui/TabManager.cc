@@ -577,7 +577,7 @@ bool TabManager::maybeSave(int x)
     box.setDefaultButton(QMessageBox::Save);
     box.setIcon(QMessageBox::Warning);
     box.setWindowModality(Qt::ApplicationModal);
-#ifdef Q_OS_MAC
+#ifdef Q_OS_MACOS
     // Cmd-D is the standard shortcut for this button on Mac
     box.button(QMessageBox::Discard)->setShortcut(QKeySequence("Ctrl+D"));
     box.button(QMessageBox::Discard)->setShortcutEnabled(true);
@@ -609,7 +609,7 @@ bool TabManager::shouldClose()
     box.setDefaultButton(QMessageBox::SaveAll);
     box.setIcon(QMessageBox::Warning);
     box.setWindowModality(Qt::ApplicationModal);
-#ifdef Q_OS_MAC
+#ifdef Q_OS_MACOS
     // Cmd-D is the standard shortcut for this button on Mac
     box.button(QMessageBox::Discard)->setShortcut(QKeySequence("Ctrl+D"));
     box.button(QMessageBox::Discard)->setShortcutEnabled(true);
