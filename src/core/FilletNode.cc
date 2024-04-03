@@ -112,20 +112,60 @@ int point_in_polyhedron(const PolySet & ps, const Vector3d &pt)
     const IndexedFace &f=ps.indices[i];	  
     Vector3d va=ps.vertices[f[1]]-ps.vertices[f[0]];
     Vector3d vb=ps.vertices[f[2]]-ps.vertices[f[0]];
-    printf("fa %g/%g/%g fb %g/%g/%g\n",va[0], va[1], va[2], vb[0], vb[1], vb[2]);
     if(linsystem(va, vb, vc,pt-ps.vertices[f[0]],res,nullptr)) continue;
-    printf("res %g/%g/%g\n",res[0], res[1], res[2]);
     if(res[2] < 0) continue;
-    if(res[0] > 0 && res[1] > 0 && res[0]+res[1] <1 ) cuts += 2;
-    if(fabs(res[0]) < 1e-6 && res[1] >0 && res[0]+res[1] < 1) cuts++;
-    if(fabs(res[1]) < 1e-6 && res[0] >0 && res[0]+res[1] < 1) cuts++;
-    if(fabs(res[0]+res[1]-1) < 1e-6 && res[0] > 0 && res[1] > 0) cuts++;
+    if(res[0] >= -1e-6 && res[1] > -1e-6 && res[0]+res[1] <1+1e-6){
+	    if(res[0] > 0 && res[1] > 0 && res[0]+res[1] <1 ) cuts += 2;
+	    if(fabs(res[0]) < 1e-6 ) cuts++;
+	    if(fabs(res[1]) < 1e-6 ) cuts++;
+	    if(fabs(res[0]+res[1]-1) < 1e-6) cuts++;
+    }
   }
   cuts /=2;
-  printf("cuts=%d\n",cuts);
   return cuts&1;
 }
 
+Vector3d Bezier(double t, Vector3d a, Vector3d b, Vector3d c)
+{
+	return (a*(1-t)+b*t)*(1-t)+ (b*(1-t)+c*t)*t;
+}
+// Credit: inphase Ryan Colyer
+void bezier_patch(PolySetBuilder &builder, Vector3d offset, Vector3d xdir, Vector3d ydir, Vector3d zdir, int N) {
+  N = floor(N/2)*2 + 1;
+  double s1 = 1.0 / (N-1);
+  std::vector<Vector3d> points_xz;
+  std::vector<Vector3d> points_yz;
+  for(int i=0;i<N;i++) {
+    double t=(double)i/(double)(N-1);
+    points_xz.push_back(Bezier(t,  xdir, xdir+zdir, zdir));
+    points_yz.push_back(Bezier(t,  ydir, ydir+zdir, zdir));
+  }
+ 
+  std::vector<int> points; 
+  for(int i=0;i<N;i++){
+    double t1=(double)i/(double)(N-1);
+    if(i == N-1) {
+	    points.push_back(builder.vertexIndex(offset+zdir));
+    } else {
+      int M=N-i;
+      for(int j=0;j<M;j++) {
+        double t2=(double)j/(double)(M-1);
+        points.push_back(builder.vertexIndex(offset+Bezier(t2, points_xz[i], Vector3d(points_xz[i][0], points_yz[i][1], points_xz[i][2]), points_yz[i])));
+      }
+    }
+  }
+  // total points = N*(N-1)/2
+  int off=0;
+  for(int i=0;i<N-1;i++) { // Zeile i, i-1
+    int off_new=off+(N-i);
+    printf("new row i=%d off %d - %d\n",i,off, off_new);			   
+    for(int j=0;j<N-i-1;j++) {
+     builder.appendPolygon({points[off+j], points[off+j+1], points[off_new+j]});
+     if(j < N-i-2){builder.appendPolygon({points[off+j+1], points[off_new+j+1], points[off_new+j]});   }
+    }
+    off=off_new;
+  }
+}
 std::unique_ptr<const Geometry> FilletNode::createGeometry() const
 {
   int bn=11; // bezier points  // odd
@@ -140,7 +180,6 @@ std::unique_ptr<const Geometry> FilletNode::createGeometry() const
   if(this->children.size() >= 2) {
     std::shared_ptr<const PolySet> sel = childToPolySet(this->children[1]);
     if(sel != nullptr) {
-      printf("selecting\n");	  
       auto sel_tess=PolySetUtils::tessellate_faces(*sel);
       for(int i=0;i<ps->vertices.size();i++) {
         corner_selected.push_back(point_in_polyhedron(*sel_tess, ps->vertices[i]));
@@ -151,9 +190,6 @@ std::unique_ptr<const Geometry> FilletNode::createGeometry() const
       for(int i=0;i<ps->vertices.size();i++) 
         corner_selected.push_back(true);	      
   }
-  for(int i=0;i<corner_selected.size();i++)
-	  printf("%d ",corner_selected[i]?1:0);
-  printf("\n");
 
   // Create vertex2face db
   std::vector<intList> polinds, polposs;
@@ -201,7 +237,8 @@ std::unique_ptr<const Geometry> FilletNode::createGeometry() const
       }
     }    
   }
-  printf("%d edges found\n",edge_db.size());
+//  printf("%d edges found\n",edge_db.size());
+
 
   std::vector<std::vector<int>> corner_rounds ; // which rounded edges in a corner
   for(int i=0;i<ps->vertices.size();i++) corner_rounds.push_back(empty);				  
@@ -242,30 +279,43 @@ std::unique_ptr<const Geometry> FilletNode::createGeometry() const
       Vector3d p1=ps->vertices[e.first.ind1];
       Vector3d p2=ps->vertices[e.first.ind2];
       Vector3d dir=(p2-p1).normalized();
-//      if(corner_rounds[e.first.ind1].size() >=  3) p1 += dir*this->r;
-//      if(corner_rounds[e.first.ind2].size() >=  3) p2 -= dir*this->r;
+      if(corner_rounds[e.first.ind1].size() >=  3) p1 += dir*this->r;
+      if(corner_rounds[e.first.ind2].size() >=  3) p2 -= dir*this->r;
       auto &face1 =ps->indices[e.second.face1];								  
       auto &face2 =ps->indices[e.second.face2];								  
+      Vector3d f1n=offset3D_normal(ps->vertices, face1).head<3>();
+      Vector3d f2n=offset3D_normal(ps->vertices, face2).head<3>();
+
       int face1n=face1.size();
       int face2n=face2.size();
       int indo;
       double f1=1.0;
       double f2=1.4142;
       indo = face1[(e.second.pos1+face1n-1)%face1n];
-      Vector3d e_f1n = (ps->vertices[indo]-ps->vertices[face1[(e.second.pos1+0)%face1n]]).normalized()*this->r; // Face1 nahe  richtung
-      if(corner_rounds[e.first.ind1].size() >= 2 && list_included(corner_rounds[e.first.ind1],indo)) e_f1n += dir*this->r;
+      Vector3d e_f1n = (ps->vertices[indo]-ps->vertices[face1[(e.second.pos1+0)%face1n]]).normalized(); // Face1 nahe  richtung
+
+
+      Vector3d e_f1nr = f1n.cross(dir).normalized();
+      double b=e_f1n.dot(e_f1nr);
+      e_f1n *= this->r;
+      printf("b = %g\n",b);
+
+      if(corner_rounds[e.first.ind1].size() == 2 && list_included(corner_rounds[e.first.ind1],indo)) e_f1n += dir*this->r; // TODO radius stimmt nicht
 
       indo = face1[(e.second.pos1+2)%face1n];		
       Vector3d e_f1f = (ps->vertices[indo]-ps->vertices[face1[(e.second.pos1+1)%face1n]]).normalized()*this->r; // Face1 entfernte richtung
-      if(corner_rounds[e.first.ind2].size() >= 2 && list_included(corner_rounds[e.first.ind2],indo)) e_f1f -= dir*this->r;
+//      e_f1f = f1n.cross(dir).normalized()*this->r;
+      if(corner_rounds[e.first.ind2].size() == 2 && list_included(corner_rounds[e.first.ind2],indo)) e_f1f -= dir*this->r;
      
       indo = face2[(e.second.pos2+2)%face2n];
       Vector3d e_f2n = (ps->vertices[indo]-ps->vertices[face2[(e.second.pos2+1)%face2n]]).normalized()*this->r; // Face2 nahe Richtung
-      if(corner_rounds[e.first.ind1].size() >= 2 && list_included(corner_rounds[e.first.ind1],indo)) e_f2n += dir*this->r;
+ //     e_f2n = dir.cross(f2n).normalized()*this->r;
+      if(corner_rounds[e.first.ind1].size() == 2 && list_included(corner_rounds[e.first.ind1],indo)) e_f2n += dir*this->r;
 
       indo = face2[(e.second.pos2+face2n-1)%face2n];
       Vector3d e_f2f = (ps->vertices[indo]-ps->vertices[face2[(e.second.pos2+0)%face2n]]).normalized()*this->r; // Face2 entfernte Rcithung
-      if(corner_rounds[e.first.ind2].size() >= 2 && list_included(corner_rounds[e.first.ind2],indo)) e_f2f -= dir*this->r;
+  //    e_f2f = dir.cross(f2n).normalized()*this->r;
+      if(corner_rounds[e.first.ind2].size() == 2 && list_included(corner_rounds[e.first.ind2],indo)) e_f2f -= dir*this->r;
 																	  
 
       for(int i=0;i<bn;i++) {
@@ -384,6 +434,17 @@ std::unique_ptr<const Geometry> FilletNode::createGeometry() const
     }
     else if(corner_rounds[i].size() == 3) {
       printf("Corner %d needs sphere\n",i);	    
+      Vector3d xdir=(ps->vertices[i] - ps->vertices[corner_rounds[i][0]]).normalized()*this->r;
+      Vector3d ydir=(ps->vertices[i] - ps->vertices[corner_rounds[i][1]]).normalized()*this->r;
+      Vector3d zdir=(ps->vertices[i] - ps->vertices[corner_rounds[i][2]]).normalized()*this->r;
+      if(i == 7) {
+//	      bezier_patch(builder, ps->vertices[i]+Vector3d(2,2,2),Vector3d(2,0,0),Vector3d(0,0,2), Vector3d(0,0,2),bn);
+  		bezier_patch(builder, Vector3d(5,5,5)-xdir-ydir-zdir, Vector3d(2,0,0), Vector3d(0,2,0), Vector3d(0,0,2),bn);
+		printf("xdir is %g/%g/%g\n",xdir[0], xdir[1], xdir[2]);
+		printf("ydir is %g/%g/%g\n",ydir[0], ydir[1], ydir[2]);
+		printf("zdir is %g/%g/%g\n",zdir[0], zdir[1], zdir[2]);
+      }
+      /*
       std::vector<std::vector<int>> conns;
       for(auto &e: edge_db) {
  	if( e.first.ind1 == i) conns.push_back(e.second.bez1);
@@ -406,11 +467,14 @@ std::unique_ptr<const Geometry> FilletNode::createGeometry() const
       }
       int j=bn/2;
       builder.appendPolygon({conns[0][j], conns[1][j],conns[2][j]});
+      */
     }	    
   }
+  //
   auto result = builder.build();
 
   printf("%d faces\n",result->indices.size());
+
   return result;
 }
 
