@@ -83,6 +83,8 @@ int operator==(const EdgeKey &t1, const EdgeKey &t2)
 }
 
 Vector4d offset3D_normal(const std::vector<Vector3d> &vertices,const IndexedFace &pol);
+std::vector<Vector4d> offset3D_normals(const std::vector<Vector3d> &vertices, const std::vector<IndexedFace> &indices);
+
 
 typedef std::vector<int> intList;
 
@@ -125,13 +127,41 @@ int point_in_polyhedron(const PolySet & ps, const Vector3d &pt)
   return cuts&1;
 }
 
+// Credit: inphase Ryan Colyer
 Vector3d Bezier(double t, Vector3d a, Vector3d b, Vector3d c)
 {
-	return (a*(1-t)+b*t)*(1-t)+ (b*(1-t)+c*t)*t;
+	return (a*(1-t)+b*t)*(1-t)+ (b*(1-t)+c*t)*t; // TODO improve
 }
-// Credit: inphase Ryan Colyer
-void bezier_patch(PolySetBuilder &builder, Vector3d offset, Vector3d xdir, Vector3d ydir, Vector3d zdir, int N) {
+
+void bezier_patch(PolySetBuilder &builder, Vector3d center, Vector3d dir1, Vector3d dir2, Vector3d dir3, int N) {
+  if((dir2.cross(dir1)).dot(dir3) < 0) {
+    Vector3d tmp=dir1;
+    dir1=dir2;
+    dir2=tmp;    
+  }	  
+  Vector3d xdir=dir1.normalized();	
+  Vector3d ydir=dir2.normalized();	
+  Vector3d zdir=dir3.normalized();
+
+  // zdir shall look upwards
+  		       
+
+  Matrix3d mat;
+  mat <<  xdir[0], ydir[0], zdir[0],
+          xdir[1], ydir[1], zdir[1],
+          xdir[2], ydir[2], zdir[2];
+
+
+
+  xdir=Vector3d(1,0,0)*dir1.norm();
+  ydir=Vector3d(0,1,0)*dir2.norm();
+  zdir=Vector3d(0,0,1)*dir3.norm();
+
+
+  // now use matrices to transform the vectors into std orientation
+  //
   N = floor(N/2)*2 + 1;
+  Vector3d pt;
   double s1 = 1.0 / (N-1);
   std::vector<Vector3d> points_xz;
   std::vector<Vector3d> points_yz;
@@ -145,12 +175,16 @@ void bezier_patch(PolySetBuilder &builder, Vector3d offset, Vector3d xdir, Vecto
   for(int i=0;i<N;i++){
     double t1=(double)i/(double)(N-1);
     if(i == N-1) {
-	    points.push_back(builder.vertexIndex(offset+zdir));
+      pt = zdir;
+      pt = mat * pt;
+      points.push_back(builder.vertexIndex(pt+center));
     } else {
       int M=N-i;
       for(int j=0;j<M;j++) {
         double t2=(double)j/(double)(M-1);
-        points.push_back(builder.vertexIndex(offset+Bezier(t2, points_xz[i], Vector3d(points_xz[i][0], points_yz[i][1], points_xz[i][2]), points_yz[i])));
+	pt = Bezier(t2, points_xz[i], Vector3d(points_xz[i][0], points_yz[i][1], points_xz[i][2]), points_yz[i]);
+	pt = mat * pt;
+        points.push_back(builder.vertexIndex(center + pt));
       }
     }
   }
@@ -158,7 +192,6 @@ void bezier_patch(PolySetBuilder &builder, Vector3d offset, Vector3d xdir, Vecto
   int off=0;
   for(int i=0;i<N-1;i++) { // Zeile i, i-1
     int off_new=off+(N-i);
-    printf("new row i=%d off %d - %d\n",i,off, off_new);			   
     for(int j=0;j<N-i-1;j++) {
      builder.appendPolygon({points[off+j], points[off+j+1], points[off_new+j]});
      if(j < N-i-2){builder.appendPolygon({points[off+j+1], points[off_new+j+1], points[off_new+j]});   }
@@ -166,6 +199,9 @@ void bezier_patch(PolySetBuilder &builder, Vector3d offset, Vector3d xdir, Vecto
     off=off_new;
   }
 }
+
+std::vector<IndexedFace> mergetriangles(const std::vector<IndexedFace> polygons,const std::vector<Vector4d> normals,std::vector<Vector4d> &newNormals, std::vector<int> &faceParents, const std::vector<Vector3d> &vert); // TODO
+																											  //
 std::unique_ptr<const Geometry> FilletNode::createGeometry() const
 {
   int bn=11; // bezier points  // odd
@@ -190,6 +226,13 @@ std::unique_ptr<const Geometry> FilletNode::createGeometry() const
       for(int i=0;i<ps->vertices.size();i++) 
         corner_selected.push_back(true);	      
   }
+  std::vector<Vector4d> normals, newnormals;
+  std::vector<int> faceParents;
+  normals = offset3D_normals(ps->vertices, ps->indices);
+  std::vector<IndexedFace> merged = mergetriangles(ps->indices, normals, newnormals, faceParents, ps->vertices);
+
+//  merged = ps->indices; // TODO weg
+
 
   // Create vertex2face db
   std::vector<intList> polinds, polposs;
@@ -198,9 +241,9 @@ std::unique_ptr<const Geometry> FilletNode::createGeometry() const
     polinds.push_back(empty);	  
     polposs.push_back(empty);	  
   }
-  for(int i=0;i<ps->indices.size();i++) {
-    for(int j=0;j<ps->indices[i].size();j++) {
-      int ind=ps->indices[i][j];	    
+  for(int i=0;i<merged.size();i++) {
+    for(int j=0;j<merged[i].size();j++) {
+      int ind=merged[i][j];	    
       polinds[ind].push_back(i);
       polposs[ind].push_back(j);
     }	    
@@ -217,11 +260,11 @@ std::unique_ptr<const Geometry> FilletNode::createGeometry() const
   val.pos1=-1;
   val.pos2=-1;
   int ind1, ind2;
-  for(int i=0;i<ps->indices.size();i++) {
-    int  n=ps->indices[i].size();
+  for(int i=0;i<merged.size();i++) {
+    int  n=merged[i].size();
     for(int j=0;j<n;j++) {
-      ind1=ps->indices[i][j];	    
-      ind2=ps->indices[i][(j+1)%n];	    
+      ind1=merged[i][j];	    
+      ind2=merged[i][(j+1)%n];	    
       if(ind2 > ind1){
         edge.ind1=ind1;
         edge.ind2=ind2;	
@@ -281,16 +324,14 @@ std::unique_ptr<const Geometry> FilletNode::createGeometry() const
       Vector3d dir=(p2-p1).normalized();
       if(corner_rounds[e.first.ind1].size() >=  3) p1 += dir*this->r;
       if(corner_rounds[e.first.ind2].size() >=  3) p2 -= dir*this->r;
-      auto &face1 =ps->indices[e.second.face1];								  
-      auto &face2 =ps->indices[e.second.face2];								  
+      auto &face1 =merged[e.second.face1];								  
+      auto &face2 =merged[e.second.face2];								  
       Vector3d f1n=offset3D_normal(ps->vertices, face1).head<3>();
       Vector3d f2n=offset3D_normal(ps->vertices, face2).head<3>();
 
       int face1n=face1.size();
       int face2n=face2.size();
       int indo;
-      double f1=1.0;
-      double f2=1.4142;
       indo = face1[(e.second.pos1+face1n-1)%face1n];
       Vector3d e_f1n = (ps->vertices[indo]-ps->vertices[face1[(e.second.pos1+0)%face1n]]).normalized(); // Face1 nahe  richtung
 
@@ -298,7 +339,6 @@ std::unique_ptr<const Geometry> FilletNode::createGeometry() const
       Vector3d e_f1nr = f1n.cross(dir).normalized();
       double b=e_f1n.dot(e_f1nr);
       e_f1n *= this->r;
-      printf("b = %g\n",b);
 
       if(corner_rounds[e.first.ind1].size() == 2 && list_included(corner_rounds[e.first.ind1],indo)) e_f1n += dir*this->r; // TODO radius stimmt nicht
 
@@ -382,8 +422,8 @@ std::unique_ptr<const Geometry> FilletNode::createGeometry() const
 //    printf("\n");
 //  } 
   // copy modified faces
-  for(int i=0;i<ps->indices.size();i++)  {
-    const IndexedFace &face = ps->indices[i];
+  for(int i=0;i<merged.size();i++)  {
+    const IndexedFace &face = merged[i];
     std::vector<int> newface;
     for(int j=0;j<face.size();j++) {
       int ind=face[j];	    
@@ -437,37 +477,7 @@ std::unique_ptr<const Geometry> FilletNode::createGeometry() const
       Vector3d xdir=(ps->vertices[i] - ps->vertices[corner_rounds[i][0]]).normalized()*this->r;
       Vector3d ydir=(ps->vertices[i] - ps->vertices[corner_rounds[i][1]]).normalized()*this->r;
       Vector3d zdir=(ps->vertices[i] - ps->vertices[corner_rounds[i][2]]).normalized()*this->r;
-      if(i == 7) {
-//	      bezier_patch(builder, ps->vertices[i]+Vector3d(2,2,2),Vector3d(2,0,0),Vector3d(0,0,2), Vector3d(0,0,2),bn);
-  		bezier_patch(builder, Vector3d(5,5,5)-xdir-ydir-zdir, Vector3d(2,0,0), Vector3d(0,2,0), Vector3d(0,0,2),bn);
-		printf("xdir is %g/%g/%g\n",xdir[0], xdir[1], xdir[2]);
-		printf("ydir is %g/%g/%g\n",ydir[0], ydir[1], ydir[2]);
-		printf("zdir is %g/%g/%g\n",zdir[0], zdir[1], zdir[2]);
-      }
-      /*
-      std::vector<std::vector<int>> conns;
-      for(auto &e: edge_db) {
- 	if( e.first.ind1 == i) conns.push_back(e.second.bez1);
- 	if( e.first.ind2 == i){
-		auto tmp = e.second.bez2;		
-	  	std::reverse(tmp.begin(), tmp.end());
-		conns.push_back(tmp);
-	}
-      }
-      printf("%d sets found\n", conns.size());
-      assert(conns.size() == 3);
-//      auto tmp=conns[1];
-//      conns[1]=conns[2];
-//      conns[2]=tmp; // TODO fix
-//      // 1und 2 tauschen
-      for(int j=0;j<bn/2;j++) {
-      	builder.appendPolygon({conns[0][j], conns[1][bn-1-j], conns[1][bn-2-j], conns[0][1+j]}); 
-      	builder.appendPolygon({conns[1][j], conns[2][bn-1-j], conns[2][bn-2-j], conns[1][1+j]}); 
-      	builder.appendPolygon({conns[2][j], conns[0][bn-1-j], conns[0][bn-2-j], conns[2][1+j]}); 
-      }
-      int j=bn/2;
-      builder.appendPolygon({conns[0][j], conns[1][j],conns[2][j]});
-      */
+      bezier_patch(builder, ps->vertices[i]-xdir-ydir-zdir, xdir, ydir, zdir,bn);
     }	    
   }
   //

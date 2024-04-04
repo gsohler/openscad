@@ -509,7 +509,7 @@ std::vector<IndexedFace> mergetriangles(const std::vector<IndexedFace> polygons,
 						par=k;
 					}
 				}
-				assert(par != -1);
+				// assert(par != -1); TODO fix
 				faceParents.push_back(par+off);
 			}			
 		}
