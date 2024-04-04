@@ -1644,6 +1644,31 @@ std::shared_ptr<const Geometry> offset3D(const std::shared_ptr<const PolySet> &p
   return geom;
 }
 
+std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> ps,  std::vector<bool> corner_selected, double r);
+
+std::unique_ptr<const Geometry> addFillets(std::shared_ptr<const Geometry> result, const Geometry::Geometries & children, double r) {
+  printf("do fillet magic\n");	
+  std::unordered_set<Vector3d> points;
+  Vector3d pt;
+  r=0.5;
+  std::shared_ptr<const PolySet> psr = PolySetUtils::getGeometryAsPolySet(result);
+  for(const Vector3d pt : psr->vertices) points.insert(pt);
+
+  for(const auto child: children) {
+    const std::shared_ptr<const Geometry> geom =child.second;
+    std::shared_ptr<const PolySet> ps = PolySetUtils::getGeometryAsPolySet(child.second);
+    for(const Vector3d pt : ps->vertices) {
+      points.erase(pt);	    
+    }
+  }
+
+  std::vector<bool> corner_selected;
+  for(int i=0;i<psr->vertices.size();i++) corner_selected.push_back(points.count(psr->vertices[i])>0?true:false);
+
+  return  createFilletInt(psr,corner_selected, r);
+
+}
+
 /*!
    Applies the operator to all child nodes of the given node.
 
@@ -1679,6 +1704,9 @@ GeometryEvaluator::ResultObject GeometryEvaluator::applyToChildren3D(const Abstr
   }
   case OpenSCADOperator::UNION:
   {
+
+    const CsgOpNode *csgOpNode = dynamic_cast<const CsgOpNode *>(&node);
+    printf("Rad is %g\n",csgOpNode->r);
     Geometry::Geometries actualchildren;
     for (const auto& item : children) {
       if (item.second && !item.second->isEmpty()) actualchildren.push_back(item);
@@ -1687,7 +1715,13 @@ GeometryEvaluator::ResultObject GeometryEvaluator::applyToChildren3D(const Abstr
     if (actualchildren.size() == 1) return ResultObject::constResult(actualchildren.front().second);
 #ifdef ENABLE_MANIFOLD
     if (Feature::ExperimentalManifold.is_enabled()) {
-      return ResultObject::mutableResult(ManifoldUtils::applyOperator3DManifold(actualchildren, op));
+      std::shared_ptr<const ManifoldGeometry> csgResult = ManifoldUtils::applyOperator3DManifold(actualchildren, op);	    
+      if(csgOpNode->r != 0){
+        std::unique_ptr<const Geometry> geom_u = addFillets(csgResult, actualchildren, csgOpNode->r);
+	std::shared_ptr<const Geometry> geom_s(geom_u.release());
+	csgResult = ManifoldUtils::createManifoldFromGeometry(geom_s);
+      }
+      return ResultObject::mutableResult(csgResult);
     }
 #endif
 #ifdef ENABLE_CGAL
@@ -1748,7 +1782,14 @@ GeometryEvaluator::ResultObject GeometryEvaluator::applyToChildren3D(const Abstr
   {
 #ifdef ENABLE_MANIFOLD
     if (Feature::ExperimentalManifold.is_enabled()) {
-      return ResultObject::mutableResult(ManifoldUtils::applyOperator3DManifold(children, op));
+      std::shared_ptr<const ManifoldGeometry> csgResult = ManifoldUtils::applyOperator3DManifold(children, op);	    
+      const CsgOpNode *csgOpNode = dynamic_cast<const CsgOpNode *>(&node);
+      if(csgOpNode->r != 0){
+        std::unique_ptr<const Geometry> geom_u = addFillets(csgResult, children, csgOpNode->r);
+	std::shared_ptr<const Geometry> geom_s(geom_u.release());
+	csgResult = ManifoldUtils::createManifoldFromGeometry(geom_s);
+      }
+      return ResultObject::mutableResult(csgResult);
     }
 #endif
 #ifdef ENABLE_CGAL
