@@ -160,7 +160,7 @@ void bezier_patch(PolySetBuilder &builder, Vector3d center, Vector3d dir1, Vecto
 
   // now use matrices to transform the vectors into std orientation
   //
-  N = floor(N/2)*2 + 1;
+//  N = floor(N/2)*2 + 1;
   Vector3d pt;
   double s1 = 1.0 / (N-1);
   std::vector<Vector3d> points_xz;
@@ -203,15 +203,15 @@ void bezier_patch(PolySetBuilder &builder, Vector3d center, Vector3d dir1, Vecto
 std::vector<IndexedFace> mergetriangles(const std::vector<IndexedFace> polygons,const std::vector<Vector4d> normals,std::vector<Vector4d> &newNormals, std::vector<int> &faceParents, const std::vector<Vector3d> &vert); // TODO
 																											  //
 
-std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> ps,  std::vector<bool> corner_selected, double r)
+std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> ps,  std::vector<bool> corner_selected, double r, int bn)
 {
-  int bn=11; // bezier points  // odd
   std::vector<Vector4d> normals, newnormals;
   std::vector<int> faceParents;
   normals = offset3D_normals(ps->vertices, ps->indices);
   std::vector<IndexedFace> merged = mergetriangles(ps->indices, normals, newnormals, faceParents, ps->vertices);
 
 
+  if(bn < 2) bn=2;
   // Create vertex2face db
   std::vector<intList> polinds, polposs;
   intList empty;
@@ -287,9 +287,10 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
   // plan fillets of all edges now
   for(auto &e: edge_db) {
     if(e.second.sel == 1) {
-//      printf("Create rnd for %d %d %d %d\n",e.first.ind1, e.first.ind2, e.second.face1, e.second.face2);	    
+      printf("Create rnd for %d %d %d %d\n",e.first.ind1, e.first.ind2, e.second.face1, e.second.face2);	    
       Vector3d p1=ps->vertices[e.first.ind1];
       Vector3d p2=ps->vertices[e.first.ind2];
+      printf("p1 %g/%g/%g p2 %g/%g/%g\n",p1[0], p1[1], p1[2], p2[0], p2[1], p2[2]);
       Vector3d dir=(p2-p1).normalized();
       if(corner_rounds[e.first.ind1].size() >=  3) p1 += dir*r;
       if(corner_rounds[e.first.ind2].size() >=  3) p2 -= dir*r;
@@ -300,32 +301,68 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
 
       int face1n=face1.size();
       int face2n=face2.size();
-      int indo;
-      indo = face1[(e.second.pos1+face1n-1)%face1n];
-      Vector3d e_f1n = (ps->vertices[indo]-ps->vertices[face1[(e.second.pos1+0)%face1n]]).normalized(); // Face1 nahe  richtung
+      int indo1, indo2;
+      int indp1, indp2;
+      Vector3d unit;
+
+      indo1 = face1[(e.second.pos1+face1n-1)%face1n];
+
+      indo2 = face2[(e.second.pos2+2)%face2n];
+    
+      Vector3d e_f1n = (ps->vertices[indo1]-ps->vertices[face1[(e.second.pos1+0)%face1n]]).normalized()*r; // Face1 nahe  richtung
+      Vector3d e_f2n = (ps->vertices[indo2]                          -ps->vertices[face2[(e.second.pos2+1)%face2n]]).normalized()*r; // Face2 nahe Richtung
+      Vector3d f_f2n = (ps->vertices[face2[(e.second.pos2+1)%face2n]]-ps->vertices[face2[e.second.pos2]]); // TODO generisher
+      Vector3d f_f1n = (ps->vertices[face1[e.second.pos1]]-ps->vertices[face1[(e.second.pos1+1)%face1n]]).normalized()*r; // Face1 nahe  richtung
+
+      if(corner_rounds[e.first.ind1].size() == 2)
+      {
+	printf("a %g\n",(e_f2n.cross(e_f1n)).dot(dir));
+        if(list_included(corner_rounds[e.first.ind1],indo1)){
+		e_f1n += dir*r; 
+	        if((e_f2n.cross(e_f1n)).dot(dir) < 0) e_f1n = -e_f1n;
+	}
+        if(list_included(corner_rounds[e.first.ind1],indo2)){
+		e_f2n += dir*r;
+	        if((e_f2n.cross(e_f1n)).dot(dir) < 0) e_f2n = -e_f2n;
+	}
+      }
+      if(corner_rounds[e.first.ind1].size() == 3)
+      {
+        if((f_f2n.cross(e_f2n)).dot(e_f1n) > 0 && face2n > 4) {
+          e_f2n += dir*r;
+          if((e_f2n.cross(e_f1n)).dot(dir) < 0) e_f2n = -e_f2n;
+	  e_f2n -= dir*r;
+	}
+
+        if((e_f1n.cross(f_f1n)).dot(e_f2n) > 0 && face1n > 4) {
+	  e_f1n += dir*r; 
+          if((e_f2n.cross(e_f1n)).dot(dir) < 0) e_f1n = -e_f1n;
+	  e_f1n-= dir*r;
+	}
+	// TODO dies auch fuer far und besser
+      }
 
 
-      Vector3d e_f1nr = f1n.cross(dir).normalized();
-      double b=e_f1n.dot(e_f1nr);
-      e_f1n *= r;
+      indo1 = face1[(e.second.pos1+2)%face1n];		
+      indo2 = face2[(e.second.pos2+face2n-1)%face2n];
 
-      if(corner_rounds[e.first.ind1].size() == 2 && list_included(corner_rounds[e.first.ind1],indo)) e_f1n += dir*r; 
-
-      indo = face1[(e.second.pos1+2)%face1n];		
-      Vector3d e_f1f = (ps->vertices[indo]-ps->vertices[face1[(e.second.pos1+1)%face1n]]).normalized()*r; // Face1 entfernte richtung
-//      e_f1f = f1n.cross(dir).normalized()*r;
-      if(corner_rounds[e.first.ind2].size() == 2 && list_included(corner_rounds[e.first.ind2],indo)) e_f1f -= dir*r;
-     
-      indo = face2[(e.second.pos2+2)%face2n];
-      Vector3d e_f2n = (ps->vertices[indo]-ps->vertices[face2[(e.second.pos2+1)%face2n]]).normalized()*r; // Face2 nahe Richtung
- //     e_f2n = dir.cross(f2n).normalized()*r;
-      if(corner_rounds[e.first.ind1].size() == 2 && list_included(corner_rounds[e.first.ind1],indo)) e_f2n += dir*r;
-
-      indo = face2[(e.second.pos2+face2n-1)%face2n];
-      Vector3d e_f2f = (ps->vertices[indo]-ps->vertices[face2[(e.second.pos2+0)%face2n]]).normalized()*r; // Face2 entfernte Rcithung
-  //    e_f2f = dir.cross(f2n).normalized()*r;
-      if(corner_rounds[e.first.ind2].size() == 2 && list_included(corner_rounds[e.first.ind2],indo)) e_f2f -= dir*r;
+      Vector3d e_f1f = (ps->vertices[indo1]-ps->vertices[face1[(e.second.pos1+1)%face1n]]).normalized()*r; // Face1 entfernte richtung
+      Vector3d e_f2f = (ps->vertices[indo2]-ps->vertices[face2[(e.second.pos2+0)%face2n]]).normalized()*r; // Face2 entfernte Rcithung
+													   //
+      if(corner_rounds[e.first.ind2].size() == 2) 
+      {
+        if(list_included(corner_rounds[e.first.ind2],indo1)){
+		e_f1f -= dir*r;
+		if((e_f2f.cross(e_f1f)).dot(dir) < 0) e_f1f = -e_f1f;
+	}
+        if(list_included(corner_rounds[e.first.ind2],indo2)){
+		e_f2f -= dir*r;
+		if((e_f2f.cross(e_f1f)).dot(dir) < 0) e_f2f = -e_f2f;
+	}
+      }	
 																	  
+      printf("p1 f1 %g/%g/%g f2  %g/%g/%g\n",e_f1n[0], e_f1n[1], e_f1n[2], e_f2n[0], e_f2n[1], e_f2n[2]);
+      printf("p2 f1 %g/%g/%g f2  %g/%g/%g\n",e_f1f[0], e_f1f[1], e_f1f[2], e_f2f[0], e_f2f[1], e_f2f[2]);
 
       for(int i=0;i<bn;i++) {
         double f=(double)i/(double)(bn-1);		
@@ -357,7 +394,7 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
           int facepos=polinds[e.first.ind1][i];
           if(faceid == e.second.face1) continue;       
           if(faceid == e.second.face2) continue;       
-	  s.pol=faceid; // stirnseite2
+	  s.pol=faceid; // stirnseite1
           s.search=e.first.ind1 ;
           s.replace={e.second.bez1};
 	  std::reverse(s.replace.begin(), s.replace.end());
@@ -440,7 +477,7 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
       Vector3d xdir=(ps->vertices[i] - ps->vertices[corner_rounds[i][0]]).normalized()*r;
       Vector3d ydir=(ps->vertices[i] - ps->vertices[corner_rounds[i][1]]).normalized()*r;
       Vector3d zdir=(ps->vertices[i] - ps->vertices[corner_rounds[i][2]]).normalized()*r;
-      bezier_patch(builder, ps->vertices[i]-xdir-ydir-zdir, xdir, ydir, zdir,bn);
+      // bezier_patch(builder, ps->vertices[i]-xdir-ydir-zdir, xdir, ydir, zdir,bn);
     }	    
   }
   //
@@ -472,7 +509,7 @@ std::unique_ptr<const Geometry> FilletNode::createGeometry() const
       for(int i=0;i<ps->vertices.size();i++) 
         corner_selected.push_back(true);	      
   }
-  return createFilletInt(ps, corner_selected, this->r);
+  return createFilletInt(ps, corner_selected, this->r, this->fn);
 }
 
 
