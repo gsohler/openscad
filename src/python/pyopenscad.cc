@@ -567,6 +567,10 @@ void initPython(double time)
       }
     }
   } else {
+    PyPreConfig preconfig;
+    PyPreConfig_InitPythonConfig(&preconfig);
+    Py_PreInitialize(&preconfig);
+
 #ifdef HAVE_PYTHON_YIELD
     set_object_callback(openscad_object_callback);
 #endif

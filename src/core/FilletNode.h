@@ -12,11 +12,12 @@ public:
   std::string toString() const override
   {
     std::ostringstream stream;
-    stream << "fillet( r = " << r << ")";
+    stream << "fillet( r = " << r << " fn = " << fn << " )";
     return  stream.str();
   }
   std::string name() const override { return "fillet"; }
   std::unique_ptr<const Geometry> createGeometry() const override;
   double r;
+  int fn=2;
 };
 

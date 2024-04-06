@@ -1489,47 +1489,54 @@ PyObject *python_oo_oversample(PyObject *obj, PyObject *args, PyObject *kwargs)
 }
 
 
-PyObject *python_fillet_core(PyObject *obj, double  r, PyObject *sel)
+PyObject *python_fillet_core(PyObject *obj, double  r, double fn, PyObject *sel)
 {
   PyObject *dummydict;
-  std::shared_ptr<AbstractNode> child = PyOpenSCADObjectToNodeMulti(obj, &dummydict);
-  std::shared_ptr<AbstractNode> sel1 = PyOpenSCADObjectToNodeMulti(sel, &dummydict);
-  if (child == NULL) {
+  DECLARE_INSTANCE
+  auto node = std::make_shared<FilletNode>(instance);
+  node->r = r;
+  node->fn = (int) fn;
+  if (obj != nullptr) node->children.push_back(PyOpenSCADObjectToNodeMulti(obj, &dummydict));
+  else {	 
     PyErr_SetString(PyExc_TypeError, "Invalid type for  Object in fillet \n");
     return NULL;
   }
 
-  DECLARE_INSTANCE
-  auto node = std::make_shared<FilletNode>(instance);
-  node->children.push_back(child);
-  node->children.push_back(sel1);
-  node->r = r;
+  if(sel != nullptr) 
+    node->children.push_back(PyOpenSCADObjectToNodeMulti(sel, &dummydict));
+
   return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
 }
 
 PyObject *python_fillet(PyObject *self, PyObject *args, PyObject *kwargs)
 {
   double r=1.0;
-  char *kwlist[] = {"obj", "r","sel",NULL};
+  double fn=NAN;
+  char *kwlist[] = {"obj", "r","sel","n", NULL};
   PyObject *obj = NULL;
   PyObject *sel = NULL;
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OdO", kwlist, &obj,&r,&sel)) {
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "Od|Od", kwlist, &obj,&r,&sel,&fn)) {
     PyErr_SetString(PyExc_TypeError, "error during parsing\n");
     return NULL;
   }
-  return python_fillet_core(obj,r,sel);
+  double dummy;
+  if(isnan(fn)) get_fnas(fn, dummy, dummy);
+  return python_fillet_core(obj,r,fn, sel);
 }
 
 PyObject *python_oo_fillet(PyObject *obj, PyObject *args, PyObject *kwargs)
 {
   double r=1.0;
-  PyObject *sel;
-  char *kwlist[] = {"r","sel",NULL};
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "dO", kwlist,&r,&sel)) {
+  double fn=NAN;
+  PyObject *sel = nullptr;
+  char *kwlist[] = {"r","sel", "fn",NULL};
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "d|Od", kwlist,&r,&sel,&fn)) {
     PyErr_SetString(PyExc_TypeError, "error during parsing\n");
     return NULL;
   }
-  return python_fillet_core(obj,r,sel);
+  double dummy;
+  if(isnan(fn)) get_fnas(fn, dummy, dummy);
+  return python_fillet_core(obj,r,fn,sel);
 }
 
 PyObject *rotate_extrude_core(PyObject *obj, char *layer, int convexity, double scale, double angle, PyObject *twist, PyObject *origin, PyObject *offset, double fn, double fa, double fs)
@@ -1925,6 +1932,10 @@ PyObject *python_csg_sub(PyObject *self, PyObject *args, PyObject *kwargs, OpenS
 	  return nullptr;
       } else if(strcmp(value_str,"r") == 0) {
 	      python_numberval(value,&(node->r));
+      } else if(strcmp(value_str,"fn") == 0) {
+	      double fn;
+	      python_numberval(value,&fn);
+	      node->fn=(int)fn;
       } else {
           PyErr_SetString(PyExc_TypeError, "Unkown parameter name in CSG.");
 	  return nullptr;
