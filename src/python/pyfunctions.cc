@@ -1271,6 +1271,10 @@ PyObject *python_oo_output(PyObject *obj, PyObject *args, PyObject *kwargs)
   return python_output_core(obj);
 }
 
+PyObject *python_oo_show(PyObject *obj, PyObject *args, PyObject *kwargs){
+  return python_oo_output(obj, args, kwargs);	
+}
+
 PyObject *python__getitem__(PyObject *dict, PyObject *key)
 {
   PyOpenSCADObject *self = (PyOpenSCADObject *) dict;
@@ -1639,7 +1643,7 @@ PyObject *python_oo_rotate_extrude(PyObject *obj, PyObject *args, PyObject *kwar
   return rotate_extrude_core(obj, layer, convexity, scale, angle, twist, origin, offset, fn, fa,fs);
 }
 
-PyObject *linear_extrude_core(PyObject *obj, double height, char *layer, int convexity, PyObject *origin, PyObject *scale, PyObject *center, int slices, int segments, PyObject *twist, double fn, double fa, double fs)
+PyObject *linear_extrude_core(PyObject *obj, PyObject *height, char *layer, int convexity, PyObject *origin, PyObject *scale, PyObject *center, int slices, int segments, PyObject *twist, double fn, double fa, double fs)
 {
   DECLARE_INSTANCE
   std::shared_ptr<AbstractNode> child;
@@ -1668,7 +1672,15 @@ PyObject *linear_extrude_core(PyObject *obj, double height, char *layer, int con
   if (!isnan(fa)) node->fa = fa;
   if (!isnan(fs)) node->fs = fs;
 
-  node->height = height;
+  Vector3d height_vec(0,0,0);
+  double dummy;
+  if(!python_numberval(height, &height_vec[2])) {
+	  printf("lin cvase\n");
+    node->height = height_vec;
+  } else if(!python_vectorval(height, &height_vec[0], &height_vec[1], &height_vec[2], &dummy)) {
+    node->height = height_vec;
+  }
+
   node->convexity = convexity;
   if (layer != NULL) node->layername = layer;
 
@@ -1711,7 +1723,7 @@ PyObject *linear_extrude_core(PyObject *obj, double height, char *layer, int con
 PyObject *python_linear_extrude(PyObject *self, PyObject *args, PyObject *kwargs)
 {
   PyObject *obj = NULL;
-  double height = 1;
+  PyObject *height = NULL;
   char *layer = NULL;
   int convexity = 1;
   PyObject *origin = NULL;
@@ -1723,7 +1735,7 @@ PyObject *python_linear_extrude(PyObject *self, PyObject *args, PyObject *kwargs
   double fn = NAN, fa = NAN, fs = NAN;
 
   char * kwlist[] ={"obj","height","layer","convexity","origin","scale","center","slices","segments","twist","fn","fa","fs",NULL};
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|dsiOOOiiOddd", kwlist, 
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|OsiOOOiiOddd", kwlist, 
                                    &obj, &height, &layer, &convexity, &origin, &scale, &center, &slices, &segments, &twist, &fn, &fs, &fs))
    {
     PyErr_SetString(PyExc_TypeError,"error during parsing\n");
@@ -1735,7 +1747,7 @@ PyObject *python_linear_extrude(PyObject *self, PyObject *args, PyObject *kwargs
 
 PyObject *python_oo_linear_extrude(PyObject *obj, PyObject *args, PyObject *kwargs)
 {
-  double height = 1;
+  PyObject *height = NULL;
   char *layer = NULL;
   int convexity = 1;
   PyObject *origin = NULL;
@@ -1747,7 +1759,7 @@ PyObject *python_oo_linear_extrude(PyObject *obj, PyObject *args, PyObject *kwar
   double fn = NAN, fa = NAN, fs = NAN;
 
   char * kwlist[] ={"height","layer","convexity","origin","scale","center","slices","segments","twist","fn","fa","fs",NULL};
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|dsiOOOiiOddd", kwlist, 
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|OsiOOOiiOddd", kwlist, 
                                   &height, &layer, &convexity, &origin, &scale, &center, &slices, &segments, &twist, &fn, &fs, &fs))
    {
     PyErr_SetString(PyExc_TypeError,"error during parsing\n");
@@ -3069,6 +3081,7 @@ PyMethodDef PyOpenSCADFunctions[] = {
   {"pull", (PyCFunction) python_pull, METH_VARARGS | METH_KEYWORDS, "Pull apart Object."},
   {"color", (PyCFunction) python_color, METH_VARARGS | METH_KEYWORDS, "Color Object."},
   {"output", (PyCFunction) python_output, METH_VARARGS | METH_KEYWORDS, "Output the result."},
+  {"show", (PyCFunction) python_output, METH_VARARGS | METH_KEYWORDS, "Output the result."},
 
   {"linear_extrude", (PyCFunction) python_linear_extrude, METH_VARARGS | METH_KEYWORDS, "Linear_extrude Object."},
   {"rotate_extrude", (PyCFunction) python_rotate_extrude, METH_VARARGS | METH_KEYWORDS, "Rotate_extrude Object."},
@@ -3130,6 +3143,7 @@ PyMethodDef PyOpenSCADMethods[] = {
   OO_METHOD_ENTRY(roof,"Roof Object")	
   OO_METHOD_ENTRY(color,"Color Object")	
   OO_METHOD_ENTRY(output,"Output Object")	
+  OO_METHOD_ENTRY(show,"Output Object")	
 
   OO_METHOD_ENTRY(linear_extrude,"Linear_extrude Object")	
   OO_METHOD_ENTRY(rotate_extrude,"Rotate_extrude Object")	

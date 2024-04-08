@@ -2398,7 +2398,7 @@ int sgn_vdiff(const Vector2d& v1, const Vector2d& v2) {
  */
 static void add_slice(PolySetBuilder &builder, const Polygon2d& poly,
                       double rot1, double rot2,
-                      double h1, double h2,
+                      Vector3d h1, Vector3d h2,
                       const Vector2d& scale1,
                       const Vector2d& scale2)
 {
@@ -2438,51 +2438,51 @@ static void add_slice(PolySetBuilder &builder, const Polygon2d& poly,
         // Split into 4 triangles, with an added midpoint.
         //Vector2d mid_prev = trans3 * (prev1 +curr1+curr2)/4;
         Vector2d mid = trans_mid * (o.vertices[(i - 1) % o.vertices.size()] + o.vertices[i % o.vertices.size()]) / 2;
-        double h_mid = (h1 + h2) / 2;
+        Vector3d h_mid = (h1 + h2) / 2;
         builder.beginPolygon(3);
-        builder.insertVertex(prev1[0], prev1[1], h1);
-        builder.insertVertex(mid[0],   mid[1], h_mid);
-        builder.insertVertex(curr1[0], curr1[1], h1);
+        builder.insertVertex(prev1[0]+h1[0], prev1[1]+h1[1], h1[2]);
+        builder.insertVertex(mid[0]+h_mid[0],   mid[1]+h_mid[1], h_mid+h_mid[2]);
+        builder.insertVertex(curr1[0]+h1[0], curr1[1]+h1[1], h1[2]);
         builder.beginPolygon(3);
-        builder.insertVertex(curr1[0], curr1[1], h1);
-        builder.insertVertex(mid[0],   mid[1], h_mid);
-        builder.insertVertex(curr2[0], curr2[1], h2);
+        builder.insertVertex(curr1[0]+h1[0], curr1[1]+h1[1], h1[2]);
+        builder.insertVertex(mid[0]+h_mid[0],   mid[1]+h_mid[1], h_mid[2]);
+        builder.insertVertex(curr2[0]+h2[0], curr2[1]+h2[1], h2[2]);
         builder.beginPolygon(3);
-        builder.insertVertex(curr2[0], curr2[1], h2);
-        builder.insertVertex(mid[0],   mid[1], h_mid);
-        builder.insertVertex(prev2[0], prev2[1], h2);
+        builder.insertVertex(curr2[0]+h2[0], curr2[1]+h2[1], h2[2]);
+        builder.insertVertex(mid[0]+h_mid[0],   mid[1]+h_mid[1], h_mid[2]);
+        builder.insertVertex(prev2[0]+h2[0], prev2[1]+h2[1], h2[2]);
         builder.beginPolygon(3);
-        builder.insertVertex(prev2[0], prev2[1], h2);
-        builder.insertVertex(mid[0],   mid[1], h_mid);
-        builder.insertVertex(prev1[0], prev1[1], h1);
+        builder.insertVertex(prev2[0]+h2[0], prev2[1]+h2[1], h2[2]);
+        builder.insertVertex(mid[0]+h_mid[0],   mid[1]+h_mid[1], h_mid[2]);
+        builder.insertVertex(prev1[0]+h1[0], prev1[1]+h1[1], h1[2]);
       } else
 #endif // ifdef LINEXT_4WAY
       // Split along shortest diagonal,
       // unless at top for a 0-scaled axis (which can create 0 thickness "ears")
       if (splitfirst xor any_zero) {
         builder.appendPolygon({
-                Vector3d(curr1[0], curr1[1], h1),
-                Vector3d(curr2[0], curr2[1], h2),
-                Vector3d(prev1[0], prev1[1], h1)
+                Vector3d(curr1[0]+h1[0], curr1[1]+h1[1], h1[2]),
+                Vector3d(curr2[0]+h2[0], curr2[1]+h2[1], h2[2]),
+                Vector3d(prev1[0]+h1[0], prev1[1]+h1[1], h1[2])
                 });
         if (!any_zero || (any_non_zero && prev2 != curr2)) {
           builder.appendPolygon({
-                Vector3d(prev2[0], prev2[1], h2),
-                Vector3d(prev1[0], prev1[1], h1),
-                Vector3d(curr2[0], curr2[1], h2)
+                Vector3d(prev2[0]+h2[0], prev2[1]+h2[1], h2[2]),
+                Vector3d(prev1[0]+h1[0], prev1[1]+h1[1], h1[2]),
+                Vector3d(curr2[0]+h2[0], curr2[1]+h2[1], h2[2])
           });
         }
       } else {
         builder.appendPolygon({
-                Vector3d(curr1[0], curr1[1], h1),
-                Vector3d(prev2[0], prev2[1], h2),
-                Vector3d(prev1[0], prev1[1], h1)
+                Vector3d(curr1[0]+h1[0], curr1[1]+h1[1], h1[2]),
+                Vector3d(prev2[0]+h2[0], prev2[1]+h2[1], h2[2]),
+                Vector3d(prev1[0]+h1[0], prev1[1]+h1[1], h1[2])
         });
         if (!any_zero || (any_non_zero && prev2 != curr2)) {
           builder.appendPolygon({
-                Vector3d(curr1[0], curr1[1], h1),
-                Vector3d(curr2[0], curr2[1], h2),
-                Vector3d(prev2[0], prev2[1], h2)
+                Vector3d(curr1[0]+h1[0], curr1[1]+h1[1], h1[2]),
+                Vector3d(curr2[0]+h2[0], curr2[1]+h2[1], h2[2]),
+                Vector3d(prev2[0]+h2[0], prev2[1]+h2[1], h2[2])
           });        
         }
       }
@@ -2665,12 +2665,12 @@ static Outline2d alterprofile(Outline2d profile,double scalex, double scaley, do
 	return result;
 }
 
-void  append_linear_vertex(PolySetBuilder &builder,const Outline2d *face, int index, double h)
+void  append_linear_vertex(PolySetBuilder &builder,const Outline2d *face, int index, Vector3d h)
 {
 	builder.addVertex(builder.vertexIndex(Vector3d(
-			face->vertices[index][0],
-			face->vertices[index][1],
-			h)));
+			face->vertices[index][0]+h[0],
+			face->vertices[index][1]+h[2],
+			h[2])));
 }
 
 void  append_rotary_vertex(PolySetBuilder &builder,const Outline2d *face, int index, double ang)
@@ -2764,7 +2764,7 @@ static std::unique_ptr<Geometry> extrudePolygon(const LinearExtrudeNode& node, c
   if (isConvex && non_linear) isConvex = unknown;
   PolySetBuilder builder(0, 0, 3, isConvex);
   builder.setConvexity(node.convexity);
-  if (node.height <= 0) return PolySet::createEmpty();
+  if (node.height[2] <= 0) return PolySet::createEmpty();
 
   size_t slices;
   if (node.has_slices) {
@@ -2777,7 +2777,7 @@ static std::unique_ptr<Geometry> extrudePolygon(const LinearExtrudeNode& node, c
         max_r1_sqr = fmax(max_r1_sqr, v.squaredNorm());
     // Calculate Helical curve length for Twist with no Scaling
     if (node.scale_x == 1.0 && node.scale_y == 1.0) {
-      slices = (unsigned int)Calc::get_helix_slices(max_r1_sqr, node.height, node.twist, node.fn, node.fs, node.fa);
+      slices = (unsigned int)Calc::get_helix_slices(max_r1_sqr, node.height[2], node.twist, node.fn, node.fs, node.fa);
     } else if (node.scale_x != node.scale_y) {  // non uniform scaling with twist using max slices from twist and non uniform scale
       double max_delta_sqr = 0; // delta from before/after scaling
       Vector2d scale(node.scale_x, node.scale_y);
@@ -2788,11 +2788,11 @@ static std::unique_ptr<Geometry> extrudePolygon(const LinearExtrudeNode& node, c
       }
       size_t slicesNonUniScale;
       size_t slicesTwist;
-      slicesNonUniScale = (unsigned int)Calc::get_diagonal_slices(max_delta_sqr, node.height, node.fn, node.fs);
-      slicesTwist = (unsigned int)Calc::get_helix_slices(max_r1_sqr, node.height, node.twist, node.fn, node.fs, node.fa);
+      slicesNonUniScale = (unsigned int)Calc::get_diagonal_slices(max_delta_sqr, node.height[2], node.fn, node.fs);
+      slicesTwist = (unsigned int)Calc::get_helix_slices(max_r1_sqr, node.height[2], node.twist, node.fn, node.fs, node.fa);
       slices = std::max(slicesNonUniScale, slicesTwist);
     } else { // uniform scaling with twist, use conical helix calculation
-      slices = (unsigned int)Calc::get_conical_helix_slices(max_r1_sqr, node.height, node.twist, node.scale_x, node.fn, node.fs, node.fa);
+      slices = (unsigned int)Calc::get_conical_helix_slices(max_r1_sqr, node.height[2], node.twist, node.scale_x, node.fn, node.fs, node.fa);
     }
   } else if (node.scale_x != node.scale_y) {
     // Non uniform scaling, w/o twist
@@ -2803,7 +2803,7 @@ static std::unique_ptr<Geometry> extrudePolygon(const LinearExtrudeNode& node, c
         max_delta_sqr = fmax(max_delta_sqr, (v - v.cwiseProduct(scale)).squaredNorm());
       }
     }
-    slices = Calc::get_diagonal_slices(max_delta_sqr, node.height, node.fn, node.fs);
+    slices = Calc::get_diagonal_slices(max_delta_sqr, node.height[2], node.fn, node.fs);
   } else {
     // uniform or [1,1] scaling w/o twist needs only one slice
     slices = 1;
@@ -2854,12 +2854,12 @@ static std::unique_ptr<Geometry> extrudePolygon(const LinearExtrudeNode& node, c
 
   const Polygon2d& polyref = is_segmented ? seg_poly : poly;
 
-  double h1, h2;
+  Vector3d h1, h2;
   if (node.center) {
-    h1 = -node.height / 2.0;
-    h2 = +node.height / 2.0;
+    h1 = Vector3d(-node.height[0]* 0.5, -node.height[1]*0.5, -node.height[2]*0.5);
+    h2 = Vector3d(node.height[0]* 0.5, node.height[1]*0.5, node.height[2]*0.5);
   } else {
-    h1 = 0;
+    h1 = Vector3d(0,0,0);
     h2 = node.height;
   }
 
@@ -2868,7 +2868,7 @@ static std::unique_ptr<Geometry> extrudePolygon(const LinearExtrudeNode& node, c
   {
 	Outline2d lowerFace;
 	Outline2d upperFace;
-	double lower_h=h1, upper_h=h2;
+	Vector3d lower_h=h1, upper_h=h2;
 	double lower_scalex=1.0, upper_scalex=1.0;
 	double lower_scaley=1.0, upper_scaley=1.0;
 	double lower_rot=0.0, upper_rot=0.0;
@@ -2881,7 +2881,7 @@ static std::unique_ptr<Geometry> extrudePolygon(const LinearExtrudeNode& node, c
 	Polygon2d botface;
         botface.addOutline(lowerFace);
     	std::unique_ptr<PolySet> ps_bot = botface.tessellate();
-	translate_PolySet(*ps_bot, Vector3d(0, 0, lower_h));
+	translate_PolySet(*ps_bot, lower_h);
   	for (auto& p : ps_bot->indices) {
 	    std::reverse(p.begin(), p.end());
 	}
@@ -2894,7 +2894,7 @@ static std::unique_ptr<Geometry> extrudePolygon(const LinearExtrudeNode& node, c
 	          upper_rot = python_doublefunc(node.twist_func, i/(double)slices);
         	} else upper_rot=i*node.twist /slices;
 		if(node.center) upper_h -= node.height/2;
-		upperFace = alterprofile(python_getprofile(node.profile_func, node.fn, upper_h), upper_scalex, upper_scaley , node.origin_x, node.origin_y, 0, 0, upper_rot);
+		upperFace = alterprofile(python_getprofile(node.profile_func, node.fn, upper_h[2]), upper_scalex, upper_scaley , node.origin_x, node.origin_y, 0, 0, upper_rot);
 		if(lowerFace.vertices.size() == upperFace.vertices.size()) {
 			unsigned int n=lowerFace.vertices.size();
 			for(unsigned int j=0;j<n;j++) {
@@ -2920,7 +2920,7 @@ static std::unique_ptr<Geometry> extrudePolygon(const LinearExtrudeNode& node, c
 	Polygon2d topface;
         topface.addOutline(upperFace);
 	std::unique_ptr<PolySet> ps_top = topface.tessellate();
-	translate_PolySet(*ps_top, Vector3d(0, 0, upper_h));
+	translate_PolySet(*ps_top, upper_h);
 	builder.appendPolySet(*ps_top);
   }
   else
@@ -2932,7 +2932,7 @@ static std::unique_ptr<Geometry> extrudePolygon(const LinearExtrudeNode& node, c
   for (auto& p : ps_bottom->indices) {
     std::reverse(p.begin(), p.end());
   }
-  translate_PolySet(*ps_bottom, Vector3d(0, 0, h1));
+  translate_PolySet(*ps_bottom, h1);
   builder.appendPolySet(*ps_bottom);
 
   // Create slice sides.
@@ -2950,8 +2950,8 @@ static std::unique_ptr<Geometry> extrudePolygon(const LinearExtrudeNode& node, c
     } else
 #endif
     rot2 = node.twist * (j + 1) / slices;
-    double height1 = h1 + (h2 - h1) * j / slices;
-    double height2 = h1 + (h2 - h1) * (j + 1) / slices;
+    Vector3d height1 = h1 + (h2 - h1) * j / slices;
+    Vector3d height2 = h1 + (h2 - h1) * (j + 1) / slices;
     Vector2d scale1(1 - (1 - node.scale_x) * j / slices,
                     1 - (1 - node.scale_y) * j / slices);
     Vector2d scale2(1 - (1 - node.scale_x) * (j + 1) / slices,
@@ -2967,7 +2967,7 @@ static std::unique_ptr<Geometry> extrudePolygon(const LinearExtrudeNode& node, c
     Eigen::Affine2d trans(Eigen::Scaling(node.scale_x, node.scale_y) * Eigen::Affine2d(rotate_degrees(-rot2)));
     top_poly.transform(trans);
     auto ps_top = top_poly.tessellate();
-    translate_PolySet(*ps_top, Vector3d(0, 0, h2));
+    translate_PolySet(*ps_top, h2);
     builder.appendPolySet(*ps_top);
   }
 }
