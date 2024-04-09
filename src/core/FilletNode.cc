@@ -329,8 +329,8 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
       }
       if(corner_rounds[e.first.ind1].size() == 3)
       {
-        if((e_fa1p.cross(e_fa1)).dot(e_fb1) > 0 && facean > 4) e_fa1 = -e_fa1 - 2*dir*r; 
-        if((e_fb1.cross(e_fb1p)).dot(e_fa1) > 0 && facebn > 4) e_fb1 = -e_fb1 - 2*dir*r; 
+        if((e_fa1p.cross(e_fa1)).dot(e_fb1) > 0 && facean > 4){ printf("corner3 fa1 fix\n"); e_fa1 = -e_fa1 - 2*dir*r;  }
+        if((e_fb1.cross(e_fb1p)).dot(e_fa1) > 0 && facebn > 4){ printf("corner3 fb1 fix\n"); e_fb1 = -e_fb1 - 2*dir*r;  }
       }
 
 
@@ -360,16 +360,18 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
 
       if(corner_rounds[e.first.ind2].size() == 3)
       {
-        if((e_fa2p.cross(e_fa2)).dot(e_fb2) > 0 && facean > 4) {
-	  e_fa2 += dir*r; 
-          if((e_fb2.cross(e_fa2)).dot(dir) < 0) e_fa2 = -e_fa2;
-	  e_fa2-= dir*r;
-	}
 
-        if((e_fb2.cross(e_fb2p)).dot(e_fa2) > 0 && facebn > 4) {
-          e_fb2 += dir*r;
-          if((e_fb2.cross(e_fa2)).dot(dir) < 0) e_fb2 = -e_fb2;
-	  e_fb2 -= dir*r;
+        if((e_fb2.cross(e_fb2p)).dot(e_fa2) < 0 && facean > 4) {
+		printf("3corner fa2 fix\n");
+          e_fa2 -= dir*r;
+          if((e_fb2.cross(e_fa2)).dot(dir) < 0) e_fa2 = -e_fa2;
+	  e_fa2 += dir*r;
+	}
+        if((e_fa2.cross(e_fa2p)).dot(e_fb2) < 0  && facebn > 4) {
+		printf("3corner fb2 fix\n");
+          e_fb2 -= dir*r;
+          if((e_fa2.cross(e_fb2)).dot(dir) < 0) e_fb2 = -e_fb2;
+	  e_fb2 += dir*r;
 	}
 
       }
@@ -490,7 +492,7 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
       Vector3d xdir=(ps->vertices[i] - ps->vertices[corner_rounds[i][0]]).normalized()*r;
       Vector3d ydir=(ps->vertices[i] - ps->vertices[corner_rounds[i][1]]).normalized()*r;
       Vector3d zdir=(ps->vertices[i] - ps->vertices[corner_rounds[i][2]]).normalized()*r;
-      bezier_patch(builder, ps->vertices[i]-xdir-ydir-zdir, xdir, ydir, zdir,bn);
+//      bezier_patch(builder, ps->vertices[i]-xdir-ydir-zdir, xdir, ydir, zdir,bn);
     }	    
   }
   //
