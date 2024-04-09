@@ -47,9 +47,15 @@ using namespace boost::assign; // bring 'operator+=()' into scope
 #define F_MINIMUM 0.01
 
 template <class InsertIterator>
-static void generate_circle(InsertIterator iter, double r, double z, int fragments) {
+static void generate_circle(InsertIterator iter, double r, double z, double angle, int fragments) {
+  int fragments_div=fragments;	
+  if(angle < 360) {
+    *(iter++) = {0,0,z};
+    fragments--;
+    fragments_div -=2;
+  }	  
   for (int i = 0; i < fragments; ++i) {
-    double phi = (360.0 * i) / fragments;
+    double phi = (angle * i) / fragments_div;
     *(iter++) = {r * cos_degrees(phi), r * sin_degrees(phi), z};
   }
 }
@@ -187,7 +193,7 @@ std::unique_ptr<const Geometry> SphereNode::createGeometry() const
     return PolySet::createEmpty();
   }
 
-  auto num_fragments = Calc::get_fragments_from_r(r, fn, fs, fa);
+  auto num_fragments = Calc::get_fragments_from_r(r, 360.0, fn, fs, fa);
   size_t num_rings = (num_fragments + 1) / 2;
   // Uncomment the following three lines to enable experimental sphere
   // tessellation
@@ -202,7 +208,7 @@ std::unique_ptr<const Geometry> SphereNode::createGeometry() const
     //                double phi = (180.0 * (i + offset)) / (fragments/2);
     const double phi = (180.0 * (i + 0.5)) / num_rings;
     const double radius = r * sin_degrees(phi);
-    generate_circle(std::back_inserter(polyset->vertices), radius, r * cos_degrees(phi), num_fragments);
+    generate_circle(std::back_inserter(polyset->vertices), radius, r * cos_degrees(phi), 360.0, num_fragments);
   }
 
   polyset->indices.push_back({});
@@ -262,12 +268,13 @@ std::unique_ptr<const Geometry> CylinderNode::createGeometry() const
     || this->r1 < 0 || !std::isfinite(this->r1)
     || this->r2 < 0 || !std::isfinite(this->r2)
     || (this->r1 <= 0 && this->r2 <= 0)
+    || (this->angle <= 0 && this->angle > 360)
     ) {
     return PolySet::createEmpty();
   }
 
-  auto num_fragments = Calc::get_fragments_from_r(std::fmax(this->r1, this->r2), this->fn, this->fs, this->fa);
-
+  auto num_fragments = Calc::get_fragments_from_r(std::fmax(this->r1, this->r2), 360.0, this->fn, this->fs, this->fa);
+  if(this->angle < 360) num_fragments++;
   double z1, z2;
   if (this->center) {
     z1 = -this->h / 2;
@@ -286,12 +293,12 @@ std::unique_ptr<const Geometry> CylinderNode::createGeometry() const
   if (inverted_cone) {
     polyset->vertices.emplace_back(0.0, 0.0, z1);
   } else {
-   generate_circle(std::back_inserter(polyset->vertices), r1, z1, num_fragments);
+   generate_circle(std::back_inserter(polyset->vertices), r1, z1, this->angle, num_fragments);
   }
   if (cone) {
     polyset->vertices.emplace_back(0.0, 0.0, z2);
   } else {
-    generate_circle(std::back_inserter(polyset->vertices), r2, z2, num_fragments);
+    generate_circle(std::back_inserter(polyset->vertices), r2, z2, this->angle, num_fragments);
   }
 
   for (int i = 0; i < num_fragments; ++i) {
@@ -569,11 +576,17 @@ std::unique_ptr<const Geometry> CircleNode::createGeometry() const
     return std::make_unique<Polygon2d>();
   }
 
-  auto fragments = Calc::get_fragments_from_r(this->r, this->fn, this->fs, this->fa);
+  auto fragments = Calc::get_fragments_from_r(this->r, this->angle, this->fn, this->fs, this->fa);
   Outline2d o;
-  o.vertices.resize(fragments);
+  int fragments_div=fragments;
+  if(this->angle < 360.0) {
+    o.vertices.resize(fragments + 1);
+    o.vertices[fragments] = {0,0};
+    fragments_div--;
+  }  
+  else o.vertices.resize(fragments);
   for (int i = 0; i < fragments; ++i) {
-    double phi = (360.0 * i) / fragments;
+    double phi = (this->angle * i) / fragments_div;
     o.vertices[i] = {this->r * cos_degrees(phi), this->r * sin_degrees(phi)};
   }
   return std::make_unique<Polygon2d>(o);

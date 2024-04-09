@@ -2045,7 +2045,7 @@ std::unique_ptr<Polygon2d> GeometryEvaluator::applyToChildren2D(const AbstractNo
 	const OffsetNode *offNode = dynamic_cast<const OffsetNode *>(&node);
         // ClipperLib documentation: The formula for the number of steps in a full
         // circular arc is ... Pi / acos(1 - arc_tolerance / abs(delta))
-        double n = Calc::get_fragments_from_r(std::abs(offNode->delta), offNode->fn, offNode->fs, offNode->fa);
+        double n = Calc::get_fragments_from_r(std::abs(offNode->delta), 360.0, offNode->fn, offNode->fs, offNode->fa);
         double arc_tolerance = std::abs(offNode->delta) * (1 - cos_degrees(180 / n));
         return   ClipperUtils::applyOffset(*pol, offNode->delta, offNode->join_type, offNode->miter_limit, arc_tolerance);
   }
@@ -3290,7 +3290,7 @@ static std::unique_ptr<Geometry> rotatePolygon(const RotateExtrudeNode& node, co
     return nullptr;
   }
 
-  fragments = (unsigned int)std::ceil(fmax(Calc::get_fragments_from_r(max_x - min_x, node.fn, node.fs, node.fa) * std::abs(node.angle) / 360, 1));
+  fragments = (unsigned int)std::ceil(fmax(Calc::get_fragments_from_r(max_x - min_x, 360.0, node.fn, node.fs, node.fa) * std::abs(node.angle) / 360, 1));
 
   bool flip_faces = (min_x >= 0 && node.angle > 0 && node.angle != 360) || (min_x < 0 && (node.angle < 0 || node.angle == 360));
 

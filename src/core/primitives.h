@@ -89,6 +89,7 @@ public:
            << ", h = " << h
            << ", r1 = " << r1
            << ", r2 = " << r2
+           << ", angle = " << angle
            << ", center = " << (center ? "true" : "false")
            << ")";
     return stream.str();
@@ -98,6 +99,7 @@ public:
 
   double fn, fs, fa;
   double r1 = 1, r2 = 1, h = 1;
+  double angle=360;
   bool center = false;
 };
 
@@ -149,6 +151,7 @@ public:
            << ", $fa = " << fa
            << ", $fs = " << fs
            << ", r = " << r
+           << ", angle = " << angle
            << ")";
     return stream.str();
   }
@@ -157,6 +160,7 @@ public:
 
   double fn, fs, fa;
   double r = 1;
+  double angle=360;
 };
 
 
