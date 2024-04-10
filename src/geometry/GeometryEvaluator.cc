@@ -567,7 +567,7 @@ Response GeometryEvaluator::visit(State& state, const OffsetNode& node)
       if (const auto polygon = applyToChildren2D(node, OpenSCADOperator::UNION)) {
         // ClipperLib documentation: The formula for the number of steps in a full
         // circular arc is ... Pi / acos(1 - arc_tolerance / abs(delta))
-        double n = Calc::get_fragments_from_r(std::abs(node.delta), node.fn, node.fs, node.fa);
+        double n = Calc::get_fragments_from_r(std::abs(node.delta), 360.0, node.fn, node.fs, node.fa);
         double arc_tolerance = std::abs(node.delta) * (1 - cos_degrees(180 / n));
         geom = ClipperUtils::applyOffset(*polygon, node.delta, node.join_type, node.miter_limit, arc_tolerance);
         assert(geom);
@@ -1270,7 +1270,7 @@ static std::unique_ptr<Geometry> rotatePolygon(const RotateExtrudeNode& node, co
     return nullptr;
   }
 
-  fragments = (unsigned int)std::ceil(fmax(Calc::get_fragments_from_r(max_x - min_x, node.fn, node.fs, node.fa) * std::abs(node.angle) / 360, 1));
+  fragments = (unsigned int)std::ceil(fmax(Calc::get_fragments_from_r(max_x - min_x, 360.0, node.fn, node.fs, node.fa) * std::abs(node.angle) / 360, 1));
 
   bool flip_faces = (min_x >= 0 && node.angle > 0 && node.angle != 360) || (min_x < 0 && (node.angle < 0 || node.angle == 360));
 

@@ -12,3 +12,4 @@ translate([6,-6,0]) circle(1, $fa=40, $fs=0.3);
 translate([0,-9,0]) circle(1, $fn=0.1);
 translate([3,-9,0]) circle(d=2, $fn=8);
 translate([6,-9,0]) circle(r=10, d=2, $fn=8);
+translate([9,-9,0]) circle(r=10, d=2, angle=120, $fn=20);

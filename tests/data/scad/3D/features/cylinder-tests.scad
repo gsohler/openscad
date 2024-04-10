@@ -12,6 +12,9 @@ translate([22,-11,0]) cylinder(h=5, r=5, r1=0, center=true);
 translate([22,0,0]) cylinder(h=5, r=5, r2=0);
 translate([22,11,0]) cylinder(h=15, r=5, r2=5);
 
+translate([33,11,0]) cylinder(h=15, r=5,angle=135);
+
+
 // This tests for hexagonal cylinder orientation, since people
 // tend to "abuse" this for captured nut slots
 translate([-10,0,0]) cylinder(h=2, r=3, $fn=6);
