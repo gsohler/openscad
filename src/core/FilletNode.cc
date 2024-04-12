@@ -133,7 +133,7 @@ Vector3d Bezier(double t, Vector3d a, Vector3d b, Vector3d c)
 	return (a*(1-t)+b*t)*(1-t)+ (b*(1-t)+c*t)*t; // TODO improve
 }
 
-void bezier_patch(PolySetBuilder &builder, Vector3d center, Vector3d dir1, Vector3d dir2, Vector3d dir3, int N) {
+void bezier_patch(PolySetBuilder &builder, Vector3d center, Vector3d dir1, Vector3d dir2, Vector3d dir3, double zfactor, int N) {
   if((dir2.cross(dir1)).dot(dir3) < 0) {
     Vector3d tmp=dir1;
     dir1=dir2;
@@ -167,8 +167,8 @@ void bezier_patch(PolySetBuilder &builder, Vector3d center, Vector3d dir1, Vecto
   std::vector<Vector3d> points_yz;
   for(int i=0;i<N;i++) {
     double t=(double)i/(double)(N-1);
-    points_xz.push_back(Bezier(t,  xdir, xdir+zdir, zdir));
-    points_yz.push_back(Bezier(t,  ydir, ydir+zdir, zdir));
+    points_xz.push_back(Bezier(t,  xdir, xdir+zdir, zdir+(1-zfactor)*(xdir+ydir)));
+    points_yz.push_back(Bezier(t,  ydir, ydir+zdir, zdir+(1-zfactor)*(xdir+ydir)));
   }
  
   std::vector<int> points; 
@@ -177,7 +177,7 @@ void bezier_patch(PolySetBuilder &builder, Vector3d center, Vector3d dir1, Vecto
     if(i == N-1) {
       pt = zdir;
       pt = mat * pt;
-      points.push_back(builder.vertexIndex(pt+center));
+      points.push_back(builder.vertexIndex(pt+center-(1-zfactor)*(xdir+ydir)));
     } else {
       int M=N-i;
       for(int j=0;j<M;j++) {
@@ -327,6 +327,8 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
 	        if((e_fb1.cross(e_fa1)).dot(dir) < 0) e_fb1 = -e_fb1;
 	}
       }
+      printf("p1 fa %g/%g/%g fb  %g/%g/%g\n",e_fa1[0], e_fa1[1], e_fa1[2], e_fb1[0], e_fb1[1], e_fb1[2]);
+
       if(corner_rounds[e.first.ind1].size() == 3)
       {
         if((e_fa1p.cross(e_fa1)).dot(e_fb1) > 0 && facean > 4){ printf("corner3 fa1 fix\n"); e_fa1 = -e_fa1 - 2*dir*r;  }
@@ -357,27 +359,24 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
 		if((e_fb2.cross(e_fa2)).dot(dir) < 0) e_fb2 = -e_fb2;
 	}
       }	
+      printf("p2 fa %g/%g/%g fb  %g/%g/%g\n",e_fa2[0], e_fa2[1], e_fa2[2], e_fb2[0], e_fb2[1], e_fb2[2]);
 
       if(corner_rounds[e.first.ind2].size() == 3)
       {
 
-        if((e_fb2.cross(e_fb2p)).dot(e_fa2) < 0 && facean > 4) {
-		printf("3corner fa2 fix\n");
-          e_fa2 -= dir*r;
-          if((e_fb2.cross(e_fa2)).dot(dir) < 0) e_fa2 = -e_fa2;
-	  e_fa2 += dir*r;
-	}
-        if((e_fa2.cross(e_fa2p)).dot(e_fb2) < 0  && facebn > 4) {
-		printf("3corner fb2 fix\n");
-          e_fb2 -= dir*r;
-          if((e_fa2.cross(e_fb2)).dot(dir) < 0) e_fb2 = -e_fb2;
-	  e_fb2 += dir*r;
-	}
+        if((e_fa2p.cross(e_fa2)).dot(e_fb2) < 0 && facean > 4){ printf("corner3 fa2 fix\n"); e_fa2 = -e_fa2 + 2*dir*r;  }
+
+	printf("r an=%d bn=%d\n",facean, facebn);
+      printf("fb2p  %g/%g/%g fb2  %g/%g/%g\n e_fa2 %g/%g/%g ",e_fb2p[0], e_fb2p[1], e_fb2p[2], e_fb2[0], e_fb2[1], e_fb2[2], e_fa2[0], e_fa2[1], e_fa2[2]);
+        if((e_fb2p.cross(e_fb2)).dot(e_fa2) > 0 && facebn > 4)
+	{
+	       	printf("corner3 fb2 fix\n");
+	       	e_fb2 = -e_fb2 + 2*dir*r; 
+       	}
+
 
       }
 																	  
-      printf("p1 fa %g/%g/%g fb  %g/%g/%g\n",e_fa1[0], e_fa1[1], e_fa1[2], e_fb1[0], e_fb1[1], e_fb1[2]);
-      printf("p2 fa %g/%g/%g fb  %g/%g/%g\n",e_fa2[0], e_fa2[1], e_fa2[2], e_fb2[0], e_fb2[1], e_fb2[2]);
 
       for(int i=0;i<bn;i++) {
         double f=(double)i/(double)(bn-1);		
@@ -492,7 +491,11 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
       Vector3d xdir=(ps->vertices[i] - ps->vertices[corner_rounds[i][0]]).normalized()*r;
       Vector3d ydir=(ps->vertices[i] - ps->vertices[corner_rounds[i][1]]).normalized()*r;
       Vector3d zdir=(ps->vertices[i] - ps->vertices[corner_rounds[i][2]]).normalized()*r;
-//      bezier_patch(builder, ps->vertices[i]-xdir-ydir-zdir, xdir, ydir, zdir,bn);
+      // y,z,x
+      if(i == 6) bezier_patch(builder, ps->vertices[i]-xdir-ydir-zdir, ydir, zdir, xdir,-1, bn);
+      else if(i == 11) bezier_patch(builder, ps->vertices[i]-xdir-ydir-zdir, ydir, zdir, xdir,-1, bn);
+ else 	      bezier_patch(builder, ps->vertices[i]-xdir-ydir-zdir, xdir, ydir, zdir,1, bn);
+      printf("i=%d %g/%g/%g\n",i, ps->vertices[i][0], ps->vertices[i][1],ps->vertices[i][2]);
     }	    
   }
   //
