@@ -268,7 +268,7 @@ std::unique_ptr<const Geometry> CylinderNode::createGeometry() const
     || this->r1 < 0 || !std::isfinite(this->r1)
     || this->r2 < 0 || !std::isfinite(this->r2)
     || (this->r1 <= 0 && this->r2 <= 0)
-    || (this->angle <= 0 && this->angle > 360)
+    || (this->angle <= 0 || this->angle > 360)
     ) {
     return PolySet::createEmpty();
   }
@@ -334,7 +334,7 @@ static std::shared_ptr<AbstractNode> builtin_cylinder(const ModuleInstantiation 
         "module %1$s() does not support child modules", node->name());
   }
 
-  Parameters parameters = Parameters::parse(std::move(arguments), inst->location(), {"h", "r1", "r2", "center"}, {"r", "d", "d1", "d2"});
+  Parameters parameters = Parameters::parse(std::move(arguments), inst->location(), {"h", "r1", "r2", "center"}, {"r", "d", "d1", "d2", "angle"});
 
   set_fragments(parameters, inst, node->fn, node->fs, node->fa);
   if (parameters["h"].type() == Value::Type::NUMBER) {
@@ -370,6 +370,15 @@ static std::shared_ptr<AbstractNode> builtin_cylinder(const ModuleInstantiation 
           "cylinder(r1=%1$s, r2=%2$s, ...)",
           (r1.type() == Value::Type::NUMBER ? r1.toEchoStringNoThrow() : r.toEchoStringNoThrow()),
           (r2.type() == Value::Type::NUMBER ? r2.toEchoStringNoThrow() : r.toEchoStringNoThrow()));
+    }
+  }
+
+  if (parameters["angle"].isDefined()) {
+    if(!parameters["angle"].getFiniteDouble(node->angle)) {
+      LOG(message_group::Error, "Angle must be a double when specified.");
+    }  
+    if(node->angle < 0.0 || node->angle > 360.0) {
+      LOG(message_group::Error, "Angle must be between 0 and 360 degrees.");
     }
   }
 
@@ -572,7 +581,7 @@ static std::shared_ptr<AbstractNode> builtin_square(const ModuleInstantiation *i
 
 std::unique_ptr<const Geometry> CircleNode::createGeometry() const
 {
-  if (this->r <= 0 || !std::isfinite(this->r)) {
+  if (this->r <= 0 || !std::isfinite(this->r) || angle <= 0 || angle > 360.0) {
     return std::make_unique<Polygon2d>();
   }
 
@@ -601,7 +610,7 @@ static std::shared_ptr<AbstractNode> builtin_circle(const ModuleInstantiation *i
         "module %1$s() does not support child modules", node->name());
   }
 
-  Parameters parameters = Parameters::parse(std::move(arguments), inst->location(), {"r"}, {"d"});
+  Parameters parameters = Parameters::parse(std::move(arguments), inst->location(), {"r"}, {"d","angle"});
 
   set_fragments(parameters, inst, node->fn, node->fs, node->fa);
   const auto r = lookup_radius(parameters, inst, "d", "r");
@@ -612,6 +621,15 @@ static std::shared_ptr<AbstractNode> builtin_circle(const ModuleInstantiation *i
           "circle(r=%1$s)", r.toEchoStringNoThrow());
     }
   }
+  if (parameters["angle"].isDefined()) {
+    if(!parameters["angle"].getFiniteDouble(node->angle)) {
+      LOG(message_group::Error, "Angle must be a double when specified.");
+    }  
+    if(node->angle < 0.0 || node->angle > 360.0) {
+      LOG(message_group::Error, "Angle must be between 0 and 360 degrees.");
+    }
+  }
+
 
   return node;
 }
