@@ -2440,49 +2440,49 @@ static void add_slice(PolySetBuilder &builder, const Polygon2d& poly,
         Vector2d mid = trans_mid * (o.vertices[(i - 1) % o.vertices.size()] + o.vertices[i % o.vertices.size()]) / 2;
         Vector3d h_mid = (h1 + h2) / 2;
         builder.beginPolygon(3);
-        builder.insertVertex(prev1[0]+h1[0], prev1[1]+h1[1], h1[2]);
-        builder.insertVertex(mid[0]+h_mid[0],   mid[1]+h_mid[1], h_mid+h_mid[2]);
-        builder.insertVertex(curr1[0]+h1[0], curr1[1]+h1[1], h1[2]);
+        builder.insertVertex(prev1[0] + h1[0], prev1[1] + h1[1], h1[2]);
+        builder.insertVertex(mid[0] + h_mid[0],   mid[1] + h_mid[1], h_mid+h_mid[2]);
+        builder.insertVertex(curr1[0] + h1[0], curr1[1] + h1[1], h1[2]);
         builder.beginPolygon(3);
-        builder.insertVertex(curr1[0]+h1[0], curr1[1]+h1[1], h1[2]);
-        builder.insertVertex(mid[0]+h_mid[0],   mid[1]+h_mid[1], h_mid[2]);
-        builder.insertVertex(curr2[0]+h2[0], curr2[1]+h2[1], h2[2]);
+        builder.insertVertex(curr1[0] + h1[0], curr1[1] + h1[1], h1[2]);
+        builder.insertVertex(mid[0] + h_mid[0],   mid[1] + h_mid[1], h_mid[2]);
+        builder.insertVertex(curr2[0] + h2[0], curr2[1] + h2[1], h2[2]);
         builder.beginPolygon(3);
-        builder.insertVertex(curr2[0]+h2[0], curr2[1]+h2[1], h2[2]);
-        builder.insertVertex(mid[0]+h_mid[0],   mid[1]+h_mid[1], h_mid[2]);
-        builder.insertVertex(prev2[0]+h2[0], prev2[1]+h2[1], h2[2]);
+        builder.insertVertex(curr2[0] + h2[0], curr2[1] + h2[1], h2[2]);
+        builder.insertVertex(mid[0] + h_mid[0],   mid[1] + h_mid[1], h_mid[2]);
+        builder.insertVertex(prev2[0] + h2[0], prev2[1] + h2[1], h2[2]);
         builder.beginPolygon(3);
-        builder.insertVertex(prev2[0]+h2[0], prev2[1]+h2[1], h2[2]);
-        builder.insertVertex(mid[0]+h_mid[0],   mid[1]+h_mid[1], h_mid[2]);
-        builder.insertVertex(prev1[0]+h1[0], prev1[1]+h1[1], h1[2]);
+        builder.insertVertex(prev2[0] + h2[0], prev2[1] + h2[1], h2[2]);
+        builder.insertVertex(mid[0] + h_mid[0],   mid[1] + h_mid[1], h_mid[2]);
+        builder.insertVertex(prev1[0] + h1[0], prev1[1] + h1[1], h1[2]);
       } else
 #endif // ifdef LINEXT_4WAY
       // Split along shortest diagonal,
       // unless at top for a 0-scaled axis (which can create 0 thickness "ears")
       if (splitfirst xor any_zero) {
         builder.appendPolygon({
-                Vector3d(curr1[0]+h1[0], curr1[1]+h1[1], h1[2]),
-                Vector3d(curr2[0]+h2[0], curr2[1]+h2[1], h2[2]),
-                Vector3d(prev1[0]+h1[0], prev1[1]+h1[1], h1[2])
+                Vector3d(curr1[0] + h1[0], curr1[1] + h1[1], h1[2]),
+                Vector3d(curr2[0] + h2[0], curr2[1] + h2[1], h2[2]),
+                Vector3d(prev1[0] + h1[0], prev1[1] + h1[1], h1[2])
                 });
         if (!any_zero || (any_non_zero && prev2 != curr2)) {
           builder.appendPolygon({
-                Vector3d(prev2[0]+h2[0], prev2[1]+h2[1], h2[2]),
-                Vector3d(prev1[0]+h1[0], prev1[1]+h1[1], h1[2]),
-                Vector3d(curr2[0]+h2[0], curr2[1]+h2[1], h2[2])
+                Vector3d(prev2[0] + h2[0], prev2[1] + h2[1], h2[2]),
+                Vector3d(prev1[0] + h1[0], prev1[1] + h1[1], h1[2]),
+                Vector3d(curr2[0] + h2[0], curr2[1] + h2[1], h2[2])
           });
         }
       } else {
         builder.appendPolygon({
-                Vector3d(curr1[0]+h1[0], curr1[1]+h1[1], h1[2]),
-                Vector3d(prev2[0]+h2[0], prev2[1]+h2[1], h2[2]),
-                Vector3d(prev1[0]+h1[0], prev1[1]+h1[1], h1[2])
+                Vector3d(curr1[0] + h1[0], curr1[1] + h1[1], h1[2]),
+                Vector3d(prev2[0] + h2[0], prev2[1] + h2[1], h2[2]),
+                Vector3d(prev1[0] + h1[0], prev1[1] + h1[1], h1[2])
         });
         if (!any_zero || (any_non_zero && prev2 != curr2)) {
           builder.appendPolygon({
-                Vector3d(curr1[0]+h1[0], curr1[1]+h1[1], h1[2]),
-                Vector3d(curr2[0]+h2[0], curr2[1]+h2[1], h2[2]),
-                Vector3d(prev2[0]+h2[0], prev2[1]+h2[1], h2[2])
+                Vector3d(curr1[0] + h1[0], curr1[1] + h1[1], h1[2]),
+                Vector3d(curr2[0] + h2[0], curr2[1] + h2[1], h2[2]),
+                Vector3d(prev2[0] + h2[0], prev2[1] + h2[1], h2[2])
           });        
         }
       }
@@ -2856,10 +2856,10 @@ static std::unique_ptr<Geometry> extrudePolygon(const LinearExtrudeNode& node, c
 
   Vector3d h1, h2;
   if (node.center) {
-    h1 = Vector3d(-node.height[0]* 0.5, -node.height[1]*0.5, -node.height[2]*0.5);
-    h2 = Vector3d(node.height[0]* 0.5, node.height[1]*0.5, node.height[2]*0.5);
+    h1 = -node.height / 2.0;
+    h2 = node.height / 2.0;
   } else {
-    h1 = Vector3d(0,0,0);
+    h1 = Vector3d(0 ,0, 0);
     h2 = node.height;
   }
 
@@ -3591,6 +3591,13 @@ std::shared_ptr<const Geometry> GeometryEvaluator::projectionCut(const Projectio
   std::shared_ptr<const Geometry> geom;
   std::shared_ptr<const Geometry> newgeom = applyToChildren3D(node, OpenSCADOperator::UNION).constptr();
   if (newgeom) {
+#ifdef ENABLE_MANIFOLD
+    if (Feature::ExperimentalManifold.is_enabled()) {
+      auto manifold = ManifoldUtils::createManifoldFromGeometry(newgeom);
+      auto poly2d = manifold->slice();
+      return std::shared_ptr<const Polygon2d>(ClipperUtils::sanitize(poly2d));
+    }
+#endif
 #ifdef ENABLE_CGAL
     auto Nptr = CGALUtils::getNefPolyhedronFromGeometry(newgeom);
     if (Nptr && !Nptr->isEmpty()) {
@@ -3607,6 +3614,19 @@ std::shared_ptr<const Geometry> GeometryEvaluator::projectionCut(const Projectio
 
 std::shared_ptr<const Geometry> GeometryEvaluator::projectionNoCut(const ProjectionNode& node)
 {
+#ifdef ENABLE_MANIFOLD
+  if (Feature::ExperimentalManifold.is_enabled()) {
+    std::shared_ptr<const Geometry> newgeom = applyToChildren3D(node, OpenSCADOperator::UNION).constptr();
+    if (newgeom) {
+        auto manifold = ManifoldUtils::createManifoldFromGeometry(newgeom);
+        auto poly2d = manifold->project();
+        return std::shared_ptr<const Polygon2d>(ClipperUtils::sanitize(poly2d));
+    } else {
+      return std::make_shared<Polygon2d>();
+    }
+  }
+#endif
+
   std::shared_ptr<const Geometry> geom;
   std::vector<std::unique_ptr<Polygon2d>> tmp_geom;
   BoundingBox bounds;
