@@ -1704,7 +1704,6 @@ GeometryEvaluator::ResultObject GeometryEvaluator::applyToChildren3D(const Abstr
   {
 
     const CsgOpNode *csgOpNode = dynamic_cast<const CsgOpNode *>(&node);
-    printf("Rad is %g\n",csgOpNode->r);
     Geometry::Geometries actualchildren;
     for (const auto& item : children) {
       if (item.second && !item.second->isEmpty()) actualchildren.push_back(item);
