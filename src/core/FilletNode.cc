@@ -60,14 +60,14 @@ struct EdgeVal {
   int sel;
   int facea, posa;  // face a with edge ind1 -> ind2, posa = index of ind1 within facea
   int faceb, posb;  // face b with edge ind2 -> ind1, posb = index of ind2 within faceb
-  std::vector<int> bez1;
-  std::vector<int> bez2;
+  IndexedFace bez1;
+  IndexedFace bez2;
 };
 
 struct SearchReplace {
   int pol;
   int search;
-  std::vector<int> replace;
+  IndexedFace replace;
 };
 
 unsigned int hash_value(const EdgeKey& r) {
@@ -262,8 +262,16 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
       }
     }    
   }
-//  printf("%d edges found\n",edge_db.size());
-
+ // check if edge_db is complete
+  
+  for(auto &e: edge_db) {
+    if(e.second.facea == -1 || e.second.faceb == -1 || e.second.posa == -1 || e.second.posb == -1 ) {
+      printf("Edge %d - %d faca %d faceb %d posa %d posb %d\n", e.second.facea, e.second.faceb, e.second.posa, e.second.posb);
+      printf("a %g/%g/%g\n", ps->vertices[e.first.ind1][0], ps->vertices[e.first.ind1][1], ps->vertices[e.first.ind1][2]);
+      printf("b %g/%g/%g\n", ps->vertices[e.first.ind2][0], ps->vertices[e.first.ind2][1], ps->vertices[e.first.ind2][2]);
+      exit(1);
+    }
+  }
 
   std::vector<std::vector<int>> corner_rounds ; // which rounded edges in a corner
   for(int i=0;i<ps->vertices.size();i++) corner_rounds.push_back(empty);				  
@@ -301,11 +309,14 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
       if(corner_rounds[e.first.ind2].size() >=  3) p2 -= dir*r;
       auto &facea =merged[e.second.facea];								  
       auto &faceb =merged[e.second.faceb];								  
-      Vector3d fan=offset3D_normal(ps->vertices, facea).head<3>();
-      Vector3d fbn=offset3D_normal(ps->vertices, faceb).head<3>();
 
       int facean=facea.size();
       int facebn=faceb.size();
+      double fanf=(faceParents[e.second.facea] != -1)?-1:1;
+      double fbnf=(faceParents[e.second.faceb] != -1)?-1:1;
+      Vector3d fan=offset3D_normal(ps->vertices, facea).head<3>();
+      Vector3d fbn=offset3D_normal(ps->vertices, faceb).head<3>();
+
       int indposao, indposbo, indposai, indposbi;
       Vector3d unit;
 
@@ -316,7 +327,7 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
       indposbi = faceb[e.second.posb];
     
       Vector3d e_fa1  = (ps->vertices[indposao]-ps->vertices[facea[e.second.posa]]).normalized()*r; // Facea neben ind1
-      Vector3d e_fa1p = (ps->vertices[indposai]-ps->vertices[facea[e.second.posa]]).normalized()*r; // Face1 nahe  richtung
+      Vector3d e_fa1p = (ps->vertices[indposai]-ps->vertices[facea[e.second.posa]]); // Face1 nahe  richtung
 															   //
       Vector3d e_fb1 =  (ps->vertices[indposbo]-ps->vertices[faceb[(e.second.posb+1)%facebn]]).normalized()*r; // Faceb neben ind1
       Vector3d e_fb1p = (ps->vertices[indposbi]-ps->vertices[faceb[(e.second.posb+1)%facebn]]); 
@@ -336,8 +347,10 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
 
       if(corner_rounds[e.first.ind1].size() == 3)
       {
-        if((e_fa1p.cross(e_fa1)).dot(e_fb1) > 0 && facean > 4) e_fa1 = -e_fa1 - 2*dir*r;
-        if((e_fb1.cross(e_fb1p)).dot(e_fa1) > 0 && facebn > 4) e_fb1 = -e_fb1 - 2*dir*r; 
+        if((fbn.cross(fan)).dot(e_fa1p)*fanf*fbnf < 0) {
+	  if((e_fa1p.cross(e_fa1)).dot(fan)*fanf < 0) e_fa1 = -e_fa1 - 2*dir*r;
+	  if((e_fb1p.cross(e_fb1)).dot(fbn)*fbnf > 0) e_fb1 = -e_fb1 - 2*dir*r; 
+	}
       }
 
 
@@ -348,10 +361,12 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
       indposbi = faceb[(e.second.posb+1)%facebn];
 
       Vector3d e_fa2 = (ps->vertices[indposao]-ps->vertices[facea[(e.second.posa+1)%facean]]).normalized()*r; // Face1 entfernte richtung
-      Vector3d e_fa2p = (ps->vertices[indposai]-ps->vertices[facea[(e.second.posa+1)%facean]]).normalized()*r; // Face1 entfernte richtung
+      Vector3d e_fa2p = (ps->vertices[indposai]-ps->vertices[facea[(e.second.posa+1)%facean]]); // Face1 entfernte richtung
 													       //
       Vector3d e_fb2 = (ps->vertices[indposbo]-ps->vertices[faceb[(e.second.posb+0)%facebn]]).normalized()*r; // Face2 entfernte Rcithung
-      Vector3d e_fb2p = (ps->vertices[indposbi]-ps->vertices[faceb[(e.second.posb+0)%facebn]]).normalized()*r; // Face2 entfernte Rcithung
+      Vector3d e_fb2p = (ps->vertices[indposbi]-ps->vertices[faceb[(e.second.posb+0)%facebn]]); // Face2 entfernte Rcithung
+													       //
+
 													   //
       if(corner_rounds[e.first.ind2].size() == 2) 
       {
@@ -367,10 +382,12 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
 
       if(corner_rounds[e.first.ind2].size() == 3)
       {
-        if((e_fa2p.cross(e_fa2)).dot(e_fb2) < 0 && facean > 4) e_fa2 = -e_fa2 + 2*dir*r; 
-        if((e_fb2p.cross(e_fb2)).dot(e_fa2) > 0 && facebn > 4) e_fb2 = -e_fb2 + 2*dir*r;
+        if((fbn.cross(fan)).dot(e_fb2p)*fanf*fbnf > 0) {
+	  if((e_fa2p.cross(e_fa2)).dot(fan)*fanf > 0) {e_fa2 = -e_fa2 + 2*dir*r;  }
+	  if((e_fb2p.cross(e_fb2)).dot(fbn)*fbnf < 0) {e_fb2 = -e_fb2 + 2*dir*r;  }
+	}
       }
-																	  
+//      printf("p2 fa %g/%g/%g fb  %g/%g/%g\n",e_fa2[0], e_fa2[1], e_fa2[2], e_fb2[0], e_fb2[1], e_fb2[2]);
 
       for(int i=0;i<bn;i++) {
         double f=(double)i/(double)(bn-1);		
@@ -436,9 +453,10 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
 //    printf("\n");
 //  } 
   // copy modified faces
+  std::vector<IndexedFace> newfaces;
   for(int i=0;i<merged.size();i++)  {
     const IndexedFace &face = merged[i];
-    std::vector<int> newface;
+    IndexedFace newface;
     for(int j=0;j<face.size();j++) {
       int ind=face[j];	    
       newface.push_back(ind);
@@ -451,7 +469,7 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
 	for(int k=0;k<fn;k++) { // all possible shifts
           if(newface[k] == needle) {
 	    // match bei shift k gefunden
-	    std::vector<int> tmp=sp[j].replace;
+	    IndexedFace tmp=sp[j].replace;
 	    for(int l=0;l<fn-1;l++) {
              tmp.push_back(newface[(k+1+l)%fn]);		    
 	    }
@@ -463,8 +481,28 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
       }	      
     }
 
-    builder.appendPolygon(newface);    
+    newfaces.push_back(newface);
   }
+  std::vector<Vector3d> vertices;
+  builder.copyVertices(vertices);
+  std::vector<Vector3f> verticesFloat;
+  for(const auto &v: vertices)
+    verticesFloat.push_back(v.cast<float>());	  
+
+  for(int i=0;i<newfaces.size();i++) {
+    // tessellate first with holes // search all holes
+    if(faceParents[i]  != -1) continue;
+    std::vector<IndexedFace> faces;
+    faces.push_back(newfaces[i]);
+    for(int j=0;j<newfaces.size();j++) 
+      if(faceParents[j] == i) faces.push_back(newfaces[j]);
+    std::vector<IndexedTriangle> triangles;
+    Vector3f norm(newnormals[i][0],newnormals[i][1],newnormals[i][2]);
+    GeometryUtils::tessellatePolygonWithHoles(verticesFloat, faces, triangles, &norm);
+    for (const auto& t : triangles) {
+      builder.appendPolygon({t[0],t[1],t[2]});
+    }
+  }  
 
   // add Rounded edges 
   for(auto &e: edge_db) {
@@ -483,55 +521,88 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
     }
     else if(corner_rounds[i].size() == 3) {
       // now get the right ordering of corner_rounds[i]
-      printf("center is %g/%g/%g\n",ps->vertices[i][0],ps->vertices[i][1],ps->vertices[i][2]);
       for(int j=0;j<3;j++) {
    	      
 	IndexedFace &face =merged[polinds[i][j]];
 	int pos=polposs[i][j];
 	int len=face.size();
       }
-      IndexedFace &face0 =merged[polinds[i][0]];
-      IndexedFace &face1 =merged[polinds[i][1]];
-      IndexedFace &face2 =merged[polinds[i][2]];
-
-      Vector3d face0norm = offset3D_normal(ps->vertices, face0).head<3>();
-      Vector3d face1norm = offset3D_normal(ps->vertices, face1).head<3>();
-      Vector3d face2norm = offset3D_normal(ps->vertices, face2).head<3>();
-
-      int face0end=face0[(polposs[i][0]+1)%face0.size()];
-      int face1end=face1[(polposs[i][1]+1)%face1.size()];
-      int face2end=face2[(polposs[i][2]+1)%face2.size()];
-
-      int face1beg=face1[(polposs[i][1]+face1.size()-1)%face1.size()];
-      int face2beg=face2[(polposs[i][2]+face2.size()-1)%face2.size()];
- //     printf("mark %d %d %d\n",face0end, face1beg, face2beg);
-
-      int angle[3];
-      Vector3d dir[3];
-      dir[0]=(ps->vertices[i] - ps->vertices[corner_rounds[i][0]]).normalized()*r;
-      if(face0end == face1beg) { // 0,1,2
-	angle[0]=(face0norm.cross(face1norm)).dot(ps->vertices[face0end]-ps->vertices[i])>0?1:-1;
-        dir[1]=(ps->vertices[i] - ps->vertices[corner_rounds[i][1]]).normalized()*r;
-	angle[1]=(face1norm.cross(face2norm)).dot(ps->vertices[face1end]-ps->vertices[i])>0?1:-1;
-        dir[2]=(ps->vertices[i] - ps->vertices[corner_rounds[i][2]]).normalized()*r;
-	angle[2]=(face2norm.cross(face0norm)).dot(ps->vertices[face2end]-ps->vertices[i])>0?1:-1;
-      } else if(face0end == face2beg) { 
-	angle[0]=(face0norm.cross(face2norm)).dot(ps->vertices[face0end]-ps->vertices[i])>0?1:-1;
-        dir[2]=(ps->vertices[i] - ps->vertices[corner_rounds[i][1]]).normalized()*r;
-	angle[1]=(face2norm.cross(face1norm)).dot(ps->vertices[face2end]-ps->vertices[i])>0?1:-1;
-        dir[1]=(ps->vertices[i] - ps->vertices[corner_rounds[i][2]]).normalized()*r;
-	angle[2]=(face1norm.cross(face0norm)).dot(ps->vertices[face1end]-ps->vertices[i])>0?1:-1;
-      } else assert(0);
-      printf("angles %d/%d/%d\n\n",angle[0], angle[1], angle[2]);
-
+      IndexedFace face[3];
+      Vector3d facenorm[3];
       for(int j=0;j<3;j++) {
-        dir[j]=(ps->vertices[i] - ps->vertices[corner_rounds[i][j]]).normalized()*r;
-      }	
-      if(angle[0] == -1 && angle[1] == -1 && angle[2] == -1) bezier_patch(builder, ps->vertices[i]-dir[0]-dir[1]-dir[2], dir[0], dir[1], dir[2],0, 1, bn); 
-      else if(angle[1] == -1 ) bezier_patch(builder, ps->vertices[i]-dir[0]-dir[1]-dir[2], dir[1], dir[2], dir[0],1, 0, bn);
-      else if(angle[2] == -1) bezier_patch(builder, ps->vertices[i]-dir[0]-dir[1]-dir[2], dir[2], dir[0], dir[1],1, 0, bn); 
-      else if(angle[0] == -1) bezier_patch(builder, ps->vertices[i]-dir[0]-dir[1]-dir[2], dir[0], dir[1], dir[2],1, 0, bn); 
-      else bezier_patch(builder, ps->vertices[i]-dir[0]-dir[1]-dir[2], dir[0], dir[1], dir[2],0, 0, bn);
+        face[j] =merged[polinds[i][j]];
+        facenorm[j] = offset3D_normal(ps->vertices, face[j]).head<3>();
+        if(faceParents[polinds[i][j]]  != -1) facenorm[j] = -facenorm[j];
+      }
+
+      int facebeg[3];
+      int faceend[3];
+      for(int j=0;j<3;j++){	     
+        facebeg[j]=face[j][(polposs[i][j]+face[j].size()-1)%face[j].size()];
+        faceend[j]=face[j][(polposs[i][j]+1)%face[j].size()];
+      }
+
+      int debug=0;
+      Vector3d ptx=ps->vertices[i];
+      if(ptx[0] > 9 && ptx[0] < 31 && ptx[1] > 9 && ptx[1] < 31 && ptx[2] > 29) debug=1;
+/*
+      if(debug) {
+        printf("Corner: ind=%d %f/%f/%f\n",i, ptx[0], ptx[1], ptx[2]);
+	for(int j=0;j<3;j++) {
+          printf("Bogen %d: \n",j);
+	  for(int k=0;k<3;k++){
+            int ind=face[j][(polposs[i][j]+face[j].size()+k-1)%face[j].size()];
+	    printf("%d (%f/%f/%f)\t",ind, ps->vertices[ind][0],  ps->vertices[ind][1],ps->vertices[ind][2]);
+	  }
+
+	  printf("\n");
+	}
+	printf("Normals\n");
+	for(int j=0;j<3;j++)
+          printf("%d %f/%f/%f\n",j,facenorm[j][0], facenorm[j][1], facenorm[j][2]);
+      }
+*/
+      std::vector<int> angle;
+      std::vector<Vector3d> dir;
+      if(faceend[0] == facebeg[1]) { // 0,1,2
+	if(debug) printf("Branch A\n");
+        dir.push_back((ps->vertices[faceend[1]]-ps->vertices[i]).normalized()*r);
+	angle.push_back((facenorm[1].cross(facenorm[2])).dot(ps->vertices[faceend[1]]-ps->vertices[i])>0?1:-1);
+        dir.push_back((ps->vertices[faceend[2]]-ps->vertices[i]).normalized()*r);
+	angle.push_back((facenorm[2].cross(facenorm[0])).dot(ps->vertices[faceend[2]]-ps->vertices[i])>0?1:-1);
+        dir.push_back((ps->vertices[faceend[0]]-ps->vertices[i]).normalized()*r);
+	angle.push_back((facenorm[0].cross(facenorm[1])).dot(ps->vertices[faceend[0]]-ps->vertices[i])>0?1:-1);
+      } else if(faceend[0] == facebeg[2]) { 
+	if(debug) printf("Branch B\n");
+        dir.push_back((ps->vertices[faceend[2]]-ps->vertices[i]).normalized()*r);
+	angle.push_back((facenorm[2].cross(facenorm[1])).dot(ps->vertices[faceend[2]]-ps->vertices[i])>0?1:-1);
+        dir.push_back((ps->vertices[faceend[0]]-ps->vertices[i]).normalized()*r);
+	angle.push_back((facenorm[0].cross(facenorm[2])).dot(ps->vertices[faceend[0]]-ps->vertices[i])>0?1:-1);
+        dir.push_back((ps->vertices[faceend[1]]-ps->vertices[i]).normalized()*r);
+	angle.push_back((facenorm[1].cross(facenorm[0])).dot(ps->vertices[faceend[1]]-ps->vertices[i])>0?1:-1);
+      } else assert(0);
+/*
+      if(debug) {
+        for(int j=0;j<3;j++) {
+          printf("Dir %d (%g/%g/%g) ang=%d\n",j, dir[j][0], dir[j][1], dir[j][2], angle[j]);		
+	}  
+		
+	printf("---------\n");
+        errcount++;
+//	if(errcount == 2) exit(1);	
+      }
+*/
+      if(angle[0] == -1 && angle[1] == -1 && angle[2] == -1) bezier_patch(builder, ps->vertices[i]+dir[0]+dir[1]+dir[2], -dir[0], -dir[1], -dir[2],0, 1, bn); 
+      else if(angle[0] == -1 && angle[1] == -1 && angle[2] ==  1) ;
+      else if(angle[0] == -1 && angle[1] == 1 && angle[2]  == -1) ;
+      else if(angle[0] ==  1 && angle[1] == -1 && angle[2] == -1) ;
+      else if(angle[0] ==  1 && angle[1] == -1 && angle[2] ==  1) 
+	      bezier_patch(builder, ps->vertices[i]+dir[0]+dir[1]+dir[2], -dir[2], -dir[0], -dir[1],1, 0, bn);
+      else if(angle[0] ==  1 && angle[1] ==  1 && angle[2] == -1) 
+	      bezier_patch(builder, ps->vertices[i]+dir[0]+dir[1]+dir[1], -dir[0], -dir[1], -dir[2],1, 0, bn); 
+      else if(angle[0] == -1 && angle[1] ==  1 && angle[2] ==  1) 
+	      bezier_patch(builder, ps->vertices[i]+dir[0]+dir[1]+dir[2], -dir[1], -dir[2], -dir[0],1, 0, bn); 
+      else bezier_patch(builder, ps->vertices[i]+dir[0]+dir[1]+dir[2], -dir[0], -dir[1], -dir[2],0, 0, bn);
     }	    
   }
   //

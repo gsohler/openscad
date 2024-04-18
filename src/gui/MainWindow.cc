@@ -2471,7 +2471,8 @@ void MainWindow::rightClick(QPoint mouse)
       ss.str("");
 
       // Check if the path is contained in a library (using parsersettings.h)
-      fs::path libpath = get_library_for_path(location.filePath());
+      fs::path libpath;
+      if(!location.filePath().empty()) libpath = get_library_for_path(location.filePath());
       if (!libpath.empty()) {
         // Display the library (without making the window too wide!)
         ss << step->verbose_name() << " (library "

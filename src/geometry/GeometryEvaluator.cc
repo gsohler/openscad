@@ -509,6 +509,7 @@ std::vector<IndexedFace> mergetriangles(const std::vector<IndexedFace> polygons,
 						par=k;
 					}
 				}
+				if(par == -1) printf("par not found here\n");
 				// assert(par != -1); TODO fix
 				faceParents.push_back(par+off);
 			}			
