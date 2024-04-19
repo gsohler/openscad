@@ -347,7 +347,7 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
 
       if(corner_rounds[e.first.ind1].size() == 3)
       {
-        if((fbn.cross(fan)).dot(e_fa1p)*fbnf < 0) {
+        if( (fbn.cross(fan)).dot(e_fb1p)*fanf < 0 ) {
 	  if((e_fa1p.cross(e_fa1)).dot(fan)*fanf < 0) e_fa1 = -e_fa1*fanf - 2*dir*r;
 	  if((e_fb1p.cross(e_fb1)).dot(fbn)*fbnf > 0) e_fb1 = -e_fb1*fbnf - 2*dir*r;
 	}
@@ -382,8 +382,9 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
 
       if(corner_rounds[e.first.ind2].size() == 3)
       {
-        if(-(fbn.cross(fan)).dot(e_fb2p)*fanf < 0) {
-	  if(-(e_fa2p.cross(e_fa2)).dot(fan*fanf) < 0) e_fa2 = -e_fa2*fanf + 2*dir*r; 
+        if(-(fbn.cross(fan)).dot(e_fb2p)*fanf < 0 || -(fbn.cross(fan)).dot(e_fa2p)*fbnf < 0
+) {
+	  if(-(e_fa2p.cross(e_fa2)).dot(fan)*fanf < 0) e_fa2 = -e_fa2*fanf + 2*dir*r; 
 	  if(-(e_fb2p.cross(e_fb2)).dot(fbn)*fbnf > 0) e_fb2 = -e_fb2*fbnf + 2*dir*r;
 	}
       }
