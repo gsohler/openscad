@@ -300,15 +300,18 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
   // plan fillets of all edges now
   for(auto &e: edge_db) {
     if(e.second.sel == 1) {
-//      printf("Create rnd for %d %d %d %d\n",e.first.ind1, e.first.ind2, e.second.facea, e.second.faceb);	    
       Vector3d p1=ps->vertices[e.first.ind1];
       Vector3d p2=ps->vertices[e.first.ind2];
-//      printf("p1 %g/%g/%g p2 %g/%g/%g\n",p1[0], p1[1], p1[2], p2[0], p2[1], p2[2]);
+      int debug=0;
+      if(p1[2] > 35 && p1[2] < 45 && p2[2] > 35 && p2[2] < 45 && p1[0] > 5 && p2[0] > 5 ) debug=1;
+      if(debug) printf("Create rnd for %d %d %d %d\n",e.first.ind1, e.first.ind2, e.second.facea, e.second.faceb);	    
+      if(debug) printf("p1 %g/%g/%g p2 %g/%g/%g\n",p1[0], p1[1], p1[2], p2[0], p2[1], p2[2]);
       Vector3d dir=(p2-p1).normalized();
       if(corner_rounds[e.first.ind1].size() >=  3) p1 += dir*r;
       if(corner_rounds[e.first.ind2].size() >=  3) p2 -= dir*r;
       auto &facea =merged[e.second.facea];								  
       auto &faceb =merged[e.second.faceb];								  
+      //
 
       int facean=facea.size();
       int facebn=faceb.size();
@@ -343,16 +346,24 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
 	        if((e_fb1.cross(e_fa1)).dot(dir) < 0) e_fb1 = -e_fb1;
 	}
       }
-//      printf("p1 fa %g/%g/%g fb  %g/%g/%g\n",e_fa1[0], e_fa1[1], e_fa1[2], e_fb1[0], e_fb1[1], e_fb1[2]);
 
       if(corner_rounds[e.first.ind1].size() == 3)
       {
-        if( (fbn.cross(fan)).dot(e_fb1p)*fanf < 0 ) {
-	  if((e_fa1p.cross(e_fa1)).dot(fan)*fanf < 0) e_fa1 = -e_fa1*fanf - 2*dir*r;
-	  if((e_fb1p.cross(e_fb1)).dot(fbn)*fbnf > 0) e_fb1 = -e_fb1*fbnf - 2*dir*r;
+        if(debug) printf("a\n");
+        if( (fbn.cross(fan)).dot(e_fa1p) < 0 || (fbn.cross(fan)).dot(e_fb1p) < 0) {
+          if(debug) printf("b\n");
+	  if((e_fa1p.cross(e_fa1)).dot(fan)*fanf < 0) {
+            if(debug) printf("c\n");
+	    e_fa1 = -e_fa1*fanf - 2*dir*r;
+	  }
+	  if((e_fb1p.cross(e_fb1)).dot(fbn)*fbnf > 0) {
+            if(debug) printf("d\n");
+	    e_fb1 = -e_fb1*fbnf - 2*dir*r;
+	  }
 	}
       }
 
+      if(debug) printf("p1 fa %g/%g/%g fb  %g/%g/%g\n",e_fa1[0], e_fa1[1], e_fa1[2], e_fb1[0], e_fb1[1], e_fb1[2]);
 
       indposao = facea[(e.second.posa+2)%facean];		
       indposai = facea[e.second.posa];		
@@ -382,13 +393,21 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
 
       if(corner_rounds[e.first.ind2].size() == 3)
       {
-        if(-(fbn.cross(fan)).dot(e_fb2p)*fanf < 0 || -(fbn.cross(fan)).dot(e_fa2p)*fbnf < 0
-) {
-	  if(-(e_fa2p.cross(e_fa2)).dot(fan)*fanf < 0) e_fa2 = -e_fa2*fanf + 2*dir*r; 
-	  if(-(e_fb2p.cross(e_fb2)).dot(fbn)*fbnf > 0) e_fb2 = -e_fb2*fbnf + 2*dir*r;
+        if(debug) printf("e\n");
+        if(
+	-(fbn.cross(fan)).dot(e_fa2p) < 0 || -(fbn.cross(fan)).dot(e_fb2p) < 0 ) {
+          if(debug) printf("f\n");
+	  if(-(e_fa2p.cross(e_fa2)).dot(fan)*fanf < 0){
+            if(debug) printf("g\n");
+            e_fa2 = -e_fa2*fanf + 2*dir*r; 
+	  }  
+	  if(-(e_fb2p.cross(e_fb2)).dot(fbn)*fbnf > 0){
+            if(debug) printf("h\n");
+            e_fb2 = -e_fb2*fbnf + 2*dir*r;
+	  }  
 	}
       }
-//      printf("p2 fa %g/%g/%g fb  %g/%g/%g\n",e_fa2[0], e_fa2[1], e_fa2[2], e_fb2[0], e_fb2[1], e_fb2[2]);
+      if(debug) printf("p2 fa %g/%g/%g fb  %g/%g/%g\n",e_fa2[0], e_fa2[1], e_fa2[2], e_fb2[0], e_fb2[1], e_fb2[2]);
 
       for(int i=0;i<bn;i++) {
         double f=(double)i/(double)(bn-1);		
@@ -497,6 +516,7 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
     faces.push_back(newfaces[i]);
     for(int j=0;j<newfaces.size();j++) 
       if(faceParents[j] == i) faces.push_back(newfaces[j]);
+    if(faces.size() > 0) continue;
     std::vector<IndexedTriangle> triangles;
     Vector3f norm(newnormals[i][0],newnormals[i][1],newnormals[i][2]);
     GeometryUtils::tessellatePolygonWithHoles(verticesFloat, faces, triangles, &norm);
