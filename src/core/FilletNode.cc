@@ -135,7 +135,7 @@ Vector3d Bezier(double t, Vector3d a, Vector3d b, Vector3d c)
 	return (a*(1-t)+b*t)*(1-t)+ (b*(1-t)+c*t)*t; // TODO improve
 }
 
-void bezier_patch(PolySetBuilder &builder, Vector3d center, Vector3d dir1, Vector3d dir2, Vector3d dir3, int partconcave, int fullconcave, int N) {
+void bezier_patch(PolySetBuilder &builder, Vector3d center, Vector3d dir1, Vector3d dir2, Vector3d dir3, int concave_1, int concave_3, int N) {
   if((dir2.cross(dir1)).dot(dir3) < 0) {
     Vector3d tmp=dir1;
     dir1=dir2;
@@ -169,22 +169,22 @@ void bezier_patch(PolySetBuilder &builder, Vector3d center, Vector3d dir1, Vecto
   std::vector<Vector3d> points_yz;
   for(int i=0;i<N;i++) {
     double t=(double)i/(double)(N-1);
-    points_xz.push_back(Bezier(t,  xdir, xdir+zdir, zdir+2*partconcave*(xdir+ydir)));
-    points_yz.push_back(Bezier(t,  ydir, ydir+zdir, zdir+2*partconcave*(xdir+ydir)));
+    points_xz.push_back(Bezier(t,  xdir, xdir+zdir, zdir+2*concave_1*(xdir+ydir)));
+    points_yz.push_back(Bezier(t,  ydir, ydir+zdir, zdir+2*concave_1*(xdir+ydir)));
   }
  
   std::vector<int> points; 
   for(int i=0;i<N;i++){
     double t1=(double)i/(double)(N-1);
     if(i == N-1) {
-      pt = zdir+2*partconcave*(xdir+ydir);
+      pt = zdir+2*concave_1*(xdir+ydir);
       pt = mat * pt;
       points.push_back(builder.vertexIndex(pt+center));
     } else {
       int M=N-i;
       for(int j=0;j<M;j++) {
         int k;
-	if(partconcave == 1 || fullconcave == 1) k=j; else k=M-1-j;
+	if(concave_1 == 1 || concave_3 == 1) k=j; else k=M-1-j;
         double t2=(double)k/(double)(M-1);
 	pt = Bezier(t2, points_xz[i], Vector3d(points_xz[i][0], points_yz[i][1], points_xz[i][2]), points_yz[i]);
 	pt = mat * pt;
@@ -326,11 +326,11 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
       indposbo = faceb[(e.second.posb+2)%facebn];
       indposbi = faceb[e.second.posb];
     
-      Vector3d e_fa1  = (ps->vertices[indposao]-ps->vertices[facea[e.second.posa]]).normalized()*r; // Facea neben ind1
-      Vector3d e_fa1p = (ps->vertices[indposai]-ps->vertices[facea[e.second.posa]]); // Face1 nahe  richtung
+      Vector3d e_fa1  = (ps->vertices[indposao]-ps->vertices[facea[e.second.posa]]).normalized()*r*fanf; // Facea neben ind1
+      Vector3d e_fa1p = (ps->vertices[indposai]-ps->vertices[facea[e.second.posa]])*fanf; // Face1 nahe  richtung
 															   //
-      Vector3d e_fb1 =  (ps->vertices[indposbo]-ps->vertices[faceb[(e.second.posb+1)%facebn]]).normalized()*r; // Faceb neben ind1
-      Vector3d e_fb1p = (ps->vertices[indposbi]-ps->vertices[faceb[(e.second.posb+1)%facebn]]); 
+      Vector3d e_fb1 =  (ps->vertices[indposbo]-ps->vertices[faceb[(e.second.posb+1)%facebn]]).normalized()*r*fbnf; // Faceb neben ind1
+      Vector3d e_fb1p = (ps->vertices[indposbi]-ps->vertices[faceb[(e.second.posb+1)%facebn]])*fbnf; 
 
       if(corner_rounds[e.first.ind1].size() == 2)
       {
@@ -347,9 +347,9 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
 
       if(corner_rounds[e.first.ind1].size() == 3)
       {
-        if((fbn.cross(fan)).dot(e_fa1p)*fanf*fbnf < 0) {
-	  if((e_fa1p.cross(e_fa1)).dot(fan)*fanf < 0) e_fa1 = -e_fa1 - 2*dir*r;
-	  if((e_fb1p.cross(e_fb1)).dot(fbn)*fbnf > 0) e_fb1 = -e_fb1 - 2*dir*r; 
+        if((fbn.cross(fan)).dot(e_fa1p)*fbnf < 0) {
+	  if((e_fa1p.cross(e_fa1)).dot(fan)*fanf < 0) e_fa1 = -e_fa1*fanf - 2*dir*r;
+	  if((e_fb1p.cross(e_fb1)).dot(fbn)*fbnf > 0) e_fb1 = -e_fb1*fbnf - 2*dir*r;
 	}
       }
 
@@ -360,12 +360,12 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
       indposbo = faceb[(e.second.posb+facebn-1)%facebn];
       indposbi = faceb[(e.second.posb+1)%facebn];
 
-      Vector3d e_fa2 = (ps->vertices[indposao]-ps->vertices[facea[(e.second.posa+1)%facean]]).normalized()*r; // Face1 entfernte richtung
-      Vector3d e_fa2p = (ps->vertices[indposai]-ps->vertices[facea[(e.second.posa+1)%facean]]); // Face1 entfernte richtung
+      Vector3d e_fa2 = (ps->vertices[indposao]-ps->vertices[facea[(e.second.posa+1)%facean]]).normalized()*r*fanf; // Face1 entfernte richtung
+      Vector3d e_fa2p = (ps->vertices[indposai]-ps->vertices[facea[(e.second.posa+1)%facean]])*fanf; // Face1 entfernte richtung
 													       //
-      Vector3d e_fb2 = (ps->vertices[indposbo]-ps->vertices[faceb[(e.second.posb+0)%facebn]]).normalized()*r; // Face2 entfernte Rcithung
-      Vector3d e_fb2p = (ps->vertices[indposbi]-ps->vertices[faceb[(e.second.posb+0)%facebn]]); // Face2 entfernte Rcithung
-													       //
+      Vector3d e_fb2 = (ps->vertices[indposbo]-ps->vertices[faceb[(e.second.posb+0)%facebn]]).normalized()*r*fbnf; // Face2 entfernte Rcithung
+      Vector3d e_fb2p = (ps->vertices[indposbi]-ps->vertices[faceb[(e.second.posb+0)%facebn]])*fbnf; // Face2 entfernte Rcithung
+        	
 
 													   //
       if(corner_rounds[e.first.ind2].size() == 2) 
@@ -382,9 +382,9 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
 
       if(corner_rounds[e.first.ind2].size() == 3)
       {
-        if((fbn.cross(fan)).dot(e_fb2p)*fanf*fbnf > 0) {
-	  if((e_fa2p.cross(e_fa2)).dot(fan)*fanf > 0) {e_fa2 = -e_fa2 + 2*dir*r;  }
-	  if((e_fb2p.cross(e_fb2)).dot(fbn)*fbnf < 0) {e_fb2 = -e_fb2 + 2*dir*r;  }
+        if(-(fbn.cross(fan)).dot(e_fb2p)*fanf < 0) {
+	  if(-(e_fa2p.cross(e_fa2)).dot(fan*fanf) < 0) e_fa2 = -e_fa2*fanf + 2*dir*r; 
+	  if(-(e_fb2p.cross(e_fb2)).dot(fbn)*fbnf > 0) e_fb2 = -e_fb2*fbnf + 2*dir*r;
 	}
       }
 //      printf("p2 fa %g/%g/%g fb  %g/%g/%g\n",e_fa2[0], e_fa2[1], e_fa2[2], e_fb2[0], e_fb2[1], e_fb2[2]);
@@ -542,9 +542,6 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
         faceend[j]=face[j][(polposs[i][j]+1)%face[j].size()];
       }
 
-      int debug=0;
-      Vector3d ptx=ps->vertices[i];
-      if(ptx[0] > 9 && ptx[0] < 31 && ptx[1] > 9 && ptx[1] < 31 && ptx[2] > 29) debug=1;
 /*
       if(debug) {
         printf("Corner: ind=%d %f/%f/%f\n",i, ptx[0], ptx[1], ptx[2]);
@@ -565,7 +562,7 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
       std::vector<int> angle;
       std::vector<Vector3d> dir;
       if(faceend[0] == facebeg[1]) { // 0,1,2
-	if(debug) printf("Branch A\n");
+//	if(debug) printf("Branch A\n");
         dir.push_back((ps->vertices[faceend[1]]-ps->vertices[i]).normalized()*r);
 	angle.push_back((facenorm[1].cross(facenorm[2])).dot(ps->vertices[faceend[1]]-ps->vertices[i])>0?1:-1);
         dir.push_back((ps->vertices[faceend[2]]-ps->vertices[i]).normalized()*r);
@@ -573,7 +570,7 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
         dir.push_back((ps->vertices[faceend[0]]-ps->vertices[i]).normalized()*r);
 	angle.push_back((facenorm[0].cross(facenorm[1])).dot(ps->vertices[faceend[0]]-ps->vertices[i])>0?1:-1);
       } else if(faceend[0] == facebeg[2]) { 
-	if(debug) printf("Branch B\n");
+//	if(debug) printf("Branch B\n");
         dir.push_back((ps->vertices[faceend[2]]-ps->vertices[i]).normalized()*r);
 	angle.push_back((facenorm[2].cross(facenorm[1])).dot(ps->vertices[faceend[2]]-ps->vertices[i])>0?1:-1);
         dir.push_back((ps->vertices[faceend[0]]-ps->vertices[i]).normalized()*r);
@@ -592,17 +589,21 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
 //	if(errcount == 2) exit(1);	
       }
 */
-      if(angle[0] == -1 && angle[1] == -1 && angle[2] == -1) bezier_patch(builder, ps->vertices[i]+dir[0]+dir[1]+dir[2], -dir[0], -dir[1], -dir[2],0, 1, bn); 
-      else if(angle[0] == -1 && angle[1] == -1 && angle[2] ==  1) ;
-      else if(angle[0] == -1 && angle[1] == 1 && angle[2]  == -1) ;
-      else if(angle[0] ==  1 && angle[1] == -1 && angle[2] == -1) ;
-      else if(angle[0] ==  1 && angle[1] == -1 && angle[2] ==  1) 
-	      bezier_patch(builder, ps->vertices[i]+dir[0]+dir[1]+dir[2], -dir[2], -dir[0], -dir[1],1, 0, bn);
-      else if(angle[0] ==  1 && angle[1] ==  1 && angle[2] == -1) 
-	      bezier_patch(builder, ps->vertices[i]+dir[0]+dir[1]+dir[1], -dir[0], -dir[1], -dir[2],1, 0, bn); 
+      if(angle[0] == -1 && angle[1] == -1 && angle[2] == -1)
+	      bezier_patch(builder, ps->vertices[i]+dir[0]+dir[1]+dir[2], -dir[0], -dir[1], -dir[2],0, 1, bn); // 0
+      else if(angle[0] == -1 && angle[1] == -1 && angle[2] ==  1) 
+	      bezier_patch(builder, ps->vertices[i]+dir[0]+dir[1]+dir[2], -dir[0], -dir[1], -dir[2],0, 0, bn); // 1
+      else if(angle[0] == -1 && angle[1] == 1 && angle[2]  == -1) 
+	      bezier_patch(builder, ps->vertices[i]+dir[0]+dir[1]+dir[2], -dir[2], -dir[0], -dir[1],0, 0, bn); // 2
       else if(angle[0] == -1 && angle[1] ==  1 && angle[2] ==  1) 
-	      bezier_patch(builder, ps->vertices[i]+dir[0]+dir[1]+dir[2], -dir[1], -dir[2], -dir[0],1, 0, bn); 
-      else bezier_patch(builder, ps->vertices[i]+dir[0]+dir[1]+dir[2], -dir[0], -dir[1], -dir[2],0, 0, bn);
+	      bezier_patch(builder, ps->vertices[i]+dir[0]+dir[1]+dir[2], -dir[1], -dir[2], -dir[0],1, 0, bn); // 3
+      else if(angle[0] ==  1 && angle[1] == -1 && angle[2] == -1) 
+	      bezier_patch(builder, ps->vertices[i]+dir[0]+dir[1]+dir[2], -dir[1], -dir[2], -dir[0],1, 0, bn); // 4
+      else if(angle[0] ==  1 && angle[1] == -1 && angle[2] ==  1) 
+	      bezier_patch(builder, ps->vertices[i]+dir[0]+dir[1]+dir[2], -dir[2], -dir[0], -dir[1],1, 0, bn); // 5
+      else if(angle[0] ==  1 && angle[1] ==  1 && angle[2] == -1) 
+	      bezier_patch(builder, ps->vertices[i]+dir[0]+dir[1]+dir[1], -dir[0], -dir[1], -dir[2],1, 0, bn); // 6
+      else bezier_patch(builder, ps->vertices[i]+dir[0]+dir[1]+dir[2], -dir[0], -dir[1], -dir[2],0,  0, bn);	  // 7
     }	    
   }
   //
