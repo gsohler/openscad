@@ -1704,6 +1704,7 @@ GeometryEvaluator::ResultObject GeometryEvaluator::applyToChildren3D(const Abstr
   case OpenSCADOperator::UNION:
   {
 
+    printf("union\n");
     const CsgOpNode *csgOpNode = dynamic_cast<const CsgOpNode *>(&node);
     Geometry::Geometries actualchildren;
     for (const auto& item : children) {
@@ -1712,6 +1713,7 @@ GeometryEvaluator::ResultObject GeometryEvaluator::applyToChildren3D(const Abstr
     if (actualchildren.empty()) return {};
     if (actualchildren.size() == 1) return ResultObject::constResult(actualchildren.front().second);
 #ifdef ENABLE_MANIFOLD
+    printf("a\n");
     if (Feature::ExperimentalManifold.is_enabled()) {
       std::shared_ptr<const ManifoldGeometry> csgResult = ManifoldUtils::applyOperator3DManifold(actualchildren, op);	    
       if(csgOpNode->r != 0){
@@ -1726,7 +1728,8 @@ GeometryEvaluator::ResultObject GeometryEvaluator::applyToChildren3D(const Abstr
     else if (Feature::ExperimentalFastCsg.is_enabled()) {
       return ResultObject::mutableResult(std::shared_ptr<Geometry>(CGALUtils::applyUnion3DHybrid(actualchildren.begin(), actualchildren.end())));
     }
-    return ResultObject::constResult(std::shared_ptr<const Geometry>(CGALUtils::applyUnion3D(actualchildren.begin(), actualchildren.end())));
+    printf("cg\n");
+    return ResultObject::constResult(std::shared_ptr<const Geometry>(CGALUtils::applyUnion3D(*csgOpNode, actualchildren.begin(), actualchildren.end())));
 #else
     assert(false && "No boolean backend available");
 #endif
@@ -1734,6 +1737,11 @@ GeometryEvaluator::ResultObject GeometryEvaluator::applyToChildren3D(const Abstr
   }
   case OpenSCADOperator::OFFSET:
   {
+    std::string instance_name; 
+    AssignmentList inst_asslist;
+    ModuleInstantiation *instance = new ModuleInstantiation(instance_name,inst_asslist, Location::NONE);
+    auto node1 = std::make_shared<CsgOpNode>(instance,OpenSCADOperator::UNION);
+
     Geometry::Geometries actualchildren;
     for (const auto& item : children) {
       if (item.second && !item.second->isEmpty()) actualchildren.push_back(item);
@@ -1749,7 +1757,7 @@ GeometryEvaluator::ResultObject GeometryEvaluator::applyToChildren3D(const Abstr
         geom ={actualchildren.front().second};
         break;
       default:
-        geom = {CGALUtils::applyUnion3D(actualchildren.begin(), actualchildren.end())};
+        geom = {CGALUtils::applyUnion3D(*node1, actualchildren.begin(), actualchildren.end())};
 	break;
     }
  
@@ -1783,7 +1791,7 @@ GeometryEvaluator::ResultObject GeometryEvaluator::applyToChildren3D(const Abstr
       std::shared_ptr<const ManifoldGeometry> csgResult = ManifoldUtils::applyOperator3DManifold(children, op);	    
       const CsgOpNode *csgOpNode = dynamic_cast<const CsgOpNode *>(&node);
       if(csgOpNode->r != 0){
-        std::unique_ptr<const Geometry> geom_u = addFillets(csgResult, children, csgOpNode->r,csgOpNode->r);
+        std::unique_ptr<const Geometry> geom_u = addFillets(csgResult, children, csgOpNode->r,csgOpNode->fn);
 	std::shared_ptr<const Geometry> geom_s(geom_u.release());
 	csgResult = ManifoldUtils::createManifoldFromGeometry(geom_s);
       }
@@ -1795,7 +1803,8 @@ GeometryEvaluator::ResultObject GeometryEvaluator::applyToChildren3D(const Abstr
       // FIXME: It's annoying to have to disambiguate here:
       return ResultObject::mutableResult(std::shared_ptr<Geometry>(CGALUtils::applyOperator3DHybrid(children, op)));
     }
-    return ResultObject::constResult(CGALUtils::applyOperator3D(children, op));
+    const CsgOpNode *csgOpNode = dynamic_cast<const CsgOpNode *>(&node);
+    return ResultObject::constResult(CGALUtils::applyOperator3D(*csgOpNode, children, op));
 #else
     assert(false && "No boolean backend available");
     #endif

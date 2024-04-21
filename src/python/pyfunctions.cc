@@ -1498,13 +1498,13 @@ PyObject *python_oo_oversample(PyObject *obj, PyObject *args, PyObject *kwargs)
 }
 
 
-PyObject *python_fillet_core(PyObject *obj, double  r, double fn, PyObject *sel)
+PyObject *python_fillet_core(PyObject *obj, double  r, int fn, PyObject *sel)
 {
   PyObject *dummydict;
   DECLARE_INSTANCE
   auto node = std::make_shared<FilletNode>(instance);
   node->r = r;
-  node->fn = (int) fn;
+  node->fn = fn;
   if (obj != nullptr) node->children.push_back(PyOpenSCADObjectToNodeMulti(obj, &dummydict));
   else {	 
     PyErr_SetString(PyExc_TypeError, "Invalid type for  Object in fillet \n");
@@ -1933,6 +1933,8 @@ PyObject *python_csg_sub(PyObject *self, PyObject *args, PyObject *kwargs, OpenS
 
   auto node = std::make_shared<CsgOpNode>(instance, mode);
   char *kwlist[] = { "obj", NULL };
+  node->r=0;
+  node->fn=1;
   PyObject *objs = NULL;
   PyObject *obj;
   PyObject *child_dict;	  
@@ -1953,6 +1955,7 @@ PyObject *python_csg_sub(PyObject *self, PyObject *args, PyObject *kwargs, OpenS
 	      double fn;
 	      python_numberval(value,&fn);
 	      node->fn=(int)fn;
+	      printf("Setting fn %d\n",node->fn);
       } else {
           PyErr_SetString(PyExc_TypeError, "Unkown parameter name in CSG.");
 	  return nullptr;

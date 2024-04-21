@@ -281,6 +281,10 @@ std::unique_ptr<Geometry> import_3mf(const std::string& filename, const Location
     return PolySet::createEmpty();
   }
 
+  std::string instance_name; 
+  AssignmentList inst_asslist;
+  ModuleInstantiation *instance = new ModuleInstantiation(instance_name,inst_asslist, Location::NONE);
+  auto node = std::make_shared<CsgOpNode>(instance, OpenSCADOperator::UNION);
   std::unique_ptr<PolySet> first_mesh;
   std::list<std::shared_ptr<PolySet>> meshes;
   unsigned int mesh_idx = 0;
@@ -343,7 +347,7 @@ std::unique_ptr<Geometry> import_3mf(const std::string& filename, const Location
     for (auto it = meshes.begin(); it != meshes.end(); ++it) {
       children.push_back(std::make_pair(std::shared_ptr<const AbstractNode>(), std::shared_ptr<const Geometry>(*it)));
     }
-    if (auto ps = PolySetUtils::getGeometryAsPolySet(CGALUtils::applyUnion3D(children.begin(), children.end()))) {
+    if (auto ps = PolySetUtils::getGeometryAsPolySet(CGALUtils::applyUnion3D(*node, children.begin(), children.end()))) {
       // FIXME: unnecessary copy
       p = std::make_unique<PolySet>(*ps);
     } else {

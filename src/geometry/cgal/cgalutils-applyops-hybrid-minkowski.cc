@@ -38,6 +38,11 @@ std::shared_ptr<const Geometry> applyMinkowskiHybrid(const Geometry::Geometries&
   using Hull_Polyhedron = CGAL::Polyhedron_3<Hull_kernel>;
   using Hybrid_Nef = CGAL::Nef_polyhedron_3<CGAL_HybridKernel3>;
 
+  std::string instance_name; 
+  AssignmentList inst_asslist;
+  ModuleInstantiation *instance = new ModuleInstantiation(instance_name,inst_asslist, Location::NONE);
+  auto node = std::make_shared<CsgOpNode>(instance,OpenSCADOperator::UNION);
+
   CGAL::Timer t, t_tot;
   assert(children.size() >= 2);
   auto it = children.begin();
@@ -212,7 +217,7 @@ std::shared_ptr<const Geometry> applyMinkowskiHybrid(const Geometry::Geometries&
           fake_children.push_back(std::make_pair(std::shared_ptr<const AbstractNode>(),
                                                  partToGeom(part)));
         }
-        auto N = CGALUtils::applyUnion3D(fake_children.begin(), fake_children.end());
+        auto N = CGALUtils::applyUnion3D(*node,fake_children.begin(), fake_children.end());
         // FIXME: This should really never throw.
         // Assert once we figured out what went wrong with issue #1069?
         if (!N) throw 0;
@@ -233,7 +238,7 @@ std::shared_ptr<const Geometry> applyMinkowskiHybrid(const Geometry::Geometries&
     LOG(message_group::Warning,
         "[fast-csg] Minkowski failed with error, falling back to Nef operation: %1$s\n", e.what());
 
-    auto N = std::shared_ptr<const Geometry>(applyOperator3D(children, OpenSCADOperator::MINKOWSKI));
+    auto N = std::shared_ptr<const Geometry>(applyOperator3D(*node, children, OpenSCADOperator::MINKOWSKI));
     return N;
   }
 }
