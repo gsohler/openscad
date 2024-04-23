@@ -1955,7 +1955,6 @@ PyObject *python_csg_sub(PyObject *self, PyObject *args, PyObject *kwargs, OpenS
 	      double fn;
 	      python_numberval(value,&fn);
 	      node->fn=(int)fn;
-	      printf("Setting fn %d\n",node->fn);
       } else {
           PyErr_SetString(PyExc_TypeError, "Unkown parameter name in CSG.");
 	  return nullptr;

@@ -152,13 +152,12 @@ std::shared_ptr<const Geometry> applyOperator3D(const CsgOpNode &node, const Geo
     std::string opstr = op == OpenSCADOperator::INTERSECTION ? "intersection" : op == OpenSCADOperator::DIFFERENCE ? "difference" : op == OpenSCADOperator::UNION ? "union" : "UNKNOWN";
     LOG(message_group::Error, "exception in CGALUtils::applyBinaryOperator %1$s: %2$s", opstr, e.what());
   }
-//  const CsgOpNode *csgOpNode = dynamic_cast<const CsgOpNode *>(&node);
 //
-//  if(csgOpNode->r != 0){
-//    std::unique_ptr<const Geometry> geom_u = addFillets(csgResult, actualchildren, csgOpNode->r, csgOpNode->fn);
+ if(node.r != 0){
+//    std::unique_ptr<const Geometry> geom_u = addFillets(N, children, node.r, node.fn);
 //    std::shared_ptr<const Geometry> geom_s(geom_u.release());
-//    csgResult = ManifoldUtils::createManifoldFromGeometry(geom_s);
-//  }
+//    N=geom_s; //  = ManifoldUtils::createManifoldFromGeometry(geom_s);
+  }
 
   return N;
 }

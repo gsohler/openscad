@@ -1649,22 +1649,31 @@ std::shared_ptr<const Geometry> offset3D(const std::shared_ptr<const PolySet> &p
 
 std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> ps,  std::vector<bool> corner_selected, double r, int fn);
 
+Vector3d createFilletRound(Vector3d pt)
+{
+   double x=((int)(pt[0]*1e6))/1e6;
+   double y=((int)(pt[1]*1e6))/1e6;
+   double z=((int)(pt[2]*1e6))/1e6;
+   return Vector3d(x,y,z);
+}
 std::unique_ptr<const Geometry> addFillets(std::shared_ptr<const Geometry> result, const Geometry::Geometries & children, double r, int fn) {
   printf("do fillet magic\n");	
   std::unordered_set<Vector3d> points;
   Vector3d pt;
   std::shared_ptr<const PolySet> psr = PolySetUtils::getGeometryAsPolySet(result);
-  for(const Vector3d pt : psr->vertices) points.insert(pt);
+  for(const Vector3d pt : psr->vertices){
+    points.insert(createFilletRound(pt));
+  }
 
   for(const auto child: children) {
     std::shared_ptr<const PolySet> ps = PolySetUtils::getGeometryAsPolySet(child.second);
     for(const Vector3d pt : ps->vertices) {
-      points.erase(pt);	    
+      points.erase(createFilletRound(pt));
     }
   }
 
   std::vector<bool> corner_selected;
-  for(int i=0;i<psr->vertices.size();i++) corner_selected.push_back(points.count(psr->vertices[i])>0?true:false);
+  for(int i=0;i<psr->vertices.size();i++) corner_selected.push_back(points.count(createFilletRound(psr->vertices[i]))>0?true:false);
 
   return  createFilletInt(psr,corner_selected, r, fn);
 
@@ -1721,7 +1730,8 @@ GeometryEvaluator::ResultObject GeometryEvaluator::applyToChildren3D(const Abstr
       if(csgOpNode->r != 0){
         std::unique_ptr<const Geometry> geom_u = addFillets(csgResult, actualchildren, csgOpNode->r, csgOpNode->fn);
 	std::shared_ptr<const Geometry> geom_s(geom_u.release());
-	csgResult = ManifoldUtils::createManifoldFromGeometry(geom_s);
+        return ResultObject::mutableResult(geom_s);
+	//csgResult = ManifoldUtils::createManifoldFromGeometry(geom_s);
       }
       return ResultObject::mutableResult(csgResult);
     }
@@ -1795,7 +1805,8 @@ GeometryEvaluator::ResultObject GeometryEvaluator::applyToChildren3D(const Abstr
       if(csgOpNode->r != 0){
         std::unique_ptr<const Geometry> geom_u = addFillets(csgResult, children, csgOpNode->r,csgOpNode->fn);
 	std::shared_ptr<const Geometry> geom_s(geom_u.release());
-	csgResult = ManifoldUtils::createManifoldFromGeometry(geom_s);
+//	csgResult = ManifoldUtils::createManifoldFromGeometry(geom_s);
+        return ResultObject::mutableResult(geom_s);
       }
       return ResultObject::mutableResult(csgResult);
     }

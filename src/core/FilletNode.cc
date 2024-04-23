@@ -303,9 +303,9 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
       Vector3d p1=ps->vertices[e.first.ind1];
       Vector3d p2=ps->vertices[e.first.ind2];
       int debug=0;
-      if(p1[2] > 35 && p1[2] < 45 && p2[2] > 35 && p2[2] < 45 && p1[0] > 5 && p2[0] > 5 ) debug=1;
-//      if(debug) printf("Create rnd for %d %d %d %d\n",e.first.ind1, e.first.ind2, e.second.facea, e.second.faceb);	    
-//      if(debug) printf("p1 %g/%g/%g p2 %g/%g/%g\n",p1[0], p1[1], p1[2], p2[0], p2[1], p2[2]);
+      if(p1[2] > 15 && p1[2] < 25 && p2[2] > 15 && p2[2] < 25  ) debug=1;
+      if(debug) printf("Create rnd for %d %d %d %d\n",e.first.ind1, e.first.ind2, e.second.facea, e.second.faceb);	    
+      if(debug) printf("p1 %g/%g/%g p2 %g/%g/%g\n",p1[0], p1[1], p1[2], p2[0], p2[1], p2[2]);
       Vector3d dir=(p2-p1).normalized();
       if(corner_rounds[e.first.ind1].size() >=  3) p1 += dir*r;
       if(corner_rounds[e.first.ind2].size() >=  3) p2 -= dir*r;
@@ -338,12 +338,26 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
       if(corner_rounds[e.first.ind1].size() == 2)
       {
         if(list_included(corner_rounds[e.first.ind1],indposao)){
-		e_fa1 += dir*r; 
-	        if((e_fb1.cross(e_fa1)).dot(dir) < 0) e_fa1 = -e_fa1*fanf;
+		e_fa1 += dir*r*fanf; 
+	        if((e_fb1.cross(e_fa1)).dot(dir) < 0){
+			printf("a\n");
+			 e_fa1 = -e_fa1*fanf;
+		}
+		else {
+			printf("b\n");
+			e_fa1 = -e_fa1*fanf;
+		}
 	}
         if(list_included(corner_rounds[e.first.ind1],indposbo)){
-		e_fb1 += dir*r;
-	        if((e_fb1.cross(e_fa1)).dot(dir) < 0) e_fb1 = -e_fb1*fbnf;
+		e_fb1 += dir*r*fbnf;
+	        if((e_fb1.cross(e_fa1)).dot(dir) < 0) {
+			printf("c\n");
+			e_fb1 = -e_fb1*fbnf;
+		}
+		else {
+			printf("d\n");
+			e_fb1 = -e_fb1*fbnf;
+		}
 	}
       }
 
@@ -374,8 +388,8 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
 	}
       }
 
-//      if(debug) printf("p1 fa %g/%g/%g fb  %g/%g/%g\n",e_fa1[0], e_fa1[1], e_fa1[2], e_fb1[0], e_fb1[1], e_fb1[2]);
- //     if(debug) printf("p1 fap %g/%g/%g fbp  %g/%g/%g\n",e_fa1p[0], e_fa1p[1], e_fa1p[2], e_fb1p[0], e_fb1p[1], e_fb1p[2]);
+      if(debug) printf("p1 fa %g/%g/%g fb  %g/%g/%g\n",e_fa1[0], e_fa1[1], e_fa1[2], e_fb1[0], e_fb1[1], e_fb1[2]);
+      if(debug) printf("p1 fap %g/%g/%g fbp  %g/%g/%g\n",e_fa1p[0], e_fa1p[1], e_fa1p[2], e_fb1p[0], e_fb1p[1], e_fb1p[2]);
 
       indposao = facea[(e.second.posa+2)%facean];		
       indposai = facea[e.second.posa];		
@@ -394,12 +408,27 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
       if(corner_rounds[e.first.ind2].size() == 2) 
       {
         if(list_included(corner_rounds[e.first.ind2],indposao)){
-		e_fa2 -= dir*r;
-		if((e_fb2.cross(e_fa2)).dot(dir) < 0) e_fa2 = -e_fa2*fanf;
+		e_fa2 -= dir*r*fanf;
+		if((fan.cross(fbn)).dot(e_fb2p) < 0) {
+			printf("e\n");
+			e_fa2 = e_fa2*fanf;
+		} else {
+			printf("f %g\n",e_fa2.cross(e_fa2p).dot(fan));
+
+			e_fa2 = -e_fa2*fanf;
+		}
 	}
         if(list_included(corner_rounds[e.first.ind2],indposbo)){
-		e_fb2 -= dir*r;
-		if((e_fb2.cross(e_fa2)).dot(dir) < 0) e_fb2 = -e_fb2*fbnf;
+		e_fb2 -= dir*r*fbnf;
+		printf("y %g\n",fan.cross(fbn).dot(e_fb2p));
+		if((fan.cross(fbn)).dot(e_fb2p) < 0) {
+			printf("g\n");
+			e_fb2 = e_fb2*fbnf;
+		}
+		else {
+			printf("h\n");
+			e_fb2 = -e_fb2*fbnf;
+		}
 	}
       }	
 
