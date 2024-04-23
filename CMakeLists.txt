@@ -978,7 +978,6 @@ set(CGAL_SOURCES
   src/geometry/cgal/CGALHybridPolyhedron.cc
   src/geometry/cgal/CGAL_Nef_polyhedron.cc
   src/geometry/cgal/CGALCache.cc
-  src/geometry/cgal/Polygon2d-CGAL.cc
   src/io/export_nef.cc
   src/io/import_nef.cc
   )
@@ -1038,7 +1037,7 @@ if(EXPERIMENTAL)
   else()
     add_subdirectory(submodules/manifold EXCLUDE_FROM_ALL)
   endif()
-  target_link_libraries(OpenSCAD PRIVATE manifold)
+  target_link_libraries(OpenSCAD PRIVATE manifold polygon)
   add_sanitizers(manifold)
 
   target_compile_definitions(OpenSCAD PRIVATE ENABLE_MANIFOLD)
