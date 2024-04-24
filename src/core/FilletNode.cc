@@ -303,8 +303,7 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
       Vector3d p1=ps->vertices[e.first.ind1];
       Vector3d p2=ps->vertices[e.first.ind2];
       int debug=0;
-      if(p1[2] > 15 && p1[2] < 25 && p2[2] > 15 && p2[2] < 25  ) debug=1;
-      if(debug) printf("Create rnd for %d %d %d %d\n",e.first.ind1, e.first.ind2, e.second.facea, e.second.faceb);	    
+      // if(debug) printf("====\nCreate rnd for %d %d %d %d\n",e.first.ind1, e.first.ind2, e.second.facea, e.second.faceb);	    
       if(debug) printf("p1 %g/%g/%g p2 %g/%g/%g\n",p1[0], p1[1], p1[2], p2[0], p2[1], p2[2]);
       Vector3d dir=(p2-p1).normalized();
       if(corner_rounds[e.first.ind1].size() >=  3) p1 += dir*r;
@@ -337,52 +336,34 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
 
       if(corner_rounds[e.first.ind1].size() == 2)
       {
+        double a=(e_fb1.cross(e_fa1)).dot(dir);
+	double b=(fan.cross(fbn)).dot(e_fa1p)*fanf*fbnf;
         if(list_included(corner_rounds[e.first.ind1],indposao)){
 		e_fa1 += dir*r*fanf; 
-	        if((e_fb1.cross(e_fa1)).dot(dir) < 0){
-			printf("a\n");
-			 e_fa1 = -e_fa1*fanf;
-		}
-		else {
-			printf("b\n");
-			e_fa1 = -e_fa1*fanf;
-		}
+		if(a*b < 0) e_fa1 = -e_fa1*fanf;
+		else e_fa1 = e_fa1*fanf;
 	}
         if(list_included(corner_rounds[e.first.ind1],indposbo)){
 		e_fb1 += dir*r*fbnf;
-	        if((e_fb1.cross(e_fa1)).dot(dir) < 0) {
-			printf("c\n");
-			e_fb1 = -e_fb1*fbnf;
-		}
-		else {
-			printf("d\n");
-			e_fb1 = -e_fb1*fbnf;
-		}
+		if(a*b < 0) e_fb1 = -e_fb1;
 	}
       }
 
       if(corner_rounds[e.first.ind1].size() == 3)
       {
-//        if(debug) printf("a\n");
         if( (fbn.cross(fan)).dot(e_fa1p) < 0 || (fbn.cross(fan)).dot(e_fb1p) < 0) {
-//          if(debug) printf("b\n");
 	  if((e_fa1p.cross(e_fa1)).dot(fan)*fanf < 0) {
- //           if(debug) printf("c\n");
 	    e_fa1 = -e_fa1*fanf - 2*dir*r;
 	  }
 	  if((e_fb1p.cross(e_fb1)).dot(fbn)*fbnf > 0) {
-  //          if(debug) printf("d\n");
 	    e_fb1 = -e_fb1*fbnf - 2*dir*r;
 	  }
 	}
-        if( /*( fbn.cross(fan)).dot(e_fa1p) > 0 || */  (fbn.cross(fan)).dot(e_fb1p) > 0 ) {
-   //       if(debug) printf("x ind1=%d test=%g\n",e.first.ind1,(e_fa1p.cross(e_fb1)).dot(fbn));		
+        if(  (fbn.cross(fan)).dot(e_fb1p) > 0 ) {
 	  if((e_fa1p.cross(e_fa1)).dot(fan)*fanf > 0  && (e_fa1p.cross(e_fb1)).dot(fbn)*fbnf > 0) {
-    //        if(debug) printf("x1\n"); // laengs rechts
 	    e_fb1 = -e_fb1*fbnf - 2*dir*r;
 	  }
-	  if((e_fb1p.cross(e_fb1)).dot(fbn)*fbnf < 0  && (e_fb1p.cross(e_fa1)).dot(fan)*fanf < 0 ) { // quer vorne
-     //       if(debug) printf("x2\n");
+	  if((e_fb1p.cross(e_fb1)).dot(fbn)*fbnf < 0  && (e_fb1p.cross(e_fa1)).dot(fan)*fanf < 0 ) {
 	    e_fa1 = -e_fa1*fanf - 2*dir*r;
 	  }
 	}
@@ -407,28 +388,16 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
 													   //
       if(corner_rounds[e.first.ind2].size() == 2) 
       {
+        double a=(e_fb2.cross(e_fa2)).dot(dir);
+	double b=(fan.cross(fbn)).dot(e_fa2p)*fanf*fbnf;
         if(list_included(corner_rounds[e.first.ind2],indposao)){
 		e_fa2 -= dir*r*fanf;
-		if((fan.cross(fbn)).dot(e_fb2p) < 0) {
-			printf("e\n");
-			e_fa2 = e_fa2*fanf;
-		} else {
-			printf("f %g\n",e_fa2.cross(e_fa2p).dot(fan));
-
-			e_fa2 = -e_fa2*fanf;
-		}
+		if(a*b > 0) e_fa2 = -e_fa2*fanf;
+		else e_fa2 = e_fa2*fanf;
 	}
         if(list_included(corner_rounds[e.first.ind2],indposbo)){
 		e_fb2 -= dir*r*fbnf;
-		printf("y %g\n",fan.cross(fbn).dot(e_fb2p));
-		if((fan.cross(fbn)).dot(e_fb2p) < 0) {
-			printf("g\n");
-			e_fb2 = e_fb2*fbnf;
-		}
-		else {
-			printf("h\n");
-			e_fb2 = -e_fb2*fbnf;
-		}
+		if(a*b > 0)  e_fb2 = -e_fb2;
 	}
       }	
 
@@ -567,7 +536,7 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
     faces.push_back(newfaces[i]);
     for(int j=0;j<newfaces.size();j++) 
       if(faceParents[j] == i) faces.push_back(newfaces[j]);
-//    if(faces.size() > 0) continue;
+//    if(faces.size() >1 ) continue;
     std::vector<IndexedTriangle> triangles;
     Vector3f norm(newnormals[i][0],newnormals[i][1],newnormals[i][2]);
     GeometryUtils::tessellatePolygonWithHoles(verticesFloat, faces, triangles, &norm);
