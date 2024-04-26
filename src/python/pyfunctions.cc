@@ -28,6 +28,7 @@
 #include <boost/format.hpp>
 #include <boost/algorithm/string.hpp>
 #include "linalg.h"
+#include "export.h"
 #include "GeometryUtils.h"
 #include <Python.h>
 #include <src/python/pyopenscad.h>
@@ -1265,6 +1266,48 @@ PyObject *python_output(PyObject *self, PyObject *args, PyObject *kwargs)
   return python_output_core(obj);
 }
 
+PyObject *python_export_core(PyObject *obj, char *file)
+{
+  printf("Exporting to %s\n", file);	
+
+  PyObject *child_dict;
+  std::shared_ptr<AbstractNode> child = PyOpenSCADObjectToNodeMulti(obj, &child_dict);
+
+  Tree tree(child, "parent");
+  GeometryEvaluator geomevaluator(tree);
+
+  auto root_geom = geomevaluator.evaluateGeometry(*tree.root(), false);
+
+  FileFormat exportFileFormat{FileFormat::STL};
+  ExportInfo exportInfo;
+ 
+  exportInfo.format = exportFileFormat;
+  exportInfo.fileName = file;
+  exportInfo.displayName = file;
+  exportInfo.sourceFilePath = file;
+  exportInfo.sourceFileName = file;
+  exportInfo.useStdOut = false;
+  exportInfo.options = nullptr;
+ 
+  exportFileByName(root_geom, exportInfo);
+
+  return Py_None;
+}
+
+PyObject *python_export(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+  PyObject *obj = NULL;
+  char *file= nullptr;
+  char *kwlist[] = {"obj", "file", NULL};
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "Os", kwlist,
+                                   &obj,&file
+                                   ))  {
+    PyErr_SetString(PyExc_TypeError, "Error during parsing output(object)");
+    return NULL;
+  }
+  return python_export_core(obj,file);
+}
+
 PyObject *python_oo_output(PyObject *obj, PyObject *args, PyObject *kwargs)
 {
   char *kwlist[] = {NULL};
@@ -1278,6 +1321,18 @@ PyObject *python_oo_output(PyObject *obj, PyObject *args, PyObject *kwargs)
 
 PyObject *python_oo_show(PyObject *obj, PyObject *args, PyObject *kwargs){
   return python_oo_output(obj, args, kwargs);	
+}
+
+PyObject *python_oo_export(PyObject *obj, PyObject *args, PyObject *kwargs)
+{
+  char *kwlist[] = {"file", NULL};
+  char *file = nullptr;
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s", kwlist, &file
+                                   ))  {
+    PyErr_SetString(PyExc_TypeError, "Error during parsing output(object)");
+    return NULL;
+  }
+  return python_export_core(obj, file);
 }
 
 PyObject *python__getitem__(PyObject *dict, PyObject *key)
@@ -3089,6 +3144,7 @@ PyMethodDef PyOpenSCADFunctions[] = {
   {"color", (PyCFunction) python_color, METH_VARARGS | METH_KEYWORDS, "Color Object."},
   {"output", (PyCFunction) python_output, METH_VARARGS | METH_KEYWORDS, "Output the result."},
   {"show", (PyCFunction) python_output, METH_VARARGS | METH_KEYWORDS, "Output the result."},
+  {"export", (PyCFunction) python_export, METH_VARARGS | METH_KEYWORDS, "Export the result."},
 
   {"linear_extrude", (PyCFunction) python_linear_extrude, METH_VARARGS | METH_KEYWORDS, "Linear_extrude Object."},
   {"rotate_extrude", (PyCFunction) python_rotate_extrude, METH_VARARGS | METH_KEYWORDS, "Rotate_extrude Object."},
@@ -3151,6 +3207,7 @@ PyMethodDef PyOpenSCADMethods[] = {
   OO_METHOD_ENTRY(color,"Color Object")	
   OO_METHOD_ENTRY(output,"Output Object")	
   OO_METHOD_ENTRY(show,"Output Object")	
+  OO_METHOD_ENTRY(export,"Export Object")	
 
   OO_METHOD_ENTRY(linear_extrude,"Linear_extrude Object")	
   OO_METHOD_ENTRY(rotate_extrude,"Rotate_extrude Object")	
