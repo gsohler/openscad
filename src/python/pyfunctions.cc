@@ -1469,34 +1469,54 @@ PyObject *python_mesh_core(PyObject *obj)
   GeometryEvaluator geomevaluator(tree);
   std::shared_ptr<const Geometry> geom = geomevaluator.evaluateGeometry(*tree.root(), true);
   std::shared_ptr<const PolySet> ps = PolySetUtils::getGeometryAsPolySet(geom);
-  if(ps == nullptr) return Py_None;
 
+
+  if(ps != nullptr){
   // Now create Python Point array
-  PyObject *ptarr = PyList_New(ps->vertices.size());  
-  for(int i=0;i<ps->vertices.size();i++) {
-    PyObject *coord = PyList_New(3);
-    for(int j=0;j<3;j++) 
-        PyList_SetItem(coord, j, PyFloat_FromDouble(ps->vertices[i][j]));
-    PyList_SetItem(ptarr, i, coord);
-    Py_XINCREF(coord);
-  }
-  Py_XINCREF(ptarr);
-  // Now create Python Point array
-  PyObject *polarr = PyList_New(ps->indices.size());  
-  for(int i=0;i<ps->indices.size();i++) {
-    PyObject *face = PyList_New(ps->indices[i].size());
-    for(int j=0;j<ps->indices[i].size();j++) 
-        PyList_SetItem(face, j, PyLong_FromLong(ps->indices[i][j]));
-    PyList_SetItem(polarr, i, face);
-    Py_XINCREF(face);
-  }
-  Py_XINCREF(polarr);
+    PyObject *ptarr = PyList_New(ps->vertices.size());  
+    for(int i=0;i<ps->vertices.size();i++) {
+      PyObject *coord = PyList_New(3);
+      for(int j=0;j<3;j++) 
+          PyList_SetItem(coord, j, PyFloat_FromDouble(ps->vertices[i][j]));
+      PyList_SetItem(ptarr, i, coord);
+      Py_XINCREF(coord);
+    }
+    Py_XINCREF(ptarr);
+    // Now create Python Point array
+    PyObject *polarr = PyList_New(ps->indices.size());  
+    for(int i=0;i<ps->indices.size();i++) {
+      PyObject *face = PyList_New(ps->indices[i].size());
+      for(int j=0;j<ps->indices[i].size();j++) 
+          PyList_SetItem(face, j, PyLong_FromLong(ps->indices[i][j]));
+      PyList_SetItem(polarr, i, face);
+      Py_XINCREF(face);
+    }
+    Py_XINCREF(polarr);
 
-  PyObject *result = PyTuple_New(2);
-  PyTuple_SetItem(result, 0, ptarr);
-  PyTuple_SetItem(result, 1, polarr);
+    PyObject *result = PyTuple_New(2);
+    PyTuple_SetItem(result, 0, ptarr);
+    PyTuple_SetItem(result, 1, polarr);
 
-  return result;
+    return result;
+  }  
+  if (auto polygon2d = std::dynamic_pointer_cast<const Polygon2d>(geom)) {
+    const std::vector<Outline2d> outlines =  polygon2d->outlines();
+    PyObject *pyth_outlines = PyList_New(outlines.size());
+    for(int i=0;i<outlines.size();i++) {
+      const Outline2d &outline = outlines[i];	    
+      PyObject *pyth_outline = PyList_New(outline.vertices.size());
+      for(int j=0;j<outline.vertices.size();j++) {
+        Vector2d pt = outline.vertices[j];	      
+        PyObject *pyth_pt = PyList_New(2);
+        for(int k=0;k<2;k++) 
+          PyList_SetItem(pyth_pt, k, PyFloat_FromDouble(pt[k]));
+        PyList_SetItem(pyth_outline, j, pyth_pt);
+      }
+      PyList_SetItem(pyth_outlines, i, pyth_outline);
+    }
+    return pyth_outlines;
+  }
+  return Py_None;
 }
 
 PyObject *python_mesh(PyObject *self, PyObject *args, PyObject *kwargs)
