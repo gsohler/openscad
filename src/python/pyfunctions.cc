@@ -1266,9 +1266,35 @@ PyObject *python_output(PyObject *self, PyObject *args, PyObject *kwargs)
   return python_output_core(obj);
 }
 
+PyObject *python_oo_output(PyObject *obj, PyObject *args, PyObject *kwargs)
+{
+  char *kwlist[] = {NULL};
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "", kwlist
+                                   ))  {
+    PyErr_SetString(PyExc_TypeError, "Error during parsing output(object)");
+    return NULL;
+  }
+  return python_output_core(obj);
+}
+
+PyObject *python_oo_show(PyObject *obj, PyObject *args, PyObject *kwargs){
+  return python_oo_output(obj, args, kwargs);	
+}
+
 PyObject *python_export_core(PyObject *obj, char *file)
 {
-  printf("Exporting to %s\n", file);	
+  const auto path = fs::path(file);
+  std::string suffix = path.has_extension() ? path.extension().generic_string().substr(1) : "";
+  boost::algorithm::to_lower(suffix);
+
+  ExportFileFormatOptions exportFileFormatOptions;
+
+  FileFormat exportFileFormat{FileFormat::STL};
+  const auto format_iter = exportFileFormatOptions.exportFileFormats.find(suffix);
+  if (format_iter != exportFileFormatOptions.exportFileFormats.end()) {
+    exportFileFormat = format_iter->second;
+  }
+
 
   PyObject *child_dict;
   std::shared_ptr<AbstractNode> child = PyOpenSCADObjectToNodeMulti(obj, &child_dict);
@@ -1278,7 +1304,6 @@ PyObject *python_export_core(PyObject *obj, char *file)
 
   auto root_geom = geomevaluator.evaluateGeometry(*tree.root(), false);
 
-  FileFormat exportFileFormat{FileFormat::STL};
   ExportInfo exportInfo;
  
   exportInfo.format = exportFileFormat;
@@ -1308,20 +1333,6 @@ PyObject *python_export(PyObject *self, PyObject *args, PyObject *kwargs)
   return python_export_core(obj,file);
 }
 
-PyObject *python_oo_output(PyObject *obj, PyObject *args, PyObject *kwargs)
-{
-  char *kwlist[] = {NULL};
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "", kwlist
-                                   ))  {
-    PyErr_SetString(PyExc_TypeError, "Error during parsing output(object)");
-    return NULL;
-  }
-  return python_output_core(obj);
-}
-
-PyObject *python_oo_show(PyObject *obj, PyObject *args, PyObject *kwargs){
-  return python_oo_output(obj, args, kwargs);	
-}
 
 PyObject *python_oo_export(PyObject *obj, PyObject *args, PyObject *kwargs)
 {
@@ -1334,6 +1345,7 @@ PyObject *python_oo_export(PyObject *obj, PyObject *args, PyObject *kwargs)
   }
   return python_export_core(obj, file);
 }
+
 
 PyObject *python__getitem__(PyObject *dict, PyObject *key)
 {
