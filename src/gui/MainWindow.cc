@@ -676,7 +676,6 @@ MainWindow::MainWindow(const QStringList& filenames)
   const auto windowState = settings.value("window/state", QByteArray()).toByteArray();
   restoreGeometry(settings.value("window/geometry", QByteArray()).toByteArray());
   restoreState(windowState);
-  updateWindowSettings(hideConsole, hideEditor, hideCustomizer, hideErrorLog, hideEditorToolbar, hide3DViewToolbar, hideAnimate, hideViewportControl);
 
   if (windowState.size() == 0) {
     /*
@@ -692,6 +691,11 @@ MainWindow::MainWindow(const QStringList& filenames)
      * fill the available space.
      */
     activeEditor->setInitialSizeHint(QSize((5 * this->width() / 11), 100));
+    tabifyDockWidget(consoleDock, errorLogDock);
+    tabifyDockWidget(errorLogDock, animateDock);
+    showConsole();
+    hideCustomizer = true;
+    hideViewportControl = true;
   } else {
 #ifdef Q_OS_WIN
     // Try moving the main window into the display range, this
@@ -711,6 +715,8 @@ MainWindow::MainWindow(const QStringList& filenames)
     }
 #endif // ifdef Q_OS_WIN
   }
+
+  updateWindowSettings(hideConsole, hideEditor, hideCustomizer, hideErrorLog, hideEditorToolbar, hide3DViewToolbar, hideAnimate, hideViewportControl);
 
   connect(this->editorDock, SIGNAL(topLevelChanged(bool)), this, SLOT(editorTopLevelChanged(bool)));
   connect(this->consoleDock, SIGNAL(topLevelChanged(bool)), this, SLOT(consoleTopLevelChanged(bool)));
@@ -917,7 +923,7 @@ void MainWindow::loadViewSettings(){
 void MainWindow::loadDesignSettings()
 {
   QSettingsCached settings;
-  if (settings.value("design/autoReload", true).toBool()) {
+  if (settings.value("design/autoReload", false).toBool()) {
     designActionAutoReload->setChecked(true);
   }
   auto polySetCacheSizeMB = Preferences::inst()->getValue("advanced/polysetCacheSizeMB").toUInt();
