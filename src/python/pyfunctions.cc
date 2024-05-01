@@ -1635,7 +1635,7 @@ PyObject *python_oo_fillet(PyObject *obj, PyObject *args, PyObject *kwargs)
   return python_fillet_core(obj,r,fn,sel);
 }
 
-PyObject *rotate_extrude_core(PyObject *obj, char *layer, int convexity, double scale, double angle, PyObject *twist, PyObject *origin, PyObject *offset, double fn, double fa, double fs)
+PyObject *rotate_extrude_core(PyObject *obj, char *layer, int convexity, double scale, double angle, PyObject *twist, PyObject *origin, PyObject *offset, PyObject *vp, char *method, double fn, double fa, double fs)
 {
   DECLARE_INSTANCE
   std::shared_ptr<AbstractNode> child;
@@ -1682,10 +1682,16 @@ PyObject *rotate_extrude_core(PyObject *obj, char *layer, int convexity, double 
     node->offset_x = PyFloat_AsDouble(PyList_GetItem(offset, 0));
     node->offset_y = PyFloat_AsDouble(PyList_GetItem(offset, 1));
   }
+  double dummy;
+  Vector3d v;
+  if(vp != nullptr && !python_vectorval(vp,&v[0],&v[1],&v[2],&dummy )){
+    node->v = v;	  
+  }
+  if(method != nullptr) node->method=method; else node->method = "centered";
 
   if (node->convexity <= 0) node->convexity = 2;
   if (node->scale <= 0) node->scale = 1;
-  if ((node->angle <= -360) || (node->angle > 360)) node->angle = 360;
+  if (node->angle <= -360)  node->angle = 360;
 
   return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
 }
@@ -1698,19 +1704,21 @@ PyObject *python_rotate_extrude(PyObject *self, PyObject *args, PyObject *kwargs
   double scale = 1.0;
   double angle = 360.0;
   PyObject *twist=NULL;
+  PyObject *v = NULL;
+  char *method = NULL;
   PyObject *origin = NULL;
   PyObject *offset = NULL;
   double fn = NAN, fa = NAN, fs = NAN;
   get_fnas(fn,fa,fs);
-  char *kwlist[] = {"obj", "layer", "convexity", "scale", "angle", "twist", "origin", "offset", "fn", "fa", "fs", NULL};
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|siddOOOddd", kwlist, 
-                          &obj, &layer, &convexity, &scale, &angle, &twist, &origin, &offset, &fn,&fa,&fs))
+  char *kwlist[] = {"obj", "layer", "convexity", "scale", "angle", "twist", "origin", "offset", "v","method", "fn", "fa", "fs", NULL};
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|siddOOOOsddd", kwlist, 
+                          &obj, &layer, &convexity, &scale, &angle, &twist, &origin, &offset, &v,&method, &fn,&fa,&fs))
     {
 
     PyErr_SetString(PyExc_TypeError, "Error during parsing rotate_extrude(object,...)");
     return NULL;
   }
-  return rotate_extrude_core(obj, layer, convexity, scale, angle, twist, origin, offset, fn, fa,fs);
+  return rotate_extrude_core(obj, layer, convexity, scale, angle, twist, origin, offset, v, method, fn, fa,fs);
 }
 
 PyObject *python_oo_rotate_extrude(PyObject *obj, PyObject *args, PyObject *kwargs)
@@ -1724,15 +1732,17 @@ PyObject *python_oo_rotate_extrude(PyObject *obj, PyObject *args, PyObject *kwar
   PyObject *offset = NULL;
   double fn = NAN, fa = NAN, fs = NAN;
   get_fnas(fn,fa,fs);
-  char *kwlist[] = {"layer", "convexity", "scale", "angle", "twist", "origin", "offset", "fn", "fa", "fs", NULL};
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|siddOOOddd", kwlist, 
-			  &layer, &convexity, &scale, &angle, &twist, &origin, &offset, &fn,&fa,&fs))
+  PyObject *v = NULL;
+  char *method = NULL;
+  char *kwlist[] = {"layer", "convexity", "scale", "angle", "twist", "origin", "offset", "v","method", "fn", "fa", "fs", NULL};
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|siddOOOOsddd", kwlist, 
+			  &layer, &convexity, &scale, &angle, &twist, &origin, &offset,&v, &method, &fn,&fa,&fs))
    {
 
     PyErr_SetString(PyExc_TypeError, "error during parsing\n");
     return NULL;
   }
-  return rotate_extrude_core(obj, layer, convexity, scale, angle, twist, origin, offset, fn, fa,fs);
+  return rotate_extrude_core(obj, layer, convexity, scale, angle, twist, origin, offset, v, method, fn, fa,fs);
 }
 
 PyObject *linear_extrude_core(PyObject *obj, PyObject *height, char *layer, int convexity, PyObject *origin, PyObject *scale, PyObject *center, int slices, int segments, PyObject *twist, double fn, double fa, double fs)
