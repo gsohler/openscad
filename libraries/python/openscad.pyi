@@ -1,4 +1,31 @@
 # PythonSCAD Stub File for use in editors like Visual Studio Code
+class PyLibFive:
+    pass
+
+class PyLibFive:
+    def x(self) -> PyLibFive:
+        """Return X coorinate
+        """
+        ...
+
+    def y(self) ->PyLibFive:
+        """Return Y coorinate
+        """
+        ...
+
+    def z(self) ->PyLibFive:
+        """Return Z coorinate
+        """
+        ...
+
+class PyOpenSCAD:
+    pass
+
+
+class PyOpenSCAD:
+    def color (self, c:str, alpha: float, texture:str) -> PyOpenSCAD:
+        ...
+# will copy functions from above when below is stable
 
 def square(dim:float | list[float], center:bool) -> PyOpenSCAD:
     """Create Square
@@ -15,12 +42,12 @@ def polygon(points:list[float], paths:list[int], convexity:int) -> PyOpenSCAD:
     """
     ...
 
-def text(text, size:float, font:string, spacing:float, direction:string, language:string, script:string, halign:float, valign:float, fn:int, fa:float, fs:float) -> PyOpenSCAD:
+def text(text, size:float, font:str, spacing:float, direction:str, language:str, script:str, halign:float, valign:float, fn:int, fa:float, fs:float) -> PyOpenSCAD:
     """Creates a Text
     """
     ...
 
-def textmetrics(text, size:float, font:string, spacing:float, direction:string, language:string, script:string, halign:float, valign:float) -> array:
+def textmetrics(text, size:float, font:str, spacing:float, direction:str, language:str, script:str, halign:float, valign:float) -> list[float]:
     """Get textmetrics from a label
     """
     ...
@@ -136,7 +163,7 @@ def offset(obj:PyOpenSCAD, r:float, delta:float, chamfer:float, fn:int, fa:float
     """
     ...
 
-def roof(obj:PyOpenSCAD, method:string, convexity:int, fn:int, fa:float, fs:float) -> PyOpenSCAD:
+def roof(obj:PyOpenSCAD, method:str, convexity:int, fn:int, fa:float, fs:float) -> PyOpenSCAD:
     """Create Roof from an 2D Shape
     """
     ...
@@ -146,7 +173,7 @@ def pull(obj:PyOpenSCAD, src:list[float], dst:list[float]) -> PyOpenSCAD:
     """
     ...
 
-def color(obj:PyOpenSCAD, c:string, alpha:float, texture:int) -> PyOpenSCAD:
+def color(obj:PyOpenSCAD, c:str, alpha:float, texture:int) -> PyOpenSCAD:
     """Colorize Object
     texture: id from texture command
     """
@@ -162,19 +189,19 @@ def show(obj:PyOpenSCAD) -> None:
     """
     ...
 
-def export(obj:PyOpenSCAD, file:string) -> None:
+def export(obj:PyOpenSCAD, file:str) -> None:
     """Export the result to a file
     file:  output file name, format is automatically detected from suffix
     """
     ...
 
-def linear_extrude(obj:PyOpenSCAD, height:float, v:list[float], layer:string, convexity:int, origin:list[float], scale:float, center:bool, slices:int, segments:int, twist:float, fn:int, fa:float, fs:float) -> PyOpenSCAD:
+def linear_extrude(obj:PyOpenSCAD, height:float, v:list[float], layer:str, convexity:int, origin:list[float], scale:float, center:bool, slices:int, segments:int, twist:float, fn:int, fa:float, fs:float) -> PyOpenSCAD:
     """Linear_extrude an 2D Object
     v: direction of extrusion
     """
     ...
 
-def rotate_extrude(obj:PyOpenSCAD, layer, convexity:int, scale:float, twist:float, origin:list[float], offset:list[float], v:list[float], method:string, fn:int, fa:float, fs:float) -> PyOpenSCAD:
+def rotate_extrude(obj:PyOpenSCAD, layer, convexity:int, scale:float, twist:float, origin:list[float], offset:list[float], v:list[float], method:str, fn:int, fa:float, fs:float) -> PyOpenSCAD:
     """Rotate_extrude an 2D Object
     v: direction of extrusion
     """
@@ -289,7 +316,7 @@ def render(obj:PyOpenSCAD,convexity:int) -> PyOpenSCAD:
     """
     ...
 
-def osimport(file:string, layer:string, convexity:int, origin:list[float], scale:float, width:float, height:float, filename:string, center:bool, dpi:float, id:int) -> PyOpenSCAD:
+def osimport(file:str, layer:str, convexity:int, origin:list[float], scale:float, width:float, height:float, filename:str, center:bool, dpi:float, id:int) -> PyOpenSCAD:
     """Imports Object from disc
     """
     ...
@@ -304,12 +331,12 @@ def version_num() -> list[float]:
     """
     ...
 
-def add_parameter(name:string, default) -> None:
+def add_parameter(name:str, default) -> None:
     """Adds Parameter for use in Customizer
     """
     ...
 
-def scad(code:string) -> PyOpenSCAD:
+def scad(code:str) -> PyOpenSCAD:
     """Evaluate Code in SCAD syntax
     """
     ...
@@ -326,9 +353,6 @@ def align(obj:PyOpenSCAD, refmat:list[float], objmat:list[float]) -> PyOpenSCAD:
 
 will copy functions from above when above is stable
 
-class PyOpenSCAD:
-    def color (self, c:str, alpha: float, texture:str) -> PyOpenSCAD:
-        ...
     def rotx (self, float) -> PyOpenSCAD:
         ...
     def translate (self, v:float | list[float]) -> PyOpenSCAD:
