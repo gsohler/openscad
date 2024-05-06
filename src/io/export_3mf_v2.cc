@@ -67,12 +67,12 @@ static void export_3mf_error(std::string msg)
 /*
  * PolySet must be triangulated.
  */
-static bool append_polyset(std::shared_ptr<const PolySet> ps, Lib3MF::PWrapper& wrapper, Lib3MF::PModel& model)
+static bool append_polyset(std::shared_ptr<const PolySet> ps, const std::string &name, Lib3MF::PWrapper& wrapper, Lib3MF::PModel& model)
 {
   try {
     auto mesh = model->AddMeshObject();
     if (!mesh) return false;
-    mesh->SetName("OpenSCAD Model");
+    mesh->SetName(name);
 
     auto vertexFunc = [&](const Vector3d& coords) -> bool {
       const auto f = coords.cast<float>();
@@ -130,7 +130,7 @@ static bool append_polyset(std::shared_ptr<const PolySet> ps, Lib3MF::PWrapper& 
 }
 
 #ifdef ENABLE_CGAL
-static bool append_nef(const CGAL_Nef_polyhedron& root_N, Lib3MF::PWrapper& wrapper, Lib3MF::PModel& model)
+static bool append_nef(const CGAL_Nef_polyhedron& root_N, const std::string &name, Lib3MF::PWrapper& wrapper, Lib3MF::PModel& model)
 {
   if (!root_N.p3) {
     LOG(message_group::Export_Error, "Export failed, empty geometry.");
@@ -142,31 +142,31 @@ static bool append_nef(const CGAL_Nef_polyhedron& root_N, Lib3MF::PWrapper& wrap
   }
 
   if (std::shared_ptr<PolySet> ps = CGALUtils::createPolySetFromNefPolyhedron3(*root_N.p3)) {
-    return append_polyset(ps, wrapper, model);
+    return append_polyset(ps, name, wrapper, model);
   }
   export_3mf_error("Error converting NEF Polyhedron.");
   return false;
 }
 #endif
 
-static bool append_3mf(const std::shared_ptr<const Geometry>& geom, Lib3MF::PWrapper& wrapper, Lib3MF::PModel& model)
+static bool append_3mf(const std::shared_ptr<const Geometry>& geom, const std::string &name, Lib3MF::PWrapper& wrapper, Lib3MF::PModel& model)
 {
   if (const auto geomlist = std::dynamic_pointer_cast<const GeometryList>(geom)) {
     for (const auto& item : geomlist->getChildren()) {
-      if (!append_3mf(item.second, wrapper, model)) return false;
+      if (!append_3mf(item.second, name, wrapper, model)) return false;
     }
 #ifdef ENABLE_CGAL
   } else if (const auto N = std::dynamic_pointer_cast<const CGAL_Nef_polyhedron>(geom)) {
-    return append_nef(*N, wrapper, model);
+    return append_nef(*N, name, wrapper, model);
   } else if (const auto hybrid = std::dynamic_pointer_cast<const CGALHybridPolyhedron>(geom)) {
-    return append_polyset(hybrid->toPolySet(), wrapper, model);
+    return append_polyset(hybrid->toPolySet(), name, wrapper, model);
 #endif
 #ifdef ENABLE_MANIFOLD
   } else if (const auto mani = std::dynamic_pointer_cast<const ManifoldGeometry>(geom)) {
-    return append_polyset(mani->toPolySet(), wrapper, model);
+    return append_polyset(mani->toPolySet(), name, wrapper, model);
 #endif
   } else if (const auto ps = std::dynamic_pointer_cast<const PolySet>(geom)) {
-    return append_polyset(PolySetUtils::tessellate_faces(*ps), wrapper, model);
+    return append_polyset(PolySetUtils::tessellate_faces(*ps), name, wrapper, model);
   } else if (std::dynamic_pointer_cast<const Polygon2d>(geom)) {
     assert(false && "Unsupported file format");
   } else {
@@ -181,7 +181,7 @@ static bool append_3mf(const std::shared_ptr<const Geometry>& geom, Lib3MF::PWra
     The file must be open.
  */
 
-void export_3mf(const std::shared_ptr<const Geometry>& geom, std::ostream& output)
+void export_3mf(const std::vector<std::shared_ptr<const Geometry>> & geoms, std::vector<std::string> &names, std::ostream& output) 
 {
   Lib3MF_uint32 interfaceVersionMajor, interfaceVersionMinor, interfaceVersionMicro;
   Lib3MF::PWrapper wrapper;
@@ -216,10 +216,13 @@ void export_3mf(const std::shared_ptr<const Geometry>& geom, std::ostream& outpu
     LOG(message_group::Export_Error, e.what());
     return;
   }
+  assert(geoms.size() == names.size());
 
-  if (!append_3mf(geom, wrapper, model)) {
-    return;
-  }
+  for(int i=0;i<geoms.size();i++) {
+    if (!append_3mf(geoms[i], names[i], wrapper, model)) {
+      return;
+    }
+  }  
 
   Lib3MF::PWriter writer;
   try {

@@ -1295,14 +1295,40 @@ PyObject *python_export_core(PyObject *obj, char *file)
     exportFileFormat = format_iter->second;
   }
 
+  std::vector<std::shared_ptr<const Geometry>> geoms;
+  std::vector<std::string>  names;
 
   PyObject *child_dict;
   std::shared_ptr<AbstractNode> child = PyOpenSCADObjectToNodeMulti(obj, &child_dict);
+  if(child != nullptr ) {
+    names.push_back("OpenSCAD Model");
+    Tree tree(child, "parent");
+    GeometryEvaluator geomevaluator(tree);
+    auto geom = geomevaluator.evaluateGeometry(*tree.root(), false);
+    geoms.push_back(geom);
+  } else if(PyDict_Check(obj)) {
+    printf("doict\n");
+    PyObject *key, *value;
+    Py_ssize_t pos = 0;
+    while (PyDict_Next(obj, &pos, &key, &value)) {
+      PyObject* value1 = PyUnicode_AsEncodedString(key, "utf-8", "~");
+      const char *value_str =  PyBytes_AS_STRING(value1);
+      if(value_str == nullptr) continue;
+      std::shared_ptr<AbstractNode> child = PyOpenSCADObjectToNodeMulti(value, &child_dict);
+      if(child == nullptr) continue;
+      names.push_back(value_str);
 
-  Tree tree(child, "parent");
-  GeometryEvaluator geomevaluator(tree);
+      Tree tree(child, "parent");
+      GeometryEvaluator geomevaluator(tree);
+      auto geom = geomevaluator.evaluateGeometry(*tree.root(), false);
+      geoms.push_back(geom);
+    }
+  }
+  if ( geoms.size() == 0) {
+    PyErr_SetString(PyExc_TypeError, "Object not recognized");
+    return NULL;
+  }  
 
-  auto root_geom = geomevaluator.evaluateGeometry(*tree.root(), false);
 
   ExportInfo exportInfo;
  
@@ -1314,8 +1340,21 @@ PyObject *python_export_core(PyObject *obj, char *file)
   exportInfo.useStdOut = false;
   exportInfo.options = nullptr;
  
-  exportFileByName(root_geom, exportInfo);
-
+  if(exportFileFormat == FileFormat::_3MF) {
+    std::ofstream fstream(file,  std::ios::out | std::ios::trunc | std::ios::binary);
+    if (!fstream.is_open()) {
+      LOG(_("Can't open file \"%1$s\" for export"), exportInfo.displayName);
+      return nullptr;
+    }
+    export_3mf(geoms, names, fstream);
+  }
+  else{
+    if(geoms.size() > 1) {
+      LOG("This Format can at most export one object");
+      return nullptr;
+    }	    
+    exportFileByName(geoms[0], exportInfo);
+  }
   return Py_None;
 }
 
@@ -1324,7 +1363,7 @@ PyObject *python_export(PyObject *self, PyObject *args, PyObject *kwargs)
   PyObject *obj = NULL;
   char *file= nullptr;
   char *kwlist[] = {"obj", "file", NULL};
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "Os", kwlist,
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "Os|O", kwlist,
                                    &obj,&file
                                    ))  {
     PyErr_SetString(PyExc_TypeError, "Error during parsing output(object)");
