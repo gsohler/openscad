@@ -18,17 +18,284 @@ class PyLibFive:
         """
         ...
 
+    def sqrt(self, v) ->PyLibFive:
+        """Return Z coorinate
+        """
+        ...
+
+    def square(self, v) ->PyLibFive:
+        """ Calculates the square of v
+        """
+        ...
+
+    def abs(self, v) ->PyLibFive:
+        """ Calculates the absolute Value of v
+        """
+        ...
+
+    def max(self, a, b) ->PyLibFive:
+        """ Calculates the maximum from a and b
+        """
+        ...
+
+    def min(self, a, b) ->PyLibFive:
+        """ Calculates the minimum from a and b
+        """
+        ...
+
+    def sin(self, v) ->PyLibFive:
+        """ Calculates the sine of v
+        """
+        ...
+
+    def cos(self, v) ->PyLibFive:
+        """ Calculates the cosine of v
+        """
+        ...
+
+    def tan(self, v) ->PyLibFive:
+        """ Calculates the tangens of v
+        """
+        ...
+
+    def asin(self, v) ->PyLibFive:
+        """ Calculates the arc sine of v
+        """
+        ...
+
+    def acos(self, v) ->PyLibFive:
+        """ Calculates the arc cosine of v
+        """
+        ...
+
+    def atan(self, v) ->PyLibFive:
+        """ Calculates the arc tangent of v
+        """
+        ...
+
+    def exp(self, v) ->PyLibFive:
+        """ Calculates the exponent of v
+        """
+        ...
+
+    def log(self, v) ->PyLibFive:
+        """ Calculates the logarithm of v
+        """
+        ...
+
+    def pow(self, a, b) ->PyLibFive:
+        """ Calculates the power from a over b
+        """
+        ...
+
+    def comp(self, a, b) ->PyLibFive:
+        """ Calculates the libfive comparision of a and b
+        """
+        ...
+
+    def atan2(self, y, x) ->PyLibFive:
+        """ Calculates aractangent from y/x
+        """
+        ...
+
+    def print(self) ->PyLibFive:
+        """ Print the Tree for debugging
+        """
+        ...
+
+
 class PyOpenSCAD:
     pass
 
 
 class PyOpenSCAD:
-    def color (self, c:str, alpha: float, texture:str) -> PyOpenSCAD:
+    def translate(obj:PyOpenSCAD, v:list[float]) -> PyOpenSCAD:
+        """Move Object by an offset
+        """
         ...
-# will copy functions from above when below is stable
+    
+    def right(obj:PyOpenSCAD, v:list[float]) -> PyOpenSCAD:
+        """Moves an Object to the right
+        """
+        ...
+    
+    def left(obj:PyOpenSCAD, v:list[float]) -> PyOpenSCAD:
+        """Moves an Object to the left
+        """
+        ...
+    
+    def back(obj:PyOpenSCAD, v:list[float]) -> PyOpenSCAD:
+        """Moves Object backwards
+        """
+        ...
+    
+    def front(obj:PyOpenSCAD, v:list[float]) -> PyOpenSCAD:
+        """Moves Object frontwards
+        """
+        ...
+
+    def up(obj:PyOpenSCAD, v:list[float]) -> PyOpenSCAD:
+        """Move Object upwards
+        """
+        ...
+
+    def down(obj:PyOpenSCAD, v:list[float]) -> PyOpenSCAD:
+        """Move Object downwards
+        """
+        ...
+    
+    def rotx(obj:PyOpenSCAD, v:list[float]) -> PyOpenSCAD:
+        """Rotate Object around X Axis
+        """
+        ...
+    
+    def roty(obj:PyOpenSCAD, v:list[float]) -> PyOpenSCAD:
+        """Rotate Object around Y Axis
+        """
+        ...
+    
+    def rotz(obj:PyOpenSCAD, v:list[float]) -> PyOpenSCAD:
+        """Rotate Object around Z Axis
+        """
+        ...
+    
+    def rotate(obj:PyOpenSCAD, a:float, v:list[float]) -> PyOpenSCAD:
+        """Rotate Object around X, Y and Z Axis
+        """
+        ...
+
+    def scale(obj:PyOpenSCAD, v:list[float]) -> PyOpenSCAD:
+        """Scale Object by a factor
+        """
+        ...
+
+    def mirror(obj:PyOpenSCAD, v:list[float]) -> PyOpenSCAD:
+        """Mirror Object 
+        """
+        ...
+
+    def multmatrix(obj:PyOpenSCAD, m:list[float]) -> PyOpenSCAD:
+        """Apply an 4x4 Eigen vector to an Object or handle
+        """
+        ...
+
+    def divmatrix(obj:PyOpenSCAD, m:list[float]) -> PyOpenSCAD:
+        """Apply inverse of an 4x4 Eigen vecor to an Object or handle
+        """
+        ...
+
+    def offset(obj:PyOpenSCAD, r:float, delta:float, chamfer:float, fn:int, fa:float, fs:float) -> PyOpenSCAD:
+        """2D or 3D Offset of an Object
+        """
+        ...
+    
+    def roof(obj:PyOpenSCAD, method:str, convexity:int, fn:int, fa:float, fs:float) -> PyOpenSCAD:
+        """Create Roof from an 2D Shape
+        """
+        ...
+
+    def pull(obj:PyOpenSCAD, src:list[float], dst:list[float]) -> PyOpenSCAD:
+        """Pull apart Object, basically between src and dst it creates a prisma with the x-section
+        src: anchor
+        dst: how much to pull
+        """
+        ...
+
+    def color(obj:PyOpenSCAD, c:str, alpha:float, texture:int) -> PyOpenSCAD:
+        """Colorize Object
+        texture: id from texture command
+        """
+        ...
+    
+    def output(obj:PyOpenSCAD) -> None:
+        """Output the result to the display
+        """
+        ...
+
+    def show(obj:PyOpenSCAD) -> None:
+        """Same as output
+        """
+        ...
+
+    def export(obj:PyOpenSCAD, file:str) -> None:
+        """Export the result to a file
+        file:  output file name, format is automatically detected from suffix
+        when obj is a dictionary, it allows 3mf export to export several paths
+        """
+        ...
+    
+    def linear_extrude(obj:PyOpenSCAD, height:float, v:list[float], layer:str, convexity:int, origin:list[float], scale:float, center:bool, slices:int, segments:int, twist:float, fn:int, fa:float, fs:float) -> PyOpenSCAD:
+        """Linear_extrude an 2D Object
+        v: direction of extrusion
+        """
+        ...
+
+    def rotate_extrude(obj:PyOpenSCAD, layer, convexity:int, scale:float, twist:float, origin:list[float], offset:list[float], v:list[float], method:str, fn:int, fa:float, fs:float) -> PyOpenSCAD:
+        """Rotate_extrude an 2D Object
+        v: direction of extrusion
+        """
+        ...
+    
+    def path_extrude(obj:PyOpenSCAD, path:list[float], xdir:list[float], convexity:int, origin:list[float], scale:float, twist:float, closed:bool, fn:int, fa:float, fs:float) -> PyOpenSCAD:
+        """Path_extrude an 2D Object
+        xdir: intial vector of x axis
+        """
+        ...
+    
+    def resize(obj:PyOpenSCAD) -> PyOpenSCAD:
+        """Resize an Object
+        """
+        ...
+
+    def highlight(obj:PyOpenSCAD) -> PyOpenSCAD:
+        """Highlights Object
+        """
+        ...
+
+    def background(obj:PyOpenSCAD) -> PyOpenSCAD:
+        """Puts Object into background
+        """
+        ...
+
+    def only(obj:PyOpenSCAD) -> PyOpenSCAD:
+        """Shows only this object
+        """
+        ...
+
+    def projection(obj:PyOpenSCAD, cut:bool, convexity:int) -> PyOpenSCAD:
+        """Crated 2D Projection from a 3D Object
+        """
+        ...
+
+    def mesh(obj:PyOpenSCAD):
+        """Retrieves Mesh Data from a 2D or 3D object
+        """
+        ...
+    
+    def oversample(obj:PyOpenSCAD,n:int, round:bool) -> PyOpenSCAD:
+        """Create artificial intermediate points into straight lines
+        n: factor  of the oversampling
+        bool: whether to round the oversampling
+        """
+        ...
+    
+    def fillet(obj:PyOpenSCAD, r:float, sel:PyOpenSCAD, fn:int) -> PyOpenSCAD:
+        """Create nice roundings for sharp edges
+        r: radius of the fillet
+        sel: Object which overlaps the "selected" edges
+        fn: number of points for fillet x-section
+        """
+        ...
+
+    def align(obj:PyOpenSCAD, refmat:list[float], objmat:list[float]) -> PyOpenSCAD:
+        """Aligns an Object to another
+        refmat: handle matrix of the reference object
+        objmat: handle matrix of the new object
+        """
+        ...
 
 def square(dim:float | list[float], center:bool) -> PyOpenSCAD:
-    """Create Square
+    """Create a Square
     """
     ...
 
@@ -38,7 +305,9 @@ def circle(r:float,d:float,angle:float, fn:int, fa:float, fs:float) -> PyOpenSCA
     ...
 
 def polygon(points:list[float], paths:list[int], convexity:int) -> PyOpenSCAD:
-    """Creates a Polygon
+    """Creates a Polygon 
+    points: array of vertices
+    paths: how to combine them
     """
     ...
 
@@ -169,7 +438,9 @@ def roof(obj:PyOpenSCAD, method:str, convexity:int, fn:int, fa:float, fs:float) 
     ...
 
 def pull(obj:PyOpenSCAD, src:list[float], dst:list[float]) -> PyOpenSCAD:
-    """Pull apart Object
+    """Pull apart Object, basically between src and dst it creates a prisma with the x-section
+    src: anchor
+    dst: how much to pull
     """
     ...
 
@@ -192,6 +463,7 @@ def show(obj:PyOpenSCAD) -> None:
 def export(obj:PyOpenSCAD, file:str) -> None:
     """Export the result to a file
     file:  output file name, format is automatically detected from suffix
+    when obj is a dictionary, it allows 3mf export to export several paths
     """
     ...
 
@@ -349,17 +621,6 @@ def align(obj:PyOpenSCAD, refmat:list[float], objmat:list[float]) -> PyOpenSCAD:
     ...
 
 
-"""
-
-will copy functions from above when above is stable
-
-    def rotx (self, float) -> PyOpenSCAD:
-        ...
-    def translate (self, v:float | list[float]) -> PyOpenSCAD:
-        ...
-
-def cube( size:float | list[float], center: bool) -> PyOpenSCAD: ...
-"""
 
 
 
