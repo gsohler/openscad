@@ -1281,6 +1281,32 @@ PyObject *python_oo_show(PyObject *obj, PyObject *args, PyObject *kwargs){
   return python_oo_output(obj, args, kwargs);	
 }
 
+
+void Export3mfInfo::writeProps(void *obj) const
+{
+  if(this->props == nullptr) return;
+  PyObject *prop = (PyObject *) this->props;
+  if(!PyDict_Check(prop)) return;
+  PyObject *key, *value;
+  Py_ssize_t pos = 0;
+  while (PyDict_Next(prop, &pos, &key, &value)) {
+    PyObject* key1 = PyUnicode_AsEncodedString(key, "utf-8", "~");
+    const char *key_str =  PyBytes_AS_STRING(key1);
+    if(key_str == nullptr) continue;
+    if(PyFloat_Check(value)) {
+      writePropsFloat(obj, key_str,PyFloat_AsDouble(value));
+    }
+    if(PyLong_Check(value)) {
+      writePropsLong(obj, key_str,PyLong_AsLong(value));
+    }
+    if(PyUnicode_Check(value)) {
+      PyObject* val1 = PyUnicode_AsEncodedString(value, "utf-8", "~");
+      const char *val_str =  PyBytes_AS_STRING(val1);
+      writePropsString(obj, key_str,val_str);
+    }
+  }
+}
+
 PyObject *python_export_core(PyObject *obj, char *file)
 {
   const auto path = fs::path(file);
@@ -1295,19 +1321,17 @@ PyObject *python_export_core(PyObject *obj, char *file)
     exportFileFormat = format_iter->second;
   }
 
-  std::vector<std::shared_ptr<const Geometry>> geoms;
+  std::vector<Export3mfInfo> export3mfInfos;
   std::vector<std::string>  names;
 
   PyObject *child_dict;
   std::shared_ptr<AbstractNode> child = PyOpenSCADObjectToNodeMulti(obj, &child_dict);
   if(child != nullptr ) {
-    names.push_back("OpenSCAD Model");
     Tree tree(child, "parent");
     GeometryEvaluator geomevaluator(tree);
-    auto geom = geomevaluator.evaluateGeometry(*tree.root(), false);
-    geoms.push_back(geom);
+    Export3mfInfo info(geomevaluator.evaluateGeometry(*tree.root(), false), "OpenSCAD Model", nullptr);
+    export3mfInfos.push_back(info);
   } else if(PyDict_Check(obj)) {
-    printf("doict\n");
     PyObject *key, *value;
     Py_ssize_t pos = 0;
     while (PyDict_Next(obj, &pos, &key, &value)) {
@@ -1316,15 +1340,19 @@ PyObject *python_export_core(PyObject *obj, char *file)
       if(value_str == nullptr) continue;
       std::shared_ptr<AbstractNode> child = PyOpenSCADObjectToNodeMulti(value, &child_dict);
       if(child == nullptr) continue;
-      names.push_back(value_str);
 
+      void *prop = nullptr;
+      if(child_dict != nullptr && PyDict_Check(child_dict)) {
+        PyObject *key = PyUnicode_FromStringAndSize("props_3mf",9);
+        prop = PyDict_GetItem(child_dict, key);
+      }
       Tree tree(child, "parent");
       GeometryEvaluator geomevaluator(tree);
-      auto geom = geomevaluator.evaluateGeometry(*tree.root(), false);
-      geoms.push_back(geom);
+      Export3mfInfo info(geomevaluator.evaluateGeometry(*tree.root(), false),value_str, prop);
+      export3mfInfos.push_back(info);
     }
   }
-  if ( geoms.size() == 0) {
+  if ( export3mfInfos.size() == 0) {
     PyErr_SetString(PyExc_TypeError, "Object not recognized");
     return NULL;
   }  
@@ -1346,14 +1374,14 @@ PyObject *python_export_core(PyObject *obj, char *file)
       LOG(_("Can't open file \"%1$s\" for export"), exportInfo.displayName);
       return nullptr;
     }
-    export_3mf(geoms, names, fstream);
+    export_3mf(export3mfInfos, fstream);
   }
   else{
-    if(geoms.size() > 1) {
+    if(export3mfInfos.size() > 1) {
       LOG("This Format can at most export one object");
       return nullptr;
     }	    
-    exportFileByName(geoms[0], exportInfo);
+    exportFileByName(export3mfInfos[0].geom, exportInfo);
   }
   return Py_None;
 }
