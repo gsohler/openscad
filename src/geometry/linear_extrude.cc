@@ -552,6 +552,12 @@ std::unique_ptr<Geometry> extrudePolygon(const LinearExtrudeNode& node, const Po
     is_segmented = true;
   }
 
+  if(node.profile_func != nullptr){
+    is_segmented = true;
+    seg_poly = python_getprofile(node.profile_func, node.fn, 0);
+    num_slices =  node.fn;	  
+  }
+
   const Polygon2d& polyref = is_segmented ? seg_poly : poly;
 
   Vector3d h1 = Vector3d::Zero();
@@ -592,10 +598,18 @@ std::unique_ptr<Geometry> extrudePolygon(const LinearExtrudeNode& node, const Po
       Eigen::Scaling(Vector2d(1,1) - full_scale * slice_idx / num_slices) * 
       Eigen::Affine2d(rotate_degrees(act_rot)));
 
-    for (const auto& o : polyref.outlines()) {
+    if(node.profile_func != nullptr) {
+      auto o = python_getprofile(node.profile_func, node.fn, full_height[2]*slice_idx/num_slices);
+        for (const auto& v : o.vertices) {
+          auto tmp = trans * v;
+          vertices.emplace_back(Vector3d(tmp[0], tmp[1], 0.0) + h1 + full_height * slice_idx / num_slices);
+	}
+    } else {
+     for (const auto& o : polyref.outlines()) {
       for (const auto& v : o.vertices) {
         auto tmp = trans * v;
         vertices.emplace_back(Vector3d(tmp[0], tmp[1], 0.0) + h1 + full_height * slice_idx / num_slices);
+      }
       }
     }
   }

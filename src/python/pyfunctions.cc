@@ -1820,9 +1820,11 @@ PyObject *linear_extrude_core(PyObject *obj, PyObject *height, char *layer, int 
 
   node->profile_func = NULL;
   node->twist_func = NULL;
+  get_fnas(node->fn, node->fa, node->fs);
   if(obj->ob_type == &PyFunction_Type) {
         Py_XINCREF(obj); // TODO there to decref it ?
 	node->profile_func = obj;
+	node->fn=2;
   	auto dummy_node = std::make_shared<SquareNode>(instance);
 	node->children.push_back(dummy_node);
   } else {
@@ -1836,7 +1838,6 @@ PyObject *linear_extrude_core(PyObject *obj, PyObject *height, char *layer, int 
    }
 
 
-  get_fnas(node->fn, node->fa, node->fs);
   if (!isnan(fn)) node->fn = fn;
   if (!isnan(fa)) node->fa = fa;
   if (!isnan(fs)) node->fs = fs;
@@ -1844,7 +1845,6 @@ PyObject *linear_extrude_core(PyObject *obj, PyObject *height, char *layer, int 
   Vector3d height_vec(0,0,0);
   double dummy;
   if(!python_numberval(height, &height_vec[2])) {
-	  printf("lin cvase\n");
     node->height = height_vec;
   } else if(!python_vectorval(height, &height_vec[0], &height_vec[1], &height_vec[2], &dummy)) {
     node->height = height_vec;
