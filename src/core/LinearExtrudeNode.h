@@ -2,6 +2,7 @@
 
 #include "node.h"
 #include "Value.h"
+#include "linalg.h"
 #ifdef ENABLE_PYTHON
 #include <src/python/python_public.h>
 #endif

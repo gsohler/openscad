@@ -88,9 +88,9 @@ static bool append_polyset(std::shared_ptr<const PolySet> ps, const Export3mfInf
     Lib3MF::PMeshObject mesh = model->AddMeshObject();
     if (!mesh) return false;
     mesh->SetName(info.name);
+#ifdef ENABLE_PYTHON    
     info.writeProps((void *) &mesh);
-//    if(props != nullptr && PyDict_Check((PyObject *) props)) {
-//    }
+#endif    
 
     auto vertexFunc = [&](const Vector3d& coords) -> bool {
       const auto f = coords.cast<float>();
