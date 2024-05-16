@@ -47,6 +47,7 @@ extern bool parse(SourceFile *& file, const std::string& text, const std::string
 #include "LinearExtrudeNode.h"
 #include "PathExtrudeNode.h"
 #include "PullNode.h"
+#include "WrapNode.h"
 #include "OversampleNode.h"
 #include "FilletNode.h"
 #include "CgalAdvNode.h"
@@ -1218,6 +1219,51 @@ PyObject *python_oo_pull(PyObject *obj, PyObject *args, PyObject *kwargs)
     return NULL;
   }
   return python_pull_core(obj, anchor, dir);
+}
+
+PyObject *python_wrap_core(PyObject *obj, double length)
+{
+  DECLARE_INSTANCE
+  auto node = std::make_shared<WrapNode>(instance);
+  PyObject *dummydict;
+  std::shared_ptr<AbstractNode> child = PyOpenSCADObjectToNodeMulti(obj, &dummydict);
+  if (child == NULL) {
+    PyErr_SetString(PyExc_TypeError, "Invalid type for  Object in translate\n");
+    return NULL;
+  }
+
+  node->length = length;
+  node->children.push_back(child);
+  return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
+}
+
+PyObject *python_wrap(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+  char *kwlist[] = {"obj", "length",NULL};
+  PyObject *obj = NULL;
+  double length;
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "Ol", kwlist,
+                                   &obj,
+                                   &length
+                                   )) {
+    PyErr_SetString(PyExc_TypeError, "error during parsing\n");
+    return NULL;
+  }
+  return python_wrap_core(obj, length);
+}
+
+PyObject *python_oo_wrap(PyObject *obj, PyObject *args, PyObject *kwargs)
+{
+  char *kwlist[] = {"length",NULL};
+  double length;
+  PyObject *dir = NULL;
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "l", kwlist,
+                                   &length
+                                   )) {
+    PyErr_SetString(PyExc_TypeError, "error during parsing\n");
+    return NULL;
+  }
+  return python_wrap_core(obj, length);
 }
 
 PyObject *python_output_core(PyObject *obj)
@@ -3250,6 +3296,7 @@ PyMethodDef PyOpenSCADFunctions[] = {
   {"offset", (PyCFunction) python_offset, METH_VARARGS | METH_KEYWORDS, "Offset Object."},
   {"roof", (PyCFunction) python_roof, METH_VARARGS | METH_KEYWORDS, "Roof Object."},
   {"pull", (PyCFunction) python_pull, METH_VARARGS | METH_KEYWORDS, "Pull apart Object."},
+  {"wrap", (PyCFunction) python_pull, METH_VARARGS | METH_KEYWORDS, "Wrap Object around cylidner."},
   {"color", (PyCFunction) python_color, METH_VARARGS | METH_KEYWORDS, "Color Object."},
   {"output", (PyCFunction) python_output, METH_VARARGS | METH_KEYWORDS, "Output the result."},
   {"show", (PyCFunction) python_output, METH_VARARGS | METH_KEYWORDS, "Output the result."},
@@ -3334,6 +3381,8 @@ PyMethodDef PyOpenSCADMethods[] = {
   OO_METHOD_ENTRY(only,"Only Object")	
 
   OO_METHOD_ENTRY(projection,"Projection Object")	
+  OO_METHOD_ENTRY(pull,"Pull Obejct apart")	
+  OO_METHOD_ENTRY(wrap,"Wrap Object around Cylinder")	
   OO_METHOD_ENTRY(render,"Render Object")	
 
   {NULL, NULL, 0, NULL}

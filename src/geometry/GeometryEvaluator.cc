@@ -13,6 +13,7 @@
 #include "roof_vd.h"
 #include "RotateExtrudeNode.h"
 #include "PullNode.h"
+#include "WrapNode.h"
 #include "rotextrude.h"
 #include "CgalAdvNode.h"
 #include "ProjectionNode.h"
@@ -2777,6 +2778,7 @@ static void pullObject_addtri(PolySetBuilder &builder,Vector3d a, Vector3d b, Ve
 	builder.addVertex(builder.vertexIndex(Vector3d(b[0], b[1], b[2])));
 	builder.addVertex(builder.vertexIndex(Vector3d(a[0], a[1], a[2])));
 }
+
 static std::unique_ptr<PolySet> pullObject(const PullNode& node, const PolySet *ps)
 {
   PolySetBuilder builder(0,0,3,true);
@@ -2856,6 +2858,19 @@ static std::unique_ptr<PolySet> pullObject(const PullNode& node, const PolySet *
   return builder.build();
 }
 
+static std::unique_ptr<PolySet> wrapObject(const WrapNode& node, const PolySet *ps)
+{
+  PolySetBuilder builder(0,0,3,true);
+  for(const auto &p : ps->indices) {
+    builder.beginPolygon(p.size());	  
+    for(const auto ind: p) {	  
+      builder.addVertex(ps->vertices[ind]);	    
+    }
+    builder.endPolygon();
+  }
+  return builder.build();
+}
+
 Response GeometryEvaluator::visit(State& state, const PullNode& node)
 {
   std::shared_ptr<const Geometry> newgeom;
@@ -2864,6 +2879,21 @@ Response GeometryEvaluator::visit(State& state, const PullNode& node)
     if(std::shared_ptr<const PolySet> ps = std::dynamic_pointer_cast<const PolySet>(geom)) {
       std::unique_ptr<Geometry> ps_pulled =  pullObject(node,ps.get());
       newgeom = std::move(ps_pulled);
+      addToParent(state, node, newgeom);
+      node.progress_report();
+    }
+  }
+  return Response::ContinueTraversal;
+}
+
+Response GeometryEvaluator::visit(State& state, const WrapNode& node)
+{
+  std::shared_ptr<const Geometry> newgeom;
+  std::shared_ptr<const Geometry> geom = applyToChildren3D(node, OpenSCADOperator::UNION).constptr();
+  if (geom) {
+    if(std::shared_ptr<const PolySet> ps = std::dynamic_pointer_cast<const PolySet>(geom)) {
+      std::unique_ptr<Geometry> ps_wrapped =  wrapObject(node,ps.get());
+      newgeom = std::move(ps_wrapped);
       addToParent(state, node, newgeom);
       node.progress_report();
     }

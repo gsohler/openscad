@@ -859,6 +859,7 @@ set(CORE_SOURCES
   src/core/Children.cc
   src/core/ColorNode.cc
   src/core/PullNode.cc
+  src/core/WrapNode.cc
   src/core/TextureNode.cc
   src/core/Context.cc
   src/core/ContextFrame.cc
