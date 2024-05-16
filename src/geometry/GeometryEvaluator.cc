@@ -2861,12 +2861,71 @@ static std::unique_ptr<PolySet> pullObject(const PullNode& node, const PolySet *
 static std::unique_ptr<PolySet> wrapObject(const WrapNode& node, const PolySet *ps)
 {
   PolySetBuilder builder(0,0,3,true);
+  int segments=20;
+  double length=2*M_PI*node.r;
+
   for(const auto &p : ps->indices) {
-    builder.beginPolygon(p.size());	  
-    for(const auto ind: p) {	  
-      builder.addVertex(ps->vertices[ind]);	    
+    // find leftmost point		 
+    int n=p.size();
+    int minind=0;
+    for(int j=1;j<p.size();j++) {
+      if(ps->vertices[p[j]][0] < ps->vertices[p[minind]][0])
+      minind=j;		
     }
-    builder.endPolygon();
+    int forw_ind=minind;
+    int back_ind=minind;
+    double xcur, xnext;
+
+    xcur=ps->vertices[p[minind]][0];
+    std::vector<Vector3d> curslice;
+    curslice.push_back(ps->vertices[p[minind]]);
+
+    int end=0;
+    do {
+      xnext = ceil((xcur+1e-6)*segments/length)*length/segments;
+      while(ps->vertices[p[(forw_ind+1)%n]][0] <= xnext && ((forw_ind+1)%n) != back_ind ) {
+        forw_ind= (forw_ind+1)%n;
+        curslice.push_back(ps->vertices[p[forw_ind]]);
+      }
+      while(ps->vertices[p[(back_ind+n-1)%n]][0] <= xnext && ((back_ind+n-1)%n) != forw_ind) {
+        back_ind= (back_ind+n-1)%n;
+        curslice.insert(curslice.begin(),ps->vertices[p[back_ind]]);
+      }
+
+      Vector3d  forw_pt, back_pt;
+      if(back_ind == ((forw_ind+1)%n)) {
+      end=1;
+      } else {
+        // calculate intermediate forward point
+        Vector3d tmp1, tmp2;
+	
+        tmp1 = ps->vertices[p[forw_ind]];
+        tmp2 = ps->vertices[p[(forw_ind+1)%n]];
+        forw_pt = tmp1 +(tmp2-tmp1)*(xnext-tmp1[0])/(tmp2[0]-tmp1[1]); // keine div/0
+        curslice.push_back(forw_pt);									      
+        tmp1 = ps->vertices[p[back_ind]];
+        tmp2 = ps->vertices[p[(back_ind+n-1)%n]];
+        back_pt = tmp1 +(tmp2-tmp1)*(xnext-tmp1[0])/(tmp2[0]-tmp1[1]); // keine div/0
+        curslice.insert(curslice.begin(), back_pt);									      
+      }  
+									      
+      double ang, rad;
+      builder.beginPolygon(curslice.size());	  
+      for(int j=0;j<curslice.size();j++) {
+        auto &pt = curslice[j];
+//        printf("%g/%g/%g ",pt[0], pt[1], pt[2]);
+        ang=2.0*M_PI*pt[0]/length;
+        rad = node.r-pt[1];
+        Vector3d pt_trans=Vector3d(rad*cos(ang),rad*sin(ang),pt[2]);
+        builder.addVertex(pt_trans);	    
+      }
+      builder.endPolygon();
+      curslice.clear();
+      xcur=xnext;
+      curslice.push_back(back_pt);	    
+      curslice.push_back(forw_pt);	    
+    } while(end == 0);
+    continue;
   }
   return builder.build();
 }

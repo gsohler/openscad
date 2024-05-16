@@ -12,5 +12,6 @@ public:
   }
   std::string toString() const override;
   std::string name() const override { return "wrap"; }
-  double length;
+  double r;
+  double fn, fa, fs;
 };

@@ -1221,7 +1221,7 @@ PyObject *python_oo_pull(PyObject *obj, PyObject *args, PyObject *kwargs)
   return python_pull_core(obj, anchor, dir);
 }
 
-PyObject *python_wrap_core(PyObject *obj, double length)
+PyObject *python_wrap_core(PyObject *obj, double r, double fn, double fa, double fs)
 {
   DECLARE_INSTANCE
   auto node = std::make_shared<WrapNode>(instance);
@@ -1232,38 +1232,43 @@ PyObject *python_wrap_core(PyObject *obj, double length)
     return NULL;
   }
 
-  node->length = length;
+
+  node->r = r;
+  get_fnas(node->fn, node->fa, node->fn);
+  if(!isnan(fn)) node->fn=fn;
+  if(!isnan(fa)) node->fa=fa;
+  if(!isnan(fs)) node->fs=fs;
   node->children.push_back(child);
   return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
 }
 
 PyObject *python_wrap(PyObject *self, PyObject *args, PyObject *kwargs)
 {
-  char *kwlist[] = {"obj", "length",NULL};
+  char *kwlist[] = {"obj", "r","fn","fa","fs", NULL};
   PyObject *obj = NULL;
-  double length;
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "Ol", kwlist,
+  double r, fn, fa, fs;
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "Od|ddd", kwlist,
                                    &obj,
-                                   &length
+                                   &r, &fn, &fa, &fs
                                    )) {
     PyErr_SetString(PyExc_TypeError, "error during parsing\n");
     return NULL;
   }
-  return python_wrap_core(obj, length);
+  return python_wrap_core(obj, r, fn,fa, fs);
 }
 
 PyObject *python_oo_wrap(PyObject *obj, PyObject *args, PyObject *kwargs)
 {
-  char *kwlist[] = {"length",NULL};
-  double length;
+  char *kwlist[] = {"r","fn","fa","fs",NULL};
+  double r,fn=NAN,fa=NAN,fs=NAN;
   PyObject *dir = NULL;
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "l", kwlist,
-                                   &length
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "d|ddd", kwlist,
+                                   &r,&fn,&fa,&fs
                                    )) {
     PyErr_SetString(PyExc_TypeError, "error during parsing\n");
     return NULL;
   }
-  return python_wrap_core(obj, length);
+  return python_wrap_core(obj, r, fn, fa, fs);
 }
 
 PyObject *python_output_core(PyObject *obj)

@@ -29,9 +29,15 @@
 std::string WrapNode::toString() const
 {
   std::ostringstream stream;
-  stream << this->name() << "(";
+  stream << "wrap" <<  "("
+         << "($fn = " << fn
+           << ", $fa = " << fa
+           << ", $fs = " << fs
+           << ", r = " << r
+           << ")";
+
   stream <<
-    "length = " << this->length << ")" ;
+    "r = " << this->r << ")" ;
   return stream.str();
 }
 
