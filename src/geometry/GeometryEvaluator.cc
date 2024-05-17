@@ -2861,8 +2861,11 @@ static std::unique_ptr<PolySet> pullObject(const PullNode& node, const PolySet *
 static std::unique_ptr<PolySet> wrapObject(const WrapNode& node, const PolySet *ps)
 {
   PolySetBuilder builder(0,0,3,true);
-  int segments=20;
-  double length=2*M_PI*node.r;
+  int segments1=360.0/node.fa;
+  int segments2=2*M_PI*node.r/node.fs;
+  int segments=segments1>segments2?segments1:segments2;	  
+  if(node.fn > 0) segments=node.fn;
+  double arclen=2*M_PI*node.r/segments;
 
   for(const auto &p : ps->indices) {
     // find leftmost point		 
@@ -2882,7 +2885,8 @@ static std::unique_ptr<PolySet> wrapObject(const WrapNode& node, const PolySet *
 
     int end=0;
     do {
-      xnext = ceil((xcur+1e-6)*segments/length)*length/segments;
+      if(xcur >= 0) xnext = ceil((xcur+1e-6)/arclen)*arclen;
+      else xnext = -floor((-xcur+1e-6)/arclen)*arclen;
       while(ps->vertices[p[(forw_ind+1)%n]][0] <= xnext && ((forw_ind+1)%n) != back_ind ) {
         forw_ind= (forw_ind+1)%n;
         curslice.push_back(ps->vertices[p[forw_ind]]);
@@ -2901,11 +2905,11 @@ static std::unique_ptr<PolySet> wrapObject(const WrapNode& node, const PolySet *
 	
         tmp1 = ps->vertices[p[forw_ind]];
         tmp2 = ps->vertices[p[(forw_ind+1)%n]];
-        forw_pt = tmp1 +(tmp2-tmp1)*(xnext-tmp1[0])/(tmp2[0]-tmp1[1]); // keine div/0
+        forw_pt = tmp1 +(tmp2-tmp1)*(xnext-tmp1[0])/(tmp2[0]-tmp1[1]);
         curslice.push_back(forw_pt);									      
         tmp1 = ps->vertices[p[back_ind]];
         tmp2 = ps->vertices[p[(back_ind+n-1)%n]];
-        back_pt = tmp1 +(tmp2-tmp1)*(xnext-tmp1[0])/(tmp2[0]-tmp1[1]); // keine div/0
+        back_pt = tmp1 +(tmp2-tmp1)*(xnext-tmp1[0])/(tmp2[0]-tmp1[1]);
         curslice.insert(curslice.begin(), back_pt);									      
       }  
 									      
@@ -2913,8 +2917,7 @@ static std::unique_ptr<PolySet> wrapObject(const WrapNode& node, const PolySet *
       builder.beginPolygon(curslice.size());	  
       for(int j=0;j<curslice.size();j++) {
         auto &pt = curslice[j];
-//        printf("%g/%g/%g ",pt[0], pt[1], pt[2]);
-        ang=2.0*M_PI*pt[0]/length;
+        ang=pt[0]/node.r;
         rad = node.r-pt[1];
         Vector3d pt_trans=Vector3d(rad*cos(ang),rad*sin(ang),pt[2]);
         builder.addVertex(pt_trans);	    

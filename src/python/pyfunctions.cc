@@ -1234,7 +1234,7 @@ PyObject *python_wrap_core(PyObject *obj, double r, double fn, double fa, double
 
 
   node->r = r;
-  get_fnas(node->fn, node->fa, node->fn);
+  get_fnas(node->fn, node->fa, node->fs);
   if(!isnan(fn)) node->fn=fn;
   if(!isnan(fa)) node->fa=fa;
   if(!isnan(fs)) node->fs=fs;
@@ -2680,9 +2680,9 @@ PyObject *python_text(PyObject *self, PyObject *args, PyObject *kwargs)
 
 /*
    node->params.set_documentPath(session->documentRoot());
-   node->params.detect_properties();
    }
  */
+   node->params.detect_properties();
 
   return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
 }
