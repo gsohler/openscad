@@ -187,13 +187,17 @@ static std::shared_ptr<AbstractNode> builtin_cube(const ModuleInstantiation *ins
   return node;
 }
 
+std::unique_ptr<const Geometry> sphereCreateFuncGeometry(void *funcptr, double fs);
+
 std::unique_ptr<const Geometry> SphereNode::createGeometry() const
 {
   if (this->r <= 0 || !std::isfinite(this->r)) {
     return PolySet::createEmpty();
   }
-
   auto num_fragments = Calc::get_fragments_from_r(r, 360.0, fn, fs, fa);
+  if(this->r_func != nullptr) {
+    return sphereCreateFuncGeometry(this->r_func, fs);
+  }
   size_t num_rings = (num_fragments + 1) / 2;
   // Uncomment the following three lines to enable experimental sphere
   // tessellation

@@ -34,6 +34,7 @@
 #include <src/python/pyopenscad.h>
 #include "SourceFile.h"
 #include "BuiltinContext.h"
+#include <PolySetBuilder.h>
 extern bool parse(SourceFile *& file, const std::string& text, const std::string& filename, const std::string& mainFile, int debug);
 
 #ifdef ENABLE_LIBFIVE
@@ -120,6 +121,50 @@ PyObject *python_cube(PyObject *self, PyObject *args, PyObject *kwargs)
   return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
 }
 
+int sphereCalcInd(PolySetBuilder &builder, PyObject *func, Vector3d dir)
+{
+  dir.normalize();
+  PyObject *dir_p= PyList_New(3);
+  for(int i=0;i<3;i++)
+    PyList_SetItem(dir_p,i,PyFloat_FromDouble(dir[i]));
+  PyObject* args = PyTuple_Pack(1,dir_p);
+  PyObject* len_p = PyObject_CallObject(func, args);
+  double len=0;
+  python_numberval(len_p, &len);
+  dir *= len;
+  return builder.vertexIndex(dir);
+}
+std::unique_ptr<const Geometry> sphereCreateFuncGeometry(void *funcptr, double fs)
+{
+  PyObject *func = (PyObject *) funcptr;
+  PolySetBuilder builder;
+  std::vector<IndexedTriangle> tri_todo;
+  int topind, botind, leftind, rightind, frontind, backind;
+  leftind=sphereCalcInd(builder, func, Vector3d(-1,0,0));
+  rightind=sphereCalcInd(builder, func, Vector3d(1,0,0));
+  frontind=sphereCalcInd(builder, func, Vector3d(0,-1,0));
+  backind=sphereCalcInd(builder, func, Vector3d(0,1,0));
+  botind=sphereCalcInd(builder, func, Vector3d(0,0,-1));
+  topind=sphereCalcInd(builder, func, Vector3d(0,0,1));
+  tri_todo.push_back(IndexedTriangle(leftind, frontind, topind));
+  tri_todo.push_back(IndexedTriangle(frontind, rightind, topind));
+  tri_todo.push_back(IndexedTriangle(rightind, backind, topind));
+  tri_todo.push_back(IndexedTriangle(backind, leftind, topind));
+  tri_todo.push_back(IndexedTriangle(leftind, botind, frontind));
+  tri_todo.push_back(IndexedTriangle(frontind, botind, rightind));
+  tri_todo.push_back(IndexedTriangle(rightind, botind, backind));
+  tri_todo.push_back(IndexedTriangle(backind, botind, leftind));
+
+  while(tri_todo.size() > 0) {
+    std::vector<IndexedTriangle> tri_done;
+    for(const IndexedTriangle & tri: tri_todo) {
+      builder.appendPolygon({tri[0], tri[1], tri[2]});
+    }
+    tri_todo=tri_done;
+  }  
+
+  return builder.build();
+}
 
 PyObject *python_sphere(PyObject *self, PyObject *args, PyObject *kwargs)
 {
@@ -128,17 +173,20 @@ PyObject *python_sphere(PyObject *self, PyObject *args, PyObject *kwargs)
 
   char *kwlist[] = {"r", "d", "fn", "fa", "fs", NULL};
   double r = NAN;
+  PyObject *rp = nullptr;
   double d = NAN;
   double fn = NAN, fa = NAN, fs = NAN;
 
   double vr = 1;
 
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|ddddd", kwlist,
-                                   &r, &d, &fn, &fa, &fs
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|Odddd", kwlist,
+                                   &rp, &d, &fn, &fa, &fs
                                    )) {
     PyErr_SetString(PyExc_TypeError, "Error during parsing sphere(r|d)");
     return NULL;
   } 
+  if(python_numberval(rp, &r))
+  if(rp->ob_type == &PyFunction_Type) node->r_func = rp;
   if (!isnan(r)) {
     if(r <= 0) {
       PyErr_SetString(PyExc_TypeError, "Parameter r must be positive");

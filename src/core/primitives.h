@@ -62,9 +62,14 @@ public:
     stream << "sphere"
            << "($fn = " << fn
            << ", $fa = " << fa
-           << ", $fs = " << fs
-           << ", r = " << r
-           << ")";
+           << ", $fs = " << fs ;
+#ifdef ENABLE_PYTHON
+    if(r_func != nullptr)
+        stream << ", r_func = " << rand() ;
+    else
+#endif
+    	stream << ", r = " << r ;
+    stream << ")";
     return stream.str();
   }
   std::string name() const override { return "sphere"; }
@@ -72,6 +77,9 @@ public:
 
   double fn, fs, fa;
   double r = 1;
+#ifdef ENABLE_PYTHON
+  void *r_func = nullptr;
+#endif
 };
 
 
