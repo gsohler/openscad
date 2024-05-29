@@ -137,9 +137,43 @@ int sphereCalcInd(PolySetBuilder &builder, std::vector<Vector3d> &vertices, PyOb
   return ind;
 }
 
-int sphereCalcSplitInd(PolySetBuilder &builder, std::vector<Vector3d> &vertices, PyObject *func, int ind1, int ind2)
+class SphereEdgeDb
 {
-  return sphereCalcInd(builder, vertices, func, vertices[ind1]+vertices[ind2]);
+        public:
+		SphereEdgeDb(int a, int b) {
+			ind1=(a<b)?a:b;
+			ind2=(a>b)?a:b;
+		}
+                int ind1, ind2;
+                int operator==(const SphereEdgeDb ref)
+                {
+                        if(this->ind1 == ref.ind1 && this->ind2 == ref.ind2) return 1;
+                        return 0;
+                }
+};
+
+unsigned int hash_value(const SphereEdgeDb& r) {
+        unsigned int i;
+        i=r.ind1 |(r.ind2<<16) ;
+        return i;
+}
+
+int operator==(const SphereEdgeDb &t1, const SphereEdgeDb &t2) 
+{
+        if(t1.ind1 == t2.ind1 && t1.ind2 == t2.ind2) return 1;
+        return 0;
+}
+
+
+int sphereCalcSplitInd(PolySetBuilder &builder, std::vector<Vector3d> &vertices, std::unordered_map<SphereEdgeDb, int, boost::hash<SphereEdgeDb> > &edges, PyObject *func, int ind1, int ind2)
+{
+  SphereEdgeDb edge(ind1, ind2);
+  if(edges.count(edge) > 0) {
+    return edges[edge];
+  }
+  int result = sphereCalcInd(builder, vertices, func, vertices[ind1]+vertices[ind2]);
+  edges[edge]=result;
+  return result;
 }
 
 std::unique_ptr<const Geometry> sphereCreateFuncGeometry(void *funcptr, double fs)
@@ -147,6 +181,8 @@ std::unique_ptr<const Geometry> sphereCreateFuncGeometry(void *funcptr, double f
   PyObject *func = (PyObject *) funcptr;
   PolySetBuilder builder;
   std::vector<Vector3d> vertices;
+  std::unordered_map<SphereEdgeDb, int, boost::hash<SphereEdgeDb> > edges;
+
   std::vector<IndexedTriangle> tri_todo;
   int topind, botind, leftind, rightind, frontind, backind;
   leftind=sphereCalcInd(builder, vertices, func, Vector3d(-1,0,0));
@@ -168,16 +204,39 @@ std::unique_ptr<const Geometry> sphereCreateFuncGeometry(void *funcptr, double f
   while(tri_todo.size() > 0) {
     std::vector<IndexedTriangle> tri_new;
     for(const IndexedTriangle & tri: tri_todo) {
-      int splitind[3]={-1,-1,-1};
-      // TODO viel errektiver auh mit kantenbasis
+      double dist[3];
+      int splitind[3];
+
+      for(int i=0;i<3;i++) {
+        SphereEdgeDb e(tri[i], tri[(i+1)%3]);
+        splitind[i] = edges.count(e) > 0?edges[e]:-1;
+        dist[i]=(vertices[tri[i]]-vertices[tri[(i+1)%3]]).norm();
+      }
+
+      double mindist=dist[0], maxdist=dist[0];
+      for(int i=1;i<3;i++) {
+        if(dist[i] < mindist) mindist=dist[i];
+        if(dist[i] > maxdist) maxdist=dist[i];
+      }
+      if(mindist > fs){
+        if(maxdist/mindist < 1.41) {
+	  for(int i=0;i<3;i++)
+            splitind[i]=sphereCalcSplitInd(builder, vertices, edges, func, tri[i], tri[(i+1)%3]);
+	} else {
+	  double middist=sqrt(maxdist* mindist);
+	  for(int i=0;i<3;i++)
+            if(dist[i] > middist) splitind[i]=sphereCalcSplitInd(builder, vertices, edges, func, tri[i], tri[(i+1)%3]);
+	}
+      }
       if(round < 7) {
-        splitind[0]=sphereCalcSplitInd(builder, vertices, func, tri[0], tri[1]);
-        splitind[1]=sphereCalcSplitInd(builder, vertices, func, tri[1], tri[2]);
-        splitind[2]=sphereCalcSplitInd(builder, vertices, func, tri[2], tri[0]);
+        splitind[0]=sphereCalcSplitInd(builder, vertices, edges, func, tri[0], tri[1]);
+        splitind[1]=sphereCalcSplitInd(builder, vertices, edges, func, tri[1], tri[2]);
+        splitind[2]=sphereCalcSplitInd(builder, vertices, edges, func, tri[2], tri[0]);
       }
       if(splitind[2] == -1 && splitind[1] == -1 && splitind[0] == -1) { // 0
         builder.appendPolygon({tri[0], tri[1], tri[2]});
       }
+      // irgendwo loecher TODO
       if(splitind[2] == -1 && splitind[1] == -1 && splitind[0] != -1) { // 1
         tri_new.push_back(IndexedTriangle(tri[0], splitind[0], tri[2]));
         tri_new.push_back(IndexedTriangle(tri[2], splitind[0], tri[1]));
@@ -186,11 +245,25 @@ std::unique_ptr<const Geometry> sphereCreateFuncGeometry(void *funcptr, double f
         tri_new.push_back(IndexedTriangle(tri[1], splitind[1], tri[0]));
         tri_new.push_back(IndexedTriangle(tri[0], splitind[1], tri[2]));
       }
+      if(splitind[2] == -1 && splitind[1] != -1 && splitind[0] != -1) { // 3
+        tri_new.push_back(IndexedTriangle(tri[0], splitind[0], tri[2]));
+        tri_new.push_back(IndexedTriangle(splitind[0], splitind[1],tri[2]));
+        tri_new.push_back(IndexedTriangle(splitind[0], tri[1],splitind[1]));
+      }
       if(splitind[2] != -1 && splitind[1] == -1 && splitind[0] == -1) { // 4
         tri_new.push_back(IndexedTriangle(tri[2], splitind[2], tri[1]));
         tri_new.push_back(IndexedTriangle(tri[1], splitind[2], tri[0]));
       }
-      // TODO andere kombinationen
+      if(splitind[2] != -1 && splitind[1] == -1 && splitind[0] != -1) { // 5
+        tri_new.push_back(IndexedTriangle(tri[0], splitind[0], splitind[2]));
+        tri_new.push_back(IndexedTriangle(splitind[0], tri[2], splitind[2]));
+        tri_new.push_back(IndexedTriangle(splitind[0], tri[1],tri[2]));
+      }
+      if(splitind[2] != -1 && splitind[1] != -1 && splitind[0] == -1) { // 6
+        tri_new.push_back(IndexedTriangle(tri[0], tri[1], splitind[2]));
+        tri_new.push_back(IndexedTriangle(tri[1], splitind[1], splitind[2]));
+        tri_new.push_back(IndexedTriangle(splitind[1], tri[1],splitind[2]));
+      }
       if(splitind[2] != -1 && splitind[1] != -1 && splitind[0] != -1) { // 7
         tri_new.push_back(IndexedTriangle(splitind[2], tri[0], splitind[0]));
         tri_new.push_back(IndexedTriangle(splitind[0], tri[1], splitind[1]));
