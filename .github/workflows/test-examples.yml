@@ -1,17 +1,18 @@
-name: Linux Release Tests
+name: Linux Examples Tests
 
 on:
   push:
     branches:
       - master
-      - "*-non-experimental"
   workflow_dispatch:
 
 jobs:
-  build:
+  build_and_test:
+    strategy:
+      matrix:
+        experimental: [true, false]
     runs-on: ubuntu-latest
-    name: Non-experimental
-
+    name: Test examples - ${{ matrix.experimental && 'experimental' || 'non-experimental' }}
     steps:
     - uses: actions/checkout@v4
       with:
@@ -20,21 +21,14 @@ jobs:
       run: ./scripts/github-ci-linux-get-dependencies.sh
     - uses: actions/setup-python@v5
       with:
-        python-version: '3.x'
-    - name: Install gcovr
-      run: python -m pip install -U gcovr
+        python-version: '3.11'
     - name: Build and test
-      run: ./scripts/github-ci.sh enable_python build test coverage
+      run: ./scripts/github-ci.sh ${{ matrix.experimental && 'experimental' || ''}} enable_python build test_examples test
     - name: Upload Test Result Report
       uses: actions/upload-artifact@v4
       if: ${{ always() }}
       with:
-        name: Test Result Report (non-experimental)
+        name: Test Result Report (Test examples ${{ matrix.experimental && 'experimental' || 'non-experimental' }})
         path: |
           b/Testing/Temporary/*_report.html
           b/Testing/Temporary/LastTest.log
-    - name: Upload Code Coverage Report
-      uses: actions/upload-artifact@v4
-      with:
-        name: Code Coverage Report (non-experimental)
-        path: c/coverage*.html
