@@ -63,6 +63,9 @@ public:
   std::string untrusted_edit_document_name;
   bool trust_python_file(const std::string &file, const std::string &content);
 #endif
+#ifdef ENABLE_PERL
+  bool perl_active;
+#endif
   Tree tree;
   EditorInterface *activeEditor;
   TabManager *tabManager;
@@ -358,6 +361,9 @@ public slots:
 #ifdef ENABLE_PYTHON
   void recomputePythonActive();
 #endif
+#ifdef ENABLE_PERL
+  void recomputePerlActive();
+#endif
 
 private:
   bool network_progress_func(const double permille);
@@ -397,6 +403,9 @@ signals:
   void unhighlightLastError();
   #ifdef ENABLE_PYTHON
   void pythonActiveChanged(bool pythonActive);
+  #endif
+  #ifdef ENABLE_PERL
+  void perlActiveChanged(bool pythonActive);
   #endif
 };
 

@@ -131,6 +131,10 @@ std::string SHA256HashString(std::string aString){
 
 #endif
 
+#ifdef ENABLE_PERL
+#include "perl/perl_public.h"
+#endif
+
 #define ENABLE_3D_PRINTING
 #include "OctoPrint.h"
 #include "PrintService.h"
@@ -328,6 +332,9 @@ MainWindow::MainWindow(const QStringList& filenames)
   knownFileExtensions["scad"] = "";
 #ifdef ENABLE_PYTHON
   knownFileExtensions["py"] = "";
+#endif
+#ifdef ENABLE_PERL
+  knownFileExtensions["pl"] = "";
 #endif
   knownFileExtensions["csg"] = "";
 
@@ -1277,6 +1284,10 @@ void MainWindow::instantiateRoot()
     if (python_result_node != NULL && this->python_active) this->absolute_root_node = python_result_node;
     else
 #endif
+#ifdef ENABLE_PERL
+    if (perl_result_node != NULL && this->perl_active) this->absolute_root_node = perl_result_node;
+    else
+#endif
     this->absolute_root_node = this->root_file->instantiate(*builtin_context, &file_context);
     if (file_context) {
       this->qglview->cam.updateView(file_context, false);
@@ -1559,6 +1570,10 @@ void MainWindow::saveBackup()
 #ifdef ENABLE_PYTHON
     this->recomputePythonActive();
     if(this->python_active) suffix="py";
+#endif
+#ifdef ENABLE_PERL
+    this->recomputePerlActive();
+    if(this->perl_active) suffix="pl";
 #endif
     this->tempFile = new QTemporaryFile(backupPath.append(basename + "-backup-XXXXXXXX." + suffix));
   }
@@ -1936,6 +1951,26 @@ void MainWindow::recomputePythonActive()
   }
 }
 #endif
+#ifdef ENABLE_PERL
+void MainWindow::recomputePerlActive()
+{
+  auto fnameba = activeEditor->filepath.toLocal8Bit();
+  const char *fname = activeEditor->filepath.isEmpty() ? "" : fnameba;
+
+  bool oldPerlActive = this->perl_active;
+  this->perl_active = false;
+  if (fname != NULL) {
+    if(boost::algorithm::ends_with(fname, ".pl")) {
+	    std::string content = std::string(this->last_compiled_doc.toUtf8().constData());
+	this->python_active = true;
+    }
+  }
+
+  if (oldPerlActive != this->perl_active) {
+    emit this->perlActiveChanged(this->perl_active);
+  }
+}
+#endif
 
 void MainWindow::parseTopLevelDocument()
 {
@@ -1987,6 +2022,41 @@ void MainWindow::parseTopLevelDocument()
 
   } else // python not enabled
 #endif // ifdef ENABLE_PYTHON
+#ifdef ENABLE_PERL
+  recomputePythonActive();
+  boost::regex ex_number_pl( R"(^(\w+)\s*=\s*(-?[\d.]+))");
+  boost::regex ex_string_pl( R"(^(\w+)\s*=\s*\"([^\"]*)\")");
+  if (this->perl_active) {
+
+    this->parsed_file = nullptr; // because the parse() call can throw and we don't want a stale pointer!
+    this->root_file = nullptr;  // ditto
+    fs::path parser_sourcefile = fs::path(fname).generic_string();				
+    this->root_file =new SourceFile(parser_sourcefile.parent_path().string(), parser_sourcefile.filename().string());
+    this->parsed_file = this->root_file;
+
+    initPerl(this->animateWidget->getAnim_tval());
+    this->activeEditor->resetHighlighting();
+    if (this->root_file != nullptr) {
+      //add parameters as annotation in AST
+      auto error = evaluatePerl(fulltext_py);
+      this->root_file->scope.assignments=customizer_parameters;
+      CommentParser::collectParameters(fulltext_py, this->root_file, '#');  // add annotations
+      this->activeEditor->parameterWidget->setParameters(this->root_file, "\n"); // set widgets values
+      this->activeEditor->parameterWidget->applyParameters(this->root_file); // use widget values
+      this->activeEditor->parameterWidget->setEnabled(true);
+      this->activeEditor->setIndicator(this->root_file->indicatorData);
+    } else {
+      this->activeEditor->parameterWidget->setEnabled(false);
+    }
+
+    customizer_parameters_finished = this->root_file->scope.assignments;
+    customizer_parameters.clear();
+    auto error = evaluatePerl(fulltext_py); // add assignments 
+    if (error.size() > 0) LOG(message_group::Error, Location::NONE, "", error.c_str());
+    finishPerl();
+
+  } else // python not enabled
+#endif // ifdef ENABLE_PERL
 {
   this->parsed_file = nullptr; // because the parse() call can throw and we don't want a stale pointer!
   this->root_file = nullptr;  // ditto
