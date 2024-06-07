@@ -63,8 +63,8 @@ public:
   std::string untrusted_edit_document_name;
   bool trust_python_file(const std::string &file, const std::string &content);
 #endif
-#ifdef ENABLE_PERL
-  bool perl_active;
+#ifdef ENABLE_JS
+  bool js_active;
 #endif
   Tree tree;
   EditorInterface *activeEditor;
@@ -361,8 +361,8 @@ public slots:
 #ifdef ENABLE_PYTHON
   void recomputePythonActive();
 #endif
-#ifdef ENABLE_PERL
-  void recomputePerlActive();
+#ifdef ENABLE_JS
+  void recomputeJsActive();
 #endif
 
 private:
@@ -404,8 +404,8 @@ signals:
   #ifdef ENABLE_PYTHON
   void pythonActiveChanged(bool pythonActive);
   #endif
-  #ifdef ENABLE_PERL
-  void perlActiveChanged(bool pythonActive);
+  #ifdef ENABLE_JS
+  void jsActiveChanged(bool pythonActive);
   #endif
 };
 

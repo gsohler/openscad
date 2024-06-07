@@ -56,7 +56,7 @@ option(ENABLE_TBB "Enable support for oneAPI Threading Building Blocks." ON)
 option(ENABLE_CGAL "Enable CGAL." ON)
 option(ALLOW_BUNDLED_HIDAPI "Allow usage of bundled HIDAPI library (Windows only)." OFF)
 option(ENABLE_PYTHON "Enable experimental Python Interpreter" OFF)
-option(ENABLE_PERL "Enable experimental Perl Interpreter" OFF)
+option(ENABLE_JS "Enable experimental Javascript Interpreter" OFF)
 option(ENABLE_LIBFIVE "Enable libfive Library" OFF)
 option(BUILD_SHARED_LIBS "Build shared library" OFF)
 include(CMakeDependentOption)
@@ -538,44 +538,69 @@ if(ENABLE_PYTHON)
   target_link_libraries(OpenSCAD PRIVATE OpenSCADPy)
 endif()
 
-if(ENABLE_PERL)
-    SET(PERL_SOURCES
-    src/perl/perlopenscad.cc
-    src/perl/perlfunctions.cc)
-  add_library(OpenSCADPerl
-	  ${PERL_SOURCES} )
-  message(STATUS "Perl enabled")
-  #findPerlLibs()
-  target_compile_definitions(OpenSCAD PRIVATE ENABLE_PERL)
-  target_compile_definitions(OpenSCADPerl PRIVATE ENABLE_PERL)
-  target_include_directories(OpenSCADPerl PRIVATE ${PERL_INCLUDE_PATH})
-  target_link_libraries(OpenSCADPerl PRIVATE ${PERL_LIBRARIES})
-  target_include_directories(OpenSCADPerl PRIVATE "/usr/lib64/perl5/CORE")
-  target_link_libraries(OpenSCADPerl PRIVATE "/usr/lib64/perl5/CORE/libperl.so")
+if(ENABLE_JS)
+    SET(JS_SOURCES
+    submodules/mujs/jsarray.c
+    submodules/mujs/jsboolean.c
+    submodules/mujs/jsbuiltin.c
+    submodules/mujs/jscompile.c
+    submodules/mujs/jsdate.c
+    submodules/mujs/jsdtoa.c
+    submodules/mujs/jserror.c
+    submodules/mujs/jsfunction.c
+    submodules/mujs/jsgc.c
+    submodules/mujs/jsintern.c
+    submodules/mujs/jslex.c
+    submodules/mujs/jsmath.c
+    submodules/mujs/jsnumber.c
+    submodules/mujs/jsobject.c
+    submodules/mujs/json.c
+    submodules/mujs/jsparse.c
+    submodules/mujs/jsproperty.c
+    submodules/mujs/jsregexp.c
+    submodules/mujs/jsrepr.c
+    submodules/mujs/jsrun.c
+    submodules/mujs/jsstate.c
+    submodules/mujs/jsstring.c
+    submodules/mujs/jsvalue.c
+    submodules/mujs/regexp.c
+    submodules/mujs/utf.c
+    src/js/jsopenscad.cc
+    src/js/jsfunctions.cc)
+
+  add_library(OpenSCADJS
+	  ${JS_SOURCES} )
+  message(STATUS "JS enabled")
+  target_compile_definitions(OpenSCAD PRIVATE ENABLE_JS)
+  target_compile_definitions(OpenSCADJS PRIVATE ENABLE_JS)
+  target_include_directories(OpenSCADJS PRIVATE ${JS_INCLUDE_PATH})
+  target_link_libraries(OpenSCADJS PRIVATE ${JS_LIBRARIES})
+  target_include_directories(OpenSCADJS PRIVATE  "${CMAKE_SOURCE_DIR}/submodules/mujs")
+  #target_link_libraries(OpenSCADJS PRIVATE "/usr/lib64/perl5/CORE/libperl.so")
   #  SET(PYTHON_LIBRARIES ${Python_LIBRARIES} )
   #SET(PYTHON_INCLUDE_DIRS ${Python_INCLUDE_DIRS} )
   #target_link_libraries(OpenSCADPy PRIVATE ${PYTHON_LIBRARIES})
   #message(STATUS "Python enabled ${PYTHONLIBS_FOUND} ${PYTHON_LIBRARIES}")
-  target_include_directories(OpenSCADPerl SYSTEM PRIVATE ${FREETYPE_INCLUDE_DIRS})
-  target_include_directories(OpenSCADPerl SYSTEM PRIVATE ${FREETYPE_INCLUDE_DIRS})
-  target_link_libraries(OpenSCADPerl PRIVATE Eigen3::Eigen)
-  target_link_libraries(OpenSCADPerl PRIVATE ${GETTEXT_LIBRARY})
-  target_link_libraries(OpenSCADPerl PRIVATE ${GLIB2_LIBRARIES})
+  target_include_directories(OpenSCADJS SYSTEM PRIVATE ${FREETYPE_INCLUDE_DIRS})
+  target_include_directories(OpenSCADJS SYSTEM PRIVATE ${FREETYPE_INCLUDE_DIRS})
+  target_link_libraries(OpenSCADJS PRIVATE Eigen3::Eigen)
+  target_link_libraries(OpenSCADJS PRIVATE ${GETTEXT_LIBRARY})
+  target_link_libraries(OpenSCADJS PRIVATE ${GLIB2_LIBRARIES})
   # copy compile options for the main OpenSCAD target
   # duplication is not very ideal but not sure what better options do we have
-  set_property(TARGET OpenSCADPerl PROPERTY CXX_STANDARD 17)
-  set_property(TARGET OpenSCADPerl PROPERTY CXX_EXTENSIONS OFF)
-  set_property(TARGET OpenSCADPerl PROPERTY CXX_STANDARD_REQUIRED ON)
-  target_compile_definitions(OpenSCADPerl PRIVATE "STACKSIZE=${STACKSIZE}")
-  target_compile_options(OpenSCADPerl PRIVATE "$<$<CONFIG:DEBUG>:-DDEBUG>")
-  target_compile_definitions(OpenSCADPerl PRIVATE
+  set_property(TARGET OpenSCADJS PROPERTY CXX_STANDARD 17)
+  set_property(TARGET OpenSCADJS PROPERTY CXX_EXTENSIONS OFF)
+  set_property(TARGET OpenSCADJS PROPERTY CXX_STANDARD_REQUIRED ON)
+  target_compile_definitions(OpenSCADJS PRIVATE "STACKSIZE=${STACKSIZE}")
+  target_compile_options(OpenSCADJS PRIVATE "$<$<CONFIG:DEBUG>:-DDEBUG>")
+  target_compile_definitions(OpenSCADJS PRIVATE
     OPENSCAD_VERSION=${OPENSCAD_VERSION}
     OPENSCAD_SHORTVERSION=${OPENSCAD_SHORTVERSION}
     OPENSCAD_YEAR=${OPENSCAD_YEAR}
     OPENSCAD_MONTH=${OPENSCAD_MONTH})
-  target_include_directories(OpenSCADPerl SYSTEM PRIVATE ${Boost_INCLUDE_DIRS})
-  target_include_directories(OpenSCADPerl SYSTEM PRIVATE ${GLIB2_INCLUDE_DIRS})
-  target_include_directories(OpenSCADPerl PRIVATE
+  target_include_directories(OpenSCADJS SYSTEM PRIVATE ${Boost_INCLUDE_DIRS})
+  target_include_directories(OpenSCADJS SYSTEM PRIVATE ${GLIB2_INCLUDE_DIRS})
+  target_include_directories(OpenSCADJS PRIVATE
     "src"
     "src/core"
     "src/core/customizer"
@@ -595,7 +620,7 @@ if(ENABLE_PERL)
     "src/platform"
     "src/utils"
   )
-  target_link_libraries(OpenSCAD PRIVATE OpenSCADPerl)
+  target_link_libraries(OpenSCAD PRIVATE OpenSCADJS)
 endif()
 
 if(ENABLE_HIDAPI)

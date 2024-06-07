@@ -54,7 +54,7 @@ extern bool parse(SourceFile *& file, const std::string& text, const std::string
 #include "RoofNode.h"
 #include "RenderNode.h"
 #include "SurfaceNode.h"
-// #include "TextNode.h"
+//#include "TextNode.h"
 #include "OffsetNode.h"
 #include "TextureNode.h"
 #include <hash.h>
@@ -68,7 +68,7 @@ extern bool parse(SourceFile *& file, const std::string& text, const std::string
 #include "printutils.h"
 #include "io/fileutils.h"
 #include "handle_dep.h"
-
+#include "jsopenscad.h"
 #if 0
 // Colors extracted from https://drafts.csswg.org/css-color/ on 2015-08-02
 // CSS Color Module Level 4 - Editor’s Draft, 29 May 2015
@@ -3606,3 +3606,17 @@ PyMappingMethods PyOpenSCADMapping =
   python__setitem__
 };
 #endif
+
+
+static void jsprint(js_State *J)
+{
+	const char *name = js_tostring(J, 1);
+	LOG(name);
+	js_pushundefined(J);
+}
+
+void registerJsFunctions(void) {
+  js_newcfunction(js_interp, jsprint, "print", 1);
+  js_setglobal(js_interp, "print");
+}
+

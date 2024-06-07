@@ -2,6 +2,7 @@
 #include "node.h"
 #include <geometry/Polygon2d.h>
 #include "src/core/function.h"
+#include "mujs.h"
 
 #pragma GCC diagnostic ignored "-Wwrite-strings"
 
@@ -9,9 +10,10 @@
 	AssignmentList inst_asslist;\
 	ModuleInstantiation *instance = new ModuleInstantiation(instance_name,inst_asslist, Location::NONE);
 
-
-void initPerl(double time);
-std::string evaluatePerl(const std::string & code);
-void finishPerl(void);
+extern js_State *js_interp;
+void registerJsFunctions(void);
+void initJs(double time);
+std::string evaluateJs(const std::string & code);
+void finishJs(void);
 
 

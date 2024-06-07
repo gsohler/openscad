@@ -23,7 +23,7 @@
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
-#include "perlopenscad.h"
+#include "jsopenscad.h"
 #include "CsgOpNode.h"
 #include "Value.h"
 #include "Expression.h"
@@ -31,10 +31,8 @@
 #include <Context.h>
 #include <Selection.h>
 
-#include<EXTERN.h> /* from the Perl distribution */ 
-#include<perl.h> /* from the Perl distribution */ 
 
-std::shared_ptr<AbstractNode> perl_result_node = nullptr; /* global result veriable containing the perl created result */
+std::shared_ptr<AbstractNode> js_result_node = nullptr; /* global result veriable containing the perl created result */
 
 #if 0
 // #define HAVE_PYTHON_YIELD
@@ -823,27 +821,23 @@ PyMODINIT_FUNC PyInit_PyOpenSCAD(void)
 }
 
 #endif
-// https://docstore.mik.ua/orelly/perl/prog3/ch21_04.htm
-/*** The Perl interpreter ***/ 
-PerlInterpreter *my_perl; 
 
-void initPerl(double time)
+#include <stdio.h>
+#include <mujs.h>
+
+js_State *js_interp;
+
+void initJs(double time)
 {
-  printf("init Perl\n");	
-  my_perl = perl_alloc(); 
-  perl_construct(my_perl); 
-  int argc=3;
-  char *argv[]={"","-e","0"};
-  perl_parse(my_perl, NULL, argc, argv, (char **)NULL);
-  perl_run(my_perl); 
-}
-std::string evaluatePerl(const std::string & code)
+  js_interp = js_newstate(NULL, NULL, JS_STRICT);
+  registerJsFunctions();
+}  
+std::string evaluateJs(const std::string & code)
 {
-  eval_pv(code.c_str(), TRUE);
+  js_dostring(js_interp, code.c_str());
   return "";	
 }
-void finishPerl(void)
+void finishJs(void)
 {
-  perl_destruct(my_perl); 
-  perl_free(my_perl); 
+  js_freestate(js_interp);
 }

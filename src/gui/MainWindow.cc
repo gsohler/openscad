@@ -131,8 +131,8 @@ std::string SHA256HashString(std::string aString){
 
 #endif
 
-#ifdef ENABLE_PERL
-#include "perl/perl_public.h"
+#ifdef ENABLE_JS
+#include "js/js_public.h"
 #endif
 
 #define ENABLE_3D_PRINTING
@@ -333,8 +333,8 @@ MainWindow::MainWindow(const QStringList& filenames)
 #ifdef ENABLE_PYTHON
   knownFileExtensions["py"] = "";
 #endif
-#ifdef ENABLE_PERL
-  knownFileExtensions["pl"] = "";
+#ifdef ENABLE_JS
+  knownFileExtensions["js"] = "";
 #endif
   knownFileExtensions["csg"] = "";
 
@@ -1284,8 +1284,8 @@ void MainWindow::instantiateRoot()
     if (python_result_node != NULL && this->python_active) this->absolute_root_node = python_result_node;
     else
 #endif
-#ifdef ENABLE_PERL
-    if (perl_result_node != NULL && this->perl_active) this->absolute_root_node = perl_result_node;
+#ifdef ENABLE_JS
+    if (js_result_node != NULL && this->js_active) this->absolute_root_node = js_result_node;
     else
 #endif
     this->absolute_root_node = this->root_file->instantiate(*builtin_context, &file_context);
@@ -1571,9 +1571,9 @@ void MainWindow::saveBackup()
     this->recomputePythonActive();
     if(this->python_active) suffix="py";
 #endif
-#ifdef ENABLE_PERL
-    this->recomputePerlActive();
-    if(this->perl_active) suffix="pl";
+#ifdef ENABLE_JS
+    this->recomputeJsActive();
+    if(this->js_active) suffix="js";
 #endif
     this->tempFile = new QTemporaryFile(backupPath.append(basename + "-backup-XXXXXXXX." + suffix));
   }
@@ -1951,23 +1951,23 @@ void MainWindow::recomputePythonActive()
   }
 }
 #endif
-#ifdef ENABLE_PERL
-void MainWindow::recomputePerlActive()
+#ifdef ENABLE_JS
+void MainWindow::recomputeJsActive()
 {
   auto fnameba = activeEditor->filepath.toLocal8Bit();
   const char *fname = activeEditor->filepath.isEmpty() ? "" : fnameba;
 
-  bool oldPerlActive = this->perl_active;
-  this->perl_active = false;
+  bool oldJsActive = this->js_active;
+  this->js_active = false;
   if (fname != NULL) {
-    if(boost::algorithm::ends_with(fname, ".pl")) {
+    if(boost::algorithm::ends_with(fname, ".js")) {
 	    std::string content = std::string(this->last_compiled_doc.toUtf8().constData());
-	this->python_active = true;
+	this->js_active = true;
     }
   }
 
-  if (oldPerlActive != this->perl_active) {
-    emit this->perlActiveChanged(this->perl_active);
+  if (oldJsActive != this->js_active) {
+    emit this->jsActiveChanged(this->js_active);
   }
 }
 #endif
@@ -2022,11 +2022,11 @@ void MainWindow::parseTopLevelDocument()
 
   } else // python not enabled
 #endif // ifdef ENABLE_PYTHON
-#ifdef ENABLE_PERL
+#ifdef ENABLE_JS
   recomputePythonActive();
-  boost::regex ex_number_pl( R"(^(\w+)\s*=\s*(-?[\d.]+))");
-  boost::regex ex_string_pl( R"(^(\w+)\s*=\s*\"([^\"]*)\")");
-  if (this->perl_active) {
+  boost::regex ex_number_js( R"(^(\w+)\s*=\s*(-?[\d.]+))");
+  boost::regex ex_string_js( R"(^(\w+)\s*=\s*\"([^\"]*)\")");
+  if (this->js_active) {
 
     this->parsed_file = nullptr; // because the parse() call can throw and we don't want a stale pointer!
     this->root_file = nullptr;  // ditto
@@ -2034,11 +2034,11 @@ void MainWindow::parseTopLevelDocument()
     this->root_file =new SourceFile(parser_sourcefile.parent_path().string(), parser_sourcefile.filename().string());
     this->parsed_file = this->root_file;
 
-    initPerl(this->animateWidget->getAnim_tval());
+    initJs(this->animateWidget->getAnim_tval());
     this->activeEditor->resetHighlighting();
     if (this->root_file != nullptr) {
       //add parameters as annotation in AST
-      auto error = evaluatePerl(fulltext_py);
+      auto error = evaluateJs(fulltext_py);
       this->root_file->scope.assignments=customizer_parameters;
       CommentParser::collectParameters(fulltext_py, this->root_file, '#');  // add annotations
       this->activeEditor->parameterWidget->setParameters(this->root_file, "\n"); // set widgets values
@@ -2051,9 +2051,9 @@ void MainWindow::parseTopLevelDocument()
 
     customizer_parameters_finished = this->root_file->scope.assignments;
     customizer_parameters.clear();
-    auto error = evaluatePerl(fulltext_py); // add assignments 
+    auto error = evaluateJs(fulltext_py); // add assignments 
     if (error.size() > 0) LOG(message_group::Error, Location::NONE, "", error.c_str());
-    finishPerl();
+    finishJs();
 
   } else // python not enabled
 #endif // ifdef ENABLE_PERL
