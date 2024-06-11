@@ -131,15 +131,6 @@ int python_more_obj(std::vector<std::shared_ptr<AbstractNode>>& children, PyObje
  *  extracts Absrtract Node from PyOpenSCAD Object
  */
 
-std::shared_ptr<AbstractNode> PyOpenSCADObjectToNode(PyObject *obj, PyObject **dict)
-{
-  std::shared_ptr<AbstractNode> result = ((PyOpenSCADObject *) obj)->node;
-  if(result.use_count() > 2) {
-    result = result->clone();
-  }
-  *dict =  ((PyOpenSCADObject *) obj)->dict;
-  return result;
-}
 
 
 /*
@@ -824,6 +815,27 @@ PyMODINIT_FUNC PyInit_PyOpenSCAD(void)
 
 #include <stdio.h>
 #include <mujs.h>
+
+#define TAG_NODE "node"
+
+
+void JsOpenSCADObjectFromNode(const std::shared_ptr<AbstractNode> &node)
+{
+  auto dumb_ptr = new std::shared_ptr<AbstractNode>(node);
+  js_currentfunction(js_interp);
+  js_getproperty(js_interp, -1, "prototype");
+  js_pushnull(js_interp);
+  js_newuserdata(js_interp, "node", static_cast<void *>(dumb_ptr), nullptr);
+  /// TODO use callback to free it
+}
+
+std::shared_ptr<AbstractNode> JsOpenSCADObjectToNode(void *data)
+{
+  auto dumb_ptr = static_cast<std::shared_ptr<AbstractNode> *>(data);
+  auto node = std::move(*dumb_ptr);
+  // delete node
+  return node;
+}
 
 js_State *js_interp;
 

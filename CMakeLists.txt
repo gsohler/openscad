@@ -539,50 +539,48 @@ if(ENABLE_PYTHON)
 endif()
 
 if(ENABLE_JS)
-    SET(JS_SOURCES
-    submodules/mujs/jsarray.c
-    submodules/mujs/jsboolean.c
-    submodules/mujs/jsbuiltin.c
-    submodules/mujs/jscompile.c
-    submodules/mujs/jsdate.c
-    submodules/mujs/jsdtoa.c
-    submodules/mujs/jserror.c
-    submodules/mujs/jsfunction.c
-    submodules/mujs/jsgc.c
-    submodules/mujs/jsintern.c
-    submodules/mujs/jslex.c
-    submodules/mujs/jsmath.c
-    submodules/mujs/jsnumber.c
-    submodules/mujs/jsobject.c
-    submodules/mujs/json.c
-    submodules/mujs/jsparse.c
-    submodules/mujs/jsproperty.c
-    submodules/mujs/jsregexp.c
-    submodules/mujs/jsrepr.c
-    submodules/mujs/jsrun.c
-    submodules/mujs/jsstate.c
-    submodules/mujs/jsstring.c
-    submodules/mujs/jsvalue.c
-    submodules/mujs/regexp.c
+  SET(JS_SOURCES
+  submodules/mujs/jsarray.c
+  submodules/mujs/jsboolean.c
+  submodules/mujs/jsbuiltin.c
+  submodules/mujs/jscompile.c
+  submodules/mujs/jsdate.c
+  submodules/mujs/jsdtoa.c
+  submodules/mujs/jserror.c
+  submodules/mujs/jsfunction.c
+  submodules/mujs/jsgc.c
+  submodules/mujs/jsintern.c
+  submodules/mujs/jslex.c
+  submodules/mujs/jsmath.c
+  submodules/mujs/jsnumber.c
+  submodules/mujs/jsobject.c
+  submodules/mujs/json.c
+  submodules/mujs/jsparse.c
+  submodules/mujs/jsproperty.c
+  submodules/mujs/jsregexp.c
+  submodules/mujs/jsrepr.c
+  submodules/mujs/jsrun.c
+  submodules/mujs/jsstate.c
+  submodules/mujs/jsstring.c
+  submodules/mujs/jsvalue.c
+  submodules/mujs/regexp.c
     submodules/mujs/utf.c
     src/js/jsopenscad.cc
     src/js/jsfunctions.cc)
 
-  add_library(OpenSCADJS
-	  ${JS_SOURCES} )
+  add_library(OpenSCADJS ${JS_SOURCES} )
   message(STATUS "JS enabled")
   target_compile_definitions(OpenSCAD PRIVATE ENABLE_JS)
+  target_compile_definitions(OpenSCAD PRIVATE ENABLE_PYTHON)
   target_compile_definitions(OpenSCADJS PRIVATE ENABLE_JS)
+  target_compile_definitions(OpenSCADJS PRIVATE ENABLE_PYTHON)
+  target_include_directories(OpenSCADJS PRIVATE  "${CMAKE_SOURCE_DIR}/submodules/mujs")
   target_include_directories(OpenSCADJS PRIVATE ${JS_INCLUDE_PATH})
   target_link_libraries(OpenSCADJS PRIVATE ${JS_LIBRARIES})
-  target_include_directories(OpenSCADJS PRIVATE  "${CMAKE_SOURCE_DIR}/submodules/mujs")
-  #target_link_libraries(OpenSCADJS PRIVATE "/usr/lib64/perl5/CORE/libperl.so")
-  #  SET(PYTHON_LIBRARIES ${Python_LIBRARIES} )
-  #SET(PYTHON_INCLUDE_DIRS ${Python_INCLUDE_DIRS} )
-  #target_link_libraries(OpenSCADPy PRIVATE ${PYTHON_LIBRARIES})
-  #message(STATUS "Python enabled ${PYTHONLIBS_FOUND} ${PYTHON_LIBRARIES}")
+  message(STATUS "JS enabled ${JS_INCLUDE_PATH} ${JS_LIBRARIES}")
+    target_include_directories(OpenSCADJS SYSTEM PRIVATE ${FREETYPE_INCLUDE_DIRS})
   target_include_directories(OpenSCADJS SYSTEM PRIVATE ${FREETYPE_INCLUDE_DIRS})
-  target_include_directories(OpenSCADJS SYSTEM PRIVATE ${FREETYPE_INCLUDE_DIRS})
+    target_include_directories(OpenSCADJS SYSTEM PRIVATE ${HARFBUZZ_INCLUDE_DIRS})
   target_link_libraries(OpenSCADJS PRIVATE Eigen3::Eigen)
   target_link_libraries(OpenSCADJS PRIVATE ${GETTEXT_LIBRARY})
   target_link_libraries(OpenSCADJS PRIVATE ${GLIB2_LIBRARIES})

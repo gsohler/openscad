@@ -1987,10 +1987,15 @@ void MainWindow::parseTopLevelDocument()
   auto fnameba = activeEditor->filepath.toLocal8Bit();
   const char *fname = activeEditor->filepath.isEmpty() ? "" : fnameba;
   delete this->parsed_file;
-#ifdef ENABLE_PYTHON
-  recomputePythonActive();
   boost::regex ex_number( R"(^(\w+)\s*=\s*(-?[\d.]+))");
   boost::regex ex_string( R"(^(\w+)\s*=\s*\"([^\"]*)\")");
+#ifdef ENABLE_PYTHON
+  recomputePythonActive();
+#endif
+#ifdef ENABLE_JS
+  recomputeJsActive();
+#endif
+#ifdef ENABLE_PYTHON
   if (this->python_active) {
 
     this->parsed_file = nullptr; // because the parse() call can throw and we don't want a stale pointer!
@@ -2023,9 +2028,6 @@ void MainWindow::parseTopLevelDocument()
   } else // python not enabled
 #endif // ifdef ENABLE_PYTHON
 #ifdef ENABLE_JS
-  recomputePythonActive();
-  boost::regex ex_number_js( R"(^(\w+)\s*=\s*(-?[\d.]+))");
-  boost::regex ex_string_js( R"(^(\w+)\s*=\s*\"([^\"]*)\")");
   if (this->js_active) {
 
     this->parsed_file = nullptr; // because the parse() call can throw and we don't want a stale pointer!
@@ -2056,7 +2058,7 @@ void MainWindow::parseTopLevelDocument()
     finishJs();
 
   } else // python not enabled
-#endif // ifdef ENABLE_PERL
+#endif // ifdef ENABLE_JS
 {
   this->parsed_file = nullptr; // because the parse() call can throw and we don't want a stale pointer!
   this->root_file = nullptr;  // ditto
