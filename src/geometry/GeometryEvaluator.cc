@@ -2862,10 +2862,10 @@ static std::unique_ptr<PolySet> wrapObject(const WrapNode& node, const PolySet *
 {
   PolySetBuilder builder(0,0,3,true);
   int segments1=360.0/node.fa;
-  int segments2=2*M_PI*node.r/node.fs;
+  int segments2=2*G_PI*node.r/node.fs;
   int segments=segments1>segments2?segments1:segments2;	  
   if(node.fn > 0) segments=node.fn;
-  double arclen=2*M_PI*node.r/segments;
+  double arclen=2*G_PI*node.r/segments;
 
   for(const auto &p : ps->indices) {
     // find leftmost point		 
