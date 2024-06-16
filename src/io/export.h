@@ -95,6 +95,22 @@ struct ExportInfo {
 };
 
 
+class Export3mfInfo{
+  public:
+  std::shared_ptr<const Geometry>  geom;
+  std::string name;
+  void *props;
+  Export3mfInfo(std::shared_ptr<const Geometry>  geom, std::string name, void *props) {
+    this->geom=geom;
+    this->name=name;
+    this->props=props;	  
+  }
+  void writeProps(void *obj) const;
+  void writePropsFloat(void *obj, const  char *name, float f) const;
+  void writePropsLong(void *obj, const  char *name, long l) const;
+  void writePropsString(void *obj, const  char *name, const char *val) const;
+};
+
 bool canPreview(const FileFormat format);
 bool is3D(const FileFormat format);
 bool is2D(const FileFormat format);
@@ -103,7 +119,7 @@ bool exportFileByName(const std::shared_ptr<const class Geometry>& root_geom, co
 
 void export_stl(const std::shared_ptr<const Geometry>& geom, std::ostream& output,
                 bool binary = true);
-void export_3mf(const std::shared_ptr<const Geometry>& geom, std::ostream& output);
+void export_3mf(const std::vector<Export3mfInfo> & exportInfo, std::ostream& output);
 void export_obj(const std::shared_ptr<const Geometry>& geom, std::ostream& output);
 void export_off(const std::shared_ptr<const Geometry>& geom, std::ostream& output);
 void export_wrl(const std::shared_ptr<const Geometry>& geom, std::ostream& output);

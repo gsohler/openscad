@@ -584,6 +584,10 @@ void initPython(double time)
       }
     }
   } else {
+    PyPreConfig preconfig;
+    PyPreConfig_InitPythonConfig(&preconfig);
+    Py_PreInitialize(&preconfig);
+
 #ifdef HAVE_PYTHON_YIELD
     set_object_callback(openscad_object_callback);
 #endif
@@ -594,7 +598,11 @@ void initPython(double time)
     PyConfig config;
     PyConfig_InitPythonConfig(&config);
     char libdir[256];
+#ifdef _WIN32
+    snprintf(libdir, 256, "%s\\..\\libraries\\python\\:.",PlatformUtils::applicationPath().c_str()); /* add libraries/python to python search path */
+#else
     snprintf(libdir, 256, "%s/../libraries/python/:.",PlatformUtils::applicationPath().c_str()); /* add libraries/python to python search path */
+#endif   
     PyConfig_SetBytesString(&config, &config.pythonpath_env, libdir);
     PyStatus status = Py_InitializeFromConfig(&config);
     if (PyStatus_Exception(status)) {
@@ -624,8 +632,8 @@ void initPython(double time)
       Py_XDECREF(key1);
     }
   }
-  char run_str[200];
-  sprintf(run_str,"fa=12.0\nfn=0.0\nfs=2.0\nt=%g",time);
+  char run_str[250];
+  sprintf(run_str,"fa=12.0\nfn=0.0\nfs=2.0\nt=%g\nphi=%g",time,2*G_PI*time);
   PyRun_String(run_str, Py_file_input, pythonInitDict, pythonInitDict);
   customizer_parameters_finished = customizer_parameters;
   customizer_parameters.clear();

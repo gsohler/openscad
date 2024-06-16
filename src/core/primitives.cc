@@ -48,9 +48,15 @@ using namespace boost::assign; // bring 'operator+=()' into scope
 #define F_MINIMUM 0.01
 
 template <class InsertIterator>
-static void generate_circle(InsertIterator iter, double r, double z, int fragments) {
+static void generate_circle(InsertIterator iter, double r, double z, double angle, int fragments) {
+  int fragments_div=fragments;	
+  if(angle < 360) {
+    *(iter++) = {0,0,z};
+    fragments--;
+    fragments_div -=2;
+  }	  
   for (int i = 0; i < fragments; ++i) {
-    double phi = (360.0 * i) / fragments;
+    double phi = (angle * i) / fragments_div;
     *(iter++) = {r * cos_degrees(phi), r * sin_degrees(phi), z};
   }
 }
@@ -187,13 +193,17 @@ static std::shared_ptr<AbstractNode> builtin_cube(const ModuleInstantiation *ins
   return node;
 }
 
+std::unique_ptr<const Geometry> sphereCreateFuncGeometry(void *funcptr, double fs);
+
 std::unique_ptr<const Geometry> SphereNode::createGeometry() const
 {
   if (this->r <= 0 || !std::isfinite(this->r)) {
     return PolySet::createEmpty();
   }
-
-  auto num_fragments = Calc::get_fragments_from_r(r, fn, fs, fa);
+  auto num_fragments = Calc::get_fragments_from_r(r, 360.0, fn, fs, fa);
+  if(this->r_func != nullptr) {
+    return sphereCreateFuncGeometry(this->r_func, fs);
+  }
   size_t num_rings = (num_fragments + 1) / 2;
   // Uncomment the following three lines to enable experimental sphere
   // tessellation
@@ -208,7 +218,7 @@ std::unique_ptr<const Geometry> SphereNode::createGeometry() const
     //                double phi = (180.0 * (i + offset)) / (fragments/2);
     const double phi = (180.0 * (i + 0.5)) / num_rings;
     const double radius = r * sin_degrees(phi);
-    generate_circle(std::back_inserter(polyset->vertices), radius, r * cos_degrees(phi), num_fragments);
+    generate_circle(std::back_inserter(polyset->vertices), radius, r * cos_degrees(phi), 360.0, num_fragments);
   }
 
   polyset->indices.push_back({});
@@ -273,12 +283,13 @@ std::unique_ptr<const Geometry> CylinderNode::createGeometry() const
     || this->r1 < 0 || !std::isfinite(this->r1)
     || this->r2 < 0 || !std::isfinite(this->r2)
     || (this->r1 <= 0 && this->r2 <= 0)
+    || (this->angle <= 0 || this->angle > 360)
     ) {
     return PolySet::createEmpty();
   }
 
-  auto num_fragments = Calc::get_fragments_from_r(std::fmax(this->r1, this->r2), this->fn, this->fs, this->fa);
-
+  auto num_fragments = Calc::get_fragments_from_r(std::fmax(this->r1, this->r2), 360.0, this->fn, this->fs, this->fa);
+  if(this->angle < 360) num_fragments++;
   double z1, z2;
   if (this->center) {
     z1 = -this->h / 2;
@@ -288,32 +299,41 @@ std::unique_ptr<const Geometry> CylinderNode::createGeometry() const
     z2 = this->h;
   }
 
+  bool cone = (r2 == 0.0);
+  bool inverted_cone = (r1 == 0.0);
+  
   auto polyset = std::make_unique<PolySet>(3, /*convex*/true);
-  polyset->vertices.reserve(2 * num_fragments);
+  polyset->vertices.reserve((cone || inverted_cone) ? num_fragments + 1 : 2 * num_fragments);
 
-  generate_circle(std::back_inserter(polyset->vertices), r1, z1, num_fragments);
-  generate_circle(std::back_inserter(polyset->vertices), r2, z2, num_fragments);
+  if (inverted_cone) {
+    polyset->vertices.emplace_back(0.0, 0.0, z1);
+  } else {
+   generate_circle(std::back_inserter(polyset->vertices), r1, z1, this->angle, num_fragments);
+  }
+  if (cone) {
+    polyset->vertices.emplace_back(0.0, 0.0, z2);
+  } else {
+    generate_circle(std::back_inserter(polyset->vertices), r2, z2, this->angle, num_fragments);
+  }
 
   for (int i = 0; i < num_fragments; ++i) {
     int j = (i + 1) % num_fragments;
-    polyset->indices.push_back({
-      i,
-      j,
-      j+num_fragments,
-      i+num_fragments,
-    });
+    if (cone) polyset->indices.push_back({i, j, num_fragments});
+    else if (inverted_cone) polyset->indices.push_back({0, j+1, i+1});
+    else polyset->indices.push_back({i, j, j+num_fragments, i+num_fragments});
   }
 
-  if (this->r1 > 0) {
+  if (!inverted_cone) {
     polyset->indices.push_back({});
     for (int i = 0; i < num_fragments; ++i) {
       polyset->indices.back().push_back(num_fragments-i-1);
     }
   }
-  if (this->r2 > 0) {
+  if (!cone) {
     polyset->indices.push_back({});
+    int offset = inverted_cone ? 1 : num_fragments;
     for (int i = 0; i < num_fragments; ++i) {
-      polyset->indices.back().push_back(num_fragments+i);
+      polyset->indices.back().push_back(offset+i);
     }
   }
   Material matcolor;
@@ -334,7 +354,7 @@ static std::shared_ptr<AbstractNode> builtin_cylinder(const ModuleInstantiation 
         "module %1$s() does not support child modules", node->name());
   }
 
-  Parameters parameters = Parameters::parse(std::move(arguments), inst->location(), {"h", "r1", "r2", "center"}, {"r", "d", "d1", "d2"});
+  Parameters parameters = Parameters::parse(std::move(arguments), inst->location(), {"h", "r1", "r2", "center"}, {"r", "d", "d1", "d2", "angle"});
 
   set_fragments(parameters, inst, node->fn, node->fs, node->fa);
   if (parameters["h"].type() == Value::Type::NUMBER) {
@@ -370,6 +390,15 @@ static std::shared_ptr<AbstractNode> builtin_cylinder(const ModuleInstantiation 
           "cylinder(r1=%1$s, r2=%2$s, ...)",
           (r1.type() == Value::Type::NUMBER ? r1.toEchoStringNoThrow() : r.toEchoStringNoThrow()),
           (r2.type() == Value::Type::NUMBER ? r2.toEchoStringNoThrow() : r.toEchoStringNoThrow()));
+    }
+  }
+
+  if (parameters["angle"].isDefined()) {
+    if(!parameters["angle"].getFiniteDouble(node->angle)) {
+      LOG(message_group::Error, "Angle must be a double when specified.");
+    }  
+    if(node->angle < 0.0 || node->angle > 360.0) {
+      LOG(message_group::Error, "Angle must be between 0 and 360 degrees.");
     }
   }
 
@@ -579,15 +608,21 @@ static std::shared_ptr<AbstractNode> builtin_square(const ModuleInstantiation *i
 
 std::unique_ptr<const Geometry> CircleNode::createGeometry() const
 {
-  if (this->r <= 0 || !std::isfinite(this->r)) {
+  if (this->r <= 0 || !std::isfinite(this->r) || angle <= 0 || angle > 360.0) {
     return std::make_unique<Polygon2d>();
   }
 
-  auto fragments = Calc::get_fragments_from_r(this->r, this->fn, this->fs, this->fa);
+  auto fragments = Calc::get_fragments_from_r(this->r, this->angle, this->fn, this->fs, this->fa);
   Outline2d o;
-  o.vertices.resize(fragments);
+  int fragments_div=fragments;
+  if(this->angle < 360.0) {
+    o.vertices.resize(fragments + 1);
+    o.vertices[fragments] = {0,0};
+    fragments_div--;
+  }  
+  else o.vertices.resize(fragments);
   for (int i = 0; i < fragments; ++i) {
-    double phi = (360.0 * i) / fragments;
+    double phi = (this->angle * i) / fragments_div;
     o.vertices[i] = {this->r * cos_degrees(phi), this->r * sin_degrees(phi)};
   }
   return std::make_unique<Polygon2d>(o);
@@ -602,7 +637,7 @@ static std::shared_ptr<AbstractNode> builtin_circle(const ModuleInstantiation *i
         "module %1$s() does not support child modules", node->name());
   }
 
-  Parameters parameters = Parameters::parse(std::move(arguments), inst->location(), {"r"}, {"d"});
+  Parameters parameters = Parameters::parse(std::move(arguments), inst->location(), {"r"}, {"d","angle"});
 
   set_fragments(parameters, inst, node->fn, node->fs, node->fa);
   const auto r = lookup_radius(parameters, inst, "d", "r");
@@ -613,6 +648,15 @@ static std::shared_ptr<AbstractNode> builtin_circle(const ModuleInstantiation *i
           "circle(r=%1$s)", r.toEchoStringNoThrow());
     }
   }
+  if (parameters["angle"].isDefined()) {
+    if(!parameters["angle"].getFiniteDouble(node->angle)) {
+      LOG(message_group::Error, "Angle must be a double when specified.");
+    }  
+    if(node->angle < 0.0 || node->angle > 360.0) {
+      LOG(message_group::Error, "Angle must be between 0 and 360 degrees.");
+    }
+  }
+
 
   return node;
 }

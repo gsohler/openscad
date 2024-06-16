@@ -90,7 +90,12 @@ void exportFile(const std::shared_ptr<const Geometry>& root_geom, std::ostream& 
     export_amf(root_geom, output);
     break;
   case FileFormat::_3MF:
-    export_3mf(root_geom, output);
+    {
+      Export3mfInfo info(root_geom,"OpenSCAD Model", nullptr);
+      std::vector<Export3mfInfo> infos;
+      infos.push_back(info);
+      export_3mf(infos, output);
+    }  
     break;
   case FileFormat::DXF:
     export_dxf(root_geom, output);

@@ -62,9 +62,14 @@ public:
     stream << "sphere"
            << "($fn = " << fn
            << ", $fa = " << fa
-           << ", $fs = " << fs
-           << ", r = " << r
-           << ")";
+           << ", $fs = " << fs ;
+#ifdef ENABLE_PYTHON
+    if(r_func != nullptr)
+        stream << ", r_func = " << rand() ;
+    else
+#endif
+    	stream << ", r = " << r ;
+    stream << ")";
     return stream.str();
   }
   std::string name() const override { return "sphere"; }
@@ -72,6 +77,9 @@ public:
 
   double fn, fs, fa;
   double r = 1;
+#ifdef ENABLE_PYTHON
+  void *r_func = nullptr;
+#endif
 };
 
 
@@ -89,6 +97,7 @@ public:
            << ", h = " << h
            << ", r1 = " << r1
            << ", r2 = " << r2
+           << ", angle = " << angle
            << ", center = " << (center ? "true" : "false")
            << ")";
     return stream.str();
@@ -98,6 +107,7 @@ public:
 
   double fn, fs, fa;
   double r1 = 1, r2 = 1, h = 1;
+  double angle=360;
   bool center = false;
 };
 
@@ -149,6 +159,7 @@ public:
            << ", $fa = " << fa
            << ", $fs = " << fs
            << ", r = " << r
+           << ", angle = " << angle
            << ")";
     return stream.str();
   }
@@ -157,6 +168,7 @@ public:
 
   double fn, fs, fa;
   double r = 1;
+  double angle=360;
 };
 
 

@@ -11,7 +11,7 @@ get_fedora_deps_yum()
   boost-devel mpfr-devel gmp-devel glew-devel CGAL-devel gcc gcc-c++ pkgconfig \
   opencsg-devel git libXmu-devel curl imagemagick ImageMagick glib2-devel make \
   xorg-x11-server-Xvfb gettext qscintilla-qt5-devel \
-  mesa-dri-drivers double-conversion-devel tbb-devel
+  mesa-dri-drivers double-conversion-devel tbb-devel nettle-devel libjpeg-turbo-devel
 }
 
 get_fedora_deps_dnf()
@@ -22,7 +22,7 @@ get_fedora_deps_dnf()
   opencsg-devel git libXmu-devel curl ImageMagick glib2-devel make \
   xorg-x11-server-Xvfb gettext qscintilla-qt5-devel \
   mesa-dri-drivers libzip-devel ccache qt5-qtmultimedia-devel qt5-qtsvg-devel \
-  double-conversion-devel tbb-devel
+  double-conversion-devel tbb-devel nettle-devel libjpeg-turbo-devel
  dnf -y install libxml2-devel
  dnf -y install libffi-devel
  dnf -y install redhat-rpm-config
@@ -99,14 +99,16 @@ get_mageia_deps()
 
 get_debian_deps()
 {
+ apt-get update
  apt-get -y install \
-  build-essential curl libffi-dev \
+  build-essential curl ninja-build libffi-dev \
   libxmu-dev cmake bison flex git-core libboost-all-dev \
   libmpfr-dev libboost-dev libglew-dev libcairo2-dev \
   libeigen3-dev libcgal-dev libopencsg-dev libgmp3-dev libgmp-dev \
   imagemagick libfreetype6-dev libdouble-conversion-dev \
   gtk-doc-tools libglib2.0-dev gettext xvfb pkg-config ragel libtbb-dev \
-  libgl1-mesa-dev libxi-dev libfontconfig-dev libzip-dev
+  libgl1-mesa-dev libxi-dev libfontconfig-dev libzip-dev libglm-dev nettle-dev \
+  libjpeg-dev
 }
 
 get_qt5_deps_debian()
@@ -124,14 +126,9 @@ get_qt5_deps_debian()
 
 get_debian_8_deps()
 {
-  apt-get -y install libharfbuzz-dev libxml2-dev
   get_debian_deps
+  apt-get -y install libharfbuzz-dev libxml2-dev
   get_qt5_deps_debian
-}
-
-get_ubuntu_14_deps()
-{
-  get_debian_8_deps
 }
 
 get_arch_deps()
@@ -145,10 +142,10 @@ get_arch_deps()
 
 get_ubuntu_16_deps()
 {
+  get_debian_8_deps
   apt-get -y install libxi-dev libxml2-dev libfontconfig1-dev
   # https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=804539
   apt-get -y install libcgal-qt5-dev
-  get_debian_8_deps
 }
 
 get_neon_deps()
@@ -174,28 +171,18 @@ unknown()
 }
 
 if [ -e /etc/issue ]; then
- if [ "`grep -i ubuntu.1[4-5] /etc/issue`" ]; then
-  get_ubuntu_14_deps
- elif [ "`grep -i ubuntu.1[6-9] /etc/issue`" ]; then
-  get_ubuntu_16_deps
- elif [ "`grep -i ubuntu.2[0-4] /etc/issue`" ]; then
+ if [ "`grep -i ubuntu.2[0-4] /etc/issue`" ]; then
   get_ubuntu_16_deps
  elif [ "`grep -i ubuntu /etc/issue`" ]; then
   get_debian_deps
  elif [ "`grep -i KDE.neon /etc/issue`" ]; then
   get_neon_deps
- elif [ "`grep -i elementary.*freya /etc/issue`" ]; then
-  get_ubuntu_14_deps
  elif [ "`grep ID=.solus /etc/os-release`" ]; then
   get_solus_deps
  elif [ "`grep -i debian /etc/issue`" ]; then
   get_debian_8_deps
  elif [ "`grep -i raspbian /etc/issue`" ]; then
   get_debian_deps
- elif [ "`grep -i linux.mint.2 /etc/issue`" ]; then
-  get_ubuntu_14_deps
- elif [ "`grep -i linux.mint.17 /etc/issue`" ]; then
-  get_ubuntu_14_deps
  elif [ "`grep -i linux.mint.1[89] /etc/issue`" ]; then
   get_ubuntu_16_deps
  elif [ "`grep -i suse /etc/issue`" ]; then

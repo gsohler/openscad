@@ -2,6 +2,7 @@
 
 #include "node.h"
 #include "Value.h"
+#include "linalg.h"
 
 #ifdef ENABLE_PYTHON
 #include <src/python/python_public.h>
@@ -23,6 +24,8 @@ public:
   double fn, fs, fa;
   double origin_x, origin_y, scale, offset_x, offset_y, angle;
   double twist;
+  std::string method;
+  Vector3d v;
   Filename filename;
   std::string layername;
  #ifdef ENABLE_PYTHON

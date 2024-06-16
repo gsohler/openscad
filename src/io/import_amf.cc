@@ -253,6 +253,11 @@ std::unique_ptr<PolySet> AmfImporter::read(const std::string& filename)
   streamFile(filename.c_str());
   vertex_list.clear();
 
+  std::string instance_name; 
+  AssignmentList inst_asslist;
+  ModuleInstantiation *instance = new ModuleInstantiation(instance_name,inst_asslist, Location::NONE);
+  auto node = std::make_shared<CsgOpNode>(instance, OpenSCADOperator::UNION);
+
   if (polySets.empty()) {
     return PolySet::createEmpty();
   }
@@ -266,7 +271,7 @@ std::unique_ptr<PolySet> AmfImporter::read(const std::string& filename)
     }
 
 #ifdef ENABLE_CGAL
-    std::unique_ptr<const Geometry> geom = CGALUtils::applyUnion3D(children.begin(), children.end());
+    std::unique_ptr<const Geometry> geom = CGALUtils::applyUnion3D(*node, children.begin(), children.end());
     if (auto ps = PolySetUtils::getGeometryAsPolySet(std::move(geom))) {
       // FIXME: Unnecessary copy
       return std::make_unique<PolySet>(*ps);

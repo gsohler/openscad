@@ -143,6 +143,11 @@ void PolySetBuilder::appendPolySet(const PolySet& ps)
   }
 }
 
+void PolySetBuilder::copyVertices(std::vector<Vector3d> &vertices) {
+  vertices.clear();	
+  vertices_.copy(std::back_inserter(vertices));
+}
+
 std::unique_ptr<PolySet> PolySetBuilder::build()
 {
   endPolygon();

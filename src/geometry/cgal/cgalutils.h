@@ -6,6 +6,7 @@
 #include "enums.h"
 
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
+#include "CsgOpNode.h"
 
 using K = CGAL::Epick;
 using Vertex3K = CGAL::Point_3<K>;
@@ -33,8 +34,8 @@ template <typename K>
 bool is_weakly_convex(const CGAL::Polyhedron_3<K>& p);
 template <typename K>
 bool is_weakly_convex(const CGAL::Surface_mesh<CGAL::Point_3<K>>& m);
-std::shared_ptr<const Geometry> applyOperator3D(const Geometry::Geometries& children, OpenSCADOperator op);
-std::unique_ptr<const Geometry> applyUnion3D(Geometry::Geometries::iterator chbegin, Geometry::Geometries::iterator chend);
+std::shared_ptr<const Geometry> applyOperator3D(const CsgOpNode &node, const Geometry::Geometries& children, OpenSCADOperator op);
+std::unique_ptr<const Geometry> applyUnion3D(const CsgOpNode &node, Geometry::Geometries::iterator chbegin, Geometry::Geometries::iterator chend);
 std::shared_ptr<CGALHybridPolyhedron> applyOperator3DHybrid(const Geometry::Geometries& children, OpenSCADOperator op);
 std::shared_ptr<CGALHybridPolyhedron> applyUnion3DHybrid(
   const Geometry::Geometries::const_iterator& chbegin,
@@ -135,4 +136,7 @@ bool corefineAndComputeDifference(TriangleMesh& lhs, TriangleMesh& rhs, Triangle
 template <typename K>
 void convertNefPolyhedronToTriangleMesh(const CGAL::Nef_polyhedron_3<K>& nef, CGAL::Surface_mesh<CGAL::Point_3<K>>& mesh);
 void cleanupMesh(CGAL_HybridMesh& mesh, bool is_corefinement_result);
+
+std::unique_ptr<PolySet> createTriangulatedPolySetFromPolygon2d(const Polygon2d& polygon2d);
+
 } // namespace CGALUtils

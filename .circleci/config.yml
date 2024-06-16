@@ -128,7 +128,7 @@ jobs:
   openscad-macos:
     resource_class: macos.x86.medium.gen2
     macos:
-      xcode: 14.3.1
+      xcode: 15.3.0
     environment:
       OPENSCAD_LIBRARIES: /Users/distiller/libraries/install
       PKG_CONFIG_PATH: /Users/distiller/libraries/install/lib/pkgconfig
@@ -145,7 +145,7 @@ jobs:
           name: Install Homebrew packages
           command: |
             brew update
-            brew install automake libtool cmake pkg-config wget meson
+            brew install automake libtool cmake pkg-config wget meson python-packaging
       - restore_cache:
           keys:
             # CircleCI library caching. If we ever need invalidate the cache (e.g. to remove any old files 
@@ -191,7 +191,7 @@ jobs:
           path: /tmp/out
 workflows:
   version: 2
-  master-build:
+  "CircleCI master build":
     jobs:
       - openscad-mxe-64bit:
           context: secret-context
@@ -211,7 +211,7 @@ workflows:
               branches:
                   only:
                       - master
-  branch-build:
+  "CircleCI branch build":
     jobs:
       - openscad-mxe-64bit:
           filters:

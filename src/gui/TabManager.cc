@@ -480,6 +480,11 @@ void TabManager::setTabModified(EditorInterface *edt)
 void TabManager::openTabFile(const QString& filename)
 {
   par->setCurrentOutput();
+#ifdef ENABLE_PYTHON
+  if(boost::algorithm::ends_with(filename, ".py"))
+    editor->setPlainText("from openscad import *\n");
+  else
+#endif  
   editor->setPlainText("");
 
   QFileInfo fileinfo(filename);
@@ -577,7 +582,7 @@ bool TabManager::maybeSave(int x)
     box.setDefaultButton(QMessageBox::Save);
     box.setIcon(QMessageBox::Warning);
     box.setWindowModality(Qt::ApplicationModal);
-#ifdef Q_OS_MAC
+#ifdef Q_OS_MACOS
     // Cmd-D is the standard shortcut for this button on Mac
     box.button(QMessageBox::Discard)->setShortcut(QKeySequence("Ctrl+D"));
     box.button(QMessageBox::Discard)->setShortcutEnabled(true);
@@ -609,7 +614,7 @@ bool TabManager::shouldClose()
     box.setDefaultButton(QMessageBox::SaveAll);
     box.setIcon(QMessageBox::Warning);
     box.setWindowModality(Qt::ApplicationModal);
-#ifdef Q_OS_MAC
+#ifdef Q_OS_MACOS
     // Cmd-D is the standard shortcut for this button on Mac
     box.button(QMessageBox::Discard)->setShortcut(QKeySequence("Ctrl+D"));
     box.button(QMessageBox::Discard)->setShortcutEnabled(true);

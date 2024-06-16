@@ -65,7 +65,7 @@
 #include "CSGTreeNormalizer.h"
 #include "QGLView.h"
 #include "MouseSelector.h"
-#ifdef Q_OS_MAC
+#ifdef Q_OS_MACOS
 #include "CocoaUtils.h"
 #endif
 #ifdef Q_OS_WIN
@@ -673,11 +673,9 @@ MainWindow::MainWindow(const QStringList& filenames)
   bool hide3DViewToolbar = settings.value("view/hide3DViewToolbar").toBool();
 
   // make sure it looks nice..
-  auto windowState = settings.value("window/state", QByteArray()).toByteArray();
+  const auto windowState = settings.value("window/state", QByteArray()).toByteArray();
+  restoreGeometry(settings.value("window/geometry", QByteArray()).toByteArray());
   restoreState(windowState);
-  resize(settings.value("window/size", QSize(800, 600)).toSize());
-  move(settings.value("window/position", QPoint(0, 0)).toPoint());
-  updateWindowSettings(hideConsole, hideEditor, hideCustomizer, hideErrorLog, hideEditorToolbar, hide3DViewToolbar, hideAnimate, hideViewportControl);
 
   if (windowState.size() == 0) {
     /*
@@ -693,6 +691,11 @@ MainWindow::MainWindow(const QStringList& filenames)
      * fill the available space.
      */
     activeEditor->setInitialSizeHint(QSize((5 * this->width() / 11), 100));
+    tabifyDockWidget(consoleDock, errorLogDock);
+    tabifyDockWidget(errorLogDock, animateDock);
+    showConsole();
+    hideCustomizer = true;
+    hideViewportControl = true;
   } else {
 #ifdef Q_OS_WIN
     // Try moving the main window into the display range, this
@@ -712,6 +715,8 @@ MainWindow::MainWindow(const QStringList& filenames)
     }
 #endif // ifdef Q_OS_WIN
   }
+
+  updateWindowSettings(hideConsole, hideEditor, hideCustomizer, hideErrorLog, hideEditorToolbar, hide3DViewToolbar, hideAnimate, hideViewportControl);
 
   connect(this->editorDock, SIGNAL(topLevelChanged(bool)), this, SLOT(editorTopLevelChanged(bool)));
   connect(this->consoleDock, SIGNAL(topLevelChanged(bool)), this, SLOT(consoleTopLevelChanged(bool)));
@@ -918,7 +923,7 @@ void MainWindow::loadViewSettings(){
 void MainWindow::loadDesignSettings()
 {
   QSettingsCached settings;
-  if (settings.value("design/autoReload", true).toBool()) {
+  if (settings.value("design/autoReload", false).toBool()) {
     designActionAutoReload->setChecked(true);
   }
   auto polySetCacheSizeMB = Preferences::inst()->getValue("advanced/polysetCacheSizeMB").toUInt();
@@ -1875,6 +1880,10 @@ bool MainWindow::trust_python_file(const std::string &file,  const std::string &
     this->trusted_edit_document_name=file;
     return true;
   }
+  if(content == "from openscad import *\n") { // 1st character already typed
+    this->trusted_edit_document_name=file;
+    return true;
+  }
 
   if(settings.contains(setting_key)) {
     QString str=settings.value(setting_key).toString();
@@ -2471,7 +2480,8 @@ void MainWindow::rightClick(QPoint mouse)
       ss.str("");
 
       // Check if the path is contained in a library (using parsersettings.h)
-      fs::path libpath = get_library_for_path(location.filePath());
+      fs::path libpath;
+      if(!location.filePath().empty()) libpath = get_library_for_path(location.filePath());
       if (!libpath.empty()) {
         // Display the library (without making the window too wide!)
         ss << step->verbose_name() << " (library "
@@ -3595,8 +3605,7 @@ void MainWindow::closeEvent(QCloseEvent *event)
     hideCurrentOutput();
 
     QSettingsCached settings;
-    settings.setValue("window/size", size());
-    settings.setValue("window/position", pos());
+    settings.setValue("window/geometry", saveGeometry());
     settings.setValue("window/state", saveState());
     if (this->tempFile) {
       delete this->tempFile;
@@ -3641,7 +3650,7 @@ void MainWindow::quit()
   QApplication::sendEvent(QApplication::instance(), &ev);
   if (ev.isAccepted()) QApplication::instance()->quit();
   // FIXME: Cancel any CGAL calculations
-#ifdef Q_OS_MAC
+#ifdef Q_OS_MACOS
   CocoaUtils::endApplication();
 #endif
 }

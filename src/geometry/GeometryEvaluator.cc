@@ -15,6 +15,8 @@
 #include "RotateExtrudeNode.h"
 #include "PullNode.h"
 #include "DebugNode.h"
+#include "WrapNode.h"
+#include "rotextrude.h"
 #include "CgalAdvNode.h"
 #include "ProjectionNode.h"
 #include "CsgOpNode.h"
@@ -46,6 +48,7 @@
 #ifdef ENABLE_MANIFOLD
 #include "manifoldutils.h"
 #endif
+#include "linear_extrude.h"
 
 
 #ifdef ENABLE_PYTHON
@@ -81,9 +84,11 @@ std::shared_ptr<const Geometry> GeometryEvaluator::evaluateGeometry(const Abstra
   if (!allownef) {
     std::shared_ptr<const PolySet> ps;
     if (std::dynamic_pointer_cast<const CGALHybridPolyhedron>(result) ||
-        std::dynamic_pointer_cast<const CGAL_Nef_polyhedron>(result) ||
-        std::dynamic_pointer_cast<const ManifoldGeometry>(result) ||
-        std::dynamic_pointer_cast<const PolySet>(result)) {
+        std::dynamic_pointer_cast<const CGAL_Nef_polyhedron>(result)
+#ifdef ENABLE_MANIFOLD
+        || std::dynamic_pointer_cast<const ManifoldGeometry>(result)
+#endif
+        || std::dynamic_pointer_cast<const PolySet>(result)) {
       ps = PolySetUtils::getGeometryAsPolySet(result);
       assert(ps && ps->getDimension() == 3);
       // We cannot render concave polygons, so tessellate any PolySets
@@ -512,7 +517,8 @@ std::vector<IndexedFace> mergetriangles(const std::vector<IndexedFace> polygons,
 						par=k;
 					}
 				}
-				assert(par != -1);
+				if(par == -1) printf("par not found here\n");
+				// assert(par != -1); TODO fix
 				faceParents.push_back(par+off);
 			}			
 		}
@@ -1565,8 +1571,8 @@ std::shared_ptr<const Geometry> offset3D_convex(const std::shared_ptr<const Poly
       sub_result->vertices = verticesNew;
       sub_result->indices = indicesNew;
 
-      std::shared_ptr<const ManifoldGeometry> term = ManifoldUtils::createManifoldFromGeometry( std::shared_ptr<const PolySet>(sub_result));
-//    std::shared_ptr<const ManifoldGeometry> term = ManifoldUtils::createManifoldFromGeometry( decomposed[i]);
+      std::shared_ptr<const ManifoldGeometry> term = ManifoldUtils::createManifoldFromGeometry(std::shared_ptr<const PolySet>(sub_result));
+//    std::shared_ptr<const ManifoldGeometry> term = ManifoldUtils::createManifoldFromGeometry(decomposed[i]);
       if(i == 0) geom = std::make_shared<ManifoldGeometry>(*term);
       else *geom = *geom + *term;	
     }
@@ -1649,6 +1655,38 @@ std::shared_ptr<const Geometry> offset3D(const std::shared_ptr<const PolySet> &p
   return geom;
 }
 
+std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> ps,  std::vector<bool> corner_selected, double r, int fn);
+
+Vector3d createFilletRound(Vector3d pt)
+{
+   double x=((int)(pt[0]*1e6))/1e6;
+   double y=((int)(pt[1]*1e6))/1e6;
+   double z=((int)(pt[2]*1e6))/1e6;
+   return Vector3d(x,y,z);
+}
+std::unique_ptr<const Geometry> addFillets(std::shared_ptr<const Geometry> result, const Geometry::Geometries & children, double r, int fn) {
+  printf("do fillet magic\n");	
+  std::unordered_set<Vector3d> points;
+  Vector3d pt;
+  std::shared_ptr<const PolySet> psr = PolySetUtils::getGeometryAsPolySet(result);
+  for(const Vector3d pt : psr->vertices){
+    points.insert(createFilletRound(pt));
+  }
+
+  for(const auto child: children) {
+    std::shared_ptr<const PolySet> ps = PolySetUtils::getGeometryAsPolySet(child.second);
+    for(const Vector3d pt : ps->vertices) {
+      points.erase(createFilletRound(pt));
+    }
+  }
+
+  std::vector<bool> corner_selected;
+  for(int i=0;i<psr->vertices.size();i++) corner_selected.push_back(points.count(createFilletRound(psr->vertices[i]))>0?true:false);
+
+  return  createFilletInt(psr,corner_selected, r, fn);
+
+}
+
 /*!
    Applies the operator to all child nodes of the given node.
 
@@ -1684,6 +1722,7 @@ GeometryEvaluator::ResultObject GeometryEvaluator::applyToChildren3D(const Abstr
   }
   case OpenSCADOperator::UNION:
   {
+    const CsgOpNode *csgOpNode = dynamic_cast<const CsgOpNode *>(&node);
     Geometry::Geometries actualchildren;
     for (const auto& item : children) {
       if (item.second && !item.second->isEmpty()) actualchildren.push_back(item);
@@ -1692,14 +1731,21 @@ GeometryEvaluator::ResultObject GeometryEvaluator::applyToChildren3D(const Abstr
     if (actualchildren.size() == 1) return ResultObject::constResult(actualchildren.front().second);
 #ifdef ENABLE_MANIFOLD
     if (Feature::ExperimentalManifold.is_enabled()) {
-      return ResultObject::mutableResult(ManifoldUtils::applyOperator3DManifold(actualchildren, op));
+      std::shared_ptr<const ManifoldGeometry> csgResult = ManifoldUtils::applyOperator3DManifold(actualchildren, op);	    
+      if(csgOpNode->r != 0){
+        std::unique_ptr<const Geometry> geom_u = addFillets(csgResult, actualchildren, csgOpNode->r, csgOpNode->fn);
+	std::shared_ptr<const Geometry> geom_s(geom_u.release());
+        return ResultObject::mutableResult(geom_s);
+	//csgResult = ManifoldUtils::createManifoldFromGeometry(geom_s);
+      }
+      return ResultObject::mutableResult(csgResult);
     }
 #endif
 #ifdef ENABLE_CGAL
     else if (Feature::ExperimentalFastCsg.is_enabled()) {
       return ResultObject::mutableResult(std::shared_ptr<Geometry>(CGALUtils::applyUnion3DHybrid(actualchildren.begin(), actualchildren.end())));
     }
-    return ResultObject::constResult(std::shared_ptr<const Geometry>(CGALUtils::applyUnion3D(actualchildren.begin(), actualchildren.end())));
+    return ResultObject::constResult(std::shared_ptr<const Geometry>(CGALUtils::applyUnion3D(*csgOpNode, actualchildren.begin(), actualchildren.end())));
 #else
     assert(false && "No boolean backend available");
 #endif
@@ -1707,6 +1753,11 @@ GeometryEvaluator::ResultObject GeometryEvaluator::applyToChildren3D(const Abstr
   }
   case OpenSCADOperator::OFFSET:
   {
+    std::string instance_name; 
+    AssignmentList inst_asslist;
+    ModuleInstantiation *instance = new ModuleInstantiation(instance_name,inst_asslist, Location::NONE);
+    auto node1 = std::make_shared<CsgOpNode>(instance,OpenSCADOperator::UNION);
+
     Geometry::Geometries actualchildren;
     for (const auto& item : children) {
       if (item.second && !item.second->isEmpty()) actualchildren.push_back(item);
@@ -1722,7 +1773,7 @@ GeometryEvaluator::ResultObject GeometryEvaluator::applyToChildren3D(const Abstr
         geom ={actualchildren.front().second};
         break;
       default:
-        geom = {CGALUtils::applyUnion3D(actualchildren.begin(), actualchildren.end())};
+        geom = {CGALUtils::applyUnion3D(*node1, actualchildren.begin(), actualchildren.end())};
 	break;
     }
  
@@ -1753,7 +1804,15 @@ GeometryEvaluator::ResultObject GeometryEvaluator::applyToChildren3D(const Abstr
   {
 #ifdef ENABLE_MANIFOLD
     if (Feature::ExperimentalManifold.is_enabled()) {
-      return ResultObject::mutableResult(ManifoldUtils::applyOperator3DManifold(children, op));
+      std::shared_ptr<const ManifoldGeometry> csgResult = ManifoldUtils::applyOperator3DManifold(children, op);	    
+      const CsgOpNode *csgOpNode = dynamic_cast<const CsgOpNode *>(&node);
+      if(csgOpNode->r != 0){
+        std::unique_ptr<const Geometry> geom_u = addFillets(csgResult, children, csgOpNode->r,csgOpNode->fn);
+	std::shared_ptr<const Geometry> geom_s(geom_u.release());
+//	csgResult = ManifoldUtils::createManifoldFromGeometry(geom_s);
+        return ResultObject::mutableResult(geom_s);
+      }
+      return ResultObject::mutableResult(csgResult);
     }
 #endif
 #ifdef ENABLE_CGAL
@@ -1761,7 +1820,8 @@ GeometryEvaluator::ResultObject GeometryEvaluator::applyToChildren3D(const Abstr
       // FIXME: It's annoying to have to disambiguate here:
       return ResultObject::mutableResult(std::shared_ptr<Geometry>(CGALUtils::applyOperator3DHybrid(children, op)));
     }
-    return ResultObject::constResult(CGALUtils::applyOperator3D(children, op));
+    const CsgOpNode *csgOpNode = dynamic_cast<const CsgOpNode *>(&node);
+    return ResultObject::constResult(CGALUtils::applyOperator3D(*csgOpNode, children, op));
 #else
     assert(false && "No boolean backend available");
     #endif
@@ -2011,7 +2071,7 @@ std::unique_ptr<Polygon2d> GeometryEvaluator::applyToChildren2D(const AbstractNo
 	const OffsetNode *offNode = dynamic_cast<const OffsetNode *>(&node);
         // ClipperLib documentation: The formula for the number of steps in a full
         // circular arc is ... Pi / acos(1 - arc_tolerance / abs(delta))
-        double n = Calc::get_fragments_from_r(std::abs(offNode->delta), offNode->fn, offNode->fs, offNode->fa);
+        double n = Calc::get_fragments_from_r(std::abs(offNode->delta), 360.0, offNode->fn, offNode->fs, offNode->fa);
         double arc_tolerance = std::abs(offNode->delta) * (1 - cos_degrees(180 / n));
         return   ClipperUtils::applyOffset(*pol, offNode->delta, offNode->join_type, offNode->miter_limit, arc_tolerance);
   }
@@ -2357,298 +2417,7 @@ Response GeometryEvaluator::visit(State& state, const TransformNode& node)
   return Response::ContinueTraversal;
 }
 
-static void translate_PolySet(PolySet& ps, const Vector3d& translation) // TODO duplicate with CGALutils ?
-{
-  for (auto& v : ps.vertices) {
-      v += translation;
-  }
-}
-
-/*
-   Compare Euclidean length of vectors
-   Return:
-    -1 : if v1  < v2
-     0 : if v1 ~= v2 (approximation to compoensate for floating point precision)
-     1 : if v1  > v2
- */
-int sgn_vdiff(const Vector2d& v1, const Vector2d& v2) {
-  constexpr double ratio_threshold = 1e5; // 10ppm difference
-  double l1 = v1.norm();
-  double l2 = v2.norm();
-  // Compare the average and difference, to be independent of geometry scale.
-  // If the difference is within ratio_threshold of the avg, treat as equal.
-  double scale = (l1 + l2);
-  double diff = 2 * std::fabs(l1 - l2) * ratio_threshold;
-  return diff > scale ? (l1 < l2 ? -1 : 1) : 0;
-}
-
-/*
-   Enable/Disable experimental 4-way split quads for linear_extrude, with added midpoint.
-   These look very nice when(and only when) diagonals are near equal.
-   This typically happens when an edge is colinear with the origin.
- */
-//#define LINEXT_4WAY
-
-/*
-   Attempt to triangulate quads in an ideal way.
-   Each quad is composed of two adjacent outline vertices: (prev1, curr1)
-   and their corresponding transformed points one step up: (prev2, curr2).
-   Quads are triangulated across the shorter of the two diagonals, which works well in most cases.
-   However, when diagonals are equal length, decision may flip depending on other factors.
- */
-static void add_slice(PolySetBuilder &builder, const Polygon2d& poly,
-                      double rot1, double rot2,
-                      double h1, double h2,
-                      const Vector2d& scale1,
-                      const Vector2d& scale2)
-{
-  Eigen::Affine2d trans1(Eigen::Scaling(scale1) * Eigen::Affine2d(rotate_degrees(-rot1)));
-  Eigen::Affine2d trans2(Eigen::Scaling(scale2) * Eigen::Affine2d(rotate_degrees(-rot2)));
-#ifdef LINEXT_4WAY
-  Eigen::Affine2d trans_mid(Eigen::Scaling((scale1 + scale2) / 2) * Eigen::Affine2d(rotate_degrees(-(rot1 + rot2) / 2)));
-  bool is_straight = rot1 == rot2 && scale1[0] == scale1[1] && scale2[0] == scale2[1];
-#endif
-  bool any_zero = scale2[0] == 0 || scale2[1] == 0;
-  bool any_non_zero = scale2[0] != 0 || scale2[1] != 0;
-  // Not likely to matter, but when no twist (rot2 == rot1),
-  // setting back_twist true helps keep diagonals same as previous builds.
-  bool back_twist = rot2 <= rot1;
-
-  for (const auto& o : poly.outlines()) {
-    Vector2d prev1 = trans1 * o.vertices[0];
-    Vector2d prev2 = trans2 * o.vertices[0];
-
-    // For equal length diagonals, flip selected choice depending on direction of twist and
-    // whether the outline is negative (eg circle hole inside a larger circle).
-    // This was tested against circles with a single point touching the origin,
-    // and extruded with twist.  Diagonal choice determined by whichever option
-    // matched the direction of diagonal for neighboring edges (which did not exhibit "equal" diagonals).
-    bool flip = ((!o.positive) xor (back_twist));
-
-    for (size_t i = 1; i <= o.vertices.size(); ++i) {
-      Vector2d curr1 = trans1 * o.vertices[i % o.vertices.size()];
-      Vector2d curr2 = trans2 * o.vertices[i % o.vertices.size()];
-
-      int diff_sign = sgn_vdiff(prev1 - curr2, curr1 - prev2);
-      bool splitfirst = diff_sign == -1 || (diff_sign == 0 && !flip);
-
-#ifdef LINEXT_4WAY
-      // Diagonals should be equal whenever an edge is co-linear with the origin (edge itself need not touch it)
-      if (!is_straight && diff_sign == 0) {
-        // Split into 4 triangles, with an added midpoint.
-        //Vector2d mid_prev = trans3 * (prev1 +curr1+curr2)/4;
-        Vector2d mid = trans_mid * (o.vertices[(i - 1) % o.vertices.size()] + o.vertices[i % o.vertices.size()]) / 2;
-        double h_mid = (h1 + h2) / 2;
-        builder.beginPolygon(3);
-        builder.insertVertex(prev1[0], prev1[1], h1);
-        builder.insertVertex(mid[0],   mid[1], h_mid);
-        builder.insertVertex(curr1[0], curr1[1], h1);
-        builder.beginPolygon(3);
-        builder.insertVertex(curr1[0], curr1[1], h1);
-        builder.insertVertex(mid[0],   mid[1], h_mid);
-        builder.insertVertex(curr2[0], curr2[1], h2);
-        builder.beginPolygon(3);
-        builder.insertVertex(curr2[0], curr2[1], h2);
-        builder.insertVertex(mid[0],   mid[1], h_mid);
-        builder.insertVertex(prev2[0], prev2[1], h2);
-        builder.beginPolygon(3);
-        builder.insertVertex(prev2[0], prev2[1], h2);
-        builder.insertVertex(mid[0],   mid[1], h_mid);
-        builder.insertVertex(prev1[0], prev1[1], h1);
-      } else
-#endif // ifdef LINEXT_4WAY
-      // Split along shortest diagonal,
-      // unless at top for a 0-scaled axis (which can create 0 thickness "ears")
-      if (splitfirst xor any_zero) {
-        builder.appendPolygon({
-                Vector3d(curr1[0], curr1[1], h1),
-                Vector3d(curr2[0], curr2[1], h2),
-                Vector3d(prev1[0], prev1[1], h1)
-                });
-        if (!any_zero || (any_non_zero && prev2 != curr2)) {
-          builder.appendPolygon({
-                Vector3d(prev2[0], prev2[1], h2),
-                Vector3d(prev1[0], prev1[1], h1),
-                Vector3d(curr2[0], curr2[1], h2)
-          });
-        }
-      } else {
-        builder.appendPolygon({
-                Vector3d(curr1[0], curr1[1], h1),
-                Vector3d(prev2[0], prev2[1], h2),
-                Vector3d(prev1[0], prev1[1], h1)
-        });
-        if (!any_zero || (any_non_zero && prev2 != curr2)) {
-          builder.appendPolygon({
-                Vector3d(curr1[0], curr1[1], h1),
-                Vector3d(curr2[0], curr2[1], h2),
-                Vector3d(prev2[0], prev2[1], h2)
-          });        
-        }
-      }
-      prev1 = curr1;
-      prev2 = curr2;
-    }
-  }
-}
-
-// Insert vertices for segments interpolated between v0 and v1.
-// The last vertex (t==1) is not added here to avoid duplicate vertices,
-// since it will be the first vertex of the *next* edge.
-static void add_segmented_edge(Outline2d& o, const Vector2d& v0, const Vector2d& v1, unsigned int edge_segments) {
-  for (unsigned int j = 0; j < edge_segments; ++j) {
-    double t = static_cast<double>(j) / edge_segments;
-    o.vertices.push_back((1 - t) * v0 + t * v1);
-  }
-}
-
-// For each edge in original outline, find its max length over all slice transforms,
-// and divide into segments no longer than fs.
-static Outline2d splitOutlineByFs(
-  const Outline2d& o,
-  const double twist, const double scale_x, const double scale_y,
-  const double fs, unsigned int slices)
-{
-  const auto sz = o.vertices.size();
-
-  Vector2d v0 = o.vertices[0];
-  Outline2d o2;
-  o2.positive = o.positive;
-
-  // non-uniform scaling requires iterating over each slice transform
-  // to find maximum length of a given edge.
-  if (scale_x != scale_y) {
-    for (size_t i = 1; i <= sz; ++i) {
-      Vector2d v1 = o.vertices[i % sz];
-      double max_edgelen = 0.0; // max length for single edge over all transformed slices
-      for (unsigned int j = 0; j <= slices; j++) {
-        double t = static_cast<double>(j) / slices;
-        Vector2d scale(Calc::lerp(1, scale_x, t), Calc::lerp(1, scale_y, t));
-        double rot = twist * t;
-        Eigen::Affine2d trans(Eigen::Scaling(scale) * Eigen::Affine2d(rotate_degrees(-rot)));
-        double edgelen = (trans * v1 - trans * v0).norm();
-        max_edgelen = std::max(max_edgelen, edgelen);
-      }
-      auto edge_segments = static_cast<unsigned int>(std::ceil(max_edgelen / fs));
-      add_segmented_edge(o2, v0, v1, edge_segments);
-      v0 = v1;
-    }
-  } else { // uniform scaling
-    double max_scale = std::max(scale_x, 1.0);
-    for (size_t i = 1; i <= sz; ++i) {
-      Vector2d v1 = o.vertices[i % sz];
-      unsigned int edge_segments = static_cast<unsigned int>(std::ceil((v1 - v0).norm() * max_scale / fs));
-      add_segmented_edge(o2, v0, v1, edge_segments);
-      v0 = v1;
-    }
-  }
-  return o2;
-}
-
-// While total outline segments < fn, increment segment_count for edge with largest
-// (max_edge_length / segment_count).
-static Outline2d splitOutlineByFn(
-  const Outline2d& o,
-  const double twist, const double scale_x, const double scale_y,
-  const double fn, unsigned int slices)
-{
-
-  struct segment_tracker {
-    size_t edge_index;
-    double max_edgelen;
-    unsigned int segment_count{1u};
-    segment_tracker(size_t i, double len) : edge_index(i), max_edgelen(len) { }
-    // metric for comparison: average between (max segment length, and max segment length after split)
-    [[nodiscard]] double metric() const { return max_edgelen / (segment_count + 0.5); }
-    bool operator<(const segment_tracker& rhs) const { return this->metric() < rhs.metric();  }
-    [[nodiscard]] bool close_match(const segment_tracker& other) const {
-      // Edges are grouped when metrics match by at least 99.9%
-      constexpr double APPROX_EQ_RATIO = 0.999;
-      double l1 = this->metric(), l2 = other.metric();
-      return std::min(l1, l2) / std::max(l1, l2) >= APPROX_EQ_RATIO;
-    }
-  };
-
-  const auto sz = o.vertices.size();
-  std::vector<unsigned int> segment_counts(sz, 1);
-  std::priority_queue<segment_tracker, std::vector<segment_tracker>> q;
-
-  Vector2d v0 = o.vertices[0];
-  // non-uniform scaling requires iterating over each slice transform
-  // to find maximum length of a given edge.
-  if (scale_x != scale_y) {
-    for (size_t i = 1; i <= sz; ++i) {
-      Vector2d v1 = o.vertices[i % sz];
-      double max_edgelen = 0.0; // max length for single edge over all transformed slices
-      for (unsigned int j = 0; j <= slices; j++) {
-        double t = static_cast<double>(j) / slices;
-        Vector2d scale(Calc::lerp(1, scale_x, t), Calc::lerp(1, scale_y, t));
-        double rot = twist * t;
-        Eigen::Affine2d trans(Eigen::Scaling(scale) * Eigen::Affine2d(rotate_degrees(-rot)));
-        double edgelen = (trans * v1 - trans * v0).norm();
-        max_edgelen = std::max(max_edgelen, edgelen);
-      }
-      q.emplace(i - 1, max_edgelen);
-      v0 = v1;
-    }
-  } else { // uniform scaling
-    double max_scale = std::max(scale_x, 1.0);
-    for (size_t i = 1; i <= sz; ++i) {
-      Vector2d v1 = o.vertices[i % sz];
-      double max_edgelen = (v1 - v0).norm() * max_scale;
-      q.emplace(i - 1, max_edgelen);
-      v0 = v1;
-    }
-  }
-
-  std::vector<segment_tracker> tmp_q;
-  // Process priority_queue until number of segments is reached.
-  size_t seg_total = sz;
-  while (seg_total < fn) {
-    auto current = q.top();
-
-    // Group similar length segmented edges to keep result roughly symmetrical.
-    while (!q.empty() && (tmp_q.empty() || current.close_match(tmp_q.front()))) {
-      q.pop();
-      tmp_q.push_back(current);
-      current = q.top();
-    }
-
-    if (seg_total + tmp_q.size() <= fn) {
-      while (!tmp_q.empty()) {
-        current = tmp_q.back();
-        tmp_q.pop_back();
-        ++current.segment_count;
-        ++segment_counts[current.edge_index];
-        ++seg_total;
-        q.push(current);
-      }
-    } else {
-      // fn too low to segment last group, push back onto queue without change.
-      while (!tmp_q.empty()) {
-        current = tmp_q.back();
-        tmp_q.pop_back();
-        q.push(current);
-      }
-      break;
-    }
-  }
-
-  // Create final segmented edges.
-  Outline2d o2;
-  o2.positive = o.positive;
-  v0 = o.vertices[0];
-  for (size_t i = 1; i <= sz; ++i) {
-    Vector2d v1 = o.vertices[i % sz];
-    add_segmented_edge(o2, v0, v1, segment_counts[i - 1]);
-    v0 = v1;
-  }
-
-  assert(o2.vertices.size() <= fn);
-  return o2;
-}
-
-static Outline2d alterprofile(Outline2d profile,double scalex, double scaley, double origin_x, double origin_y,double offset_x, double offset_y, double rot)
+Outline2d alterprofile(Outline2d profile,double scalex, double scaley, double origin_x, double origin_y,double offset_x, double offset_y, double rot)
 {
 	Outline2d result;
 	double ang=rot*3.14/180.0;
@@ -2663,23 +2432,6 @@ static Outline2d alterprofile(Outline2d profile,double scalex, double scaley, do
 		result.vertices.push_back(Vector2d(xr,yr));
 	}
 	return result;
-}
-
-void  append_linear_vertex(PolySetBuilder &builder,const Outline2d *face, int index, double h)
-{
-	builder.addVertex(builder.vertexIndex(Vector3d(
-			face->vertices[index][0],
-			face->vertices[index][1],
-			h)));
-}
-
-void  append_rotary_vertex(PolySetBuilder &builder,const Outline2d *face, int index, double ang)
-{
-	double a=ang*G_PI / 180.0;
-	builder.addVertex(builder.vertexIndex(Vector3d(
-			face->vertices[index][0]*cos(a),
-			face->vertices[index][0]*sin(a),
-			face->vertices[index][1])));
 }
 
 void calculate_path_dirs(Vector3d prevpt, Vector3d curpt,Vector3d nextpt,Vector3d vec_x_last, Vector3d vec_y_last, Vector3d *vec_x, Vector3d *vec_y) {
@@ -2751,235 +2503,7 @@ std::vector<Vector3d> calculate_path_profile(Vector3d *vec_x, Vector3d *vec_y,Ve
 	return result;
 }
 
-/*!
-   Input to extrude should be sanitized. This means non-intersecting, correct winding order
-   etc., the input coming from a library like Clipper.
- */
- // FIXME: What happens if the input Polygon isn't manifold, or has coincident vertices?
-static std::unique_ptr<Geometry> extrudePolygon(const LinearExtrudeNode& node, const Polygon2d& poly)
-{
-  bool non_linear = node.twist != 0 || node.scale_x != node.scale_y;
-  boost::tribool isConvex{poly.is_convex()};
-  // Twist or non-uniform scale makes convex polygons into unknown polyhedrons
-  if (isConvex && non_linear) isConvex = unknown;
-  PolySetBuilder builder(0, 0, 3, isConvex);
-  builder.setConvexity(node.convexity);
-  if (node.height <= 0) return PolySet::createEmpty();
 
-  size_t slices;
-  if (node.has_slices) {
-    slices = node.slices;
-  } else if (node.has_twist) {
-    double max_r1_sqr = 0; // r1 is before scaling
-    Vector2d scale(node.scale_x, node.scale_y);
-    for (const auto& o : poly.outlines())
-      for (const auto& v : o.vertices)
-        max_r1_sqr = fmax(max_r1_sqr, v.squaredNorm());
-    // Calculate Helical curve length for Twist with no Scaling
-    if (node.scale_x == 1.0 && node.scale_y == 1.0) {
-      slices = (unsigned int)Calc::get_helix_slices(max_r1_sqr, node.height, node.twist, node.fn, node.fs, node.fa);
-    } else if (node.scale_x != node.scale_y) {  // non uniform scaling with twist using max slices from twist and non uniform scale
-      double max_delta_sqr = 0; // delta from before/after scaling
-      Vector2d scale(node.scale_x, node.scale_y);
-      for (const auto& o : poly.outlines()) {
-        for (const auto& v : o.vertices) {
-          max_delta_sqr = fmax(max_delta_sqr, (v - v.cwiseProduct(scale)).squaredNorm());
-        }
-      }
-      size_t slicesNonUniScale;
-      size_t slicesTwist;
-      slicesNonUniScale = (unsigned int)Calc::get_diagonal_slices(max_delta_sqr, node.height, node.fn, node.fs);
-      slicesTwist = (unsigned int)Calc::get_helix_slices(max_r1_sqr, node.height, node.twist, node.fn, node.fs, node.fa);
-      slices = std::max(slicesNonUniScale, slicesTwist);
-    } else { // uniform scaling with twist, use conical helix calculation
-      slices = (unsigned int)Calc::get_conical_helix_slices(max_r1_sqr, node.height, node.twist, node.scale_x, node.fn, node.fs, node.fa);
-    }
-  } else if (node.scale_x != node.scale_y) {
-    // Non uniform scaling, w/o twist
-    double max_delta_sqr = 0; // delta from before/after scaling
-    Vector2d scale(node.scale_x, node.scale_y);
-    for (const auto& o : poly.outlines()) {
-      for (const auto& v : o.vertices) {
-        max_delta_sqr = fmax(max_delta_sqr, (v - v.cwiseProduct(scale)).squaredNorm());
-      }
-    }
-    slices = Calc::get_diagonal_slices(max_delta_sqr, node.height, node.fn, node.fs);
-  } else {
-    // uniform or [1,1] scaling w/o twist needs only one slice
-    slices = 1;
-  }
-
-  // Calculate outline segments if appropriate.
-  Polygon2d seg_poly;
-  bool is_segmented = false;
-  if (node.has_segments) {
-    // Set segments = 0 to disable
-    if (node.segments > 0) {
-      for (const auto& o : poly.outlines()) {
-        if (o.vertices.size() >= node.segments) {
-          seg_poly.addOutline(o);
-        } else {
-          seg_poly.addOutline(splitOutlineByFn(o, node.twist, node.scale_x, node.scale_y, node.segments, slices));
-        }
-      }
-      is_segmented = true;
-    }
-  } else if (non_linear) {
-    if (node.fn > 0.0) {
-      for (const auto& o : poly.outlines()) {
-        if (o.vertices.size() >= node.fn) {
-          seg_poly.addOutline(o);
-        } else {
-          seg_poly.addOutline(splitOutlineByFn(o, node.twist, node.scale_x, node.scale_y, node.fn, slices));
-        }
-      }
-    } else { // $fs and $fa based segmentation
-      auto fa_segs = static_cast<unsigned int>(std::ceil(360.0 / node.fa));
-      for (const auto& o : poly.outlines()) {
-        if (o.vertices.size() >= fa_segs) {
-          seg_poly.addOutline(o);
-        } else {
-          // try splitting by $fs, then check if $fa results in less segments
-          auto fsOutline = splitOutlineByFs(o, node.twist, node.scale_x, node.scale_y, node.fs, slices);
-          if (fsOutline.vertices.size() >= fa_segs) {
-            seg_poly.addOutline(splitOutlineByFn(o, node.twist, node.scale_x, node.scale_y, fa_segs, slices));
-          } else {
-            seg_poly.addOutline(std::move(fsOutline));
-          }
-        }
-      }
-    }
-    is_segmented = true;
-  }
-
-  const Polygon2d& polyref = is_segmented ? seg_poly : poly;
-
-  double h1, h2;
-  if (node.center) {
-    h1 = -node.height / 2.0;
-    h2 = +node.height / 2.0;
-  } else {
-    h1 = 0;
-    h2 = node.height;
-  }
-
-#ifdef ENABLE_PYTHON  
-  if(node.profile_func != NULL)
-  {
-	Outline2d lowerFace;
-	Outline2d upperFace;
-	double lower_h=h1, upper_h=h2;
-	double lower_scalex=1.0, upper_scalex=1.0;
-	double lower_scaley=1.0, upper_scaley=1.0;
-	double lower_rot=0.0, upper_rot=0.0;
-        if(node.twist_func != NULL) {
-          lower_rot = python_doublefunc(node.twist_func, 0);
-        } else lower_rot=0;
-
-	// Add Bottom face
-	lowerFace = alterprofile(python_getprofile(node.profile_func, node.fn, 0),lower_scalex, lower_scaley,node.origin_x, node.origin_y, 0, 0, lower_rot);
-	Polygon2d botface;
-        botface.addOutline(lowerFace);
-    	std::unique_ptr<PolySet> ps_bot = botface.tessellate();
-	translate_PolySet(*ps_bot, Vector3d(0, 0, lower_h));
-  	for (auto& p : ps_bot->indices) {
-	    std::reverse(p.begin(), p.end());
-	}
-	builder.appendPolySet(*ps_bot);
-  	for (unsigned int i = 1; i <= slices; i++) {
-		upper_h=i*node.height/slices;
-    		upper_scalex = 1 - i * (1 - node.scale_x) / slices;
-    		upper_scaley = 1 - i * (1 - node.scale_y) / slices;
-        	if(node.twist_func != NULL) {
-	          upper_rot = python_doublefunc(node.twist_func, i/(double)slices);
-        	} else upper_rot=i*node.twist /slices;
-		if(node.center) upper_h -= node.height/2;
-		upperFace = alterprofile(python_getprofile(node.profile_func, node.fn, upper_h), upper_scalex, upper_scaley , node.origin_x, node.origin_y, 0, 0, upper_rot);
-		if(lowerFace.vertices.size() == upperFace.vertices.size()) {
-			unsigned int n=lowerFace.vertices.size();
-			for(unsigned int j=0;j<n;j++) {
-				builder.beginPolygon(3);
-				append_linear_vertex(builder,&lowerFace,(j+0)%n, lower_h);
-				append_linear_vertex(builder,&lowerFace,(j+1)%n, lower_h);
-				append_linear_vertex(builder,&upperFace,(j+1)%n, upper_h);
-
-				builder.beginPolygon(3);
-				append_linear_vertex(builder,&lowerFace,(j+0)%n, lower_h);
-				append_linear_vertex(builder,&upperFace,(j+1)%n, upper_h);
-				append_linear_vertex(builder,&upperFace,(j+0)%n, upper_h);
-			}
-		}
-
-		lowerFace = upperFace;
-		lower_h = upper_h;
-		lower_scalex = upper_scalex;
-		lower_scaley = upper_scaley;
-		lower_rot = upper_rot;
-	}
-	// Add Top face
-	Polygon2d topface;
-        topface.addOutline(upperFace);
-	std::unique_ptr<PolySet> ps_top = topface.tessellate();
-	translate_PolySet(*ps_top, Vector3d(0, 0, upper_h));
-	builder.appendPolySet(*ps_top);
-  }
-  else
-#endif  
-{
-  // Create bottom face.
-  auto ps_bottom = polyref.tessellate(); // bottom
-  // Flip vertex ordering for bottom polygon
-  for (auto& p : ps_bottom->indices) {
-    std::reverse(p.begin(), p.end());
-  }
-  translate_PolySet(*ps_bottom, Vector3d(0, 0, h1));
-  builder.appendPolySet(*ps_bottom);
-
-  // Create slice sides.
-  double rot1, rot2;
-#ifdef ENABLE_PYTHON  
-    if(node.twist_func != NULL) {
-      rot1 = python_doublefunc(node.twist_func, 0);
-    } else
-#endif
-  rot1=0;
-  for (unsigned int j = 0; j < slices; j++) {
-#ifdef ENABLE_PYTHON	  
-    if(node.twist_func != NULL) {
-      rot2 = python_doublefunc(node.twist_func, (double)(j+1.0)/(double) slices);
-    } else
-#endif
-    rot2 = node.twist * (j + 1) / slices;
-    double height1 = h1 + (h2 - h1) * j / slices;
-    double height2 = h1 + (h2 - h1) * (j + 1) / slices;
-    Vector2d scale1(1 - (1 - node.scale_x) * j / slices,
-                    1 - (1 - node.scale_y) * j / slices);
-    Vector2d scale2(1 - (1 - node.scale_x) * (j + 1) / slices,
-                    1 - (1 - node.scale_y) * (j + 1) / slices);
-    add_slice(builder, polyref, rot1, rot2, height1, height2, scale1, scale2);
-    rot1=rot2;
-  }
-
-  // Create top face.
-  // If either scale components are 0, then top will be zero-area, so skip it.
-  if (node.scale_x != 0 && node.scale_y != 0) {
-    Polygon2d top_poly(polyref);
-    Eigen::Affine2d trans(Eigen::Scaling(node.scale_x, node.scale_y) * Eigen::Affine2d(rotate_degrees(-rot2)));
-    top_poly.transform(trans);
-    auto ps_top = top_poly.tessellate();
-    translate_PolySet(*ps_top, Vector3d(0, 0, h2));
-    builder.appendPolySet(*ps_top);
-  }
-}
-  auto ps = builder.build();
-  Material matcolor;
-  auto cs = ColorMap::inst()->defaultColorScheme();
-  matcolor.color = ColorMap::getColor(cs, RenderColor::OPENCSG_FACE_FRONT_COLOR);
-  ps->mat.push_back(matcolor);
-  for(int i=0;i<ps->indices.size();i++) ps->matind.push_back(0);
-  
-  return ps;
-}
 
 static std::unique_ptr<Geometry> extrudePolygon(const PathExtrudeNode& node, const Polygon2d& poly)
 {
@@ -3184,7 +2708,6 @@ static std::unique_ptr<Geometry> extrudePolygon(const PathExtrudeNode& node, con
   ps->mat.push_back(matcolor);
   for(int i=0;i<ps->indices.size();i++) ps->matind.push_back(0);
   return ps;
-
 }
 
 /*!
@@ -3211,9 +2734,8 @@ Response GeometryEvaluator::visit(State& state, const LinearExtrudeNode& node)
       }
       if (geometry) {
         const auto polygons = std::dynamic_pointer_cast<const Polygon2d>(geometry);
-        auto extruded = extrudePolygon(node, *polygons);
-        assert(extruded);
-        geom = std::move(extruded);
+        geom = extrudePolygon(node, *polygons);
+        assert(geom);
       }
     } else {
       geom = smartCacheGet(node, false);
@@ -3245,209 +2767,6 @@ Response GeometryEvaluator::visit(State& state, const PathExtrudeNode& node)
   }
   return Response::ContinueTraversal;
 }
-
-static void fill_ring(std::vector<Vector3d>& ring, const Outline2d& o, double a, bool flip)
-{
-  if (flip) {
-    unsigned int l = o.vertices.size() - 1;
-    for (unsigned int i = 0; i < o.vertices.size(); ++i) {
-      ring[i][0] = o.vertices[l - i][0] * sin_degrees(a);
-      ring[i][1] = o.vertices[l - i][0] * cos_degrees(a);
-      ring[i][2] = o.vertices[l - i][1];
-    }
-  } else {
-    for (unsigned int i = 0; i < o.vertices.size(); ++i) {
-      ring[i][0] = o.vertices[i][0] * sin_degrees(a);
-      ring[i][1] = o.vertices[i][0] * cos_degrees(a);
-      ring[i][2] = o.vertices[i][1];
-    }
-  }
-}
-
-/*!
-   Input to extrude should be clean. This means non-intersecting, correct winding order
-   etc., the input coming from a library like Clipper.
-
-   FIXME: We should handle some common corner cases better:
-   o 2D polygon having an edge being on the Y axis:
-    In this case, we don't need to generate geometry involving this edge as it
-    will be an internal edge.
-   o 2D polygon having a vertex touching the Y axis:
-    This is more complex as the resulting geometry will (may?) be nonmanifold.
-    In any case, the previous case is a specialization of this, so the following
-    should be handled for both cases:
-    Since the ring associated with this vertex will have a radius of zero, it will
-    collapse to one vertex. Any quad using this ring will be collapsed to a triangle.
-
-   Currently, we generate a lot of zero-area triangles
-
- */
-static std::unique_ptr<Geometry> rotatePolygon(const RotateExtrudeNode& node, const Polygon2d& poly)
-{
-  if (node.angle == 0) return nullptr;
-
-  PolySetBuilder builder;
-  builder.setConvexity(node.convexity);
-
-  double min_x = 0;
-  double max_x = 0;
-  unsigned int fragments = 0;
-  for (const auto& o : poly.outlines()) {
-    for (const auto& v : o.vertices) {
-      min_x = fmin(min_x, v[0]);
-      max_x = fmax(max_x, v[0]);
-    }
-  }
-
-  if ((max_x - min_x) > max_x && (max_x - min_x) > fabs(min_x)) {
-    LOG(message_group::Error, "all points for rotate_extrude() must have the same X coordinate sign (range is %1$.2f -> %2$.2f)", min_x, max_x);
-    return nullptr;
-  }
-
-  fragments = (unsigned int)std::ceil(fmax(Calc::get_fragments_from_r(max_x - min_x, node.fn, node.fs, node.fa) * std::abs(node.angle) / 360, 1));
-
-  bool flip_faces = (min_x >= 0 && node.angle > 0 && node.angle != 360) || (min_x < 0 && (node.angle < 0 || node.angle == 360));
-
-#ifdef ENABLE_PYTHON  
-  if(node.profile_func != NULL)
-  {
-	fragments=node.fn; // TODO fix
-	Outline2d lastFace;
-	Outline2d curFace;
-	double last_ang=0, cur_ang=0;
-	double last_twist=0.0, cur_twist=0.0;
-
-#ifdef ENABLE_PYTHON
-        if(node.twist_func != NULL) {
-          last_twist = python_doublefunc(node.twist_func, 0);
-        } else last_twist=0;
-#endif	
-	
-
-		lastFace = alterprofile(python_getprofile(node.profile_func, node.fn, 0),1.0, 1.0,node.origin_x, node.origin_y, node.offset_x, node.offset_y, last_twist);
-	if(node.angle != 360) {
-		// Add initial closing
-		Polygon2d lastface;
-	        lastface.addOutline(lastFace);
-	        std::unique_ptr<PolySet> ps_last = lastface.tessellate();
-
-		Transform3d rot(angle_axis_degrees(90, Vector3d::UnitX()));
-		ps_last->transform(rot);
-		// Flip vertex ordering
-		if (!flip_faces) {
-		for (auto& p : ps_last->indices) {
-		std::reverse(p.begin(), p.end());
-		}
-		}
-		builder.appendPolySet(*ps_last);
-
-	}
-  	for (unsigned int i = 1; i <= fragments; i++) {
-		cur_ang=i*node.angle/fragments;
-
-		if(node.twist_func != NULL) {
-		  cur_twist = python_doublefunc(node.twist_func, i/(double) fragments);
-		} else
-		cur_twist=i*node.twist /fragments;
-
-		curFace = alterprofile(python_getprofile(node.profile_func, node.fn, cur_ang), 1.0, 1.0 , node.origin_x, node.origin_y, node.offset_x, node.offset_y , cur_twist);
-
-		if(lastFace.vertices.size() == curFace.vertices.size()) {
-			unsigned int n=lastFace.vertices.size();
-			for(unsigned int j=0;j<n;j++) {
-				builder.beginPolygon(3);
-				append_rotary_vertex(builder,&lastFace,(j+0)%n, last_ang);
-				append_rotary_vertex(builder,&lastFace,(j+1)%n, last_ang);
-				append_rotary_vertex(builder,&curFace,(j+1)%n, cur_ang);
-				builder.beginPolygon(3);
-				append_rotary_vertex(builder,&lastFace,(j+0)%n, last_ang);
-				append_rotary_vertex(builder,&curFace,(j+1)%n, cur_ang);
-				append_rotary_vertex(builder,&curFace,(j+0)%n, cur_ang);
-			}
-		}
-
-		lastFace = curFace;
-		last_ang = cur_ang;
-		last_twist = cur_twist;
-	}
-	if(node.angle != 360) {
-		Polygon2d curface;
-	        curface.addOutline(curFace);
-		std::unique_ptr<PolySet> ps_cur = curface.tessellate();
-		Transform3d rot2(angle_axis_degrees(cur_ang, Vector3d::UnitZ()) * angle_axis_degrees(90, Vector3d::UnitX()));
-		ps_cur->transform(rot2);
-		if (flip_faces) {
-			for (auto& p : ps_cur->indices) {
-				std::reverse(p.begin(), p.end());
-			}
-		}
-		builder.appendPolySet(*ps_cur);
-	}
-	  
-}
-  else
-#endif
-  {	  
-  if (node.angle != 360) {
-    auto ps_start = poly.tessellate(); // starting face
-    Transform3d rot(angle_axis_degrees(90, Vector3d::UnitX()));
-    ps_start->transform(rot);
-    // Flip vertex ordering
-    if (!flip_faces) {
-      for (auto& p : ps_start->indices) {
-        std::reverse(p.begin(), p.end());
-      }
-    }
-    builder.appendPolySet(*ps_start);
-
-    auto ps_end = poly.tessellate();
-    Transform3d rot2(angle_axis_degrees(node.angle, Vector3d::UnitZ()) * angle_axis_degrees(90, Vector3d::UnitX()));
-    ps_end->transform(rot2);
-    if (flip_faces) {
-      for (auto& p : ps_end->indices) {
-        std::reverse(p.begin(), p.end());
-      }
-    }
-    builder.appendPolySet(*ps_end);
-  }
-
-  for (const auto& o : poly.outlines()) {
-    std::vector<Vector3d> rings[2];
-    rings[0].resize(o.vertices.size());
-    rings[1].resize(o.vertices.size());
-
-    fill_ring(rings[0], o, (node.angle == 360) ? -90 : 90, flip_faces); // first ring
-    for (unsigned int j = 0; j < fragments; ++j) {
-      double a;
-      if (node.angle == 360) a = -90 + ((j + 1) % fragments) * 360.0 / fragments; // start on the -X axis, for legacy support
-      else a = 90 - (j + 1) * node.angle / fragments; // start on the X axis
-      fill_ring(rings[(j + 1) % 2], o, a, flip_faces);
-
-      for (size_t i = 0; i < o.vertices.size(); ++i) {
-        builder.appendPolygon({
-                rings[j % 2][(i + 1) % o.vertices.size()],
-                rings[(j + 1) % 2][(i + 1) % o.vertices.size()],
-                rings[j % 2][i]
-        });                
-
-        builder.appendPolygon({
-                rings[(j + 1) % 2][(i + 1) % o.vertices.size()],
-                rings[(j + 1) % 2][i],
-                rings[j % 2][i]
-        });
-      }
-    }
-  }
-  }
-  auto ps = builder.build();
-  Material matcolor;
-  auto cs = ColorMap::inst()->defaultColorScheme();
-  matcolor.color = ColorMap::getColor(cs, RenderColor::OPENCSG_FACE_FRONT_COLOR);
-  ps->mat.push_back(matcolor);
-  for(int i=0;i<ps->indices.size();i++) ps->matind.push_back(0);
-  return ps;
-}
-
 /*!
    input: List of 2D objects
    output: 3D PolySet
@@ -3470,7 +2789,6 @@ Response GeometryEvaluator::visit(State& state, const RotateExtrudeNode& node)
         geometry = applyToChildren2D(node, OpenSCADOperator::UNION);
       }
       if (geometry) {
-        geom = rotatePolygon(node, *geometry);
         geom = rotatePolygon(node, *geometry);
       }
     } else {
@@ -3582,6 +2900,81 @@ static std::unique_ptr<PolySet> pullObject(const PullNode& node, const PolySet *
   return builder.build();
 }
 
+static std::unique_ptr<PolySet> wrapObject(const WrapNode& node, const PolySet *ps)
+{
+  PolySetBuilder builder(0,0,3,true);
+  int segments1=360.0/node.fa;
+  int segments2=2*G_PI*node.r/node.fs;
+  int segments=segments1>segments2?segments1:segments2;	  
+  if(node.fn > 0) segments=node.fn;
+  double arclen=2*G_PI*node.r/segments;
+
+  for(const auto &p : ps->indices) {
+    // find leftmost point		 
+    int n=p.size();
+    int minind=0;
+    for(int j=1;j<p.size();j++) {
+      if(ps->vertices[p[j]][0] < ps->vertices[p[minind]][0])
+      minind=j;		
+    }
+    int forw_ind=minind;
+    int back_ind=minind;
+    double xcur, xnext;
+
+    xcur=ps->vertices[p[minind]][0];
+    std::vector<Vector3d> curslice;
+    curslice.push_back(ps->vertices[p[minind]]);
+
+    int end=0;
+    do {
+      if(xcur >= 0) xnext = ceil((xcur+1e-6)/arclen)*arclen;
+      else xnext = -floor((-xcur+1e-6)/arclen)*arclen;
+      while(ps->vertices[p[(forw_ind+1)%n]][0] <= xnext && ((forw_ind+1)%n) != back_ind ) {
+        forw_ind= (forw_ind+1)%n;
+        curslice.push_back(ps->vertices[p[forw_ind]]);
+      }
+      while(ps->vertices[p[(back_ind+n-1)%n]][0] <= xnext && ((back_ind+n-1)%n) != forw_ind) {
+        back_ind= (back_ind+n-1)%n;
+        curslice.insert(curslice.begin(),ps->vertices[p[back_ind]]);
+      }
+
+      Vector3d  forw_pt, back_pt;
+      if(back_ind == ((forw_ind+1)%n)) {
+      end=1;
+      } else {
+        // calculate intermediate forward point
+        Vector3d tmp1, tmp2;
+	
+        tmp1 = ps->vertices[p[forw_ind]];
+        tmp2 = ps->vertices[p[(forw_ind+1)%n]];
+        forw_pt = tmp1 +(tmp2-tmp1)*(xnext-tmp1[0])/(tmp2[0]-tmp1[1]);
+        curslice.push_back(forw_pt);									      
+        tmp1 = ps->vertices[p[back_ind]];
+        tmp2 = ps->vertices[p[(back_ind+n-1)%n]];
+        back_pt = tmp1 +(tmp2-tmp1)*(xnext-tmp1[0])/(tmp2[0]-tmp1[1]);
+        curslice.insert(curslice.begin(), back_pt);									      
+      }  
+									      
+      double ang, rad;
+      builder.beginPolygon(curslice.size());	  
+      for(int j=0;j<curslice.size();j++) {
+        auto &pt = curslice[j];
+        ang=pt[0]/node.r;
+        rad = node.r-pt[1];
+        Vector3d pt_trans=Vector3d(rad*cos(ang),rad*sin(ang),pt[2]);
+        builder.addVertex(pt_trans);	    
+      }
+      builder.endPolygon();
+      curslice.clear();
+      xcur=xnext;
+      curslice.push_back(back_pt);	    
+      curslice.push_back(forw_pt);	    
+    } while(end == 0);
+    continue;
+  }
+  return builder.build();
+}
+
 Response GeometryEvaluator::visit(State& state, const PullNode& node)
 {
   std::shared_ptr<const Geometry> newgeom;
@@ -3649,6 +3042,22 @@ Response GeometryEvaluator::visit(State& state, const DebugNode& node)
   return Response::ContinueTraversal;
 }
 
+
+Response GeometryEvaluator::visit(State& state, const WrapNode& node)
+{
+  std::shared_ptr<const Geometry> newgeom;
+  std::shared_ptr<const Geometry> geom = applyToChildren3D(node, OpenSCADOperator::UNION).constptr();
+  if (geom) {
+    if(std::shared_ptr<const PolySet> ps = std::dynamic_pointer_cast<const PolySet>(geom)) {
+      std::unique_ptr<Geometry> ps_wrapped =  wrapObject(node,ps.get());
+      newgeom = std::move(ps_wrapped);
+      addToParent(state, node, newgeom);
+      node.progress_report();
+    }
+  }
+  return Response::ContinueTraversal;
+}
+
 /*!
    FIXME: Not in use
  */
@@ -3663,6 +3072,13 @@ std::shared_ptr<const Geometry> GeometryEvaluator::projectionCut(const Projectio
   std::shared_ptr<const Geometry> geom;
   std::shared_ptr<const Geometry> newgeom = applyToChildren3D(node, OpenSCADOperator::UNION).constptr();
   if (newgeom) {
+#ifdef ENABLE_MANIFOLD
+    if (Feature::ExperimentalManifold.is_enabled()) {
+      auto manifold = ManifoldUtils::createManifoldFromGeometry(newgeom);
+      auto poly2d = manifold->slice();
+      return std::shared_ptr<const Polygon2d>(ClipperUtils::sanitize(poly2d));
+    }
+#endif
 #ifdef ENABLE_CGAL
     auto Nptr = CGALUtils::getNefPolyhedronFromGeometry(newgeom);
     if (Nptr && !Nptr->isEmpty()) {
@@ -3679,6 +3095,19 @@ std::shared_ptr<const Geometry> GeometryEvaluator::projectionCut(const Projectio
 
 std::shared_ptr<const Geometry> GeometryEvaluator::projectionNoCut(const ProjectionNode& node)
 {
+#ifdef ENABLE_MANIFOLD
+  if (Feature::ExperimentalManifold.is_enabled()) {
+    std::shared_ptr<const Geometry> newgeom = applyToChildren3D(node, OpenSCADOperator::UNION).constptr();
+    if (newgeom) {
+        auto manifold = ManifoldUtils::createManifoldFromGeometry(newgeom);
+        auto poly2d = manifold->project();
+        return std::shared_ptr<const Polygon2d>(ClipperUtils::sanitize(poly2d));
+    } else {
+      return std::make_shared<Polygon2d>();
+    }
+  }
+#endif
+
   std::shared_ptr<const Geometry> geom;
   std::vector<std::unique_ptr<Polygon2d>> tmp_geom;
   BoundingBox bounds;
