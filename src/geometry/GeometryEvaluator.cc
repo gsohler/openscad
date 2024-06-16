@@ -1732,7 +1732,7 @@ GeometryEvaluator::ResultObject GeometryEvaluator::applyToChildren3D(const Abstr
 #ifdef ENABLE_MANIFOLD
     if (Feature::ExperimentalManifold.is_enabled()) {
       std::shared_ptr<const ManifoldGeometry> csgResult = ManifoldUtils::applyOperator3DManifold(actualchildren, op);	    
-      if(csgOpNode->r != 0){
+      if(csgOpNode != nullptr && csgOpNode->r != 0){
         std::unique_ptr<const Geometry> geom_u = addFillets(csgResult, actualchildren, csgOpNode->r, csgOpNode->fn);
 	std::shared_ptr<const Geometry> geom_s(geom_u.release());
         return ResultObject::mutableResult(geom_s);

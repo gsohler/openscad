@@ -159,7 +159,6 @@ std::shared_ptr<ManifoldGeometry> createManifoldFromPolySet(const PolySet& ps)
   return std::make_shared<ManifoldGeometry>();
 #endif
 #else
-  printf("MAnifold FromPolyset\n");
   auto ps_tri = PolySetUtils::tessellate_faces(ps);
   manifold::Mesh mesh;
 

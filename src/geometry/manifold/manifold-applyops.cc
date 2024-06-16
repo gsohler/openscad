@@ -9,6 +9,7 @@
 #include "progress.h"
 #include "printutils.h"
 #include "PolySet.h"
+#include "PolySetBuilder.h"
 
 namespace ManifoldUtils {
 
@@ -23,18 +24,20 @@ Location getLocation(const std::shared_ptr<const AbstractNode>& node)
  */
 std::shared_ptr<ManifoldGeometry> applyOperator3DManifold(const Geometry::Geometries& children, OpenSCADOperator op)
 {
-  std::shared_ptr<ManifoldGeometry> geom;
+	PolySetBuilder builder;
+      	std::shared_ptr<ManifoldGeometry> geom;
 
   bool foundFirst = false;
-  printf("start csg %d\n",children.size());
   std::vector<Material> matnew;
   std::vector<std::vector<unsigned int>> matinds_org;
   int cnt=0;
+  std::vector<int> runOriginalMap;
   for (const auto& item : children) {
     cnt++;	  
     std::vector<unsigned int> matind_org;	  
     std::shared_ptr<const ManifoldGeometry> chN = item.second ? createManifoldFromGeometry(item.second) : nullptr;
-    printf("op %d matsize=%d matindsize=%d\n",cnt, chN->mat.size(), chN->matind.size());
+    manifold::MeshGL meshgl = chN->getManifold().GetMeshGL();
+    runOriginalMap.push_back(meshgl.runOriginalID[0]); // TODO 0???						      
     for(auto ind: chN->matind) {
       int found=-1;	    
       for(int j=0;j<matnew.size();j++) {
@@ -45,10 +48,8 @@ std::shared_ptr<ManifoldGeometry> applyOperator3DManifold(const Geometry::Geomet
         found=matnew.size();
         matnew.push_back(chN->mat[ind]); 	 
       }
-      printf("%d ",found);
       matind_org.push_back(found);	   
     }
-    printf("\n");
     matinds_org.push_back(matind_org);
 
     // Intersecting something with nothing results in nothing
@@ -92,97 +93,51 @@ std::shared_ptr<ManifoldGeometry> applyOperator3DManifold(const Geometry::Geomet
   geom->mat=matnew;
 
   std::vector<unsigned int> matind;
-  manifold::MeshGL meshgl = geom->getManifold().GetMeshGL();
 
-  printf("runIndex is ");
-  for(int i=0;i<meshgl.runIndex.size();i++) printf("%d ",meshgl.runIndex[i]);
-  printf("\n");
-  int cntx=0;
-  for(int i=1;i<meshgl.runIndex.size();i++) {
-	  while(cntx < meshgl.runIndex[i]/3)
-		  printf("%d ",meshgl.faceID[cntx++]);
-	  printf("\n");
-  }
-
-  printf("runOriginalID is ");
-  for(int i=0;i<meshgl.runOriginalID.size();i++) printf("%d ",meshgl.runOriginalID[i]);
-  printf("\n");
-
-  const std::shared_ptr<const PolySet> psxs = geom->toPolySet(true);
+	const auto & mesh = geom->getManifold().GetMeshGL();
+	assert(mesh.runIndex.size() >= 2);
+	const auto meshNumVerts = mesh.vertProperties.size() / mesh.numProp;
+	const auto meshNumTris = mesh.triVerts.size();
 
 
-  std::vector<int> runMapping ; // insane mapping from runIndex to matinds
-  for(int i=0;i<meshgl.runIndex.size()-1;i++) {
-    int findLen=(meshgl.runIndex[i+1]-meshgl.runIndex[i])/3;
-    int found=-1;
-    printf("findlen %d\n",findLen);
-    for(int j=0;found == -1 &&j<matinds_org.size();j++) {
-	    printf("Compare against %d\n",matinds_org[j].size());
-      if(matinds_org[j].size() == findLen){
-        bool valid=true;	      
-        for(int k=0;valid && k<runMapping.size();k++)
-          if(runMapping[k] == j) valid=false;		
-        if(valid) found=j;	 
-      }
-    }   
-    if(found == -1) {
-	    printf("No mapping found\n");
-    }
-    runMapping.push_back(found);
-  }	  
+	auto id = mesh.runOriginalID[0];
+	auto start = mesh.runIndex[0];
 
-  printf("mapping %d %d\n",runMapping.size(), matinds_org.size());
-  for(int i=0;i<runMapping.size();i++)
-	  printf("m %d %d\n",i,runMapping[i]);
-  for(int i=0;i<meshgl.runIndex.size()-1;i++) {
-    int oldind = meshgl.runIndex[i];	  
-    int newind = meshgl.runIndex[i+1];	  
-    printf("Step %d process from %d to %d, data len is %d\n", i, oldind, newind, matinds_org[i].size());
-    if(newind-oldind != 3*matinds_org[i].size()){
-	    printf("wrong\n");
-	    exit(1);
-    }
-    printf("faceID ");
-    for(int j=oldind;j<newind;j+=3) {
-      int ind=meshgl.faceID[j/3];    
-      printf("%d ",ind);
-      matind.push_back(matinds_org[runMapping[i]][ind]); 
-    }
-    printf("\n");
-  }
+	for (int run = 0, numRun = mesh.runIndex.size() - 1; run < numRun; ++run) {
+		const auto nextID = mesh.runOriginalID[run + 1];
+		if (nextID != id) {
+			int ind=-1;
+			for(int i=0;i<runOriginalMap.size();i++) {
+                          if(runOriginalMap[i] == id) ind=i;				
+			}
+			if(ind == -1) { printf("Program error!\n"); ind=0; }
 
-  geom->mat = matnew;
-  geom->matind = matind;
+			const auto end = mesh.runIndex[run + 1];
+			const size_t numTri = (end - start) / 3;
 
-
-//  auto mani = std::make_shared<manifold::Manifold>(std::move(meshgl));
-//  geom  = std::make_shared<ManifoldGeometry>(mani);
-
-  const std::shared_ptr<const PolySet> ps = geom->toPolySet(true);
-
-  geom = createManifoldFromPolySet(*ps);
-  printf("finally\n");
-  meshgl = geom->getManifold().GetMeshGL();
-   printf("mat:\n");
-   for(int i=0;i<geom->mat.size();i++)
-	   printf("%d %g/%g/%g\n",i, geom->mat[i].color[0],geom->mat[i].color[1],geom->mat[i].color[2]); 
-   printf("tri:\n");
-   for(int i=0;i<meshgl.triVerts.size();i+=3)
-	   printf("%d %d/%d/%d - %d\n",i/3,
-	static_cast<int>(meshgl.triVerts[i]),
-        static_cast<int>(meshgl.triVerts[i + 1]),
-        static_cast<int>(meshgl.triVerts[i + 2]),
-	geom->matind[meshgl.faceID[i/3]]);
-   printf("Vert:\n");
-   for (int i = 0; i < meshgl.vertProperties.size(); i += meshgl.numProp)
-      printf("%d %g/%g/%g\n",i/3,	   
-        meshgl.vertProperties[i],
-        meshgl.vertProperties[i + 1],
-        meshgl.vertProperties[i + 2]);
-
-  printf("end csg\n");
-
-  return geom;
+			for (int i = start; i < end; i += 3) {
+				builder.beginPolygon(3);
+				for (int j = 0; j < 3; ++j) {
+					auto iVert = mesh.triVerts[i + j];
+					auto propOffset = iVert * mesh.numProp;
+					builder.addVertex({
+						mesh.vertProperties[propOffset],
+						mesh.vertProperties[propOffset + 1],
+						mesh.vertProperties[propOffset + 2]
+					});
+				}
+				int orgfaceid=mesh.faceID[i/3];
+				matind.push_back(matinds_org[ind][orgfaceid]);
+				builder.endPolygon();
+			}
+			id = nextID;
+			start = end;
+		}
+	}
+	auto result = builder.build();
+	result->mat = matnew;
+	result->matind = matind;
+	return createManifoldFromPolySet(*result);
 }
 
 };  // namespace ManifoldUtils

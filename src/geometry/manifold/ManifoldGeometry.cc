@@ -99,7 +99,6 @@ std::shared_ptr<const PolySet> ManifoldGeometry::toPolySet(bool ignore_mapping) 
   ps->vertices.reserve(mesh.NumVert());
   ps->indices.reserve(mesh.NumTri());
   ps->setConvexity(convexity);
-  printf("Running toPolyset\n");
 
   // first 3 channels are xyz coordinate
   for (size_t i = 0; i < mesh.vertProperties.size(); i += mesh.numProp)
@@ -117,10 +116,6 @@ std::shared_ptr<const PolySet> ManifoldGeometry::toPolySet(bool ignore_mapping) 
     else ps->matind.push_back(this->matind[mesh.faceID[i/3]]);
   }
   ps->mat = this->mat;
-  printf("indices %d matind %d mat %d\n",ps->indices.size(), ps->matind.size(),ps->mat.size());
-  for(int i=0;i<ps->matind.size();i++) printf("%d ",ps->matind[i]);
-  printf("\n");
-
   return ps;
 }
 
