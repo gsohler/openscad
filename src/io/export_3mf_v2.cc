@@ -88,7 +88,6 @@ static bool append_polyset(std::shared_ptr<const PolySet> ps, const Export3mfInf
     Lib3MF::PMeshObject mesh = model->AddMeshObject();
     if (!mesh) return false;
     mesh->SetName(info.name);
-    printf("%d %d\n",ps->mat.size(), ps->matind.size());
 #ifdef ENABLE_PYTHON    
     info.writeProps((void *) &mesh);
 #endif    
@@ -133,6 +132,26 @@ static bool append_polyset(std::shared_ptr<const PolySet> ps, const Export3mfInf
       export_3mf_error("Can't add triangle to 3MF model.");
       return false;
       }
+    }
+    Lib3MF::PBaseMaterialGroup pBaseMaterial = model->AddBaseMaterialGroup();
+
+    std::vector<Lib3MF_uint32> ids;
+    for(int i=0;i<out_ps->mat.size();i++) {
+      sLib3MFColor col;
+      char tempname[20];
+      sprintf(tempname,"Material%d",i);
+      Lib3MF_uint32 nBaseMaterialID = pBaseMaterial->AddMaterial(tempname, wrapper->FloatRGBAToColor(
+		out_ps->mat[i].color[0], out_ps->mat[i].color[1], out_ps->mat[i].color[2], out_ps->mat[i].color[3]));
+      ids.push_back(nBaseMaterialID);
+    }
+    mesh->SetObjectLevelProperty(pBaseMaterial->GetResourceID(), ids[0]);
+    sLib3MFTriangleProperties tri_prop;
+    tri_prop.m_ResourceID=pBaseMaterial->GetResourceID();
+    for(int i=0;i<out_ps->matind.size();i++) {
+      tri_prop.m_PropertyIDs[0]=ids[out_ps->matind[i]];
+      tri_prop.m_PropertyIDs[1]=ids[out_ps->matind[i]];
+      tri_prop.m_PropertyIDs[2]=ids[out_ps->matind[i]];
+      mesh->SetTriangleProperties(i,tri_prop);
     }
 
     Lib3MF::PBuildItem builditem;
@@ -254,7 +273,6 @@ void export_3mf(const std::vector<struct Export3mfInfo> & infos, std::ostream& o
     export_3mf_error("Can't get writer for 3MF model.");
     return;
   }
-printf("export\n");
   try {
     writer->WriteToCallback((Lib3MF::WriteCallback)lib3mf_write_callback, (Lib3MF::SeekCallback)lib3mf_seek_callback, &output);
   } catch (Lib3MF::ELib3MFException& e) {

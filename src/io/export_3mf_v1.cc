@@ -130,6 +130,41 @@ static bool append_polyset(std::shared_ptr<const PolySet> ps, const Export3mfInf
       return false;
     }
   }
+/*
+  PLib3MFModelBaseMaterial *baseMaterial = nullptr;
+  lib3mf_model_addbasematerialgroup(model, &baseMaterial);
+
+  std::vector<int> ids;
+  int nBaseMaterialID;
+  for(int i=0;i<sorted_ps->mat.size();i++) {
+    //Lib3MFColor col;
+    //sLib3MFColor col;
+    wchar_t tempname[20];
+    swprintf(tempname,20,L"Material%d",i);
+    // Lib3MF_uint32 nBaseMaterialID = pBaseMaterial->AddMaterial(tempname, wrapper->FloatRGBAToColor(
+    // sorted_ps->mat[i].color[0], sorted_ps->mat[i].color[1], sorted_ps->mat[i].color[2], sorted_ps->mat[i].color[3]));
+    //lib3mf_floatrgbatocolor(out_ps->mat[i].color[0], out_ps->mat[i].color[1], out_ps->mat[i].color[2], out_ps->mat[i].color[3],&col)
+//    lib3mf_basematerialgroup_addmaterial(&baseMaterial, tempname, &col,&nBaseMaterialID);
+
+    lib3mf_basematerial_addmaterial(baseMaterial, tempname, 
+	sorted_ps->mat[i].color[0], sorted_ps->mat[i].color[1], sorted_ps->mat[i].color[2], sorted_ps->mat[i].color[3] ,
+	&nBaseMaterialID);
+
+    ids.push_back(nBaseMaterialID);
+  }
+  //mesh->SetObjectLevelProperty(pBaseMaterial->GetResourceID(), ids[0]);
+  // TODO enable lib3mf_meshobject_setobjectlevelproperty(meshobject, Lib3MF_uint32 nUniqueResourceID, ids[0]);
+
+  sLib3MFTriangleProperties tri_prop;
+  // tri_prop.m_ResourceID=pBaseMaterial->GetResourceID(); TODO activate 2x
+  for(int i=0;i<sorted_ps->matind.size();i++) {
+    tri_prop.m_PropertyIDs[0]=ids[out_ps->matind[i]];
+    tri_prop.m_PropertyIDs[1]=ids[out_ps->matind[i]];
+    tri_prop.m_PropertyIDs[2]=ids[out_ps->matind[i]];
+    //mesh->SetTriangleProperties(i,tri_prop);
+    lib3mf_meshobject_settriangleproperties(pMeshObject, i,&tri_prop); 
+  }
+*/
 
   PLib3MFModelBuildItem *builditem;
   if (lib3mf_model_addbuilditem(model, mesh, nullptr, &builditem) != LIB3MF_OK) {
