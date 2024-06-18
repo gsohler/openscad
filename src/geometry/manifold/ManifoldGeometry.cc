@@ -8,6 +8,7 @@
 #ifdef ENABLE_CGAL
 #include "cgalutils.h"
 #endif
+#include "Feature.h"
 
 namespace {
 
@@ -92,7 +93,7 @@ std::string ManifoldGeometry::dump() const {
   return out.str();
 }
 
-std::shared_ptr<const PolySet> ManifoldGeometry::toPolySet(bool ignore_mapping) const {
+std::shared_ptr<const PolySet> ManifoldGeometry::toPolySet() const {
   manifold::MeshGL mesh = getManifold().GetMeshGL();
   auto ps = std::make_shared<PolySet>(3);
   ps->setTriangular(true);
@@ -106,16 +107,18 @@ std::shared_ptr<const PolySet> ManifoldGeometry::toPolySet(bool ignore_mapping) 
         mesh.vertProperties[i],
         mesh.vertProperties[i + 1],
         mesh.vertProperties[i + 2]);
-  ps->matind.clear();
   for (size_t i = 0; i < mesh.triVerts.size(); i += 3){
     ps->indices.push_back({
         static_cast<int>(mesh.triVerts[i]),
         static_cast<int>(mesh.triVerts[i + 1]),
         static_cast<int>(mesh.triVerts[i + 2])});
-    if(ignore_mapping) ps->matind.push_back(this->matind[i/3]);
-    else ps->matind.push_back(this->matind[mesh.faceID[i/3]]);
   }
-  ps->mat = this->mat;
+  if(Feature::ExperimentalColorCsg.is_enabled() ) {
+    ps->matind.clear();
+    for (size_t i = 0; i < mesh.triVerts.size(); i += 3)
+      ps->matind.push_back(this->matind[mesh.faceID[i/3]]);
+    ps->mat = this->mat;
+  }
   return ps;
 }
 

@@ -195,7 +195,6 @@ std::unique_ptr<PolySet> import_stl(const std::string& filename, const Location&
         "STL format not recognized in '%1$s'.", filename);
     return PolySet::createEmpty();
   }
-
   auto p =builder.build();
   Material matcolor;
   auto cs = ColorMap::inst()->defaultColorScheme();
@@ -203,5 +202,4 @@ std::unique_ptr<PolySet> import_stl(const std::string& filename, const Location&
   p->mat.push_back(matcolor);
   for(int i=0;i<p->indices.size();i++) p->matind.push_back(0);
   return p;
-
 }

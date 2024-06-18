@@ -115,10 +115,10 @@ static bool append_polyset(std::shared_ptr<const PolySet> ps, const Export3mfInf
       return true;
     };
 
-  std::shared_ptr<const PolySet> out_ps = ps;
+    std::shared_ptr<const PolySet> out_ps = ps;
     if (Feature::ExperimentalPredictibleOutput.is_enabled()) {
-    out_ps = createSortedPolySet(*ps);
-  }
+      out_ps = createSortedPolySet(*ps);
+    }
 
     for (const auto &v : out_ps->vertices) {
       if (!vertexFunc(v)) {
@@ -127,10 +127,10 @@ static bool append_polyset(std::shared_ptr<const PolySet> ps, const Export3mfInf
       }
     }
 
-  for (const auto& poly : out_ps->indices) {
-    if (!triangleFunc(poly)) {
-      export_3mf_error("Can't add triangle to 3MF model.");
-      return false;
+    for (const auto& poly : out_ps->indices) {
+      if (!triangleFunc(poly)) {
+        export_3mf_error("Can't add triangle to 3MF model.");
+        return false;
       }
     }
     Lib3MF::PBaseMaterialGroup pBaseMaterial = model->AddBaseMaterialGroup();
@@ -178,7 +178,6 @@ static bool append_nef(const CGAL_Nef_polyhedron& root_N, const Export3mfInfo &i
   if (!root_N.p3->is_simple()) {
     LOG(message_group::Export_Warning, "Exported object may not be a valid 2-manifold and may need repair");
   }
-
 
   if (std::shared_ptr<PolySet> ps = CGALUtils::createPolySetFromNefPolyhedron3(*root_N.p3)) {
     return append_polyset(ps, info, wrapper, model);
@@ -273,6 +272,7 @@ void export_3mf(const std::vector<struct Export3mfInfo> & infos, std::ostream& o
     export_3mf_error("Can't get writer for 3MF model.");
     return;
   }
+
   try {
     writer->WriteToCallback((Lib3MF::WriteCallback)lib3mf_write_callback, (Lib3MF::SeekCallback)lib3mf_seek_callback, &output);
   } catch (Lib3MF::ELib3MFException& e) {

@@ -13,6 +13,7 @@
 #include "PolySet.h"
 #include "Material.h"
 #include "polygon.h"
+#include "Feature.h"
 
 using Error = manifold::Manifold::Error;
 
@@ -76,17 +77,9 @@ template std::shared_ptr<ManifoldGeometry> createManifoldFromSurfaceMesh(const C
 template std::shared_ptr<ManifoldGeometry> createManifoldFromSurfaceMesh(const CGAL_DoubleMesh &tm);
 #endif
 
-std::shared_ptr<ManifoldGeometry> createManifoldFromPolySet(const PolySet& ps)
+std::shared_ptr<ManifoldGeometry> createManifoldFromTriangularPolySet(const PolySet& ps)
 {
-//  assert(ps.isTriangular());
-#if 0	
-#ifdef ENABLE_CGAL
-  PolySet psq(ps);
-  std::vector<Vector3d> points3d;
-  psq.quantizeVertices(&points3d);
-  auto ps_tri = PolySetUtils::tessellate_faces(psq);
-  
-  CGAL_DoubleMesh m;
+  assert(ps.isTriangular());
 
   manifold::Mesh mesh;
 
@@ -117,6 +110,7 @@ std::shared_ptr<ManifoldGeometry> createManifoldFromPolySet(const PolySet& ps)
   }
   const PolySet& triangle_set = ps.isTriangular() ? ps : *triangulated;
 
+  if( !Feature::ExperimentalColorCsg.is_enabled()) {
   auto mani = createManifoldFromTriangularPolySet(triangle_set);
   if (mani->getManifold().Status() == Error::NoError) {
     return mani;
@@ -129,7 +123,7 @@ std::shared_ptr<ManifoldGeometry> createManifoldFromPolySet(const PolySet& ps)
 
   // 2. If the PolySet couldn't be converted into a Manifold object, let's try to repair it.
   // We currently have to utilize some CGAL functions to do this.
-  {
+  #ifdef ENABLE_CGAL
     PolySet psq(ps);
     std::vector<Vector3d> points3d;
     psq.quantizeVertices(&points3d);
@@ -154,23 +148,32 @@ std::shared_ptr<ManifoldGeometry> createManifoldFromPolySet(const PolySet& ps)
       CGALUtils::createMeshFromPolySet(*ps_tri, m);
     }
 
-  return createManifoldFromSurfaceMesh(m);
-#else
-  return std::make_shared<ManifoldGeometry>();
-#endif
-#else
-  auto ps_tri = PolySetUtils::tessellate_faces(ps);
+    if (!ps_tri->isConvex()) {
+      if (CGALUtils::isClosed(m)) {
+        CGALUtils::orientToBoundAVolume(m);
+      } else {
+        LOG(message_group::Error, "[manifold] Input mesh is not closed!");
+      }
+    }
+
+    return createManifoldFromSurfaceMesh(m);
+  #else
+    return std::make_shared<ManifoldGeometry>();
+  #endif
+  }
+
+//  auto triangle_set = PolySetUtils::tessellate_faces(ps);
   manifold::Mesh mesh;
 
-  mesh.vertPos.resize(ps_tri->vertices.size());
-  for(int i=0;i<ps_tri->vertices.size();i++) {
-    Vector3d pt=ps_tri->vertices[i];
+  mesh.vertPos.resize(triangle_set.vertices.size());
+  for(int i=0;i<triangle_set.vertices.size();i++) {
+    Vector3d pt=triangle_set.vertices[i];
     mesh.vertPos[i] = glm::vec3((float) pt[0], (float) pt[1], (float) pt[2]);
   }
 
-  mesh.triVerts.reserve(ps_tri->indices.size()); 
-  for(int i=0;i<ps_tri->indices.size();i++) {		
-    auto &tri = ps_tri->indices[i];	  
+  mesh.triVerts.reserve(triangle_set.indices.size()); 
+  for(int i=0;i<triangle_set.indices.size();i++) {		
+    auto &tri = triangle_set.indices[i];	  
     assert(tri.size() == 3);
     mesh.triVerts.emplace_back(tri[0], tri[1], tri[2]);
   }
@@ -182,17 +185,16 @@ std::shared_ptr<ManifoldGeometry> createManifoldFromPolySet(const PolySet& ps)
         ManifoldUtils::statusToString(mani->Status()));
   }
   auto res = std::make_shared<ManifoldGeometry>(mani);
-  res->mat = ps_tri->mat;
-  res->matind = ps_tri->matind;
+  res->mat = triangle_set.mat;
+  res->matind = triangle_set.matind;
   return res;
-#endif
 }
 
 std::shared_ptr<const ManifoldGeometry> createManifoldFromGeometry(const std::shared_ptr<const Geometry>& geom) {
   if (auto mani = std::dynamic_pointer_cast<const ManifoldGeometry>(geom)) {
     return mani;
   }
-  if ( auto ps = PolySetUtils::getGeometryAsPolySet(geom)) {
+  if (auto ps = PolySetUtils::getGeometryAsPolySet(geom)) {
     return createManifoldFromPolySet(*ps);
   }
   return nullptr;

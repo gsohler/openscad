@@ -40,6 +40,7 @@ const Feature Feature::ExperimentalImportFunction("import-function", "Enable imp
 const Feature Feature::ExperimentalPredictibleOutput("predictible-output", "Attempt to produce predictible, diffable outputs (e.g. sorting the STL, or remeshing in a determined order)");
 #ifdef ENABLE_PYTHON
 const Feature Feature::ExperimentalPythonEngine("python-engine", "Enable experimental Python Engine (implies risk of malicious scripts downloaded).");
+const Feature Feature::ExperimentalColorCsg("color-csg", "Enable experimental Color CSG Renering");
 #endif
 const Feature Feature::ExperimentalPathExtrude("path-extrude", "Enable experimental <code> path_extrude </code> functions analogue to linear_extrude and rotate_extrude.");
 

@@ -2797,6 +2797,7 @@ static void pullObject_addtri(PolySetBuilder &builder,Vector3d a, Vector3d b, Ve
 	builder.addVertex(builder.vertexIndex(Vector3d(b[0], b[1], b[2])));
 	builder.addVertex(builder.vertexIndex(Vector3d(a[0], a[1], a[2])));
 }
+
 static std::unique_ptr<PolySet> pullObject(const PullNode& node, const PolySet *ps)
 {
   PolySetBuilder builder(0,0,3,true);

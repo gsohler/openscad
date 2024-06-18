@@ -34,7 +34,7 @@ public:
   [[nodiscard]] unsigned int getDimension() const override { return 3; }
   [[nodiscard]] std::unique_ptr<Geometry> copy() const override;
 
-  [[nodiscard]] std::shared_ptr<const PolySet> toPolySet(bool ignore_mapping=false) const;
+  [[nodiscard]] std::shared_ptr<const PolySet> toPolySet() const;
 
   template <class Polyhedron>
   [[nodiscard]] std::shared_ptr<Polyhedron> toPolyhedron() const;
@@ -58,6 +58,7 @@ public:
   void foreachVertexUntilTrue(const std::function<bool(const glm::vec3& pt)>& f) const;
 
   const manifold::Manifold& getManifold() const;
+
 private:
   std::shared_ptr<const manifold::Manifold> manifold_;
 };

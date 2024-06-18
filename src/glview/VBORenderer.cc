@@ -263,11 +263,8 @@ void VBORenderer::create_surface(const PolySet& ps, VertexArray& vertex_array,
   int ind=0;
   for (const auto& poly : ps.indices) {
     color_eff = color;
-    if(ind < ps.matind.size() && csgmode == CSGMODE_USEMATIND ){
+    if(ind < ps.matind.size() && csgmode == CSGMODE_USEMATIND )
 	    color_eff=ps.mat[ps.matind[ind]].color;
-//	    printf("use matind color\n");
-   } // else  printf("no matind color\n"); 
-
     if (poly.size() == 3) {
       Vector3d p0 = uniqueMultiply(vert_mult_map, ps.vertices[poly.at(0)], m);
       Vector3d p1 = uniqueMultiply(vert_mult_map, ps.vertices[poly.at(1)], m);
