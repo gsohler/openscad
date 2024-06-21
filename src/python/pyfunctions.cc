@@ -178,7 +178,6 @@ int sphereCalcSplitInd(PolySetBuilder &builder, std::vector<Vector3d> &vertices,
   return result;
 }
 
-#define MAXROUNDS 4
 std::unique_ptr<const Geometry> sphereCreateFuncGeometry(void *funcptr, double fs)
 {
   PyObject *func = (PyObject *) funcptr;
@@ -277,7 +276,15 @@ std::unique_ptr<const Geometry> sphereCreateFuncGeometry(void *funcptr, double f
       round++;
     }  
   }
-  return builder.build();
+  auto ps = builder.build();
+  printf("%d triangles\n",ps->indices.size());
+  std::vector<Vector4d> normals, newnormals;
+  std::vector<int> faceParents;
+  normals = calcTriangleNormals(ps->vertices, ps->indices);
+  std::vector<IndexedFace> indices_merged = mergeTriangles(ps->indices, normals,newnormals, faceParents, ps->vertices);
+  // TODO faces zusammenfassen
+  printf("%d triangles\n",indices_merged.size());
+  return ps; 
 }
 
 PyObject *python_sphere(PyObject *self, PyObject *args, PyObject *kwargs)

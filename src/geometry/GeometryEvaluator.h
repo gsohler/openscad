@@ -9,6 +9,7 @@
 #include <list>
 #include <vector>
 #include <map>
+#include "GeometryUtils.h"
 
 class CGAL_Nef_polyhedron;
 class Polygon2d;
@@ -17,6 +18,11 @@ class Tree;
 int linsystem( Vector3d v1,Vector3d v2,Vector3d v3,Vector3d pt,Vector3d &res,double *detptr=NULL);
 int cut_face_face_face(Vector3d p1, Vector3d n1, Vector3d p2,Vector3d n2, Vector3d p3, Vector3d n3, Vector3d &res,double *detptr=NULL);
 int cut_face_line(Vector3d fp, Vector3d fn, Vector3d lp, Vector3d ld, Vector3d &res, double *detptr=NULL);
+bool pointInPolygon(const std::vector<Vector3d> &vert, const IndexedFace &bnd, int ptind);
+Vector4d calcTriangleNormal(const std::vector<Vector3d> &vertices,const IndexedFace &pol);
+std::vector<Vector4d> calcTriangleNormals(const std::vector<Vector3d> &vertices, const std::vector<IndexedFace> &indices);
+std::vector<IndexedFace> mergeTriangles(const std::vector<IndexedFace> polygons,const std::vector<Vector4d> normals,std::vector<Vector4d> &newNormals, std::vector<int> &faceParents, const std::vector<Vector3d> &vert);
+
 // This evaluates a node tree into concrete geometry usign an underlying geometry engine
 // FIXME: Ideally, each engine should implement its own subtype. Instead we currently have
 // multiple embedded engines with varoius methods of selecting the right one.

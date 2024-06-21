@@ -82,8 +82,6 @@ int operator==(const EdgeKey &t1, const EdgeKey &t2)
         return 0;
 }
 
-Vector4d offset3D_normal(const std::vector<Vector3d> &vertices,const IndexedFace &pol);
-std::vector<Vector4d> offset3D_normals(const std::vector<Vector3d> &vertices, const std::vector<IndexedFace> &indices);
 
 
 typedef std::vector<int> intList;
@@ -204,15 +202,14 @@ void bezier_patch(PolySetBuilder &builder, Vector3d center, Vector3d dir1, Vecto
   }
 }
 
-std::vector<IndexedFace> mergetriangles(const std::vector<IndexedFace> polygons,const std::vector<Vector4d> normals,std::vector<Vector4d> &newNormals, std::vector<int> &faceParents, const std::vector<Vector3d> &vert); // TODO
 																											  //
 
 std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> ps,  std::vector<bool> corner_selected, double r, int bn)
 {
   std::vector<Vector4d> normals, newnormals;
   std::vector<int> faceParents;
-  normals = offset3D_normals(ps->vertices, ps->indices);
-  std::vector<IndexedFace> merged = mergetriangles(ps->indices, normals, newnormals, faceParents, ps->vertices);
+  normals = calcTriangleNormals(ps->vertices, ps->indices);
+  std::vector<IndexedFace> merged = mergeTriangles(ps->indices, normals, newnormals, faceParents, ps->vertices);
 
 
   if(bn < 2) bn=2;
@@ -316,8 +313,8 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
       int facebn=faceb.size();
       double fanf=(faceParents[e.second.facea] != -1)?-1:1;
       double fbnf=(faceParents[e.second.faceb] != -1)?-1:1;
-      Vector3d fan=offset3D_normal(ps->vertices, facea).head<3>();
-      Vector3d fbn=offset3D_normal(ps->vertices, faceb).head<3>();
+      Vector3d fan=calcTriangleNormal(ps->vertices, facea).head<3>();
+      Vector3d fbn=calcTriangleNormal(ps->vertices, faceb).head<3>();
 
       int indposao, indposbo, indposai, indposbi;
       Vector3d unit;
@@ -572,7 +569,7 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
       Vector3d facenorm[3];
       for(int j=0;j<3;j++) {
         face[j] =merged[polinds[i][j]];
-        facenorm[j] = offset3D_normal(ps->vertices, face[j]).head<3>();
+        facenorm[j] = calcTriangleNormal(ps->vertices, face[j]).head<3>();
         if(faceParents[polinds[i][j]]  != -1) facenorm[j] = -facenorm[j];
       }
 

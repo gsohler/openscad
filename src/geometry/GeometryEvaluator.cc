@@ -104,6 +104,74 @@ std::shared_ptr<const Geometry> GeometryEvaluator::evaluateGeometry(const Abstra
   return result;
 }
 
+
+Vector4d calcTriangleNormal(const std::vector<Vector3d> &vertices,const IndexedFace &pol)
+{
+	int n=pol.size();
+	Vector3d norm(0,0,0);
+	for(int j=0;j<n-2;j++) {
+		// need to calculate all normals, as 1st 2 could be in a concave corner
+		Vector3d diff1=(vertices[pol[0]] - vertices[pol[j+1]]);
+		Vector3d diff2=(vertices[pol[j+1]] - vertices[pol[j+2]]);
+		norm += diff1.cross(diff2);
+	}
+	norm.normalize();
+	Vector3d pt=vertices[pol[0]];
+	double off=norm.dot(pt);
+	return Vector4d(norm[0],norm[1],norm[2],off);
+}
+
+
+std::vector<Vector4d> calcTriangleNormals(const std::vector<Vector3d> &vertices, const std::vector<IndexedFace> &indices)
+{
+	std::vector<Vector4d>  faceNormal;
+	for(unsigned int i=0;i<indices.size();i++) {
+		IndexedFace pol = indices[i];
+		assert (pol.size() >= 3);
+		faceNormal.push_back(calcTriangleNormal(vertices, pol));
+	}
+	return faceNormal;
+
+}
+
+bool pointInPolygon(const std::vector<Vector3d> &vert, const IndexedFace &bnd, int ptind)
+{
+	int i,n;
+	double dist;
+	n=bnd.size();
+	int cuts=0;
+	Vector3d fdir, fnorm, p1, p2;
+	Vector3d pt=vert[ptind];
+	if(n < 3) return false;
+	Vector3d raydir=vert[bnd[1]]-vert[bnd[0]];
+	Vector3d fn=raydir.cross(vert[bnd[1]]-vert[bnd[2]]).normalized();
+	// check, how many times the ray crosses the 3D fence, classical algorithm in 3D
+	for(i=1;i<n;i++) { // 0 is always parallel
+		// build fence side
+		const Vector3d &p1=vert[bnd[i]];
+		const Vector3d &p2=vert[bnd[(i+1)%n]];
+		fdir=p2-p1;
+		fnorm=fdir.cross(fn);
+
+		// make sure, fence is ahead
+		if(fabs(fnorm.dot(raydir)) < 1e-5) continue;
+
+		dist = (pt-p1).dot(fnorm);
+		if(fnorm.dot(raydir) > 0) dist=-dist;
+		if(dist < 0) continue;
+
+		// make sure begin of fence is on the right
+		dist= (pt-p1).dot(fdir);
+		if(dist < 0) continue;
+
+		// make sure end of fence is on the left
+		dist= (pt-p2).dot(fdir);
+		if(dist > 0) continue;
+		cuts++;
+	}
+	return (cuts&1)?true:false;
+}
+
 bool GeometryEvaluator::isValidDim(const Geometry::GeometryItem& item, unsigned int& dim) const {
   if (!item.first->modinst->isBackground() && item.second) {
     if (!dim) dim = item.second->getDimension();
@@ -115,41 +183,23 @@ bool GeometryEvaluator::isValidDim(const Geometry::GeometryItem& item, unsigned 
   return true;
 }
 
-GeometryEvaluator::ResultObject GeometryEvaluator::applyToChildren(const AbstractNode& node, OpenSCADOperator op)
-{
-  unsigned int dim = 0;
-  for (const auto& item : this->visitedchildren[node.index()]) {
-    if (!isValidDim(item, dim)) break;
-  }
-  if (dim == 2) return ResultObject::mutableResult(std::shared_ptr<Geometry>(applyToChildren2D(node, op)));
-  else if (dim == 3) return applyToChildren3D(node, op);
-  return {};
-}
+using Eigen::Vector4d;
+typedef std::vector<IndexedFace> indexedFaceList;
 
-int cut_face_face_face(Vector3d p1, Vector3d n1, Vector3d p2,Vector3d n2, Vector3d p3, Vector3d n3, Vector3d &res,double *detptr)
+bool mergeTrianglesOpposite(const IndexedFace & poly1, const IndexedFace &poly2)
 {
-        //   vec1     vec2     vec3
-        // x*dirx + y*diry + z*dirz =( posx*dirx + posy*diry + posz*dirz )
-        // x*dirx + y*diry + z*dirz =( posx*dirx + posy*diry + posz*dirz )
-        // x*dirx + y*diry + z*dirz =( posx*dirx + posy*diry + posz*dirz )
-        Vector3d vec1,vec2,vec3,sum;
-        vec1[0]=n1[0]; vec1[1]= n2[0] ; vec1[2] = n3[0];
-        vec2[0]=n1[1]; vec2[1]= n2[1] ; vec2[2] = n3[1];
-        vec3[0]=n1[2]; vec3[1]= n2[2] ; vec3[2] = n3[2];
-        sum[0]=p1.dot(n1);
-        sum[1]=p2.dot(n2);
-        sum[2]=p3.dot(n3);
-        return linsystem( vec1,vec2,vec3,sum,res,detptr);
-}
+	if(poly1.size() != poly2.size()) return false;
+	int n=poly1.size();
+	int off=-1;
+	for(int i=0;off == -1 && i<n;i++)
+		if(poly1[0] == poly2[i]) off=i;
+	if(off == -1) return false;
 
-int cut_face_line(Vector3d fp, Vector3d fn, Vector3d lp, Vector3d ld, Vector3d &res, double *detptr)
-{
-	Vector3d c1 = fn.cross(ld);
-	Vector3d c2 = fn.cross(c1);
-	Vector3d diff=fp-lp;
-        if(linsystem(ld, c1, c2, diff,res,detptr)) return 1;
-	res=lp+ld*res[0];
-	return 0;
+	for(int i=1;i<n;i++)
+		if(poly1[i] != poly2[(off+n-i)%n])
+			return false;
+
+	return true;
 }
 
 typedef std::vector<int> intList;
@@ -177,10 +227,8 @@ int operator==(const TriCombineStub &t1, const TriCombineStub &t2)
 	if(t1.ind1 == t2.ind1 && t1.ind2 == t2.ind2) return 1;
 	return 0;
 }
-//
-// combine all tringles into polygons where applicable
-typedef std::vector<IndexedFace> indexedFaceList;
-static indexedFaceList stl_tricombine(const std::vector<IndexedFace> &triangles)
+
+static indexedFaceList mergeTrianglesSub(const std::vector<IndexedFace> &triangles)
 {
 	unsigned int i,j,n;
 	int ind1, ind2;
@@ -346,65 +394,9 @@ static indexedFaceList stl_tricombine(const std::vector<IndexedFace> &triangles)
 	}
 	return result;
 }
-bool offset3D_opposite(const IndexedFace & poly1, const IndexedFace &poly2)
-{
-	if(poly1.size() != poly2.size()) return false;
-	int n=poly1.size();
-	int off=-1;
-	for(int i=0;off == -1 && i<n;i++)
-		if(poly1[0] == poly2[i]) off=i;
-	if(off == -1) return false;
-
-	for(int i=1;i<n;i++)
-		if(poly1[i] != poly2[(off+n-i)%n])
-			return false;
-
-	return true;
-}
 
 
-bool offset3D_pointInPolygon(const std::vector<Vector3d> &vert, const IndexedFace &bnd, int ptind)
-{
-	int i,n;
-	double dist;
-	n=bnd.size();
-	int cuts=0;
-	Vector3d fdir, fnorm, p1, p2;
-	Vector3d pt=vert[ptind];
-	if(n < 3) return false;
-	Vector3d raydir=vert[bnd[1]]-vert[bnd[0]];
-	Vector3d fn=raydir.cross(vert[bnd[1]]-vert[bnd[2]]).normalized();
-	// check, how many times the ray crosses the 3D fence, classical algorithm in 3D
-	for(i=1;i<n;i++) { // 0 is always parallel
-		// build fence side
-		const Vector3d &p1=vert[bnd[i]];
-		const Vector3d &p2=vert[bnd[(i+1)%n]];
-		fdir=p2-p1;
-		fnorm=fdir.cross(fn);
-
-		// make sure, fence is ahead
-		if(fabs(fnorm.dot(raydir)) < 1e-5) continue;
-
-		dist = (pt-p1).dot(fnorm);
-		if(fnorm.dot(raydir) > 0) dist=-dist;
-		if(dist < 0) continue;
-
-		// make sure begin of fence is on the right
-		dist= (pt-p1).dot(fdir);
-		if(dist < 0) continue;
-
-		// make sure end of fence is on the left
-		dist= (pt-p2).dot(fdir);
-		if(dist > 0) continue;
-		cuts++;
-	}
-	return (cuts&1)?true:false;
-}
-
-using Eigen::Vector4d;
-
-Vector4d offset3D_normal(const std::vector<Vector3d> &vertices,const IndexedFace &pol);
-std::vector<IndexedFace> mergetriangles(const std::vector<IndexedFace> polygons,const std::vector<Vector4d> normals,std::vector<Vector4d> &newNormals, std::vector<int> &faceParents, const std::vector<Vector3d> &vert) 
+std::vector<IndexedFace> mergeTriangles(const std::vector<IndexedFace> polygons,const std::vector<Vector4d> normals,std::vector<Vector4d> &newNormals, std::vector<int> &faceParents, const std::vector<Vector3d> &vert) 
 {
 	indexedFaceList emptyList;
 	std::vector<Vector4d> norm_list;
@@ -451,13 +443,13 @@ std::vector<IndexedFace> mergetriangles(const std::vector<IndexedFace> polygons,
 			for(unsigned int l=0;l<polygons_sorted[i_].size();l++) {
 				IndexedFace hole = polygons_sorted[i_][l];
 //				// holes dont intersect with the polygon, so its sufficent to check, if one point of the hole is inside the polygon
-				if(offset3D_opposite(poly, hole)){
+				if(mergeTrianglesOpposite(poly, hole)){
 					polygons_sorted[i].erase(polygons_sorted[i].begin()+k);
 					polygons_sorted[i_].erase(polygons_sorted[i_].begin()+l);
 					k--;
 					l--;
 				}
-				else if(offset3D_pointInPolygon(vert, poly, hole[0])){
+				else if(pointInPolygon(vert, poly, hole[0])){
 					polygons_sorted[i].push_back(hole);
 					polygons_sorted[i_].erase(polygons_sorted[i_].begin()+l);
 					l--; // could have more holes
@@ -473,12 +465,12 @@ std::vector<IndexedFace> mergetriangles(const std::vector<IndexedFace> polygons,
 	newNormals.clear();
 	faceParents.clear();
 	for(unsigned int i=0;i<polygons_sorted.size();i++ ) {
-		indexedFaceList indices_sub = stl_tricombine(polygons_sorted[i]);
+		indexedFaceList indices_sub = mergeTrianglesSub(polygons_sorted[i]);
 		int off=indices.size();
 		for(unsigned int j=0;j<indices_sub.size();j++) {
 			indices.push_back(indices_sub[j]);
 			newNormals.push_back(norm_list[i]);
-			Vector4d loc_norm = offset3D_normal(vert,indices_sub[j]);
+			Vector4d loc_norm = calcTriangleNormal(vert,indices_sub[j]);
 			if(norm_list[i].head<3>().dot(loc_norm.head<3>()) > 0) 
 				faceParents.push_back(-1); 
 			else {
@@ -486,7 +478,7 @@ std::vector<IndexedFace> mergetriangles(const std::vector<IndexedFace> polygons,
 				for(unsigned int k=0;k< indices_sub.size();k++)
 				{
 					if(k == j) continue;
-					if(offset3D_pointInPolygon(vert, indices_sub[k],indices_sub[j][0])) {
+					if(pointInPolygon(vert, indices_sub[k],indices_sub[j][0])) {
 						par=k;
 					}
 				}
@@ -500,6 +492,46 @@ std::vector<IndexedFace> mergetriangles(const std::vector<IndexedFace> polygons,
 
 	return indices;
 }
+
+GeometryEvaluator::ResultObject GeometryEvaluator::applyToChildren(const AbstractNode& node, OpenSCADOperator op)
+{
+  unsigned int dim = 0;
+  for (const auto& item : this->visitedchildren[node.index()]) {
+    if (!isValidDim(item, dim)) break;
+  }
+  if (dim == 2) return ResultObject::mutableResult(std::shared_ptr<Geometry>(applyToChildren2D(node, op)));
+  else if (dim == 3) return applyToChildren3D(node, op);
+  return {};
+}
+
+int cut_face_face_face(Vector3d p1, Vector3d n1, Vector3d p2,Vector3d n2, Vector3d p3, Vector3d n3, Vector3d &res,double *detptr)
+{
+        //   vec1     vec2     vec3
+        // x*dirx + y*diry + z*dirz =( posx*dirx + posy*diry + posz*dirz )
+        // x*dirx + y*diry + z*dirz =( posx*dirx + posy*diry + posz*dirz )
+        // x*dirx + y*diry + z*dirz =( posx*dirx + posy*diry + posz*dirz )
+        Vector3d vec1,vec2,vec3,sum;
+        vec1[0]=n1[0]; vec1[1]= n2[0] ; vec1[2] = n3[0];
+        vec2[0]=n1[1]; vec2[1]= n2[1] ; vec2[2] = n3[1];
+        vec3[0]=n1[2]; vec3[1]= n2[2] ; vec3[2] = n3[2];
+        sum[0]=p1.dot(n1);
+        sum[1]=p2.dot(n2);
+        sum[2]=p3.dot(n3);
+        return linsystem( vec1,vec2,vec3,sum,res,detptr);
+}
+
+int cut_face_line(Vector3d fp, Vector3d fn, Vector3d lp, Vector3d ld, Vector3d &res, double *detptr)
+{
+	Vector3d c1 = fn.cross(ld);
+	Vector3d c2 = fn.cross(c1);
+	Vector3d diff=fp-lp;
+        if(linsystem(ld, c1, c2, diff,res,detptr)) return 1;
+	res=lp+ld*res[0];
+	return 0;
+}
+//
+// combine all tringles into polygons where applicable
+
 
 void offset3D_RemoveColinear(const std::vector<Vector3d> &vertices, std::vector<IndexedFace> &indices, std::vector<intList> &pointToFaceInds, std::vector<intList> &pointToFacePos)
 {
@@ -587,35 +619,6 @@ void offset_3D_dump(const std::vector<Vector3d> &vertices, const std::vector<Ind
 			printf("%d ",face[j]);
 		printf("\n");
 	}
-}
-
-Vector4d offset3D_normal(const std::vector<Vector3d> &vertices,const IndexedFace &pol)
-{
-	int n=pol.size();
-	Vector3d norm(0,0,0);
-	for(int j=0;j<n-2;j++) {
-		// need to calculate all normals, as 1st 2 could be in a concave corner
-		Vector3d diff1=(vertices[pol[0]] - vertices[pol[j+1]]);
-		Vector3d diff2=(vertices[pol[j+1]] - vertices[pol[j+2]]);
-		norm += diff1.cross(diff2);
-	}
-	norm.normalize();
-	Vector3d pt=vertices[pol[0]];
-	double off=norm.dot(pt);
-	return Vector4d(norm[0],norm[1],norm[2],off);
-}
-
-
-std::vector<Vector4d> offset3D_normals(const std::vector<Vector3d> &vertices, const std::vector<IndexedFace> &indices)
-{
-	std::vector<Vector4d>  faceNormal;
-	for(unsigned int i=0;i<indices.size();i++) {
-		IndexedFace pol = indices[i];
-		assert (pol.size() >= 3);
-		faceNormal.push_back(offset3D_normal(vertices, pol));
-	}
-	return faceNormal;
-
 }
 double offset3D_angle(const Vector3d &refdir, const Vector3d &edgedir, const Vector3d &facenorm)
 {
@@ -989,7 +992,7 @@ std::vector<std::shared_ptr<const PolySet>>  offset3D_decompose(std::shared_ptr<
 			}
 			if(valid){
 				int n=faces_convex.size();
-				Vector4d newface_norm = offset3D_normal(ps->vertices, ps->indices[newfaceind]);
+				Vector4d newface_norm = calcTriangleNormal(ps->vertices, ps->indices[newfaceind]);
 				for(int i=0;i<n;i++) {
 					auto &tri = ps->indices[faces_convex[i]]; // bestehednde
 					// if tri is completely outside of new tri, skip it
@@ -1027,7 +1030,7 @@ std::vector<std::shared_ptr<const PolySet>>  offset3D_decompose(std::shared_ptr<
 		std::vector<Vector4d> faces_normals;
 		for(unsigned int i=0;i<faces_convex.size();i++)
 		{
-			Vector4d norm = offset3D_normal(ps->vertices, ps->indices[faces_convex[i]]);
+			Vector4d norm = calcTriangleNormal(ps->vertices, ps->indices[faces_convex[i]]);
 //			printf("r norm is %g/%g/%g/%g\n",norm[0], norm[1],norm[2], norm[3]);
 			faces_normals.push_back(norm);
 			unsigned int j;
@@ -1400,7 +1403,7 @@ std::vector<Vector3d> offset3D_offset(std::vector<Vector3d> vertices, std::vecto
 				std::vector<IndexedFace> input;
 				input.push_back(indices[keile[i].ind2]);
 				input.push_back(indices[keile[i].ind1]);
-				output = stl_tricombine(input);
+				output = mergeTrianglesSub(input);
 			}
 			if(output.size() == 1) {
 				printf("Successful merge #1 %d -> %d\n",keile[i].ind1, keile[i].ind2);
@@ -1412,7 +1415,7 @@ std::vector<Vector3d> offset3D_offset(std::vector<Vector3d> vertices, std::vecto
 				std::vector<IndexedFace> input;
 				input.push_back(indices[keile[i].ind3]);
 				input.push_back(indices[keile[i].ind1]);
-				output = stl_tricombine(input);
+				output = mergeTrianglesSub(input);
 			}
 			if(output.size() == 1) {
 				printf("Successful merge #2 %d -> %d\n",keile[i].ind1, keile[i].ind3);
@@ -1525,12 +1528,12 @@ std::shared_ptr<const Geometry> offset3D_convex(const std::shared_ptr<const Poly
       std::vector<IndexedFace> indicesNew = offset3D_removeOverPoints(ps->vertices, ps->indices,0);
 
       printf("Calc Normals\n");
-      std::vector<Vector4d>  faceNormal=offset3D_normals(ps->vertices, indicesNew);
+      std::vector<Vector4d>  faceNormal=calcTriangleNormals(ps->vertices, indicesNew);
 
       printf("Merge Triangles %ld %ld\n",indicesNew.size(), faceNormal.size());
       std::vector<Vector4d> newNormals;
       std::vector<int> faceParents;
-      indicesNew  = mergetriangles(indicesNew,faceNormal,newNormals, faceParents, ps->vertices );
+      indicesNew  = mergeTriangles(indicesNew,faceNormal,newNormals, faceParents, ps->vertices );
 
       printf("Remove Colinear Points\n");
       offset3D_RemoveColinear(ps->vertices, indicesNew,pointToFaceInds, pointToFacePos);
@@ -1567,11 +1570,11 @@ std::shared_ptr<const Geometry> offset3D_convex(const std::shared_ptr<const Poly
       indices = indicesNew;
 
       printf("Normals OP\n");
-      normals = offset3D_normals(vertices, indices);
+      normals = calcTriangleNormals(vertices, indices);
 
       printf("Merge OP\n");
       std::vector<int> faceParents;
-      indicesNew  = mergetriangles(indices,normals,newNormals, faceParents, vertices ); 
+      indicesNew  = mergeTriangles(indices,normals,newNormals, faceParents, vertices ); 
       normals = newNormals;									   
       indices = indicesNew;									       
 
