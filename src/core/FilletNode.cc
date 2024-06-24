@@ -45,43 +45,11 @@
 #include <hash.h>
 #include <PolySetUtils.h>
 
-class EdgeKey
-{
-  public:
-  int ind1, ind2 ;
-  int operator==(const EdgeKey ref)
-  {
-    if(this->ind1 == ref.ind1 && this->ind2 == ref.ind2) return 1;
-    return 0;
-  }
-};
-
-struct EdgeVal {
-  int sel;
-  int facea, posa;  // face a with edge ind1 -> ind2, posa = index of ind1 within facea
-  int faceb, posb;  // face b with edge ind2 -> ind1, posb = index of ind2 within faceb
-  IndexedFace bez1;
-  IndexedFace bez2;
-};
-
 struct SearchReplace {
   int pol;
   int search;
   IndexedFace replace;
 };
-
-unsigned int hash_value(const EdgeKey& r) {
-        unsigned int i;
-        i=r.ind1 |(r.ind2<<16) ;
-        return i;
-}
-
-int operator==(const EdgeKey &t1, const EdgeKey &t2) 
-{
-        if(t1.ind1 == t2.ind1 && t1.ind2 == t2.ind2) return 1;
-        return 0;
-}
-
 
 
 typedef std::vector<int> intList;
@@ -228,47 +196,8 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
     }	    
   }
 
-  EdgeKey edge;                                                    
   std::unordered_map<EdgeKey, EdgeVal, boost::hash<EdgeKey> > edge_db;
-  //
-  // Create EDGE DB
-  EdgeVal val;
-  val.sel=0;
-  val.facea=-1;
-  val.faceb=-1;
-  val.posa=-1;
-  val.posb=-1;
-  int ind1, ind2;
-  for(int i=0;i<merged.size();i++) {
-    int  n=merged[i].size();
-    for(int j=0;j<n;j++) {
-      ind1=merged[i][j];	    
-      ind2=merged[i][(j+1)%n];	    
-      if(ind2 > ind1){
-        edge.ind1=ind1;
-        edge.ind2=ind2;	
-	if(edge_db.count(edge) == 0) edge_db[edge]=val;
-	edge_db[edge].facea=i;
-	edge_db[edge].posa=j;
-      } else {
-        edge.ind1=ind2;
-        edge.ind2=ind1;	
-	if(edge_db.count(edge) == 0) edge_db[edge]=val;
-	edge_db[edge].faceb=i;
-	edge_db[edge].posb=j;
-      }
-    }    
-  }
- // check if edge_db is complete
-  
-  for(auto &e: edge_db) {
-    if(e.second.facea == -1 || e.second.faceb == -1 || e.second.posa == -1 || e.second.posb == -1 ) {
-      printf("Edge %d - %d faca %d faceb %d posa %d posb %d\n", e.second.facea, e.second.faceb, e.second.posa, e.second.posb);
-      printf("a %g/%g/%g\n", ps->vertices[e.first.ind1][0], ps->vertices[e.first.ind1][1], ps->vertices[e.first.ind1][2]);
-      printf("b %g/%g/%g\n", ps->vertices[e.first.ind2][0], ps->vertices[e.first.ind2][1], ps->vertices[e.first.ind2][2]);
-      exit(1);
-    }
-  }
+  edge_db= createEdgeDb(merged);
 
   std::vector<std::vector<int>> corner_rounds ; // which rounded edges in a corner
   for(int i=0;i<ps->vertices.size();i++) corner_rounds.push_back(empty);				  

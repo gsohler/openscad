@@ -237,7 +237,6 @@ std::unique_ptr<const Geometry> sphereCreateFuncGeometry(void *funcptr, double f
           if(step == 1) builder.appendPolygon({tri[0], tri[1], tri[2]});
 	  continue;
         }
-        // irgendwo loecher TODO
         if(splitind[2] == -1 && splitind[1] == -1 && splitind[0] != -1) { // 1
           tri_new.push_back(IndexedTriangle(tri[0], splitind[0], tri[2]));
           tri_new.push_back(IndexedTriangle(tri[2], splitind[0], tri[1]));
@@ -281,9 +280,96 @@ std::unique_ptr<const Geometry> sphereCreateFuncGeometry(void *funcptr, double f
   std::vector<Vector4d> normals, newnormals;
   std::vector<int> faceParents;
   normals = calcTriangleNormals(ps->vertices, ps->indices);
-  std::vector<IndexedFace> indices_merged = mergeTriangles(ps->indices, normals,newnormals, faceParents, ps->vertices);
-  // TODO faces zusammenfassen
-  printf("%d triangles\n",indices_merged.size());
+  ps->indices = mergeTriangles(ps->indices, normals,newnormals, faceParents, ps->vertices);
+//  ps->indices = indices_merged;
+  std::unordered_map<EdgeKey, EdgeVal, boost::hash<EdgeKey> > edge_db=createEdgeDb(ps->indices);
+  printf("%d triangles\n",ps->indices.size());
+  std::vector<int> faces_delete;
+  for( int i1=0;i1<ps->indices.size();i1++) {
+
+    if(ps->indices[i1].size() != 3) continue;
+    EdgeKey key;
+    // TODO check if small
+    if ( std::find(faces_delete.begin(), faces_delete.end(), i1) != faces_delete.end() ) continue;
+
+    int smallind1=-1;
+    std::vector<int> small_polygon1;	    
+    std::vector<int> big_polygon1;	    
+    int imid0=-1;
+    int imid1=-1;
+    for(int j=0;j<3;j++) {	 
+     // 2 von 3 kanten muessen grosse nachbarn haben	    
+      int ind1=ps->indices[i1][j];
+      int ind2=ps->indices[i1][(j+1)%3];
+      key.ind1=ind1<ind2?ind1:ind2;
+      key.ind2=ind1+ind2-key.ind1;
+      EdgeVal value=edge_db[key];
+      if(value.facea != i1) {
+        if(ps->indices[value.facea].size() > 30) big_polygon1.push_back(value.facea);
+          else {small_polygon1.push_back(value.facea); smallind1=j;imid0 = ind1; imid1 = ind2; }
+      }
+      if(value.faceb != i1) {
+        if(ps->indices[value.faceb].size() > 30) big_polygon1.push_back(value.faceb);
+	  else {small_polygon1.push_back(value.faceb); smallind1=j;imid0 = ind1; imid1 = ind2; }
+      }
+    }
+    if(big_polygon1.size() != 2) continue;
+    if(small_polygon1.size() != 1)  continue;
+ //   Vector3d norm1a=calcTriangleNormal(ps->vertices,indices_merged[big_polygon1[0]]).head<3>();
+ //   Vector3d norm1b=calcTriangleNormal(ps->vertices,indices_merged[big_polygon1[1]]).head<3>();
+ //   Vector3d dir1=norm1a.cross(norm1b).normalized();
+ //   if(smallind1 == 1) dir1=-dir1;
+
+    int i2=small_polygon1[0];
+    // TODO check if small
+    if ( std::find(faces_delete.begin(), faces_delete.end(), i1) != faces_delete.end() ) continue;
+    int smallind2=-1;
+    std::vector<int> small_polygon2;	    
+    std::vector<int> big_polygon2;	    
+    for(int j=0;j<3;j++) {	 
+      int ind1=ps->indices[i2][j];
+      int ind2=ps->indices[i2][(j+1)%3];
+      key.ind1=ind1<ind2?ind1:ind2;
+      key.ind2=ind1+ind2-key.ind1;
+      EdgeVal value=edge_db[key];
+      if(value.facea != i2) {
+        if(ps->indices[value.facea].size() > 30) big_polygon2.push_back(value.facea);
+          else {small_polygon2.push_back(value.facea); smallind2=j; }
+      }
+      if(value.faceb != i2) {
+        if(ps->indices[value.faceb].size() > 30) big_polygon2.push_back(value.faceb);
+	  else { small_polygon2.push_back(value.faceb); smallind2=j; }
+      }
+    }
+    if(big_polygon2.size() != 2) continue;
+    if(small_polygon2.size() != 1)  continue;
+    if(small_polygon2[0] != i1) continue;
+
+//    Vector3d norm2a=calcTriangleNormal(ps->vertices,ps->indices[big_polygon2[0]]).head<3>();
+//    Vector3d norm2b=calcTriangleNormal(ps->vertices,ps->indices[big_polygon2[1]]).head<3>();
+//    Vector3d dir2=norm2a.cross(norm2b).normalized();
+//    if(smallind2 == 1) dir2=-dir2;
+    int pt1=ps->indices[i1][(smallind1+2)%3];
+    int pt2=ps->indices[i2][(smallind2+2)%3];
+
+    Vector3d pmid=(ps->vertices[pt1]+ps->vertices[pt2])/2.0;
+    // customfunc TODO
+
+    int imid = ps->vertices.size();
+    ps->vertices.push_back(pmid);
+    { IndexedFace tmp; tmp.push_back(pt1); tmp.push_back(imid0); tmp.push_back(imid); ps->indices.push_back(tmp); }
+    { IndexedFace tmp; tmp.push_back(pt1); tmp.push_back(imid); tmp.push_back(imid1); ps->indices.push_back(tmp); }
+    { IndexedFace tmp; tmp.push_back(pt2); tmp.push_back(imid1); tmp.push_back(imid); ps->indices.push_back(tmp); }
+    { IndexedFace tmp; tmp.push_back(pt2); tmp.push_back(imid); tmp.push_back(imid0); ps->indices.push_back(tmp); }
+    faces_delete.push_back(i1);
+    faces_delete.push_back(i2);
+  }
+  std::sort(faces_delete.begin(), faces_delete.end());
+  for(int i=faces_delete.size()-1;i >= 0; i--) ps->indices.erase(ps->indices.begin()+faces_delete[i]);
+  printf("triangles left %d\n",ps->indices.size());
+  normals = calcTriangleNormals(ps->vertices, ps->indices);
+  ps->indices = mergeTriangles(ps->indices, normals,newnormals, faceParents, ps->vertices);
+  printf("triangles left %d\n",ps->indices.size());
   return ps; 
 }
 

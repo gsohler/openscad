@@ -172,6 +172,55 @@ bool pointInPolygon(const std::vector<Vector3d> &vert, const IndexedFace &bnd, i
 	return (cuts&1)?true:false;
 }
 
+unsigned int hash_value(const EdgeKey& r) {
+        unsigned int i;
+        i=r.ind1 |(r.ind2<<16) ;
+        return i;
+}
+
+int operator==(const EdgeKey &t1, const EdgeKey &t2) 
+{
+        if(t1.ind1 == t2.ind1 && t1.ind2 == t2.ind2) return 1;
+        return 0;
+}
+
+
+std::unordered_map<EdgeKey, EdgeVal, boost::hash<EdgeKey> > createEdgeDb(const std::vector<IndexedFace> &indices)
+{
+  std::unordered_map<EdgeKey, EdgeVal, boost::hash<EdgeKey> > edge_db;
+  EdgeKey edge;                                                    
+  //
+  // Create EDGE DB
+  EdgeVal val;
+  val.sel=0;
+  val.facea=-1;
+  val.faceb=-1;
+  val.posa=-1;
+  val.posb=-1;
+  int ind1, ind2;
+  for(int i=0;i<indices.size();i++) {
+    int  n=indices[i].size();
+    for(int j=0;j<n;j++) {
+      ind1=indices[i][j];	    
+      ind2=indices[i][(j+1)%n];	    
+      if(ind2 > ind1){
+        edge.ind1=ind1;
+        edge.ind2=ind2;	
+	if(edge_db.count(edge) == 0) edge_db[edge]=val;
+	edge_db[edge].facea=i;
+	edge_db[edge].posa=j;
+      } else {
+        edge.ind1=ind2;
+        edge.ind2=ind1;	
+	if(edge_db.count(edge) == 0) edge_db[edge]=val;
+	edge_db[edge].faceb=i;
+	edge_db[edge].posb=j;
+      }
+    }    
+  }
+  return edge_db;
+}
+	
 bool GeometryEvaluator::isValidDim(const Geometry::GeometryItem& item, unsigned int& dim) const {
   if (!item.first->modinst->isBackground() && item.second) {
     if (!dim) dim = item.second->getDimension();

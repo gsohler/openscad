@@ -15,6 +15,29 @@ class CGAL_Nef_polyhedron;
 class Polygon2d;
 class Tree;
 
+class EdgeKey
+{
+  public:
+  int ind1, ind2 ;
+  int operator==(const EdgeKey ref)
+  {
+    if(this->ind1 == ref.ind1 && this->ind2 == ref.ind2) return 1;
+    return 0;
+  }
+};
+
+unsigned int hash_value(const EdgeKey& r);
+int operator==(const EdgeKey &t1, const EdgeKey &t2);
+
+struct EdgeVal {
+  int sel;
+  int facea, posa;  // face a with edge ind1 -> ind2, posa = index of ind1 within facea
+  int faceb, posb;  // face b with edge ind2 -> ind1, posb = index of ind2 within faceb
+  IndexedFace bez1;
+  IndexedFace bez2;
+};
+
+
 int linsystem( Vector3d v1,Vector3d v2,Vector3d v3,Vector3d pt,Vector3d &res,double *detptr=NULL);
 int cut_face_face_face(Vector3d p1, Vector3d n1, Vector3d p2,Vector3d n2, Vector3d p3, Vector3d n3, Vector3d &res,double *detptr=NULL);
 int cut_face_line(Vector3d fp, Vector3d fn, Vector3d lp, Vector3d ld, Vector3d &res, double *detptr=NULL);
@@ -22,6 +45,7 @@ bool pointInPolygon(const std::vector<Vector3d> &vert, const IndexedFace &bnd, i
 Vector4d calcTriangleNormal(const std::vector<Vector3d> &vertices,const IndexedFace &pol);
 std::vector<Vector4d> calcTriangleNormals(const std::vector<Vector3d> &vertices, const std::vector<IndexedFace> &indices);
 std::vector<IndexedFace> mergeTriangles(const std::vector<IndexedFace> polygons,const std::vector<Vector4d> normals,std::vector<Vector4d> &newNormals, std::vector<int> &faceParents, const std::vector<Vector3d> &vert);
+std::unordered_map<EdgeKey, EdgeVal, boost::hash<EdgeKey> > createEdgeDb(const std::vector<IndexedFace> &indices);
 
 // This evaluates a node tree into concrete geometry usign an underlying geometry engine
 // FIXME: Ideally, each engine should implement its own subtype. Instead we currently have
