@@ -123,7 +123,7 @@ PyObject *python_cube(PyObject *self, PyObject *args, PyObject *kwargs)
   return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
 }
 
-int sphereCalcInd(PolySetBuilder &builder, std::vector<Vector3d> &vertices, PyObject *func, Vector3d dir)
+Vector3d sphereCalcIndInt(PyObject *func, Vector3d dir)
 {
   dir.normalize();
   PyObject *dir_p= PyList_New(3);
@@ -132,8 +132,17 @@ int sphereCalcInd(PolySetBuilder &builder, std::vector<Vector3d> &vertices, PyOb
   PyObject* args = PyTuple_Pack(1,dir_p);
   PyObject* len_p = PyObject_CallObject(func, args);
   double len=0;
+  if(len_p == nullptr) {
+	  printf("Null\n");
+	  return dir;
+  }
   python_numberval(len_p, &len);
-  dir *= len;
+  return dir * len;
+}
+
+int sphereCalcInd(PolySetBuilder &builder, std::vector<Vector3d> &vertices, PyObject *func, Vector3d dir)
+{
+  dir = sphereCalcIndInt(func, dir);	
   int ind=builder.vertexIndex(dir);
   if(ind == vertices.size()) vertices.push_back(dir);
   return ind;
@@ -276,14 +285,12 @@ std::unique_ptr<const Geometry> sphereCreateFuncGeometry(void *funcptr, double f
     }  
   }
   auto ps = builder.build();
-  printf("%d triangles\n",ps->indices.size());
   std::vector<Vector4d> normals, newnormals;
   std::vector<int> faceParents;
   normals = calcTriangleNormals(ps->vertices, ps->indices);
   ps->indices = mergeTriangles(ps->indices, normals,newnormals, faceParents, ps->vertices);
-//  ps->indices = indices_merged;
+#if 0  
   std::unordered_map<EdgeKey, EdgeVal, boost::hash<EdgeKey> > edge_db=createEdgeDb(ps->indices);
-  printf("%d triangles\n",ps->indices.size());
   std::vector<int> faces_delete;
   for( int i1=0;i1<ps->indices.size();i1++) {
 
@@ -315,10 +322,6 @@ std::unique_ptr<const Geometry> sphereCreateFuncGeometry(void *funcptr, double f
     }
     if(big_polygon1.size() != 2) continue;
     if(small_polygon1.size() != 1)  continue;
- //   Vector3d norm1a=calcTriangleNormal(ps->vertices,indices_merged[big_polygon1[0]]).head<3>();
- //   Vector3d norm1b=calcTriangleNormal(ps->vertices,indices_merged[big_polygon1[1]]).head<3>();
- //   Vector3d dir1=norm1a.cross(norm1b).normalized();
- //   if(smallind1 == 1) dir1=-dir1;
 
     int i2=small_polygon1[0];
     // TODO check if small
@@ -353,7 +356,7 @@ std::unique_ptr<const Geometry> sphereCreateFuncGeometry(void *funcptr, double f
     int pt2=ps->indices[i2][(smallind2+2)%3];
 
     Vector3d pmid=(ps->vertices[pt1]+ps->vertices[pt2])/2.0;
-    // customfunc TODO
+    pmid =  sphereCalcIndInt(func, pmid);	
 
     int imid = ps->vertices.size();
     ps->vertices.push_back(pmid);
@@ -370,6 +373,7 @@ std::unique_ptr<const Geometry> sphereCreateFuncGeometry(void *funcptr, double f
   normals = calcTriangleNormals(ps->vertices, ps->indices);
   ps->indices = mergeTriangles(ps->indices, normals,newnormals, faceParents, ps->vertices);
   printf("triangles left %d\n",ps->indices.size());
+#endif  
   return ps; 
 }
 
