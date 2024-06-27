@@ -1746,7 +1746,6 @@ GeometryEvaluator::ResultObject GeometryEvaluator::applyToChildren3D(const Abstr
   case OpenSCADOperator::UNION:
   {
 
-    printf("union\n");
     const CsgOpNode *csgOpNode = dynamic_cast<const CsgOpNode *>(&node);
     Geometry::Geometries actualchildren;
     for (const auto& item : children) {

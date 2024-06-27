@@ -146,6 +146,7 @@ std::string SHA256HashString(std::string aString){
 #include "CGALRenderer.h"
 #include "LegacyCGALRenderer.h"
 #include "CGALWorker.h"
+#include "CSGWorker.h"
 
 #ifdef ENABLE_CGAL
 #include "cgal.h"
@@ -335,6 +336,10 @@ MainWindow::MainWindow(const QStringList& filenames)
   root_file = nullptr;
   parsed_file = nullptr;
   absolute_root_node = nullptr;
+
+  this->csgworker = new CSGWorker(this);
+  connect(this->csgworker, SIGNAL(done(void)),
+          this, SLOT(compileCSGDone(void)));
 
   // Open Recent
   for (auto& recent : this->actionRecentFile) {
@@ -1326,10 +1331,17 @@ void MainWindow::compileCSG()
     // Main CSG evaluation
     this->progresswidget = new ProgressWidget(this);
     connect(this->progresswidget, SIGNAL(requestShow()), this, SLOT(showProgress()));
+  } catch (const HardWarningException&) {
+    exceptionCleanup();
+  }
+  csgworker->start();
+}
 
+void MainWindow::compileCSGThread(void)
+{
     GeometryEvaluator geomevaluator(this->tree);
 #ifdef ENABLE_OPENCSG
-    CSGTreeEvaluator csgrenderer(this->tree, &geomevaluator);
+    this->csgrenderer = new CSGTreeEvaluator(this->tree, &geomevaluator);
 #endif
 
     if (!isClosing) progress_report_prep(this->root_node, report_func, this);
@@ -1337,7 +1349,7 @@ void MainWindow::compileCSG()
     try {
 #ifdef ENABLE_OPENCSG
       this->processEvents();
-      this->csgRoot = csgrenderer.buildCSGTree(*root_node);
+      this->csgRoot = this->csgrenderer->buildCSGTree(*root_node);
 #endif
       renderStatistic.printCacheStatistic();
       this->processEvents();
@@ -1346,6 +1358,10 @@ void MainWindow::compileCSG()
     } catch (const HardWarningException&) {
       LOG("CSG generation cancelled due to hardwarning being enabled.");
     }
+}
+void MainWindow::compileCSGDone()
+{
+  try{
     progress_report_fin();
     updateStatusBar(nullptr);
 
@@ -1367,7 +1383,7 @@ void MainWindow::compileCSG()
       }
     }
 
-    const std::vector<std::shared_ptr<CSGNode>>& highlight_terms = csgrenderer.getHighlightNodes();
+    const std::vector<std::shared_ptr<CSGNode>>& highlight_terms = this->csgrenderer->getHighlightNodes();
     if (highlight_terms.size() > 0) {
       LOG("Compiling highlights (%1$d CSG Trees)...", highlight_terms.size());
       this->processEvents();
@@ -1382,8 +1398,7 @@ void MainWindow::compileCSG()
     } else {
       this->highlights_products.reset();
     }
-
-    const auto& background_terms = csgrenderer.getBackgroundNodes();
+    const auto& background_terms = this->csgrenderer->getBackgroundNodes();
     if (background_terms.size() > 0) {
       LOG("Compiling background (%1$d CSG Trees)...", background_terms.size());
       this->processEvents();
@@ -1435,6 +1450,8 @@ void MainWindow::compileCSG()
   } catch (const HardWarningException&) {
     exceptionCleanup();
   }
+  delete this->csgrenderer ;
+  csgRenderFinished();
 }
 
 void MainWindow::actionOpen()
@@ -2066,17 +2083,6 @@ void MainWindow::csgReloadRender()
 {
   if (this->root_node) compileCSG();
 
-  // Go to non-CGAL view mode
-  if (viewActionThrownTogether->isChecked()) {
-    viewModeThrownTogether();
-  } else {
-#ifdef ENABLE_OPENCSG
-    viewModePreview();
-#else
-    viewModeThrownTogether();
-#endif
-  }
-  compileEnded();
 }
 
 void MainWindow::prepareCompile(const char *afterCompileSlot, bool procevents, bool preview)
@@ -2116,7 +2122,10 @@ void MainWindow::actionRenderPreview()
 void MainWindow::csgRender()
 {
   if (this->root_node) compileCSG();
+}
 
+void MainWindow::csgRenderFinished()
+{
   // Go to non-CGAL view mode
   if (viewActionThrownTogether->isChecked()) {
     viewModeThrownTogether();
