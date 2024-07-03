@@ -225,6 +225,8 @@ std::unique_ptr<const Geometry> sphereCreateFuncGeometry(void *funcptr, double f
           SphereEdgeDb e(tri[i], tri[(i+1)%3]);
           splitind[i] = edges.count(e) > 0?edges[e]:-1;
           dist[i]=(vertices[tri[i]]-vertices[tri[(i+1)%3]]).norm();
+	// TODO also split if the faces of the edge are too bent
+	//
         }
   
         double mindist=dist[0], maxdist=dist[0];
@@ -236,13 +238,13 @@ std::unique_ptr<const Geometry> sphereCreateFuncGeometry(void *funcptr, double f
           if(maxdist/mindist < 1.41) {
     	  for(int i=0;i<3;i++)
               splitind[i]=sphereCalcSplitInd(builder, vertices, edges, func, tri[i], tri[(i+1)%3]);
-  	} else {
-  	  double middist=sqrt(maxdist* mindist);
-  	  for(int i=0;i<3;i++)
-            if(dist[i] > middist) splitind[i]=sphereCalcSplitInd(builder, vertices, edges, func, tri[i], tri[(i+1)%3]);
-  	}
+  	  } else {
+  	    double middist=sqrt(maxdist* mindist);
+  	    for(int i=0;i<3;i++)
+              if(dist[i] > middist) splitind[i]=sphereCalcSplitInd(builder, vertices, edges, func, tri[i], tri[(i+1)%3]);
+  	  }
         }
-        if(splitind[2] == -1 && splitind[1] == -1 && splitind[0] == -1 ) { // 0
+        if(splitind[2] == -1 && splitind[1] == -1 && splitind[0] == -1) { //   || round > 2) { // 0
           if(step == 1) builder.appendPolygon({tri[0], tri[1], tri[2]});
 	  continue;
         }
@@ -285,13 +287,109 @@ std::unique_ptr<const Geometry> sphereCreateFuncGeometry(void *funcptr, double f
     }  
   }
   auto ps = builder.build();
+//#if 0  
+
   std::vector<Vector4d> normals, newnormals;
   std::vector<int> faceParents;
   normals = calcTriangleNormals(ps->vertices, ps->indices);
-  ps->indices = mergeTriangles(ps->indices, normals,newnormals, faceParents, ps->vertices);
-#if 0  
+//  ps->indices = mergeTriangles(ps->indices, normals,newnormals, faceParents, ps->vertices);
   std::unordered_map<EdgeKey, EdgeVal, boost::hash<EdgeKey> > edge_db=createEdgeDb(ps->indices);
+
+  std::unordered_set<EdgeKey,boost::hash<EdgeKey> > edge_todo;
+  for(auto kv : edge_db) {
+    edge_todo.insert(kv.first);	  
+  }
   std::vector<int> faces_delete;
+  while(edge_todo.size() > 0)
+  {
+    std::unordered_set<EdgeKey,boost::hash<EdgeKey> > edge_new;
+    for(auto edge: edge_todo) {
+      Vector3d p1=ps->vertices[edge.ind1];
+      Vector3d p2=ps->vertices[edge.ind2];
+      double dist=(p1-p2).norm();
+      if(dist < 0.5) continue; // TODO
+      EdgeVal val=edge_db[edge];			       
+      if(val.facea == -1) { printf("Error 1 %d %d\n",edge.ind1, edge.ind2); }
+      if(val.faceb == -1) { printf("Error 2\n"); }
+      Vector3d norm1=calcTriangleNormal(ps->vertices,ps->indices[val.facea]).head<3>();
+      Vector3d norm2=calcTriangleNormal(ps->vertices,ps->indices[val.faceb]).head<3>();
+      if(norm1.dot(norm2) > 0.99) continue; // 8 deg
+					    
+      // create new pt
+      Vector3d pmid =(p1+p2)/2.0;
+      pmid =  sphereCalcIndInt(func, pmid);	
+      int imid = ps->vertices.size();
+      ps->vertices.push_back(pmid);
+
+      // get 4 outer pts and 4 outer edges
+      int ind1f = ps->indices[val.facea][(val.posa+1)%3];
+      int ind2f = ps->indices[val.faceb][(val.posb+1)%3];
+		
+      // create 4 new faces
+      int newfaceind=ps->indices.size();
+      { IndexedFace tmp; tmp.push_back(edge.ind1); tmp.push_back(ind1f); tmp.push_back(imid); ps->indices.push_back(tmp); }
+      { IndexedFace tmp; tmp.push_back(imid); tmp.push_back(ind1f); tmp.push_back(edge.ind2); ps->indices.push_back(tmp); }
+      { IndexedFace tmp; tmp.push_back(edge.ind2); tmp.push_back(ind2f); tmp.push_back(imid); ps->indices.push_back(tmp); }
+      { IndexedFace tmp; tmp.push_back(imid); tmp.push_back(ind2f); tmp.push_back(edge.ind1); ps->indices.push_back(tmp); }
+
+      // relink 4 edgeVals
+      EdgeKey ek1(edge.ind1,ind1f);
+      EdgeVal &ev1=edge_db[ek1];
+      if(ev1.facea == val.facea) { ev1.facea=newfaceind+0; ev1.posa=0; }
+      if(ev1.faceb == val.facea) { ev1.faceb=newfaceind+0; ev1.posb=0; }
+
+      EdgeKey ek2(edge.ind2,ind1f);
+      EdgeVal &ev2=edge_db[ek2];
+      if(ev2.facea == val.facea) { ev2.facea=newfaceind+1; ev2.posa=1; }
+      if(ev2.faceb == val.facea) { ev2.faceb=newfaceind+1; ev2.posb=1; }
+
+      EdgeKey ek3(edge.ind2,ind2f);
+      EdgeVal &ev3=edge_db[ek3];
+      if(ev3.facea == val.faceb) { ev3.facea=newfaceind+2; ev3.posa=0; }
+      if(ev3.faceb == val.faceb) { ev3.faceb=newfaceind+2; ev3.posb=0; }
+
+      EdgeKey ek4(edge.ind1,ind2f);
+      EdgeVal &ev4=edge_db[ek4];
+      if(ev4.facea == val.faceb) { ev4.facea=newfaceind+3; ev2.posa=1; }
+      if(ev4.faceb == val.faceb) { ev4.faceb=newfaceind+3; ev2.posb=1; }
+
+      // create - relation
+      EdgeVal eval;
+      EdgeKey ekm1(ind1f,imid);
+      eval.facea=newfaceind+0; eval.posa=1; eval.faceb=newfaceind+1; eval.posb=0;
+      edge_db[ekm1]=eval;
+
+      EdgeKey ekm2(ind2f,imid);
+      eval.facea=newfaceind+2; eval.posa=1; eval.faceb=newfaceind+3; eval.posb=0;
+      edge_db[ekm1]=eval;
+
+      // ceate | relation
+      EdgeKey ekp1(imid,edge.ind1);
+      eval.facea=newfaceind+0; eval.posa=2; eval.faceb=newfaceind+3; eval.posb=2;
+      edge_db[ekp1]=eval;
+
+      EdgeKey ekp2(imid,edge.ind2);
+      eval.facea=newfaceind+2; eval.posa=2; eval.faceb=newfaceind+1; eval.posb=1;
+      edge_db[ekp2]=eval;
+
+      // delete 2 faces
+      faces_delete.push_back(val.facea);
+      faces_delete.push_back(val.faceb);
+      edge_new.insert(ekm1);
+      edge_new.insert(ekm2);
+      edge_new.insert(ekp1);
+      edge_new.insert(ekp2);
+      // edge i1-i2 loeschen ? nein, sie ist einfach nicht neu
+      // TODO 4 aussenkanten auch 
+      edge_todo.clear();
+      break;
+    }
+    edge_todo = edge_new;
+  }
+  std::sort(faces_delete.begin(), faces_delete.end());
+  for(int i=faces_delete.size()-1;i >= 0; i--) ps->indices.erase(ps->indices.begin()+faces_delete[i]);
+  // split edgesuntil they are small enough or faces have no big angle
+#if 0  
   for( int i1=0;i1<ps->indices.size();i1++) {
 
     if(ps->indices[i1].size() != 3) continue;
@@ -360,7 +458,7 @@ std::unique_ptr<const Geometry> sphereCreateFuncGeometry(void *funcptr, double f
 
     int imid = ps->vertices.size();
     ps->vertices.push_back(pmid);
-    { IndexedFace tmp; tmp.push_back(pt1); tmp.push_back(imid0); tmp.push_back(imid); ps->indices.push_back(tmp); }
+    yy{ IndexedFace tmp; tmp.push_back(pt1); tmp.push_back(imid0); tmp.push_back(imid); ps->indices.push_back(tmp); }
     { IndexedFace tmp; tmp.push_back(pt1); tmp.push_back(imid); tmp.push_back(imid1); ps->indices.push_back(tmp); }
     { IndexedFace tmp; tmp.push_back(pt2); tmp.push_back(imid1); tmp.push_back(imid); ps->indices.push_back(tmp); }
     { IndexedFace tmp; tmp.push_back(pt2); tmp.push_back(imid); tmp.push_back(imid0); ps->indices.push_back(tmp); }
@@ -374,6 +472,7 @@ std::unique_ptr<const Geometry> sphereCreateFuncGeometry(void *funcptr, double f
   ps->indices = mergeTriangles(ps->indices, normals,newnormals, faceParents, ps->vertices);
   printf("triangles left %d\n",ps->indices.size());
 #endif  
+//#endif  
   return ps; 
 }
 

@@ -18,6 +18,8 @@ class Tree;
 class EdgeKey
 {
   public:
+  EdgeKey(){ this->ind1=-1; this->ind2=-1; }
+  EdgeKey(int i1, int i2);	  
   int ind1, ind2 ;
   int operator==(const EdgeKey ref)
   {

@@ -177,6 +177,10 @@ unsigned int hash_value(const EdgeKey& r) {
         i=r.ind1 |(r.ind2<<16) ;
         return i;
 }
+EdgeKey::EdgeKey(int i1, int i2) {
+  this->ind1=i1>i2?i1:i2;
+  this->ind2=i1+i2-this->ind1;  
+}
 
 int operator==(const EdgeKey &t1, const EdgeKey &t2) 
 {
@@ -203,6 +207,7 @@ std::unordered_map<EdgeKey, EdgeVal, boost::hash<EdgeKey> > createEdgeDb(const s
     for(int j=0;j<n;j++) {
       ind1=indices[i][j];	    
       ind2=indices[i][(j+1)%n];	    
+      printf("e %d %d\n",ind1, ind2);
       if(ind2 > ind1){
         edge.ind1=ind1;
         edge.ind2=ind2;	
