@@ -189,6 +189,7 @@ int sphereCalcSplitInd(PolySetBuilder &builder, std::vector<Vector3d> &vertices,
 
 std::unique_ptr<const Geometry> sphereCreateFuncGeometry(void *funcptr, double fs)
 {
+	printf("crerate sphere\n");
   PyObject *func = (PyObject *) funcptr;
   std::unordered_map<SphereEdgeDb, int, boost::hash<SphereEdgeDb> > edges;
 
@@ -196,159 +197,180 @@ std::unique_ptr<const Geometry> sphereCreateFuncGeometry(void *funcptr, double f
   std::vector<Vector3d> vertices;
 
   int topind, botind, leftind, rightind, frontind, backind;
-  std::vector<IndexedTriangle> tri_todo;
   leftind=sphereCalcInd(builder, vertices, func, Vector3d(-1,0,0));
   rightind=sphereCalcInd(builder, vertices, func, Vector3d(1,0,0));
   frontind=sphereCalcInd(builder, vertices, func, Vector3d(0,-1,0));
   backind=sphereCalcInd(builder, vertices, func, Vector3d(0,1,0));
   botind=sphereCalcInd(builder, vertices, func, Vector3d(0,0,-1));
   topind=sphereCalcInd(builder, vertices, func, Vector3d(0,0,1));
-  for(int step=0;step<2;step++) {
 
-    tri_todo.push_back(IndexedTriangle(leftind, frontind, topind));
-    tri_todo.push_back(IndexedTriangle(frontind, rightind, topind));
-    tri_todo.push_back(IndexedTriangle(rightind, backind, topind));
-    tri_todo.push_back(IndexedTriangle(backind, leftind, topind));
-    tri_todo.push_back(IndexedTriangle(leftind, botind, frontind));
-    tri_todo.push_back(IndexedTriangle(frontind, botind, rightind));
-    tri_todo.push_back(IndexedTriangle(rightind, botind, backind));
-    tri_todo.push_back(IndexedTriangle(backind, botind, leftind));
+  std::vector<IndexedTriangle> triangles;
+  std::vector<IndexedTriangle> tri_new;
+  tri_new.push_back(IndexedTriangle(leftind, frontind, topind));
+  tri_new.push_back(IndexedTriangle(frontind, rightind, topind));
+  tri_new.push_back(IndexedTriangle(rightind, backind, topind));
+  tri_new.push_back(IndexedTriangle(backind, leftind, topind));
+  tri_new.push_back(IndexedTriangle(leftind, botind, frontind));
+  tri_new.push_back(IndexedTriangle(frontind, botind, rightind));
+  tri_new.push_back(IndexedTriangle(rightind, botind, backind));
+  tri_new.push_back(IndexedTriangle(backind, botind, leftind));
 
-    int round=0;
-    while(tri_todo.size() > 0) {
-      std::vector<IndexedTriangle> tri_new;
-      for(const IndexedTriangle & tri: tri_todo) {
-          double dist[3];
-        int splitind[3];
+  int round=0;
+  do {
+    triangles = tri_new;	  
+    tri_new.clear();
+    // convert triangles to edges and decide which to split
+    for(const IndexedTriangle & tri: triangles) {
+      double dist[3];
+      for(int i=0;i<3;i++) 
+        dist[i]=(vertices[tri[i]]-vertices[tri[(i+1)%3]]).norm();
 
-        for(int i=0;i<3;i++) {
-          SphereEdgeDb e(tri[i], tri[(i+1)%3]);
-          splitind[i] = edges.count(e) > 0?edges[e]:-1;
-          dist[i]=(vertices[tri[i]]-vertices[tri[(i+1)%3]]).norm();
-	// TODO also split if the faces of the edge are too bent
-	//
-        }
-  
-        double mindist=dist[0], maxdist=dist[0];
-        for(int i=1;i<3;i++) {
-              if(dist[i] < mindist) mindist=dist[i];
-            if(dist[i] > maxdist) maxdist=dist[i];
-        }
-        if(mindist > fs){
-          if(maxdist/mindist < 1.41) {
-    	  for(int i=0;i<3;i++)
-              splitind[i]=sphereCalcSplitInd(builder, vertices, edges, func, tri[i], tri[(i+1)%3]);
-  	  } else {
-  	    double middist=sqrt(maxdist* mindist);
-  	    for(int i=0;i<3;i++)
-              if(dist[i] > middist) splitind[i]=sphereCalcSplitInd(builder, vertices, edges, func, tri[i], tri[(i+1)%3]);
-  	  }
-        }
-        if(splitind[2] == -1 && splitind[1] == -1 && splitind[0] == -1) { //   || round > 2) { // 0
-          if(step == 1) builder.appendPolygon({tri[0], tri[1], tri[2]});
-	  continue;
-        }
-        if(splitind[2] == -1 && splitind[1] == -1 && splitind[0] != -1) { // 1
-          tri_new.push_back(IndexedTriangle(tri[0], splitind[0], tri[2]));
-          tri_new.push_back(IndexedTriangle(tri[2], splitind[0], tri[1]));
-        }
-        if(splitind[2] == -1 && splitind[1] != -1 && splitind[0] == -1) { // 2
-          tri_new.push_back(IndexedTriangle(tri[1], splitind[1], tri[0]));
-          tri_new.push_back(IndexedTriangle(tri[0], splitind[1], tri[2]));
-          }
-        if(splitind[2] == -1 && splitind[1] != -1 && splitind[0] != -1) { // 3
-          tri_new.push_back(IndexedTriangle(tri[0], splitind[0], tri[2]));
-          tri_new.push_back(IndexedTriangle(splitind[0], splitind[1],tri[2]));
-          tri_new.push_back(IndexedTriangle(splitind[0], tri[1],splitind[1]));
-        }
-        if(splitind[2] != -1 && splitind[1] == -1 && splitind[0] == -1) { // 4
-          tri_new.push_back(IndexedTriangle(tri[2], splitind[2], tri[1]));
-          tri_new.push_back(IndexedTriangle(tri[1], splitind[2], tri[0]));
-        }
-        if(splitind[2] != -1 && splitind[1] == -1 && splitind[0] != -1) { // 5
-          tri_new.push_back(IndexedTriangle(tri[0], splitind[0], splitind[2]));
-          tri_new.push_back(IndexedTriangle(splitind[0], tri[2], splitind[2]));
-          tri_new.push_back(IndexedTriangle(splitind[0], tri[1],tri[2]));
-        }
-        if(splitind[2] != -1 && splitind[1] != -1 && splitind[0] == -1) { // 6
-          tri_new.push_back(IndexedTriangle(tri[0], tri[1], splitind[2]));
-          tri_new.push_back(IndexedTriangle(tri[1], splitind[1], splitind[2]));
-          tri_new.push_back(IndexedTriangle(splitind[1], tri[2],splitind[2]));
-        }
-        if(splitind[2] != -1 && splitind[1] != -1 && splitind[0] != -1) { // 7
-          tri_new.push_back(IndexedTriangle(splitind[2], tri[0], splitind[0]));
-          tri_new.push_back(IndexedTriangle(splitind[0], tri[1], splitind[1]));
-          tri_new.push_back(IndexedTriangle(splitind[1], tri[2], splitind[2]));
-          tri_new.push_back(IndexedTriangle(splitind[0], splitind[1], splitind[2]));
-        }
+      double mindist=dist[0], maxdist=dist[0];
+      for(int i=1;i<3;i++) {
+        if(dist[i] < mindist) mindist=dist[i];
+        if(dist[i] > maxdist) maxdist=dist[i];
       }
-      tri_todo=tri_new;
-      round++;
+      if(mindist > fs){
+        if(maxdist/mindist < 1.41) {
+  	  for(int i=0;i<3;i++) // splt evenly
+            sphereCalcSplitInd(builder, vertices, edges, func, tri[i], tri[(i+1)%3]);
+        } else {
+  	  double middist=sqrt(maxdist* mindist);
+  	  for(int i=0;i<3;i++) // decide which triangles to split
+            if(dist[i] > middist) sphereCalcSplitInd(builder, vertices, edges, func, tri[i], tri[(i+1)%3]);
+  	}
+      }
+    }
+    // create new triangles from split edges    
+    for(const IndexedTriangle & tri: triangles) {
+
+      int splitind[3];	    
+      for(int i=0;i<3;i++) {
+        SphereEdgeDb e(tri[i], tri[(i+1)%3]);
+        splitind[i] = edges.count(e) > 0?edges[e]:-1;
+      }
+
+      int bucket= ((splitind[0]!= -1)?1:0) | ((splitind[1]!= -1)?2:0) | ((splitind[2]!= -1)?4:0) ;
+      switch(bucket) {
+          case 0:		
+            tri_new.push_back(IndexedTriangle(tri[0], tri[1], tri[2]));
+	    break;
+	  case 1:
+            tri_new.push_back(IndexedTriangle(tri[0], splitind[0], tri[2]));
+            tri_new.push_back(IndexedTriangle(tri[2], splitind[0], tri[1]));
+	    break;
+	  case 2:
+            tri_new.push_back(IndexedTriangle(tri[1], splitind[1], tri[0]));
+            tri_new.push_back(IndexedTriangle(tri[0], splitind[1], tri[2]));
+	    break;
+	  case 3:
+            tri_new.push_back(IndexedTriangle(tri[0], splitind[0], tri[2]));
+            tri_new.push_back(IndexedTriangle(splitind[0], splitind[1],tri[2]));
+            tri_new.push_back(IndexedTriangle(splitind[0], tri[1],splitind[1]));
+	    break;
+	  case 4:
+            tri_new.push_back(IndexedTriangle(tri[2], splitind[2], tri[1]));
+            tri_new.push_back(IndexedTriangle(tri[1], splitind[2], tri[0]));
+	    break;
+	  case 5:
+            tri_new.push_back(IndexedTriangle(tri[0], splitind[0], splitind[2]));
+            tri_new.push_back(IndexedTriangle(splitind[0], tri[2], splitind[2]));
+            tri_new.push_back(IndexedTriangle(splitind[0], tri[1],tri[2]));
+	    break;
+	  case 6:
+            tri_new.push_back(IndexedTriangle(tri[0], tri[1], splitind[2]));
+            tri_new.push_back(IndexedTriangle(tri[1], splitind[1], splitind[2]));
+            tri_new.push_back(IndexedTriangle(splitind[1], tri[2],splitind[2]));
+	    break;
+	  case 7:
+            tri_new.push_back(IndexedTriangle(splitind[2], tri[0], splitind[0]));
+            tri_new.push_back(IndexedTriangle(splitind[0], tri[1], splitind[1]));
+            tri_new.push_back(IndexedTriangle(splitind[1], tri[2], splitind[2]));
+            tri_new.push_back(IndexedTriangle(splitind[0], splitind[1], splitind[2]));
+	    break;
+      }
     }  
+     
+    round++;
+  }
+  while(tri_new.size() != triangles.size());
+  for(const IndexedTriangle & tri: triangles) {
+    builder.appendPolygon({tri[0], tri[1], tri[2]});
   }
   auto ps = builder.build();
-//#if 0  
 
+  // blumen-algorithmus
   std::vector<Vector4d> normals, newnormals;
   std::vector<int> faceParents;
   normals = calcTriangleNormals(ps->vertices, ps->indices);
 //  ps->indices = mergeTriangles(ps->indices, normals,newnormals, faceParents, ps->vertices);
-  std::unordered_map<EdgeKey, EdgeVal, boost::hash<EdgeKey> > edge_db=createEdgeDb(ps->indices);
-
+  std::unordered_map<EdgeKey, EdgeVal, boost::hash<EdgeKey> > edge_db;
   std::unordered_set<EdgeKey,boost::hash<EdgeKey> > edge_todo;
+  std::unordered_set<int> faces_delete_set;
+  round=0;
+
+  edge_db=createEdgeDb(ps->indices);
   for(auto kv : edge_db) {
     edge_todo.insert(kv.first);	  
   }
-  std::vector<int> faces_delete;
-  while(edge_todo.size() > 0)
+
+  while(edge_todo.size() > 0 && round < 5)
   {
+    std::unordered_set<EdgeKey,boost::hash<EdgeKey> > edge_blocked;
+//    printf("edge_todo is %d\n",edge_todo.size());	  
     std::unordered_set<EdgeKey,boost::hash<EdgeKey> > edge_new;
+    int num=0;
     for(auto edge: edge_todo) {
+      if(edge_blocked.count(edge) > 0) continue;	    
+      EdgeVal val=edge_db[edge];			       
       Vector3d p1=ps->vertices[edge.ind1];
       Vector3d p2=ps->vertices[edge.ind2];
       double dist=(p1-p2).norm();
       if(dist < 0.5) continue; // TODO
-      EdgeVal val=edge_db[edge];			       
-      if(val.facea == -1) { printf("Error 1 %d %d\n",edge.ind1, edge.ind2); }
-      if(val.faceb == -1) { printf("Error 2\n"); }
       Vector3d norm1=calcTriangleNormal(ps->vertices,ps->indices[val.facea]).head<3>();
       Vector3d norm2=calcTriangleNormal(ps->vertices,ps->indices[val.faceb]).head<3>();
-      if(norm1.dot(norm2) > 0.99) continue; // 8 deg
+      if(norm1.dot(norm2) > 0.999) continue; // 8 deg
 					    
-      // create new pt
+					    
       Vector3d pmid =(p1+p2)/2.0;
       pmid =  sphereCalcIndInt(func, pmid);	
       int imid = ps->vertices.size();
       ps->vertices.push_back(pmid);
 
       // get 4 outer pts and 4 outer edges
-      int ind1f = ps->indices[val.facea][(val.posa+1)%3];
-      int ind2f = ps->indices[val.faceb][(val.posb+1)%3];
+      int ind1f = ps->indices[val.facea][(val.posa+2)%3];
+      int ind2f = ps->indices[val.faceb][(val.posb+2)%3];
+//      printf("ind1=%d ind2=%d imid=%d ind1f=%d ind2f=%d \n",edge.ind1, edge.ind2, imid, ind1f, ind2f);
 		
       // create 4 new faces
       int newfaceind=ps->indices.size();
-      { IndexedFace tmp; tmp.push_back(edge.ind1); tmp.push_back(ind1f); tmp.push_back(imid); ps->indices.push_back(tmp); }
-      { IndexedFace tmp; tmp.push_back(imid); tmp.push_back(ind1f); tmp.push_back(edge.ind2); ps->indices.push_back(tmp); }
-      { IndexedFace tmp; tmp.push_back(edge.ind2); tmp.push_back(ind2f); tmp.push_back(imid); ps->indices.push_back(tmp); }
-      { IndexedFace tmp; tmp.push_back(imid); tmp.push_back(ind2f); tmp.push_back(edge.ind1); ps->indices.push_back(tmp); }
+      { IndexedFace tmp; tmp.push_back(ind1f); tmp.push_back(edge.ind1); tmp.push_back(imid); ps->indices.push_back(tmp); }
+      { IndexedFace tmp; tmp.push_back(imid); tmp.push_back(edge.ind2); tmp.push_back(ind1f); ps->indices.push_back(tmp); }
+      { IndexedFace tmp; tmp.push_back(ind2f); tmp.push_back(edge.ind2); tmp.push_back(imid); ps->indices.push_back(tmp); }
+      { IndexedFace tmp; tmp.push_back(imid); tmp.push_back(edge.ind1); tmp.push_back(ind2f); ps->indices.push_back(tmp); }
+
+      EdgeKey ek1(edge.ind1,ind1f);
+      EdgeKey ek2(edge.ind2,ind1f);
+      EdgeKey ek3(edge.ind2,ind2f);
+      EdgeKey ek4(edge.ind1,ind2f);
+      edge_blocked.insert(ek1);
+      edge_blocked.insert(ek2);
+      edge_blocked.insert(ek3);
+      edge_blocked.insert(ek4);
 
       // relink 4 edgeVals
-      EdgeKey ek1(edge.ind1,ind1f);
       EdgeVal &ev1=edge_db[ek1];
       if(ev1.facea == val.facea) { ev1.facea=newfaceind+0; ev1.posa=0; }
       if(ev1.faceb == val.facea) { ev1.faceb=newfaceind+0; ev1.posb=0; }
 
-      EdgeKey ek2(edge.ind2,ind1f);
       EdgeVal &ev2=edge_db[ek2];
       if(ev2.facea == val.facea) { ev2.facea=newfaceind+1; ev2.posa=1; }
       if(ev2.faceb == val.facea) { ev2.faceb=newfaceind+1; ev2.posb=1; }
 
-      EdgeKey ek3(edge.ind2,ind2f);
       EdgeVal &ev3=edge_db[ek3];
       if(ev3.facea == val.faceb) { ev3.facea=newfaceind+2; ev3.posa=0; }
       if(ev3.faceb == val.faceb) { ev3.faceb=newfaceind+2; ev3.posb=0; }
 
-      EdgeKey ek4(edge.ind1,ind2f);
       EdgeVal &ev4=edge_db[ek4];
       if(ev4.facea == val.faceb) { ev4.facea=newfaceind+3; ev2.posa=1; }
       if(ev4.faceb == val.faceb) { ev4.faceb=newfaceind+3; ev2.posb=1; }
@@ -373,23 +395,37 @@ std::unique_ptr<const Geometry> sphereCreateFuncGeometry(void *funcptr, double f
       edge_db[ekp2]=eval;
 
       // delete 2 faces
-      faces_delete.push_back(val.facea);
-      faces_delete.push_back(val.faceb);
       edge_new.insert(ekm1);
       edge_new.insert(ekm2);
       edge_new.insert(ekp1);
       edge_new.insert(ekp2);
-      // edge i1-i2 loeschen ? nein, sie ist einfach nicht neu
-      // TODO 4 aussenkanten auch 
-      edge_todo.clear();
-      break;
+      faces_delete_set.insert(val.facea);
+      faces_delete_set.insert(val.faceb);
+      num++;
     }
     edge_todo = edge_new;
+    std::vector<int> faces_delete; // TODO do in the end instead
+    for(auto kv: faces_delete_set){
+      faces_delete.push_back(kv);	  
+    }
+    faces_delete_set.clear();
+    std::sort(faces_delete.begin(), faces_delete.end());
+    for(int i=faces_delete.size()-1;i >= 0; i--){
+	    ps->indices.erase(ps->indices.begin()+faces_delete[i]);
+    }
+
+    // TODO redo edge_todo, because its wrong
+    edge_db=createEdgeDb(ps->indices);
+    edge_todo.clear();
+    for(auto kv : edge_db) {
+      edge_todo.insert(kv.first);	  
+    }
+    
+    round++;
   }
-  std::sort(faces_delete.begin(), faces_delete.end());
-  for(int i=faces_delete.size()-1;i >= 0; i--) ps->indices.erase(ps->indices.begin()+faces_delete[i]);
+
   // split edgesuntil they are small enough or faces have no big angle
-#if 0  
+#if 0  // schmetterling algorithm
   for( int i1=0;i1<ps->indices.size();i1++) {
 
     if(ps->indices[i1].size() != 3) continue;
@@ -458,7 +494,7 @@ std::unique_ptr<const Geometry> sphereCreateFuncGeometry(void *funcptr, double f
 
     int imid = ps->vertices.size();
     ps->vertices.push_back(pmid);
-    yy{ IndexedFace tmp; tmp.push_back(pt1); tmp.push_back(imid0); tmp.push_back(imid); ps->indices.push_back(tmp); }
+    { IndexedFace tmp; tmp.push_back(pt1); tmp.push_back(imid0); tmp.push_back(imid); ps->indices.push_back(tmp); }
     { IndexedFace tmp; tmp.push_back(pt1); tmp.push_back(imid); tmp.push_back(imid1); ps->indices.push_back(tmp); }
     { IndexedFace tmp; tmp.push_back(pt2); tmp.push_back(imid1); tmp.push_back(imid); ps->indices.push_back(tmp); }
     { IndexedFace tmp; tmp.push_back(pt2); tmp.push_back(imid); tmp.push_back(imid0); ps->indices.push_back(tmp); }

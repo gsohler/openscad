@@ -178,8 +178,8 @@ unsigned int hash_value(const EdgeKey& r) {
         return i;
 }
 EdgeKey::EdgeKey(int i1, int i2) {
-  this->ind1=i1>i2?i1:i2;
-  this->ind2=i1+i2-this->ind1;  
+  this->ind1=i1<i2?i1:i2;
+  this->ind2=i2>i1?i2:i1;
 }
 
 int operator==(const EdgeKey &t1, const EdgeKey &t2) 
@@ -207,7 +207,6 @@ std::unordered_map<EdgeKey, EdgeVal, boost::hash<EdgeKey> > createEdgeDb(const s
     for(int j=0;j<n;j++) {
       ind1=indices[i][j];	    
       ind2=indices[i][(j+1)%n];	    
-      printf("e %d %d\n",ind1, ind2);
       if(ind2 > ind1){
         edge.ind1=ind1;
         edge.ind2=ind2;	
@@ -546,6 +545,171 @@ std::vector<IndexedFace> mergeTriangles(const std::vector<IndexedFace> polygons,
 
 	return indices;
 }
+
+
+Map3DTree::Map3DTree(void) {
+	for(int i=0;i<8;ind[i++]=-1);
+	ptlen=0;
+}
+
+Map3D::Map3D(Vector3d min, Vector3d max) {
+	this->min=min;
+	this->max=max;
+}
+void Map3D::add_sub(int ind, Vector3d min, Vector3d max,Vector3d pt, int ptind, int disable_local_num) {
+	int indnew;
+	int corner;
+	Vector3d mid;
+	do {
+		if(items[ind].ptlen >= 0 && disable_local_num != ind) {
+			if(items[ind].ptlen < BUCKET) {
+				for(int i=0;i<items[ind].ptlen;i++)
+					if(items[ind].pts[i] == pt) return;
+				items[ind].pts[items[ind].ptlen]=pt;
+				items[ind].ptsind[items[ind].ptlen]=ptind;
+				items[ind].ptlen++;
+				return;
+			} else {  
+				for(int i=0;i<items[ind].ptlen;i++) {
+					add_sub(ind, min, max,items[ind].pts[i],items[ind].ptsind[i],ind);
+				}
+				items[ind].ptlen=-1;
+				// run through
+			} 
+		}
+		mid[0]=(min[0]+max[0])/2.0;
+		mid[1]=(min[1]+max[1])/2.0;
+		mid[2]=(min[2]+max[2])/2.0;
+		corner=(pt[0]>=mid[0]?1:0)+(pt[1]>=mid[1]?2:0)+(pt[2]>=mid[2]?4:0);
+		indnew=items[ind].ind[corner];
+		if(indnew == -1) {
+			indnew=items.size();
+			items.push_back(Map3DTree());
+			items[ind].ind[corner]=indnew;					
+		}
+		if(corner&1) min[0]=mid[0]; else max[0]=mid[0];
+		if(corner&2) min[1]=mid[1]; else max[1]=mid[1];
+		if(corner&4) min[2]=mid[2]; else max[2]=mid[2];
+		ind=indnew;
+	}
+	while(1);
+
+}
+void Map3D::add(Vector3d pt, int ind) { 
+	if(items.size() == 0) {
+		items.push_back(Map3DTree());
+		items[0].pts[0]=pt;
+		items[0].ptsind[0]=ind;
+		items[0].ptlen++;
+		return;
+	}
+	add_sub(0,this->min, this->max, pt,ind,-1);
+}
+
+void Map3D::del(Vector3d pt) {
+	int ind=0;
+	int corner;
+	Vector3d min=this->min;
+	Vector3d max=this->max;
+	Vector3d mid;
+	printf("Deleting %g/%g/%g\n",pt[0], pt[1], pt[2]);
+	while(ind != -1) {
+		for(int i=0;i<items[ind].ptlen;i++) {
+			if(items[ind].pts[i]==pt) {
+				for(int j=i+1;j<items[ind].ptlen;j++)
+					items[ind].pts[j-1]=items[ind].pts[j];
+				items[ind].ptlen--;
+				return;
+			}
+			// was wenn leer wird dnn sind ind immer noch -1
+		}
+		mid[0]=(min[0]+max[0])/2.0;
+		mid[1]=(min[1]+max[1])/2.0;
+		mid[2]=(min[2]+max[2])/2.0;
+		corner=(pt[0]>mid[0]?1:0)+(pt[1]>mid[1]?2:0)+(pt[2]>mid[2]?4:0);
+		printf("corner=%d\n",corner);
+		ind=items[ind].ind[corner];
+		if(corner&1) min[0]=mid[0]; else max[0]=mid[0];
+		if(corner&2) min[1]=mid[1]; else max[1]=mid[1];
+		if(corner&4) min[2]=mid[2]; else max[2]=mid[2];
+	}
+}
+
+void Map3D::find_sub(int ind, double minx, double miny, double minz, double maxx, double maxy, double maxz, Vector3d pt, double r,std::vector<Vector3d> &result,std::vector<int> &resultind, int maxresult){
+	if(ind == -1) return;
+	if(this->items[ind].ptlen > 0){
+		for(int i=0;i<this->items[ind].ptlen;i++) {
+			if((this->items[ind].pts[i]-pt).norm() < r) {
+				result.push_back(this->items[ind].pts[i]);
+				resultind.push_back(this->items[ind].ptsind[i]);
+			}
+			if(result.size() >= maxresult) return;
+		}
+		return;
+	}
+	double midx,midy, midz;
+//	printf("find_sub ind=%d %g/%g/%g - %g/%g/%g\n",ind, minx, miny,  minz, maxx, maxy, maxz );
+	midx=(minx+maxx)/2.0;
+	midy=(miny+maxy)/2.0;
+	midz=(minz+maxz)/2.0;
+	if(result.size() >= maxresult) return;
+	if( pt[2]+r >= minz && pt[2]-r < midz ) {
+		if( pt[1]+r >= miny && pt[1]-r < midy) {
+			if(pt[0]+r >= minx && pt[0]-r < midx ) find_sub(this->items[ind].ind[0],minx, miny, minz, midx, midy, midz,pt,r,result,resultind, maxresult);
+			if(pt[0]+r >= midx && pt[0]-r < maxx ) find_sub(this->items[ind].ind[1],midx, miny, minz, maxx, midy, midz,pt,r,result,resultind, maxresult);
+		}
+		if( pt[1]+r >= midy && pt[1]-r < maxy) {
+			if(pt[0]+r >= minx && pt[0]-r < midx ) find_sub(this->items[ind].ind[2],minx, midy, minz, midx, maxy, midz,pt,r,result,resultind, maxresult);
+			if(pt[0]+r >= midx && pt[0]-r < maxx ) find_sub(this->items[ind].ind[3],midx, midy, minz, maxx, maxy, midz,pt,r,result,resultind, maxresult);
+		}
+	}
+	if( pt[2]+r >= midz && pt[2]-r < maxz ) {
+		if( pt[1]+r >= miny && pt[1]-r < midy) {
+			if(pt[0]+r >= minx && pt[0]-r < midx ) find_sub(this->items[ind].ind[4],minx, miny, midz, midx, midy, maxz,pt,r,result,resultind, maxresult);
+			if(pt[0]+r >= midx && pt[0]-r < maxx ) find_sub(this->items[ind].ind[5],midx, miny, midz, maxx, midy, maxz,pt,r,result,resultind, maxresult);
+		}
+		if( pt[1]+r >= midy && pt[1]-r < maxy) {
+			if(pt[0]+r >= minx && pt[0]-r < midx ) find_sub(this->items[ind].ind[6],minx, midy, midz, midx, maxy, maxz,pt,r,result,resultind, maxresult);
+			if(pt[0]+r >= midx && pt[0]-r < maxx ) find_sub(this->items[ind].ind[7],midx, midy, midz, maxx, maxy, maxz,pt,r,result,resultind, maxresult);
+		}
+	}
+
+}
+int Map3D::find(Vector3d pt, double r,std::vector<Vector3d> &result, std::vector<int> &resultind, int maxresult){
+	int results=0;
+	if(items.size() == 0) return results;
+	result.clear();
+	resultind.clear();
+	find_sub(0,this->min[0], this->min[1], this->min[2], this->max[0], this->max[1], this->max[2], pt,r,result, resultind, maxresult);
+	return result.size();
+}
+
+void Map3D::dump_hier(int i, int hier, float minx, float miny, float minz, float maxx, float maxy, float maxz) {
+	for(int i=0;i<hier;i++) printf("  ");
+	printf("%d inds ",i);
+	for(int j=0;j<8;j++) printf("%d ",items[i].ind[j]);
+	printf("pts ");
+	for(int j=0;j<items[i].ptlen;j++) printf("%g/%g/%g ",items[i].pts[j][0],items[i].pts[j][1],items[i].pts[j][2]);
+
+	float midx, midy, midz;
+	midx=(minx+maxx)/2.0;
+	midy=(miny+maxy)/2.0;
+	midz=(minz+maxz)/2.0;
+	printf(" (%g/%g/%g - %g/%g/%g)\n", minx, miny, minz, maxx, maxy, maxz);
+	if(items[i].ind[0] != -1) dump_hier(items[i].ind[0],hier+1,minx,miny, minz, midx, midy, midz);
+	if(items[i].ind[1] != -1) dump_hier(items[i].ind[1],hier+1,midx,miny, minz, maxx, midy, midz);
+	if(items[i].ind[2] != -1) dump_hier(items[i].ind[2],hier+1,minx,midy, minz, midx, maxy, midz);
+	if(items[i].ind[3] != -1) dump_hier(items[i].ind[3],hier+1,midx,midy, minz, maxx, maxy, midz);
+	if(items[i].ind[4] != -1) dump_hier(items[i].ind[4],hier+1,minx,miny, midz, midx, midy, maxz);
+	if(items[i].ind[5] != -1) dump_hier(items[i].ind[5],hier+1,midx,miny, midz, maxx, midy, maxz);
+	if(items[i].ind[6] != -1) dump_hier(items[i].ind[6],hier+1,minx,midy, midz, midx, maxy, maxz);
+	if(items[i].ind[7] != -1) dump_hier(items[i].ind[7],hier+1,midx,midy, midz, maxx, maxy, maxz);
+}
+void Map3D::dump(void) {
+	dump_hier(0,0,min[0],min[1],min[2],max[0], max[1],max[2]);
+}
+
+
 
 GeometryEvaluator::ResultObject GeometryEvaluator::applyToChildren(const AbstractNode& node, OpenSCADOperator op)
 {
