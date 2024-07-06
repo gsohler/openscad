@@ -37,6 +37,7 @@ struct EdgeVal {
   int faceb, posb;  // face b with edge ind2 -> ind1, posb = index of ind2 within faceb
   IndexedFace bez1;
   IndexedFace bez2;
+  double angle;
 };
 
 // 3D Map stuff

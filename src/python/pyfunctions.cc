@@ -175,7 +175,6 @@ int operator==(const SphereEdgeDb &t1, const SphereEdgeDb &t2)
         return 0;
 }
 
-
 int sphereCalcSplitInd(PolySetBuilder &builder, std::vector<Vector3d> &vertices, std::unordered_map<SphereEdgeDb, int, boost::hash<SphereEdgeDb> > &edges, PyObject *func, int ind1, int ind2)
 {
   SphereEdgeDb edge(ind1, ind2);
@@ -187,7 +186,7 @@ int sphereCalcSplitInd(PolySetBuilder &builder, std::vector<Vector3d> &vertices,
   return result;
 }
 
-std::unique_ptr<const Geometry> sphereCreateFuncGeometry(void *funcptr, double fs)
+std::unique_ptr<const Geometry> sphereCreateFuncGeometry(void *funcptr, double fs, int n)
 {
 	printf("crerate sphere\n");
   PyObject *func = (PyObject *) funcptr;
@@ -216,38 +215,99 @@ std::unique_ptr<const Geometry> sphereCreateFuncGeometry(void *funcptr, double f
   tri_new.push_back(IndexedTriangle(backind, botind, leftind));
 
   int round=0;
+  int i1, i2, imid;
+  Vector3d p1, p2, p3,pmin, pmax, pmid, pmid_test, dir1, dir2;
+  double dist,ang,ang_test;
   do {
     triangles = tri_new;	  
+    if(round == n) break;
     tri_new.clear();
-    // convert triangles to edges and decide which to split
+    std::vector<int> midinds;
     for(const IndexedTriangle & tri: triangles) {
-      double dist[3];
-      for(int i=0;i<3;i++) 
-        dist[i]=(vertices[tri[i]]-vertices[tri[(i+1)%3]]).norm();
+      int zeroang=0;	    
+      int midind=-1;
+      for(int i=0;i<3;i++) {
+        i1=tri[i];
+	i2=tri[(i+1)%3];
+        SphereEdgeDb edge(i1, i2);
+  	if(edges.count(edge) > 0) continue;
+        dist=(vertices[i1]-vertices[i2]).norm();
+	if(dist < fs) continue;
+	p1=vertices[i1];
+	p2=vertices[i2];
+	pmin=p1;
+	pmax=p2;
+	pmid=(pmin+pmax)/2;
+	pmid=sphereCalcIndInt(func, pmid);
+	dir1=(pmid-p1).normalized();
+	dir2=(p2-pmid).normalized();
+	ang=acos(dir1.dot(dir2));
+//	printf("ang=%g\n",ang*180/3.14);
+        if(ang < 0.001) { zeroang++; continue; }
+	do
+	{
+	  pmid_test=(pmin+pmid)/2;
+	  pmid_test=sphereCalcIndInt(func, pmid_test);
+	  dir1=(pmid_test-p1).normalized();
+	  dir2=(p2-pmid_test).normalized();
+	  ang_test=acos(dir1.dot(dir2));
+	  if(ang_test > ang) {
+		  pmax=pmid; ang=ang_test; pmid = pmid_test; 
+		  if((pmax-pmin).norm() > fs) continue;
+	  }
 
-      double mindist=dist[0], maxdist=dist[0];
-      for(int i=1;i<3;i++) {
-        if(dist[i] < mindist) mindist=dist[i];
-        if(dist[i] > maxdist) maxdist=dist[i];
+ 	  pmid_test=(pmax+pmid)/2;
+ 	  pmid_test=sphereCalcIndInt(func, pmid_test);
+	  dir1=(pmid_test-p1).normalized();
+	  dir2=(p2-pmid_test).normalized();
+	  ang_test=acos(dir1.dot(dir2));
+	  if(ang_test > ang) {
+		  pmin=pmid; ang=ang_test; pmid = pmid_test;
+		  if((pmax-pmin).norm() > fs) continue;
+	  }
+	}
+        while(0);	
+
+  	imid=builder.vertexIndex(pmid);
+        if(imid == vertices.size()) vertices.push_back(pmid);
+	edges[edge]=imid;
       }
-      if(mindist > fs){
-        if(maxdist/mindist < 1.41) {
-  	  for(int i=0;i<3;i++) // splt evenly
-            sphereCalcSplitInd(builder, vertices, edges, func, tri[i], tri[(i+1)%3]);
-        } else {
-  	  double middist=sqrt(maxdist* mindist);
-  	  for(int i=0;i<3;i++) // decide which triangles to split
-            if(dist[i] > middist) sphereCalcSplitInd(builder, vertices, edges, func, tri[i], tri[(i+1)%3]);
-  	}
+      if(zeroang == 3) {
+	p1=vertices[tri[0]];
+	p2=vertices[tri[1]];
+	p3=vertices[tri[2]];
+	pmid=(p1+p2+p3)/3.0;
+	pmid=sphereCalcIndInt(func, pmid);
+        Vector4d norm=calcTriangleNormal(vertices,{tri[0], tri[1], tri[2] });
+	if(fabs(pmid.dot(norm.head<3>())- norm[3]) > 1e-3) {
+  	  midind=builder.vertexIndex(pmid);
+          if(midind == vertices.size()) vertices.push_back(pmid);
+	}  
       }
+      midinds.push_back(midind);
     }
     // create new triangles from split edges    
+    int ind=0;
     for(const IndexedTriangle & tri: triangles) {
 
       int splitind[3];	    
       for(int i=0;i<3;i++) {
         SphereEdgeDb e(tri[i], tri[(i+1)%3]);
         splitind[i] = edges.count(e) > 0?edges[e]:-1;
+      }
+
+      if(midinds[ind] != -1) {
+        for(int i=0;i<3;i++) {	     
+          if(splitind[i] == -1) {		
+            tri_new.push_back(IndexedTriangle(tri[i], tri[(i+1)%3], midinds[ind]));
+	  }
+	  else {
+            tri_new.push_back(IndexedTriangle(tri[i], splitind[i], midinds[ind]));
+            tri_new.push_back(IndexedTriangle(splitind[i], tri[(i+1)%3], midinds[ind]));
+	  }  
+	}  
+        ind++;
+        continue;	
       }
 
       int bucket= ((splitind[0]!= -1)?1:0) | ((splitind[1]!= -1)?2:0) | ((splitind[2]!= -1)?4:0) ;
@@ -289,226 +349,17 @@ std::unique_ptr<const Geometry> sphereCreateFuncGeometry(void *funcptr, double f
             tri_new.push_back(IndexedTriangle(splitind[0], splitind[1], splitind[2]));
 	    break;
       }
+      ind++;
     }  
      
     round++;
   }
   while(tri_new.size() != triangles.size());
-  for(const IndexedTriangle & tri: triangles) {
+  for(const IndexedTriangle & tri: tri_new) {
     builder.appendPolygon({tri[0], tri[1], tri[2]});
   }
   auto ps = builder.build();
 
-  // blumen-algorithmus
-  std::vector<Vector4d> normals, newnormals;
-  std::vector<int> faceParents;
-  normals = calcTriangleNormals(ps->vertices, ps->indices);
-//  ps->indices = mergeTriangles(ps->indices, normals,newnormals, faceParents, ps->vertices);
-  std::unordered_map<EdgeKey, EdgeVal, boost::hash<EdgeKey> > edge_db;
-  std::unordered_set<EdgeKey,boost::hash<EdgeKey> > edge_todo;
-  std::unordered_set<int> faces_delete_set;
-  round=0;
-
-  edge_db=createEdgeDb(ps->indices);
-  for(auto kv : edge_db) {
-    edge_todo.insert(kv.first);	  
-  }
-
-  while(edge_todo.size() > 0 && round < 5)
-  {
-    std::unordered_set<EdgeKey,boost::hash<EdgeKey> > edge_blocked;
-//    printf("edge_todo is %d\n",edge_todo.size());	  
-    std::unordered_set<EdgeKey,boost::hash<EdgeKey> > edge_new;
-    int num=0;
-    for(auto edge: edge_todo) {
-      if(edge_blocked.count(edge) > 0) continue;	    
-      EdgeVal val=edge_db[edge];			       
-      Vector3d p1=ps->vertices[edge.ind1];
-      Vector3d p2=ps->vertices[edge.ind2];
-      double dist=(p1-p2).norm();
-      if(dist < 0.5) continue; // TODO
-      Vector3d norm1=calcTriangleNormal(ps->vertices,ps->indices[val.facea]).head<3>();
-      Vector3d norm2=calcTriangleNormal(ps->vertices,ps->indices[val.faceb]).head<3>();
-      if(norm1.dot(norm2) > 0.999) continue; // 8 deg
-					    
-					    
-      Vector3d pmid =(p1+p2)/2.0;
-      pmid =  sphereCalcIndInt(func, pmid);	
-      int imid = ps->vertices.size();
-      ps->vertices.push_back(pmid);
-
-      // get 4 outer pts and 4 outer edges
-      int ind1f = ps->indices[val.facea][(val.posa+2)%3];
-      int ind2f = ps->indices[val.faceb][(val.posb+2)%3];
-//      printf("ind1=%d ind2=%d imid=%d ind1f=%d ind2f=%d \n",edge.ind1, edge.ind2, imid, ind1f, ind2f);
-		
-      // create 4 new faces
-      int newfaceind=ps->indices.size();
-      { IndexedFace tmp; tmp.push_back(ind1f); tmp.push_back(edge.ind1); tmp.push_back(imid); ps->indices.push_back(tmp); }
-      { IndexedFace tmp; tmp.push_back(imid); tmp.push_back(edge.ind2); tmp.push_back(ind1f); ps->indices.push_back(tmp); }
-      { IndexedFace tmp; tmp.push_back(ind2f); tmp.push_back(edge.ind2); tmp.push_back(imid); ps->indices.push_back(tmp); }
-      { IndexedFace tmp; tmp.push_back(imid); tmp.push_back(edge.ind1); tmp.push_back(ind2f); ps->indices.push_back(tmp); }
-
-      EdgeKey ek1(edge.ind1,ind1f);
-      EdgeKey ek2(edge.ind2,ind1f);
-      EdgeKey ek3(edge.ind2,ind2f);
-      EdgeKey ek4(edge.ind1,ind2f);
-      edge_blocked.insert(ek1);
-      edge_blocked.insert(ek2);
-      edge_blocked.insert(ek3);
-      edge_blocked.insert(ek4);
-
-      // relink 4 edgeVals
-      EdgeVal &ev1=edge_db[ek1];
-      if(ev1.facea == val.facea) { ev1.facea=newfaceind+0; ev1.posa=0; }
-      if(ev1.faceb == val.facea) { ev1.faceb=newfaceind+0; ev1.posb=0; }
-
-      EdgeVal &ev2=edge_db[ek2];
-      if(ev2.facea == val.facea) { ev2.facea=newfaceind+1; ev2.posa=1; }
-      if(ev2.faceb == val.facea) { ev2.faceb=newfaceind+1; ev2.posb=1; }
-
-      EdgeVal &ev3=edge_db[ek3];
-      if(ev3.facea == val.faceb) { ev3.facea=newfaceind+2; ev3.posa=0; }
-      if(ev3.faceb == val.faceb) { ev3.faceb=newfaceind+2; ev3.posb=0; }
-
-      EdgeVal &ev4=edge_db[ek4];
-      if(ev4.facea == val.faceb) { ev4.facea=newfaceind+3; ev2.posa=1; }
-      if(ev4.faceb == val.faceb) { ev4.faceb=newfaceind+3; ev2.posb=1; }
-
-      // create - relation
-      EdgeVal eval;
-      EdgeKey ekm1(ind1f,imid);
-      eval.facea=newfaceind+0; eval.posa=1; eval.faceb=newfaceind+1; eval.posb=0;
-      edge_db[ekm1]=eval;
-
-      EdgeKey ekm2(ind2f,imid);
-      eval.facea=newfaceind+2; eval.posa=1; eval.faceb=newfaceind+3; eval.posb=0;
-      edge_db[ekm1]=eval;
-
-      // ceate | relation
-      EdgeKey ekp1(imid,edge.ind1);
-      eval.facea=newfaceind+0; eval.posa=2; eval.faceb=newfaceind+3; eval.posb=2;
-      edge_db[ekp1]=eval;
-
-      EdgeKey ekp2(imid,edge.ind2);
-      eval.facea=newfaceind+2; eval.posa=2; eval.faceb=newfaceind+1; eval.posb=1;
-      edge_db[ekp2]=eval;
-
-      // delete 2 faces
-      edge_new.insert(ekm1);
-      edge_new.insert(ekm2);
-      edge_new.insert(ekp1);
-      edge_new.insert(ekp2);
-      faces_delete_set.insert(val.facea);
-      faces_delete_set.insert(val.faceb);
-      num++;
-    }
-    edge_todo = edge_new;
-    std::vector<int> faces_delete; // TODO do in the end instead
-    for(auto kv: faces_delete_set){
-      faces_delete.push_back(kv);	  
-    }
-    faces_delete_set.clear();
-    std::sort(faces_delete.begin(), faces_delete.end());
-    for(int i=faces_delete.size()-1;i >= 0; i--){
-	    ps->indices.erase(ps->indices.begin()+faces_delete[i]);
-    }
-
-    // TODO redo edge_todo, because its wrong
-    edge_db=createEdgeDb(ps->indices);
-    edge_todo.clear();
-    for(auto kv : edge_db) {
-      edge_todo.insert(kv.first);	  
-    }
-    
-    round++;
-  }
-
-  // split edgesuntil they are small enough or faces have no big angle
-#if 0  // schmetterling algorithm
-  for( int i1=0;i1<ps->indices.size();i1++) {
-
-    if(ps->indices[i1].size() != 3) continue;
-    EdgeKey key;
-    // TODO check if small
-    if ( std::find(faces_delete.begin(), faces_delete.end(), i1) != faces_delete.end() ) continue;
-
-    int smallind1=-1;
-    std::vector<int> small_polygon1;	    
-    std::vector<int> big_polygon1;	    
-    int imid0=-1;
-    int imid1=-1;
-    for(int j=0;j<3;j++) {	 
-     // 2 von 3 kanten muessen grosse nachbarn haben	    
-      int ind1=ps->indices[i1][j];
-      int ind2=ps->indices[i1][(j+1)%3];
-      key.ind1=ind1<ind2?ind1:ind2;
-      key.ind2=ind1+ind2-key.ind1;
-      EdgeVal value=edge_db[key];
-      if(value.facea != i1) {
-        if(ps->indices[value.facea].size() > 30) big_polygon1.push_back(value.facea);
-          else {small_polygon1.push_back(value.facea); smallind1=j;imid0 = ind1; imid1 = ind2; }
-      }
-      if(value.faceb != i1) {
-        if(ps->indices[value.faceb].size() > 30) big_polygon1.push_back(value.faceb);
-	  else {small_polygon1.push_back(value.faceb); smallind1=j;imid0 = ind1; imid1 = ind2; }
-      }
-    }
-    if(big_polygon1.size() != 2) continue;
-    if(small_polygon1.size() != 1)  continue;
-
-    int i2=small_polygon1[0];
-    // TODO check if small
-    if ( std::find(faces_delete.begin(), faces_delete.end(), i1) != faces_delete.end() ) continue;
-    int smallind2=-1;
-    std::vector<int> small_polygon2;	    
-    std::vector<int> big_polygon2;	    
-    for(int j=0;j<3;j++) {	 
-      int ind1=ps->indices[i2][j];
-      int ind2=ps->indices[i2][(j+1)%3];
-      key.ind1=ind1<ind2?ind1:ind2;
-      key.ind2=ind1+ind2-key.ind1;
-      EdgeVal value=edge_db[key];
-      if(value.facea != i2) {
-        if(ps->indices[value.facea].size() > 30) big_polygon2.push_back(value.facea);
-          else {small_polygon2.push_back(value.facea); smallind2=j; }
-      }
-      if(value.faceb != i2) {
-        if(ps->indices[value.faceb].size() > 30) big_polygon2.push_back(value.faceb);
-	  else { small_polygon2.push_back(value.faceb); smallind2=j; }
-      }
-    }
-    if(big_polygon2.size() != 2) continue;
-    if(small_polygon2.size() != 1)  continue;
-    if(small_polygon2[0] != i1) continue;
-
-//    Vector3d norm2a=calcTriangleNormal(ps->vertices,ps->indices[big_polygon2[0]]).head<3>();
-//    Vector3d norm2b=calcTriangleNormal(ps->vertices,ps->indices[big_polygon2[1]]).head<3>();
-//    Vector3d dir2=norm2a.cross(norm2b).normalized();
-//    if(smallind2 == 1) dir2=-dir2;
-    int pt1=ps->indices[i1][(smallind1+2)%3];
-    int pt2=ps->indices[i2][(smallind2+2)%3];
-
-    Vector3d pmid=(ps->vertices[pt1]+ps->vertices[pt2])/2.0;
-    pmid =  sphereCalcIndInt(func, pmid);	
-
-    int imid = ps->vertices.size();
-    ps->vertices.push_back(pmid);
-    { IndexedFace tmp; tmp.push_back(pt1); tmp.push_back(imid0); tmp.push_back(imid); ps->indices.push_back(tmp); }
-    { IndexedFace tmp; tmp.push_back(pt1); tmp.push_back(imid); tmp.push_back(imid1); ps->indices.push_back(tmp); }
-    { IndexedFace tmp; tmp.push_back(pt2); tmp.push_back(imid1); tmp.push_back(imid); ps->indices.push_back(tmp); }
-    { IndexedFace tmp; tmp.push_back(pt2); tmp.push_back(imid); tmp.push_back(imid0); ps->indices.push_back(tmp); }
-    faces_delete.push_back(i1);
-    faces_delete.push_back(i2);
-  }
-  std::sort(faces_delete.begin(), faces_delete.end());
-  for(int i=faces_delete.size()-1;i >= 0; i--) ps->indices.erase(ps->indices.begin()+faces_delete[i]);
-  printf("triangles left %d\n",ps->indices.size());
-  normals = calcTriangleNormals(ps->vertices, ps->indices);
-  ps->indices = mergeTriangles(ps->indices, normals,newnormals, faceParents, ps->vertices);
-  printf("triangles left %d\n",ps->indices.size());
-#endif  
-//#endif  
   return ps; 
 }
 
