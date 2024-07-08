@@ -1,4 +1,4 @@
-#include "io/import.h"
+#include "import.h"
 #include "PolySet.h"
 #include "PolySetBuilder.h"
 #include "printutils.h"
