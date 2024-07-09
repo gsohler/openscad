@@ -26,6 +26,7 @@
 #include <iostream>
 #include <memory>
 #include "boost-utils.h"
+#include "Builtins.h"
 #include "BuiltinContext.h"
 #include "CommentParser.h"
 #include "RenderVariables.h"
@@ -1117,6 +1118,7 @@ void MainWindow::compile(bool reload, bool forcedone)
     // reload picking up where it left off, thwarting the stop, so we turn off exceptions in PRINT.
     no_exceptions_for_warnings();
     if (shouldcompiletoplevel) {
+      initialize_rng();
       this->errorLogWidget->clearModel();
       if (Preferences::inst()->getValue("advanced/consoleAutoClear").toBool()) {
         this->console->actionClearConsole_triggered();
