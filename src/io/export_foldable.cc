@@ -35,6 +35,7 @@
 #include <cairo-pdf.h>
 
 #include "export_foldable.h"
+#include "GeometryEvaluator.h"
 
 
 Vector2d pointrecht(Vector2d x)
@@ -217,11 +218,6 @@ int plot_try(unsigned int refplate,unsigned  int destplate,Vector2d px,Vector2d 
   return success;
 }
 
-std::vector<IndexedFace> mergetriangles(const std::vector<IndexedFace> polygons,const std::vector<Vector4d> normals,std::vector<Vector4d> &newNormals, std::vector<int> &faceParents, const std::vector<Vector3d> &vert) ;
-
-std::vector<Vector4d> offset3D_normals(const std::vector<Vector3d> &vertices, const std::vector<IndexedFace> &faces);
-
-
 class EdgeDbStub
 {
         public:
@@ -366,7 +362,6 @@ std::vector<sheetS> sheets_combine(std::vector<sheetS> sheets, const plotSetting
   return combined;	
 }
 
-extern Vector4d offset3D_normal(const std::vector<Vector3d> &vertices, const IndexedFace &pol); // TODO move function
 
 void debug_conn(std::vector<connS> &con,std::vector<IndexedFace> &faces, const std::vector<Vector3d> &vertices) {
   for(unsigned int i=0;i<con.size();i++)
@@ -380,10 +375,10 @@ void debug_conn(std::vector<connS> &con,std::vector<IndexedFace> &faces, const s
 std::vector<sheetS> fold_3d(std::shared_ptr<const PolySet> ps, const plotSettingsS &plot_s)
 {
   	
-  std::vector<Vector4d> normals=offset3D_normals(ps->vertices, ps->indices);
+  std::vector<Vector4d> normals=calcTriangleNormals(ps->vertices, ps->indices);
   std::vector<Vector4d> newNormals;
   std::vector<int> faceParents;
-  std::vector<IndexedFace> faces = mergetriangles(ps->indices, normals,newNormals, faceParents, ps->vertices);
+  std::vector<IndexedFace> faces = mergeTriangles(ps->indices, normals,newNormals, faceParents, ps->vertices);
   unsigned int i,j,k;
   int  glue,num,cont,success,drawn,other;
   int facesdone=0,facestodo;

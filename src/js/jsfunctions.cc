@@ -70,6 +70,8 @@ extern bool parse(SourceFile *& file, const std::string& text, const std::string
 
 //using namespace boost::assign; // bring 'operator+=()' into scope
 
+#define TAG_NODE "node"
+
 
 // Colors extracted from https://drafts.csswg.org/css-color/ on 2015-08-02
 // CSS Color Module Level 4 - Editor’s Draft, 29 May 2015
@@ -87,13 +89,39 @@ static void js_cube(js_State *J)
 {
   DECLARE_INSTANCE
   std::shared_ptr<CubeNode>  node = std::make_shared<CubeNode>(instance);
-  double size = js_tonumber(J, 1);
+  node->center=0;
+  node->x=1;
+  node->y=1;
+  node->z=1;
+  if(js_isarray(J,1)) {
+    if(js_hasindex(J, 1, 0)) {
+      if(js_isnumber(J,-1)) node->x = js_tonumber(J, -1);
+      js_pop(J,1);
+    }
+    if(js_hasindex(J, 1, 1)) {
+      if(js_isnumber(J,-1)) node->y = js_tonumber(J, -1);
+      js_pop(J,1);
+    }
+    if(js_hasindex(J, 1, 2)) {
+      if(js_isnumber(J,-1)) node->z = js_tonumber(J, -1);
+      js_pop(J,1);
+    }
+  } else if(js_isnumber(J,1)) {
+    double size = js_tonumber(J, 1);
+    node->x = size;
+    node->y = size;
+    node->z = size;
+  }
+  if(js_isobject(J,2)) {
+    if(js_hasproperty(J, 2, "center")) {
+      if(js_isboolean(J,-1))
+        node->center = js_toboolean(J, -1)?1:0;
+      js_pop(J,1);
+    }
+  }
 //  char *kwlist[] = {"size", "center", NULL};
 //  PyObject *size = NULL;
 
-  node->x = size;
-  node->y = size;
-  node->z = size;
 //  PyObject *center = NULL;
 
 
@@ -291,154 +319,67 @@ std::unique_ptr<const Geometry> sphereCreateFuncGeometry(void *funcptr, double f
   return builder.build();
 }
 #endif
+
+void get_fnas(js_State *J, int objindex, double &fn, double &fa, double &fs) {
+  fn=0;
+  fa=12;
+  fs=2;
+  if(js_isobject(J,objindex)) {
+    if(js_hasproperty(J, objindex, "fn")) {
+      if(js_isnumber(J,-1))
+        fn = js_tonumber(J, -1);
+      js_pop(J,1);
+    }
+    if(js_hasproperty(J, objindex, "fa")) {
+      if(js_isnumber(J,-1))
+        fa = js_tonumber(J, -1);
+      js_pop(J,1);
+    }
+    if(js_hasproperty(J, objindex, "fs")) {
+      if(js_isnumber(J,-1))
+        fs = js_tonumber(J, -1);
+      js_pop(J,1);
+    }
+  }  
+}
+
+
 static void js_sphere(js_State *J)
 {
   DECLARE_INSTANCE
   auto node = std::make_shared<SphereNode>(instance);
 
-  double r = js_tonumber(J, 1);
-
-//  char *kwlist[] = {"r", "d", "fn", "fa", "fs", NULL};
-//  double r = NAN;
-//  PyObject *rp = nullptr;
-//  double d = NAN;
-//  double fn = NAN, fa = NAN, fs = NAN;
-
-//  double vr = 1;
-
-//  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|Odddd", kwlist,
-//                                   &rp, &d, &fn, &fa, &fs
-//                                   )) {
-//    PyErr_SetString(PyExc_TypeError, "Error during parsing sphere(r|d)");
-//    return NULL;
-//  } 
-//  if(js_numberval(rp, &r))
-//  if(rp->ob_type == &PyFunction_Type) node->r_func = rp;
-//  if (!isnan(r)) {
-//    if(r <= 0) {
-//      PyErr_SetString(PyExc_TypeError, "Parameter r must be positive");
-//      return NULL;
-//    }	    
-//    vr = r;
-//    if(!isnan(d)) {
-//      PyErr_SetString(PyExc_TypeError, "Cant specify r and d at the same time for sphere");
-//      return NULL;
-//    }
-//  } 
-//  if (!isnan(d)) {
-//    if(d <= 0) {
-//      PyErr_SetString(PyExc_TypeError, "Parameter d must be positive");
-//      return NULL;
-//    }	    
-//    vr = d / 2.0;
-//  }
-//
-//  get_fnas(node->fn, node->fa, node->fs);
-    node->fn=0;
-    node->fa=12;
-    node->fs=2;
-//  if (!isnan(fn)) node->fn = fn;
-//  if (!isnan(fa)) node->fa = fa;
-//  if (!isnan(fs)) node->fs = fs;
-
-  node->r = r;
+  node->r=1;
+  if(js_isnumber(J,1)) node->r = js_tonumber(J, 1);
+  get_fnas(J,2,node->fn, node->fa, node->fs);
 
 //  js_retrieve_pyname(node);
   JsOpenSCADObjectFromNode(node);
 }
-
 static void js_cylinder(js_State *J)
 {
   DECLARE_INSTANCE
   auto node = std::make_shared<CylinderNode>(instance);
-  double h = js_tonumber(J, 1);
-  double r = js_tonumber(J, 2);
+  node->r1=1;
+  node->r2=1;
+  node->h=1;
 
-//  char *kwlist[] = {"h", "r1", "r2", "center",  "r", "d", "d1", "d2", "angle", "fn", "fa", "fs", NULL};
-//  double h = NAN;
-//  double r = NAN;
-//  double r1 = NAN;
-//  double r2 = NAN;
-//  double d = NAN;
-//  double d1 = NAN;
-//  double d2 = NAN;
-//  double angle = NAN;
-//
- // double fn = NAN, fa = NAN, fs = NAN;
-//
-//  PyObject *center = NULL;
-//  double vr1 = 1, vr2 = 1, vh = 1;
-//
-//
-//  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|dddOddddddddd", kwlist, &h, &r1, &r2, &center, &r, &d, &d1, &d2, &angle,  &fn, &fa, &fs)) {
-//    PyErr_SetString(PyExc_TypeError, "Error during parsing cylinder(h,r|r1+r2|d1+d2)");
-//    return NULL;
-//  }
-//
-//  if(h <= 0) {
-//    PyErr_SetString(PyExc_TypeError, "Cylinder height must be positive");
-//    return NULL;
-//  }
-//  vh = h;
-//
-//  if(!isnan(d) && d <= 0) {
-//    PyErr_SetString(PyExc_TypeError, "Cylinder d must be positive");
-//    return NULL;
-//  }
-//  if(!isnan(r1) && r1 < 0) {
-//    PyErr_SetString(PyExc_TypeError, "Cylinder r1 must not be negative");
-//    return NULL;
-//  }
-//  if(!isnan(r2) && r2 < 0) {
-//    PyErr_SetString(PyExc_TypeError, "Cylinder r2 must not be negative");
-//    return NULL;
-//  }
-//  if(!isnan(d1) && d1 < 0) {
-//    PyErr_SetString(PyExc_TypeError, "Cylinder d1 must not be negative");
-//    return NULL;
-//  }
-//  if(!isnan(d2) && d2 < 0) {
-//    PyErr_SetString(PyExc_TypeError, "Cylinder d2 must not be negative");
-//    return NULL;
-//  }
-//
-//  if (!isnan(r1) && !isnan(r2)) {
-//    vr1 = r1; vr2 = r2;
-//  } else if (!isnan(r1) && isnan(r2)) {
-//    vr1 = r1; vr2 = r1;
-//  } else if (!isnan(d1) && !isnan(d2)) {
-//    vr1 = d1 / 2.0; vr2 = d2 / 2.0;
-//  } else if (!isnan(r)) {
-//    vr1 = r; vr2 = r;
-//  } else if (!isnan(d)) {
-//    vr1 = d / 2.0; vr2 = d / 2.0;
-//  }
-//
-//  if (!isnan(angle)) node->angle = angle;
-//  get_fnas(node->fn, node->fa, node->fs);
-//  if (!isnan(fn)) node->fn = fn;
-//  if (!isnan(fa)) node->fa = fa;
-//  if (!isnan(fs)) node->fs = fs;
-//
-//  node->r1 = vr1;
-//  node->r2 = vr2;
-//  node->h = vh;
-    node->fn=0;
-    node->fa=12;
-    node->fs=2;
-    node->r1=r;
-    node->r2=r;
-    node->h=h;
-//
-//  if (center == Py_True) node->center = 1;
-//  else if (center == Py_False || center == NULL )  node->center = 0;
-//  else {
-//      PyErr_SetString(PyExc_TypeError, "Unknown Value for center parameter");
- //     return NULL;
-//  }
-//
-//  js_retrieve_pyname(node);
-//  return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
+  if(js_isnumber(J,1)) node->h = js_tonumber(J, 1);
+  if(js_isnumber(J,2)) { node->r1 = js_tonumber(J, 2);  node->r2 = node->r1; }
+  if(js_isobject(J,3)) {
+    if(js_hasproperty(J, 3, "center")) {
+      if(js_isboolean(J,-1))
+        node->center = js_toboolean(J, -1)?1:0;
+      js_pop(J,1);
+    }
+    if(js_hasproperty(J, 3, "angle")) {
+      if(js_isnumber(J,-1))
+        node->angle = js_tonumber(J, -1)?1:0;
+      js_pop(J,1);
+    }
+  }
+  get_fnas(J,3,node->fn, node->fa, node->fs);
+
   JsOpenSCADObjectFromNode(node);
 }
 
@@ -901,65 +842,73 @@ PyObject *js_matrix_rot(PyObject *mat, Matrix3d rotvec)
   return js_frommatrix(raw);
 }
 
+#endif
 
-PyObject *js_rotate_sub(PyObject *obj, Vector3d vec3, double angle)
+void js_rotate(js_State *J)
 {
-  Matrix3d M;
-  if(isnan(angle)) {	
-    double sx = 0, sy = 0, sz = 0;
-    double cx = 1, cy = 1, cz = 1;
-    double a = 0.0;
-    bool ok = true;
-    if(vec3[2] != 0) {
-      a = vec3[2];
-      sz = sin_degrees(a);
-      cz = cos_degrees(a);
-    }
-    if(vec3[1] != 0) {
-      a = vec3[1];
-      sy = sin_degrees(a);
-      cy = cos_degrees(a);
-    }
-    if(vec3[0] != 0) {
-      a = vec3[0];
-      sx = sin_degrees(a);
-      cx = cos_degrees(a);
-    }
-
-    M << cy * cz,  cz *sx *sy - cx * sz,   cx *cz *sy + sx * sz,
-      cy *sz,  cx *cz + sx * sy * sz,  -cz * sx + cx * sy * sz,
-      -sy,       cy *sx,                  cx *cy;
-  } else {
-    M = angle_axis_degrees(angle, vec3);
-  }
-  PyObject *mat = js_matrix_rot(obj, M);
-  if(mat != nullptr) return mat;
-
   DECLARE_INSTANCE
   auto node = std::make_shared<TransformNode>(instance, "rotate");
 
-  PyObject *child_dict;
-  std::shared_ptr<AbstractNode> child = PyOpenSCADObjectToNodeMulti(obj, &child_dict);
-  if (child == NULL) {
-    PyErr_SetString(PyExc_TypeError, "Invalid type for Object in rotate");
-    return NULL;
+  if(js_isuserdata(J,1,TAG_NODE)){
+    void *data = js_touserdata(J, 1, TAG_NODE);
+    std::shared_ptr<AbstractNode> child = JsOpenSCADObjectToNode(data);
+    node->children.push_back(child);
   }
-  node->matrix.rotate(M);
-  node->setPyName(child->getPyName());
-
-  node->children.push_back(child);
-  PyObject *pyresult =  PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
-  if(child_dict != nullptr) {
-    PyObject *key, *value;
-    Py_ssize_t pos = 0;
-     while(PyDict_Next(child_dict, &pos, &key, &value)) {
-       PyObject *value1 = js_matrix_rot(value,M);
-       if(value1 != nullptr) PyDict_SetItem(((PyOpenSCADObject *) pyresult)->dict,key, value1);
-       else PyDict_SetItem(((PyOpenSCADObject *) pyresult)->dict,key, value);
+  Vector3d vec3(0,0,0);	
+  if(js_isarray(J,2)) {
+    if(js_hasindex(J, 2, 0)) {
+      if(js_isnumber(J,-1)) vec3[0] = js_tonumber(J, -1);
+      js_pop(J,1);
+    }
+    if(js_hasindex(J, 2, 1)) {
+      if(js_isnumber(J,-1)) vec3[1] = js_tonumber(J, -1);
+      js_pop(J,1);
+    }
+    if(js_hasindex(J, 2, 2)) {
+      if(js_isnumber(J,-1)) vec3[2] = js_tonumber(J, -1);
+      js_pop(J,1);
     }
   }
-  return pyresult;
+
+  Matrix3d M;
+  double sx = 0, sy = 0, sz = 0;
+  double cx = 1, cy = 1, cz = 1;
+  double a = 0.0;
+  bool ok = true;
+  if(vec3[2] != 0) {
+    a = vec3[2];
+    sz = sin_degrees(a);
+    cz = cos_degrees(a);
+  }
+  if(vec3[1] != 0) {
+    a = vec3[1];
+    sy = sin_degrees(a);
+    cy = cos_degrees(a);
+  }
+  if(vec3[0] != 0) {
+    a = vec3[0];
+    sx = sin_degrees(a);
+    cx = cos_degrees(a);
+  }
+
+  M << cy * cz,  cz *sx *sy - cx * sz,   cx *cz *sy + sx * sz,
+      cy *sz,  cx *cz + sx * sy * sz,  -cz * sx + cx * sy * sz,
+      -sy,       cy *sx,                  cx *cy;
+
+
+//  PyObject *child_dict;
+//  std::shared_ptr<AbstractNode> child = PyOpenSCADObjectToNodeMulti(obj, &child_dict);
+//  if (child == NULL) {
+//    PyErr_SetString(PyExc_TypeError, "Invalid type for Object in rotate");
+//    return NULL;
+//  }
+  node->matrix.rotate(M);
+//  node->setPyName(child->getPyName());
+
+  JsOpenSCADObjectFromNode(node);
 }
+
+#if 0
 
 PyObject *js_rotate_core(PyObject *obj, PyObject *val_a, PyObject *val_v)
 {
@@ -1461,14 +1410,15 @@ PyObject *js_oo_wrap(PyObject *obj, PyObject *args, PyObject *kwargs)
 
 #endif
 
-#define TAG_NODE "node"
 
 static void js_output(js_State *J)
 {
 //  PyObject *child_dict;
-  void *data = js_touserdata(J, 1, TAG_NODE);
-  std::shared_ptr<AbstractNode> child = JsOpenSCADObjectToNode(data);
-auto cube_node = std::dynamic_pointer_cast<CubeNode>(child);
+  if(js_isuserdata(J,1,TAG_NODE)){
+    void *data = js_touserdata(J, 1, TAG_NODE);
+    js_result_node = JsOpenSCADObjectToNode(data);
+  }
+//auto cube_node = std::dynamic_pointer_cast<CubeNode>(child);
 	
 
 //
@@ -1478,7 +1428,6 @@ auto cube_node = std::dynamic_pointer_cast<CubeNode>(child);
 //  }
 //  PyObject *key, *value;
 //  Py_ssize_t pos = 0;
-  js_result_node = child;
 //  mapping_name.clear();
 //  mapping_code.clear();
 //  mapping_level.clear();
@@ -2338,16 +2287,26 @@ PyObject *js_oo_path_extrude(PyObject *obj, PyObject *args, PyObject *kwargs)
   return path_extrude_core(obj, path, xdir, convexity, origin, scale, twist, closed, allow_intersect, fn, fa, fs);
 }
 
-PyObject *js_csg_sub(PyObject *self, PyObject *args, PyObject *kwargs, OpenSCADOperator mode)
+#endif
+
+void js_csg_sub(js_State *J, OpenSCADOperator mode)
 {
   DECLARE_INSTANCE
   int i;
-  int n;
 
   auto node = std::make_shared<CsgOpNode>(instance, mode);
-  char *kwlist[] = { "obj", NULL };
   node->r=0;
   node->fn=1;
+  int n=1;
+  while(1) {
+    if(!js_isuserdata(J,n,TAG_NODE)) break;
+    void *data = js_touserdata(J, n, TAG_NODE);
+    std::shared_ptr<AbstractNode> child = JsOpenSCADObjectToNode(data);
+    node->children.push_back(child);
+    n++;
+  }
+/*  
+  char *kwlist[] = { "obj", NULL };
   PyObject *objs = NULL;
   PyObject *obj;
   PyObject *child_dict;	  
@@ -2406,22 +2365,26 @@ PyObject *js_csg_sub(PyObject *self, PyObject *args, PyObject *kwargs, OpenSCADO
     }
   }
   return pyresult;
+  */
+  JsOpenSCADObjectFromNode(node);
 }
 
-PyObject *js_union(PyObject *self, PyObject *args, PyObject *kwargs)
+static void js_union(js_State *J)
 {
-  return js_csg_sub(self, args, kwargs, OpenSCADOperator::UNION);
+  return js_csg_sub(J, OpenSCADOperator::UNION);
 }
 
-PyObject *js_difference(PyObject *self, PyObject *args, PyObject *kwargs)
+static void js_difference(js_State *J)
 {
-  return js_csg_sub(self, args, kwargs, OpenSCADOperator::DIFFERENCE);
+  return js_csg_sub(J, OpenSCADOperator::DIFFERENCE);
 }
 
-PyObject *js_intersection(PyObject *self, PyObject *args, PyObject *kwargs)
+static void js_intersection(js_State *J)
 {
-  return js_csg_sub(self, args, kwargs, OpenSCADOperator::INTERSECTION);
+  return js_csg_sub(J, OpenSCADOperator::INTERSECTION);
 }
+
+#if 0
 
 PyObject *js_nb_sub(PyObject *arg1, PyObject *arg2, OpenSCADOperator mode)
 {
@@ -3650,6 +3613,10 @@ void registerJsFunctions(void) {
   js_newcfunction(js_interp, js_cube, "cube", 1); js_setglobal(js_interp, "cube");
   js_newcfunction(js_interp, js_sphere, "sphere", 1); js_setglobal(js_interp, "sphere");
   js_newcfunction(js_interp, js_cylinder, "cylinder", 2); js_setglobal(js_interp, "cylinder");
+  js_newcfunction(js_interp, js_union, "union", 1); js_setglobal(js_interp, "union");
+  js_newcfunction(js_interp, js_difference, "difference", 1); js_setglobal(js_interp, "difference");
+  js_newcfunction(js_interp, js_intersection, "intersection", 1); js_setglobal(js_interp, "intersection");
+  js_newcfunction(js_interp, js_rotate, "rotate", 1); js_setglobal(js_interp, "rotate");
   js_newcfunction(js_interp, js_output, "output", 1); js_setglobal(js_interp, "output");
 }
 

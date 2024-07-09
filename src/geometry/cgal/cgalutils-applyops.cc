@@ -14,7 +14,7 @@
 #include "ManifoldGeometry.h"
 #include "manifoldutils.h"
 #endif
-#include "core/node.h"
+#include "node.h"
 
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/normal_vector_newell_3.h>
