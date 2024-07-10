@@ -125,30 +125,7 @@ static void js_cube(js_State *J)
 //  PyObject *center = NULL;
 
 
-//  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|OO", kwlist,
-//                                   &size,
-//                                   &center)){
-//    PyErr_SetString(PyExc_TypeError, "Error during parsing cube(size)");
-//    return NULL;
-//  }	  
 
-//  if (size != NULL) {
-//    if (js_vectorval(size, &(node->x), &(node->y), &(node->z))) {
-//      PyErr_SetString(PyExc_TypeError, "Invalid Cube dimensions");
-//      return NULL;
-//    }
-//  }
-//  if(node->x <= 0 || node->y <= 0 || node ->z <= 0) {
-//     PyErr_SetString(PyExc_TypeError, "Cube Dimensions must be positive");
-//      return;
-//  }
-//  if (center == Py_True)  node->center = 1;
-//  else if (center == Py_False || center == NULL )  node->center = 0;
-//  else {
-//      PyErr_SetString(PyExc_TypeError, "Unknown Value for center parameter");
-//      return NULL;
-//  }
-//  js_retrieve_pyname(node);
   JsOpenSCADObjectFromNode(node);
 }
 
@@ -375,6 +352,11 @@ static void js_cylinder(js_State *J)
     if(js_hasproperty(J, 3, "angle")) {
       if(js_isnumber(J,-1))
         node->angle = js_tonumber(J, -1)?1:0;
+      js_pop(J,1);
+    }
+    if(js_hasproperty(J, 3, "r2")) {
+      if(js_isnumber(J,-1))
+        node->r2 = js_tonumber(J, -1)?1:0;
       js_pop(J,1);
     }
   }
@@ -854,6 +836,7 @@ void js_rotate(js_State *J)
     std::shared_ptr<AbstractNode> child = JsOpenSCADObjectToNode(data);
     node->children.push_back(child);
   }
+  Matrix3d M;
   Vector3d vec3(0,0,0);	
   if(js_isarray(J,2)) {
     if(js_hasindex(J, 2, 0)) {
@@ -868,41 +851,53 @@ void js_rotate(js_State *J)
       if(js_isnumber(J,-1)) vec3[2] = js_tonumber(J, -1);
       js_pop(J,1);
     }
-  }
 
-  Matrix3d M;
-  double sx = 0, sy = 0, sz = 0;
-  double cx = 1, cy = 1, cz = 1;
-  double a = 0.0;
-  bool ok = true;
-  if(vec3[2] != 0) {
-    a = vec3[2];
-    sz = sin_degrees(a);
-    cz = cos_degrees(a);
-  }
-  if(vec3[1] != 0) {
-    a = vec3[1];
-    sy = sin_degrees(a);
-    cy = cos_degrees(a);
-  }
-  if(vec3[0] != 0) {
-    a = vec3[0];
-    sx = sin_degrees(a);
-    cx = cos_degrees(a);
-  }
+    double sx = 0, sy = 0, sz = 0;
+    double cx = 1, cy = 1, cz = 1;
+    double a = 0.0;
+    bool ok = true;
+    if(vec3[2] != 0) {
+      a = vec3[2];
+      sz = sin_degrees(a);
+      cz = cos_degrees(a);
+    }
+    if(vec3[1] != 0) {
+      a = vec3[1];
+      sy = sin_degrees(a);
+      cy = cos_degrees(a);
+    }
+    if(vec3[0] != 0) {
+      a = vec3[0];
+      sx = sin_degrees(a);
+      cx = cos_degrees(a);
+    }
 
-  M << cy * cz,  cz *sx *sy - cx * sz,   cx *cz *sy + sx * sz,
-      cy *sz,  cx *cz + sx * sy * sz,  -cz * sx + cx * sy * sz,
+    M << cy * cz,  cz *sx *sy - cx * sz,   cx *cz *sy + sx * sz,
+        cy *sz,  cx *cz + sx * sy * sz,  -cz * sx + cx * sy * sz,
       -sy,       cy *sx,                  cx *cy;
+    node->matrix.rotate(M);
+  }
+  if(js_isnumber(J,2)) {
+    double angle=js_tonumber(J,2);	  
+    if(js_isarray(J,3)) {
+      if(js_hasindex(J, 3, 0)) {
+        if(js_isnumber(J,-1)) vec3[0] = js_tonumber(J, -1);
+        js_pop(J,1);
+      }
+      if(js_hasindex(J, 3, 1)) {
+        if(js_isnumber(J,-1)) vec3[1] = js_tonumber(J, -1);
+        js_pop(J,1);
+      }
+      if(js_hasindex(J, 3, 2)) {
+        if(js_isnumber(J,-1)) vec3[2] = js_tonumber(J, -1);
+        js_pop(J,1);
+      }
+    }  
+    M = angle_axis_degrees(angle, vec3);
+    node->matrix.rotate(M);
 
+  }
 
-//  PyObject *child_dict;
-//  std::shared_ptr<AbstractNode> child = PyOpenSCADObjectToNodeMulti(obj, &child_dict);
-//  if (child == NULL) {
-//    PyErr_SetString(PyExc_TypeError, "Invalid type for Object in rotate");
-//    return NULL;
-//  }
-  node->matrix.rotate(M);
 //  node->setPyName(child->getPyName());
 
   JsOpenSCADObjectFromNode(node);
@@ -1062,37 +1057,38 @@ PyObject *js_matrix_trans(PyObject *mat, Vector3d transvec)
   return js_frommatrix(raw);
 }
 
-PyObject *js_translate_sub(PyObject *obj, Vector3d translatevec)
+#endif
+void js_translate(js_State *J)
 {
-  PyObject *child_dict;
-  PyObject *mat = js_matrix_trans(obj,translatevec);
-  if(mat != nullptr) return mat;
-
   DECLARE_INSTANCE
   auto node = std::make_shared<TransformNode>(instance, "translate");
-  std::shared_ptr<AbstractNode> child;
-  child = PyOpenSCADObjectToNodeMulti(obj, &child_dict);
-  node->setPyName(child->getPyName());
-  if (child == NULL) {
-    PyErr_SetString(PyExc_TypeError, "Invalid type for Object in translate");
-    return NULL;
+  if(js_isuserdata(J,1,TAG_NODE)){
+    void *data = js_touserdata(J, 1, TAG_NODE);
+    std::shared_ptr<AbstractNode> child = JsOpenSCADObjectToNode(data);
+    node->children.push_back(child);
   }
-  node->matrix.translate(translatevec);
 
-  node->children.push_back(child);
-  PyObject *pyresult = PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
-  if(child_dict != nullptr) { // TODO dies ueberall
-    PyObject *key, *value;
-    Py_ssize_t pos = 0;
-     while(PyDict_Next(child_dict, &pos, &key, &value)) {
-       PyObject *value1 = js_matrix_trans(value,translatevec);
-       if(value1 != nullptr) PyDict_SetItem(((PyOpenSCADObject *) pyresult)->dict,key, value1);
-       else PyDict_SetItem(((PyOpenSCADObject *) pyresult)->dict,key, value);
+  Vector3d vec3(0,0,0);	
+  if(js_isarray(J,2)) {
+    if(js_hasindex(J, 2, 0)) {
+      if(js_isnumber(J,-1)) vec3[0] = js_tonumber(J, -1);
+      js_pop(J,1);
+    }
+    if(js_hasindex(J, 2, 1)) {
+      if(js_isnumber(J,-1)) vec3[1] = js_tonumber(J, -1);
+      js_pop(J,1);
+    }
+    if(js_hasindex(J, 2, 2)) {
+      if(js_isnumber(J,-1)) vec3[2] = js_tonumber(J, -1);
+      js_pop(J,1);
     }
   }
-  return pyresult;
+
+  node->matrix.translate(vec3);
+  JsOpenSCADObjectFromNode(node);
 }
 
+#if 0
 PyObject *js_translate_core(PyObject *obj, PyObject *v) 
 {
   double x = 0, y = 0, z = 0;
@@ -3607,16 +3603,18 @@ PyMappingMethods PyOpenSCADMapping =
 #endif
 
 
+#define JS_ADDFUNCTION(name) \
+  js_newcfunction(js_interp, js_##name, #name, 1); js_setglobal(js_interp, #name);
 
 void registerJsFunctions(void) {
-  js_newcfunction(js_interp, js_print, "print", 1); js_setglobal(js_interp, "print");
-  js_newcfunction(js_interp, js_cube, "cube", 1); js_setglobal(js_interp, "cube");
-  js_newcfunction(js_interp, js_sphere, "sphere", 1); js_setglobal(js_interp, "sphere");
-  js_newcfunction(js_interp, js_cylinder, "cylinder", 2); js_setglobal(js_interp, "cylinder");
-  js_newcfunction(js_interp, js_union, "union", 1); js_setglobal(js_interp, "union");
-  js_newcfunction(js_interp, js_difference, "difference", 1); js_setglobal(js_interp, "difference");
-  js_newcfunction(js_interp, js_intersection, "intersection", 1); js_setglobal(js_interp, "intersection");
-  js_newcfunction(js_interp, js_rotate, "rotate", 1); js_setglobal(js_interp, "rotate");
-  js_newcfunction(js_interp, js_output, "output", 1); js_setglobal(js_interp, "output");
+  JS_ADDFUNCTION(print)	
+  JS_ADDFUNCTION(cube)
+  JS_ADDFUNCTION(sphere)
+  JS_ADDFUNCTION(cylinder)
+  JS_ADDFUNCTION(difference)
+  JS_ADDFUNCTION(intersection)
+  JS_ADDFUNCTION(translate)
+  JS_ADDFUNCTION(rotate)
+  JS_ADDFUNCTION(output)
 }
 

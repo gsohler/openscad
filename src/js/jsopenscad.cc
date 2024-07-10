@@ -23,6 +23,9 @@
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
+
+/* MuJS is Copyright © 2013-2020 Artifex Software, Inc */
+
 #include "jsopenscad.h"
 #include "CsgOpNode.h"
 #include "Value.h"
@@ -818,21 +821,22 @@ PyMODINIT_FUNC PyInit_PyOpenSCAD(void)
 
 #define TAG_NODE "node"
 
-
+void JsFreeData(js_State *J, void *data) {
+  (void) std::move(data);	
+}
 void JsOpenSCADObjectFromNode(const std::shared_ptr<AbstractNode> &node)
 {
   auto dumb_ptr = new std::shared_ptr<AbstractNode>(node);
   js_currentfunction(js_interp);
   js_getproperty(js_interp, -1, "prototype");
   js_pushnull(js_interp);
-  js_newuserdata(js_interp, "node", static_cast<void *>(dumb_ptr), nullptr);
-  /// TODO use callback to free it
+  js_newuserdata(js_interp, "node", static_cast<void *>(dumb_ptr), JsFreeData);
 }
 
 std::shared_ptr<AbstractNode> JsOpenSCADObjectToNode(void *data)
 {
   auto dumb_ptr = static_cast<std::shared_ptr<AbstractNode> *>(data);
-  auto node = std::move(*dumb_ptr);
+  auto node = *dumb_ptr;
   // delete node
   return node;
 }
@@ -846,8 +850,17 @@ void initJs(double time)
 }  
 std::string evaluateJs(const std::string & code)
 {
+  char outbuf[BUFSIZ]="";
+  char errbuf[BUFSIZ]="";
+  setbuf(stdout, outbuf);
+  setbuf(stderr, errbuf);
   js_dostring(js_interp, code.c_str());
-  return "";	
+  fflush(stdout);
+  fflush(stderr);
+  setbuf(stdout, NULL);
+  setbuf(stderr, NULL);
+  if(*errbuf != '\0') LOG( message_group::Error, std::string(errbuf));
+  return outbuf;
 }
 void finishJs(void)
 {
