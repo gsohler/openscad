@@ -108,6 +108,9 @@
 #include <QSettings> //Include QSettings for direct operations on settings arrays
 #include "QSettingsCached.h"
 
+#include <curl/curl.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #ifdef ENABLE_PYTHON
 #include "python/python_public.h"
 #include "nettle/sha2.h"
@@ -165,6 +168,7 @@ std::string SHA256HashString(std::string aString){
 
 #include "PrintInitDialog.h"
 //#include "ExportPdfDialog.h"
+#include "ShareDesignDialog.h"
 #include "input/InputDriverEvent.h"
 #include "input/InputDriverManager.h"
 #include <cstdio>
@@ -484,6 +488,7 @@ MainWindow::MainWindow(const QStringList& filenames)
   connect(this->designActionMeasureAngle, SIGNAL(triggered()), this, SLOT(actionMeasureAngle()));
   connect(this->designActionFindHandle, SIGNAL(triggered()), this, SLOT(actionFindHandle()));
   connect(this->designAction3DPrint, SIGNAL(triggered()), this, SLOT(action3DPrint()));
+  connect(this->designShareDesign, SIGNAL(triggered()), this, SLOT(actionShareDesign()));
   connect(this->designCheckValidity, SIGNAL(triggered()), this, SLOT(actionCheckValidity()));
   connect(this->designActionDisplayAST, SIGNAL(triggered()), this, SLOT(actionDisplayAST()));
   connect(this->designActionDisplayCSGTree, SIGNAL(triggered()), this, SLOT(actionDisplayCSGTree()));
@@ -2672,6 +2677,80 @@ void MainWindow::actionDisplayCSGProducts()
   e->resize(600, 400);
   e->show();
   clearCurrentOutput();
+}
+ 
+ShareDesignDialog *shareDesignDialog;
+void MainWindow::actionShareDesignPublish()
+{
+  CURL *curl;
+  CURLcode res;
+  struct stat file_info;
+  curl_off_t speed_upload, total_time;
+  FILE *fd;
+  printf("Publish");	
+  auto design = shareDesignDialog->getDesignName();
+  auto author = shareDesignDialog->getAuthorName();
+  printf("%s %s\n",design.c_str(), author.c_str());
+
+ 
+  fd = fopen("debugit", "rb"); /* open file to upload */
+  if(!fd)
+    return 1; /* cannot continue */
+ 
+  /* to get the file size */
+  if(fstat(fileno(fd), &file_info) != 0)
+    return 1; /* cannot continue */
+ 
+  curl = curl_easy_init();
+  if(curl) {
+    /* upload to this place */
+    curl_easy_setopt(curl, CURLOPT_URL,
+                     "file:///home/dast/src/curl/debug/new");
+ 
+    /* tell it to "upload" to the URL */
+    curl_easy_setopt(curl, CURLOPT_UPLOAD, 1L);
+ 
+    /* set where to read from (on Windows you need to use READFUNCTION too) */
+    curl_easy_setopt(curl, CURLOPT_READDATA, fd);
+ 
+    /* and give the size of the upload (optional) */
+    curl_easy_setopt(curl, CURLOPT_INFILESIZE_LARGE,
+                     (curl_off_t)file_info.st_size);
+ 
+    /* enable verbose for easier tracing */
+    curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+ 
+    res = curl_easy_perform(curl);
+    /* Check for errors */
+    if(res != CURLE_OK) {
+      fprintf(stderr, "curl_easy_perform() failed: %s\n",
+              curl_easy_strerror(res));
+    }
+    else {
+      /* now extract transfer info */
+      curl_easy_getinfo(curl, CURLINFO_SPEED_UPLOAD_T, &speed_upload);
+      curl_easy_getinfo(curl, CURLINFO_TOTAL_TIME_T, &total_time);
+ 
+      fprintf(stderr, "Speed: %lu bytes/sec during %lu.%06lu seconds\n",
+              (unsigned long)speed_upload,
+              (unsigned long)(total_time / 1000000),
+              (unsigned long)(total_time % 1000000));
+    }
+    /* always cleanup */
+    curl_easy_cleanup(curl);
+  }
+  fclose(fd);
+  return 0;
+}
+
+void MainWindow::actionShareDesign()
+{
+  shareDesignDialog = new ShareDesignDialog();
+  connect(shareDesignDialog->publishButton, SIGNAL(clicked()), this, SLOT(actionShareDesignPublish()));
+
+  if (shareDesignDialog->exec() == QDialog::Rejected) {
+    return;
+  };
 }
 
 void MainWindow::actionCheckValidity()
