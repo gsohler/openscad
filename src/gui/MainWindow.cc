@@ -2678,46 +2678,47 @@ void MainWindow::actionDisplayCSGProducts()
   e->show();
   clearCurrentOutput();
 }
- 
+
+void html_encode(std::string& data) {
+    std::string buffer;
+    buffer.reserve(data.size());
+    for(size_t pos = 0; pos != data.size(); ++pos) {
+        switch(data[pos]) {
+            case '&':  buffer.append("&amp;");       break;
+            case '\"': buffer.append("&quot;");      break;
+            case '\'': buffer.append("&apos;");      break;
+            case '<':  buffer.append("&lt;");        break;
+            case '>':  buffer.append("&gt;");        break;
+            case '\n':  buffer.append(" ");        break;
+            default:   buffer.append(&data[pos], 1); break;
+        }
+    }
+    data.swap(buffer);
+}
+
 ShareDesignDialog *shareDesignDialog;
 void MainWindow::actionShareDesignPublish()
 {
+  int success=0;	
   CURL *curl;
   CURLcode res;
   struct stat file_info;
   curl_off_t speed_upload, total_time;
   FILE *fd;
-  printf("Publish");	
   auto design = shareDesignDialog->getDesignName();
   auto author = shareDesignDialog->getAuthorName();
-  printf("%s %s\n",design.c_str(), author.c_str());
+  std::string code=std::string(this->last_compiled_doc.toUtf8().constData());
+  html_encode(design);
+  html_encode(author);
+  html_encode(code);
 
- 
-  fd = fopen("debugit", "rb"); /* open file to upload */
-  if(!fd)
-    return 1; /* cannot continue */
- 
-  /* to get the file size */
-  if(fstat(fileno(fd), &file_info) != 0)
-    return 1; /* cannot continue */
- 
   curl = curl_easy_init();
+  std::string poststring="author="+author="&design="+design+"&code="+code;
+  printf("r %s\n",poststring.c_str());
   if(curl) {
-    /* upload to this place */
-    curl_easy_setopt(curl, CURLOPT_URL,
-                     "file:///home/dast/src/curl/debug/new");
- 
-    /* tell it to "upload" to the URL */
-    curl_easy_setopt(curl, CURLOPT_UPLOAD, 1L);
- 
-    /* set where to read from (on Windows you need to use READFUNCTION too) */
-    curl_easy_setopt(curl, CURLOPT_READDATA, fd);
- 
-    /* and give the size of the upload (optional) */
-    curl_easy_setopt(curl, CURLOPT_INFILESIZE_LARGE,
-                     (curl_off_t)file_info.st_size);
- 
-    /* enable verbose for easier tracing */
+    curl_easy_setopt(curl, CURLOPT_URL, "https://pythonscad.org/share_design.php");
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, poststring);
+    curl_easy_setopt(curl, CURLOPT_FORBID_REUSE, 1L);
     curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
  
     res = curl_easy_perform(curl);
@@ -2726,21 +2727,16 @@ void MainWindow::actionShareDesignPublish()
       fprintf(stderr, "curl_easy_perform() failed: %s\n",
               curl_easy_strerror(res));
     }
-    else {
-      /* now extract transfer info */
-      curl_easy_getinfo(curl, CURLINFO_SPEED_UPLOAD_T, &speed_upload);
-      curl_easy_getinfo(curl, CURLINFO_TOTAL_TIME_T, &total_time);
- 
-      fprintf(stderr, "Speed: %lu bytes/sec during %lu.%06lu seconds\n",
-              (unsigned long)speed_upload,
-              (unsigned long)(total_time / 1000000),
-              (unsigned long)(total_time % 1000000));
-    }
+    else success=1;
+    
     /* always cleanup */
     curl_easy_cleanup(curl);
   }
-  fclose(fd);
-  return 0;
+  shareDesignDialog->close();
+  if(success) 
+    QMessageBox::information(this,"Share Design","Design successfully submitted");  
+  else QMessageBox::information(this,"Share Design","Error during submission");  
+  printf("end\n");
 }
 
 void MainWindow::actionShareDesign()

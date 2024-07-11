@@ -30,6 +30,8 @@
 ShareDesignDialog::ShareDesignDialog()
 {
   setupUi(this);
+  this->setAttribute(Qt::WA_DeleteOnClose);
+
 }
 // Getters
 

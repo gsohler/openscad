@@ -202,13 +202,13 @@ ManifoldGeometry ManifoldGeometry::minkowski(const ManifoldGeometry& other) cons
 
 
 Polygon2d ManifoldGeometry::slice() const {
-  manifold::Polygons cross_section = manifold_->Slice();
-  return ManifoldUtils::polygonsToPolygon2d(cross_section);
+  auto cross_section = manifold_->Slice();
+  return ManifoldUtils::polygonsToPolygon2d(cross_section.ToPolygons());
 }
 
 Polygon2d ManifoldGeometry::project() const {
   auto cross_section = manifold_->Project();
-  return ManifoldUtils::polygonsToPolygon2d(cross_section);
+  return ManifoldUtils::polygonsToPolygon2d(cross_section.ToPolygons());
 }
 
 void ManifoldGeometry::transform(const Transform3d& mat) {
