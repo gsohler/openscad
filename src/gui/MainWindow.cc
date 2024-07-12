@@ -23,7 +23,9 @@
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
+#ifdef _WIN32
 #include "winsock2.h"
+#endif
 #include <iostream>
 #include <memory>
 
@@ -2690,7 +2692,6 @@ void html_encode(std::string& data) {
             case '\'': buffer.append("&apos;");      break;
             case '<':  buffer.append("&lt;");        break;
             case '>':  buffer.append("&gt;");        break;
-            case '\n':  buffer.append(" ");        break;
             default:   buffer.append(&data[pos], 1); break;
         }
     }
@@ -2700,6 +2701,21 @@ void html_encode(std::string& data) {
 ShareDesignDialog *shareDesignDialog;
 void MainWindow::actionShareDesignPublish()
 {
+  QMessageBox::StandardButton disclaimer;
+  disclaimer = QMessageBox::question(this, "Disclaimer", "By Clicking Yes, you accept that:\n\
+\n\
+1) Your design will be public on pythonscad.org\n\
+2) it's on good purpose and not offending to anybody\n\
+3) you keep the copyright by your name \n\
+4) you accept that anybody can use it\n\
+5) no commerical use/adverisement\n\
+6) inapropriate content will be deleted without prior  notice\n\
+\n\
+\nProceed?", QMessageBox::Yes|QMessageBox::No);
+  if (disclaimer != QMessageBox::Yes) {
+    shareDesignDialog->close();
+    return;	  
+  }
   int success=0;	
   CURL *curl;
   CURLcode res;
@@ -2712,15 +2728,15 @@ void MainWindow::actionShareDesignPublish()
   html_encode(design);
   html_encode(author);
   html_encode(code);
+  std::string poststring="author=" + author +"&design=" + design + "&code="+code;
 
   curl = curl_easy_init();
-  std::string poststring="author="+author="&design="+design+"&code="+code;
-  printf("r %s\n",poststring.c_str());
   if(curl) {
     curl_easy_setopt(curl, CURLOPT_URL, "https://pythonscad.org/share_design.php");
-    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, poststring);
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, poststring.size());
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, poststring.c_str());
     curl_easy_setopt(curl, CURLOPT_FORBID_REUSE, 1L);
-    curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+//    curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
  
     res = curl_easy_perform(curl);
     /* Check for errors */
@@ -2737,7 +2753,6 @@ void MainWindow::actionShareDesignPublish()
   if(success) 
     QMessageBox::information(this,"Share Design","Design successfully submitted");  
   else QMessageBox::information(this,"Share Design","Error during submission");  
-  printf("end\n");
 }
 
 void MainWindow::actionShareDesign()
