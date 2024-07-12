@@ -23,6 +23,9 @@
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
+#ifdef _WIN32
+#include "winsock2.h"
+#endif
 #include <iostream>
 #include <memory>
 
@@ -108,6 +111,9 @@
 #include <QSettings> //Include QSettings for direct operations on settings arrays
 #include "QSettingsCached.h"
 
+#include <curl/curl.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #ifdef ENABLE_PYTHON
 #include "python/python_public.h"
 #include "nettle/sha2.h"
@@ -165,6 +171,7 @@ std::string SHA256HashString(std::string aString){
 
 #include "PrintInitDialog.h"
 //#include "ExportPdfDialog.h"
+#include "ShareDesignDialog.h"
 #include "input/InputDriverEvent.h"
 #include "input/InputDriverManager.h"
 #include <cstdio>
@@ -484,6 +491,7 @@ MainWindow::MainWindow(const QStringList& filenames)
   connect(this->designActionMeasureAngle, SIGNAL(triggered()), this, SLOT(actionMeasureAngle()));
   connect(this->designActionFindHandle, SIGNAL(triggered()), this, SLOT(actionFindHandle()));
   connect(this->designAction3DPrint, SIGNAL(triggered()), this, SLOT(action3DPrint()));
+  connect(this->designShareDesign, SIGNAL(triggered()), this, SLOT(actionShareDesign()));
   connect(this->designCheckValidity, SIGNAL(triggered()), this, SLOT(actionCheckValidity()));
   connect(this->designActionDisplayAST, SIGNAL(triggered()), this, SLOT(actionDisplayAST()));
   connect(this->designActionDisplayCSGTree, SIGNAL(triggered()), this, SLOT(actionDisplayCSGTree()));
@@ -2672,6 +2680,89 @@ void MainWindow::actionDisplayCSGProducts()
   e->resize(600, 400);
   e->show();
   clearCurrentOutput();
+}
+
+void html_encode(std::string& data) {
+    std::string buffer;
+    buffer.reserve(data.size());
+    for(size_t pos = 0; pos != data.size(); ++pos) {
+        switch(data[pos]) {
+            case '&':  buffer.append("&amp;");       break;
+            case '\"': buffer.append("&quot;");      break;
+            case '\'': buffer.append("&apos;");      break;
+            case '<':  buffer.append("&lt;");        break;
+            case '>':  buffer.append("&gt;");        break;
+            default:   buffer.append(&data[pos], 1); break;
+        }
+    }
+    data.swap(buffer);
+}
+
+ShareDesignDialog *shareDesignDialog;
+void MainWindow::actionShareDesignPublish()
+{
+  QMessageBox::StandardButton disclaimer;
+  disclaimer = QMessageBox::question(this, "Disclaimer", "By Clicking Yes, you accept that:\n\
+\n\
+1) Your design will be public on pythonscad.org\n\
+2) it's on good purpose and not offending to anybody\n\
+3) you keep the copyright by your name \n\
+4) you accept that anybody can use it\n\
+5) no commerical use/adverisement\n\
+6) inapropriate content will be deleted without prior  notice\n\
+\n\
+\nProceed?", QMessageBox::Yes|QMessageBox::No);
+  if (disclaimer != QMessageBox::Yes) {
+    shareDesignDialog->close();
+    return;	  
+  }
+  int success=0;	
+  CURL *curl;
+  CURLcode res;
+  struct stat file_info;
+  curl_off_t speed_upload, total_time;
+  FILE *fd;
+  auto design = shareDesignDialog->getDesignName();
+  auto author = shareDesignDialog->getAuthorName();
+  std::string code=std::string(this->last_compiled_doc.toUtf8().constData());
+  html_encode(design);
+  html_encode(author);
+  html_encode(code);
+  std::string poststring="author=" + author +"&design=" + design + "&code="+code;
+
+  curl = curl_easy_init();
+  if(curl) {
+    curl_easy_setopt(curl, CURLOPT_URL, "https://pythonscad.org/share_design.php");
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, poststring.size());
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, poststring.c_str());
+    curl_easy_setopt(curl, CURLOPT_FORBID_REUSE, 1L);
+//    curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+ 
+    res = curl_easy_perform(curl);
+    /* Check for errors */
+    if(res != CURLE_OK) {
+      fprintf(stderr, "curl_easy_perform() failed: %s\n",
+              curl_easy_strerror(res));
+    }
+    else success=1;
+    
+    /* always cleanup */
+    curl_easy_cleanup(curl);
+  }
+  shareDesignDialog->close();
+  if(success) 
+    QMessageBox::information(this,"Share Design","Design successfully submitted");  
+  else QMessageBox::information(this,"Share Design","Error during submission");  
+}
+
+void MainWindow::actionShareDesign()
+{
+  shareDesignDialog = new ShareDesignDialog();
+  connect(shareDesignDialog->publishButton, SIGNAL(clicked()), this, SLOT(actionShareDesignPublish()));
+
+  if (shareDesignDialog->exec() == QDialog::Rejected) {
+    return;
+  };
 }
 
 void MainWindow::actionCheckValidity()

@@ -253,6 +253,8 @@ private slots:
   void actionMeasureDistance();
   void actionMeasureAngle();
   void actionFindHandle();
+  void actionShareDesignPublish();
+  void actionShareDesign();
   void actionCheckValidity();
   void actionDisplayAST();
   void actionDisplayCSGTree();

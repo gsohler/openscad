@@ -554,6 +554,19 @@ if(ENABLE_PYTHON)
   )
   target_link_libraries(OpenSCAD PRIVATE OpenSCADPy)
 endif()
+if(MXECROSS)
+  find_package(CURL REQUIRED)
+#  message(STATUS ${CURL_FOUND})
+#  message(STATUS ${CURL_INCLUDE_DIR})
+#  message(STATUS ${CURL_INCLUDE_LIBRARIES})
+#  message(STATUS ${CURL_VERSION_STRING})
+  target_compile_definitions(OpenSCAD PRIVATE CURL_STATICLIB)
+  target_include_directories(OpenSCAD SYSTEM PRIVATE ${CURL_INCLUDE_DIR})
+  target_link_libraries(OpenSCAD PRIVATE "libcurl.a;libidn2.a;libssh2.a;libunistring.a")
+else()	
+  target_link_directories(OpenSCAD PRIVATE "/usr/lib64")
+  target_link_libraries(OpenSCAD PRIVATE "libcurl.so")
+endif()
 
 if(ENABLE_HIDAPI)
   find_package(HidAPI 0.10 QUIET)
@@ -1180,6 +1193,7 @@ set(GUI_SOURCES
   src/gui/ErrorLog.cc
   src/gui/EventFilter.h
   src/gui/ExportPdfDialog.cc
+  src/gui/ShareDesignDialog.cc
   src/gui/FontListDialog.cc
   src/gui/FontListTableView.cc
   src/gui/InitConfigurator.cc
@@ -1245,6 +1259,7 @@ set(GUI_HEADERS
     src/gui/Editor.h
     src/gui/ErrorLog.h
     src/gui/EventFilter.h
+    src/gui/ShareDesignDialog.h
     src/gui/ExportPdfDialog.h
     src/gui/FontListDialog.h
     src/gui/FontListTableView.h
@@ -1298,6 +1313,7 @@ set(GUI_UIS
     src/gui/Console.ui
     src/gui/ErrorLog.ui
     src/gui/ExportPdfDialog.ui
+    src/gui/ShareDesignDialog.ui
     src/gui/FontListDialog.ui
     src/gui/LaunchingScreen.ui
     src/gui/LibraryInfoDialog.ui
