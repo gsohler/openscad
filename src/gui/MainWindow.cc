@@ -171,6 +171,7 @@ std::string SHA256HashString(std::string aString){
 
 #include "PrintInitDialog.h"
 //#include "ExportPdfDialog.h"
+#include "LoadShareDesignDialog.h"
 #include "ShareDesignDialog.h"
 #include "input/InputDriverEvent.h"
 #include "input/InputDriverManager.h"
@@ -492,6 +493,7 @@ MainWindow::MainWindow(const QStringList& filenames)
   connect(this->designActionFindHandle, SIGNAL(triggered()), this, SLOT(actionFindHandle()));
   connect(this->designAction3DPrint, SIGNAL(triggered()), this, SLOT(action3DPrint()));
   connect(this->designShareDesign, SIGNAL(triggered()), this, SLOT(actionShareDesign()));
+  connect(this->designLoadShareDesign, SIGNAL(triggered()), this, SLOT(actionLoadShareDesign()));
   connect(this->designCheckValidity, SIGNAL(triggered()), this, SLOT(actionCheckValidity()));
   connect(this->designActionDisplayAST, SIGNAL(triggered()), this, SLOT(actionDisplayAST()));
   connect(this->designActionDisplayCSGTree, SIGNAL(triggered()), this, SLOT(actionDisplayCSGTree()));
@@ -2689,6 +2691,7 @@ void html_encode(std::string& data) {
         switch(data[pos]) {
             case '\"': buffer.append("%22");        break;
             case '<':  buffer.append("%3C");        break;
+            case '+':  buffer.append("%2b");        break;
             case '>':  buffer.append("%3e");        break;
             case ' ':  buffer.append("%20");        break;
             case '&':  buffer.append("%26");        break;
@@ -2721,9 +2724,6 @@ void MainWindow::actionShareDesignPublish()
   int success=0;	
   CURL *curl;
   CURLcode res;
-  struct stat file_info;
-  curl_off_t speed_upload, total_time;
-  FILE *fd;
   auto design = shareDesignDialog->getDesignName();
   auto author = shareDesignDialog->getAuthorName();
   std::string code=std::string(this->last_compiled_doc.toUtf8().constData());
@@ -2735,7 +2735,7 @@ void MainWindow::actionShareDesignPublish()
   curl = curl_easy_init();
   if(curl) {
     curl_easy_setopt(curl, CURLOPT_URL, "https://pythonscad.org/share_design.php");
-    curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, poststring.size());
+//    curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, poststring.size());
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, poststring.c_str());
     curl_easy_setopt(curl, CURLOPT_FORBID_REUSE, 1L);
 //    curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
@@ -2763,6 +2763,110 @@ void MainWindow::actionShareDesign()
   connect(shareDesignDialog->publishButton, SIGNAL(clicked()), this, SLOT(actionShareDesignPublish()));
 
   if (shareDesignDialog->exec() == QDialog::Rejected) {
+    return;
+  };
+}
+
+LoadShareDesignDialog *loadShareDesignDialog;
+std::string actionLoadSharedDesignData;
+
+size_t actionLoadSharedDesignDataFunc(void *ptr, size_t size, size_t nmemb, struct string *s)
+{
+  actionLoadSharedDesignData += std::string((char *)ptr, size*nmemb);
+  return size*nmemb;
+}
+
+std::vector<std::vector<std::string>> loadShareDesignDatabase;
+
+void MainWindow::actionLoadShareDesignSelect()
+{
+  CURL *curl;
+  CURLcode res;
+  int success=0;
+  int selected =loadShareDesignDialog->list_design->currentRow();
+  if(selected < 0 || selected >= loadShareDesignDatabase.size()) return;
+  std::string url = "https://pythonscad.org/shared_designs/"+loadShareDesignDatabase[selected][2];
+  curl = curl_easy_init();
+  if(curl) {
+    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curl, CURLOPT_FORBID_REUSE, 1L);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, actionLoadSharedDesignDataFunc);
+ 
+    actionLoadSharedDesignData="";
+    res = curl_easy_perform(curl);
+    /* Check for errors */
+    if(res != CURLE_OK) {
+      fprintf(stderr, "curl_easy_perform() failed: %s\n",
+              curl_easy_strerror(res));
+    }
+    else success=1;
+    
+    /* always cleanup */
+    curl_easy_cleanup(curl);
+  }
+  this->activeEditor->setPlainText(QString(actionLoadSharedDesignData.c_str()));
+
+  loadShareDesignDialog->close();
+}
+
+void MainWindow::actionLoadShareDesign()
+{
+  CURL *curl;
+  CURLcode res;
+  int success=0;
+  curl = curl_easy_init();
+  if(curl) {
+    curl_easy_setopt(curl, CURLOPT_URL, "https://pythonscad.org/list_design.php");
+    curl_easy_setopt(curl, CURLOPT_FORBID_REUSE, 1L);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, actionLoadSharedDesignDataFunc);
+ 
+    actionLoadSharedDesignData="";
+    res = curl_easy_perform(curl);
+    /* Check for errors */
+    if(res != CURLE_OK) {
+      fprintf(stderr, "curl_easy_perform() failed: %s\n",
+              curl_easy_strerror(res));
+    }
+    else success=1;
+    
+    /* always cleanup */
+    curl_easy_cleanup(curl);
+  }
+
+  loadShareDesignDialog = new LoadShareDesignDialog();
+  // now json_decode
+  std::string word;
+  std::vector<std::string> words;
+  loadShareDesignDatabase.clear();
+  int in_string=0;
+  int level=0;
+  for(int i=0;i<actionLoadSharedDesignData.size();i++){
+    switch(actionLoadSharedDesignData[i])
+    {	  
+      case '[': level++; break;
+      case ']': 
+        if(level == 2) {
+          loadShareDesignDatabase.push_back(words);
+	  if(words.size() > 0) loadShareDesignDialog->list_design->addItem(QString(words[0].c_str()));
+
+          words.clear();	  
+	}		
+        level--; break;		
+      case '\'':
+        if(in_string){
+         words.push_back(word);
+         word="";	 
+        }		
+        in_string=1-in_string;		
+        break;	      
+      default:
+        if(in_string)word += actionLoadSharedDesignData[i];	      
+	break;
+	    
+    }
+  }
+  connect(loadShareDesignDialog->selectButton, SIGNAL(clicked()), this, SLOT(actionLoadShareDesignSelect()));
+  if (loadShareDesignDialog->exec() == QDialog::Rejected) {
     return;
   };
 }

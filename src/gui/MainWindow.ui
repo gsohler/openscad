@@ -318,6 +318,7 @@
     <addaction name="designActionMeasureAngle"/>
     <addaction name="designActionFindHandle"/>
     <addaction name="designShareDesign"/>
+    <addaction name="designLoadShareDesign"/>
     <addaction name="separator"/>
     <addaction name="designCheckValidity"/>
     <addaction name="designActionDisplayAST"/>
@@ -1015,6 +1016,11 @@
   <action name="designShareDesign">
    <property name="text">
     <string>&amp;Share Design</string>
+   </property>
+  </action>
+ <action name="designLoadShareDesign">
+   <property name="text">
+    <string>&amp;Load shared Design</string>
    </property>
   </action>
   <action name="designCheckValidity">

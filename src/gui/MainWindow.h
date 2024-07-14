@@ -254,7 +254,9 @@ private slots:
   void actionMeasureAngle();
   void actionFindHandle();
   void actionShareDesignPublish();
+  void actionLoadShareDesignSelect();
   void actionShareDesign();
+  void actionLoadShareDesign();
   void actionCheckValidity();
   void actionDisplayAST();
   void actionDisplayCSGTree();
