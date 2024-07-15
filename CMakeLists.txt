@@ -41,7 +41,6 @@ option(ENABLE_GLX "Enable GLX support if available" ON)
 # For now, we'll default to whatever OpenCSG uses (>=1.6 -> GLAD, <1.6 -> GLEW)
 option(USE_GLAD "Use GLAD. Mutually exclusive from USE_GLEW" OFF)
 option(USE_GLEW "Use GLEW. Mutually exclusive from USE_GLEW" OFF)
-option(WASM "Build WebAssembly, (implies NULLGL=ON) " OFF)
 option(NULLGL "Build without OpenGL, (implies HEADLESS=ON) " OFF)
 option(IDPREFIX "Prefix CSG nodes with index # (debugging purposes only, will break node cache)" OFF)
 option(PROFILE "Enable compiling with profiling / test coverage instrumentation" OFF)
@@ -138,11 +137,29 @@ if(PROFILE)
   SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${GCC_COVERAGE_LINK_FLAGS}")
 endif()
 
-if(WASM)
+if (CMAKE_SYSTEM_NAME STREQUAL Emscripten)
+  set(Boost_USE_STATIC_LIBS ON CACHE BOOL "" FORCE)
+  set(Boost_USE_STATIC_RUNTIME ON CACHE BOOL "" FORCE)
+  set(ENABLE_CAIRO OFF CACHE BOOL "" FORCE)
+  set(ENABLE_TBB OFF CACHE BOOL "" FORCE)
   set(NULLGL ON CACHE BOOL "" FORCE)
   set(ENABLE_PYTHON OFF CACHE BOOL "" FORCE)
+  set(USE_MIMALLOC OFF CACHE BOOL "" FORCE)
   set(ENV{PKG_CONFIG_PATH} "/emsdk/upstream/emscripten/cache/sysroot/lib/pkgconfig")
   target_compile_definitions(OpenSCAD PRIVATE CGAL_DISABLE_ROUNDING_MATH_CHECK)
+  target_link_libraries(OpenSCAD PRIVATE /emsdk/upstream/emscripten/cache/sysroot/lib/libz.a)
+  target_link_options(OpenSCAD PUBLIC
+    -sALLOW_MEMORY_GROWTH=1
+    -sENVIRONMENT=web,worker
+    -sEXIT_RUNTIME=1
+    -sEXPORT_ES6=1
+    -sEXPORT_NAME=OpenSCAD
+    -sEXPORTED_RUNTIME_METHODS=['FS','ENV','callMain','ERRNO_CODES']
+    -sFORCE_FILESYSTEM=1
+    -sMODULARIZE=1
+    -sNO_DISABLE_EXCEPTION_CATCHING
+    -sUSE_PTHREADS=0
+  )
 endif()
 
 if(NULLGL)
@@ -536,6 +553,19 @@ if(ENABLE_PYTHON)
     "src/utils"
   )
   target_link_libraries(OpenSCAD PRIVATE OpenSCADPy)
+endif()
+if(MXECROSS)
+  find_package(CURL REQUIRED)
+#  message(STATUS ${CURL_FOUND})
+#  message(STATUS ${CURL_INCLUDE_DIR})
+#  message(STATUS ${CURL_INCLUDE_LIBRARIES})
+#  message(STATUS ${CURL_VERSION_STRING})
+  target_compile_definitions(OpenSCAD PRIVATE CURL_STATICLIB)
+  target_include_directories(OpenSCAD SYSTEM PRIVATE ${CURL_INCLUDE_DIR})
+  target_link_libraries(OpenSCAD PRIVATE "libcurl.a;libidn2.a;libssh2.a;libunistring.a")
+else()	
+  target_link_directories(OpenSCAD PRIVATE "/usr/lib64")
+  target_link_libraries(OpenSCAD PRIVATE "libcurl.so")
 endif()
 
 if(ENABLE_HIDAPI)
@@ -1156,6 +1186,7 @@ set(GUI_SOURCES
   ${GUI_SOURCES}
   src/gui/AutoUpdater.cc
   src/gui/CGALWorker.cc
+  src/gui/CSGWorker.cc
   src/gui/ViewportControl.cc
   src/gui/Console.cc
   src/gui/Dock.cc
@@ -1163,6 +1194,8 @@ set(GUI_SOURCES
   src/gui/ErrorLog.cc
   src/gui/EventFilter.h
   src/gui/ExportPdfDialog.cc
+  src/gui/LoadShareDesignDialog.cc
+  src/gui/ShareDesignDialog.cc
   src/gui/FontListDialog.cc
   src/gui/FontListTableView.cc
   src/gui/InitConfigurator.cc
@@ -1228,6 +1261,8 @@ set(GUI_HEADERS
     src/gui/Editor.h
     src/gui/ErrorLog.h
     src/gui/EventFilter.h
+    src/gui/LoadShareDesignDialog.h
+    src/gui/ShareDesignDialog.h
     src/gui/ExportPdfDialog.h
     src/gui/FontListDialog.h
     src/gui/FontListTableView.h
@@ -1281,6 +1316,8 @@ set(GUI_UIS
     src/gui/Console.ui
     src/gui/ErrorLog.ui
     src/gui/ExportPdfDialog.ui
+    src/gui/ShareDesignDialog.ui
+    src/gui/LoadShareDesignDialog.ui
     src/gui/FontListDialog.ui
     src/gui/LaunchingScreen.ui
     src/gui/LibraryInfoDialog.ui
@@ -1486,6 +1523,10 @@ if(NOT APPLE OR APPLE_UNIX)
   install(DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/locale DESTINATION "${OPENSCAD_INSTALL_RESOURCEDIR}" FILES_MATCHING PATTERN "*/LC_MESSAGES/openscad.mo")
   install(DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/shaders DESTINATION "${OPENSCAD_INSTALL_RESOURCEDIR}")
   install(DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/templates DESTINATION "${OPENSCAD_INSTALL_RESOURCEDIR}" FILES_MATCHING PATTERN "*.json")
+else()
+  install(TARGETS ${CMAKE_PROJECT_NAME}
+      BUNDLE DESTINATION ${CMAKE_INSTALL_BINDIR}
+  )
 endif()
 
 # Packaging: CPACK_* settings should be configured before `include(CPack)`

@@ -115,7 +115,6 @@ void Renderer::setupShader() {
     glUniform1i(renderer_shader.data.csg_rendering.tex1 , 0);
   }
 
-  PRINTD("Renderer() end");
 }
 
 void Renderer::resize(int /*w*/, int /*h*/)

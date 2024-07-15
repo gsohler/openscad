@@ -30,6 +30,7 @@ Q_IMPORT_PLUGIN(QSvgPlugin)
 
 class BuiltinContext;
 class CGALWorker;
+class CSGWorker;
 class CSGNode;
 class CSGProducts;
 class FontListDialog;
@@ -37,6 +38,7 @@ class LibraryInfoDialog;
 class Preferences;
 class ProgressWidget;
 class ThrownTogetherRenderer;
+class CSGTreeEvaluator;
 
 class MainWindow : public QMainWindow, public Ui::MainWindow, public InputEventHandler
 {
@@ -127,15 +129,17 @@ public:
   void exceptionCleanup();
   void setLastFocus(QWidget *widget);
   void UnknownExceptionCleanup(std::string msg = "");
-
+ CSGTreeEvaluator *csgrenderer;
   bool isLightTheme();
+  void compileCSG();
+  void compileCSGThread();
+  void csgRenderFinished();
 
 private:
   void initActionIcon(QAction *action, const char *darkResource, const char *lightResource);
   void setRenderVariables(ContextHandle<BuiltinContext>& context);
   void updateCompileResult();
   void compile(bool reload, bool forcedone = false);
-  void compileCSG();
   bool checkEditorModified();
   QString dumpCSGTree(const std::shared_ptr<AbstractNode>& root);
 
@@ -159,6 +163,7 @@ public slots:
   void updateRecentFiles(const QString& FileSavedOrOpened);
   void updateRecentFileActions();
   void handleFileDrop(const QUrl& url);
+  void compileCSGDone();
 
 private slots:
   void actionOpen();
@@ -248,6 +253,10 @@ private slots:
   void actionMeasureDistance();
   void actionMeasureAngle();
   void actionFindHandle();
+  void actionShareDesignPublish();
+  void actionLoadShareDesignSelect();
+  void actionShareDesign();
+  void actionLoadShareDesign();
   void actionCheckValidity();
   void actionDisplayAST();
   void actionDisplayCSGTree();
@@ -379,6 +388,7 @@ private:
   QTemporaryFile *tempFile{nullptr};
   ProgressWidget *progresswidget{nullptr};
   CGALWorker *cgalworker;
+  CSGWorker *csgworker;
   QMutex consolemutex;
   EditorInterface *renderedEditor; // stores pointer to editor which has been most recently rendered
   time_t includes_mtime{0}; // latest include mod time

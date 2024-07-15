@@ -23,8 +23,12 @@
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
+#ifdef _WIN32
+#include "winsock2.h"
+#endif
 #include <iostream>
 #include <memory>
+
 #include "boost-utils.h"
 #include "Builtins.h"
 #include "BuiltinContext.h"
@@ -107,6 +111,9 @@
 #include <QSettings> //Include QSettings for direct operations on settings arrays
 #include "QSettingsCached.h"
 
+#include <curl/curl.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #ifdef ENABLE_PYTHON
 #include "python/python_public.h"
 #include "nettle/sha2.h"
@@ -146,6 +153,7 @@ std::string SHA256HashString(std::string aString){
 #include "CGALRenderer.h"
 #include "LegacyCGALRenderer.h"
 #include "CGALWorker.h"
+#include "CSGWorker.h"
 
 #ifdef ENABLE_CGAL
 #include "cgal.h"
@@ -163,6 +171,8 @@ std::string SHA256HashString(std::string aString){
 
 #include "PrintInitDialog.h"
 //#include "ExportPdfDialog.h"
+#include "LoadShareDesignDialog.h"
+#include "ShareDesignDialog.h"
 #include "input/InputDriverEvent.h"
 #include "input/InputDriverManager.h"
 #include <cstdio>
@@ -336,6 +346,10 @@ MainWindow::MainWindow(const QStringList& filenames)
   parsed_file = nullptr;
   absolute_root_node = nullptr;
 
+  this->csgworker = new CSGWorker(this);
+  connect(this->csgworker, SIGNAL(done(void)),
+          this, SLOT(compileCSGDone(void)));
+
   // Open Recent
   for (auto& recent : this->actionRecentFile) {
     recent = new QAction(this);
@@ -478,6 +492,8 @@ MainWindow::MainWindow(const QStringList& filenames)
   connect(this->designActionMeasureAngle, SIGNAL(triggered()), this, SLOT(actionMeasureAngle()));
   connect(this->designActionFindHandle, SIGNAL(triggered()), this, SLOT(actionFindHandle()));
   connect(this->designAction3DPrint, SIGNAL(triggered()), this, SLOT(action3DPrint()));
+  connect(this->designShareDesign, SIGNAL(triggered()), this, SLOT(actionShareDesign()));
+  connect(this->designLoadShareDesign, SIGNAL(triggered()), this, SLOT(actionLoadShareDesign()));
   connect(this->designCheckValidity, SIGNAL(triggered()), this, SLOT(actionCheckValidity()));
   connect(this->designActionDisplayAST, SIGNAL(triggered()), this, SLOT(actionDisplayAST()));
   connect(this->designActionDisplayCSGTree, SIGNAL(triggered()), this, SLOT(actionDisplayCSGTree()));
@@ -1326,10 +1342,17 @@ void MainWindow::compileCSG()
     // Main CSG evaluation
     this->progresswidget = new ProgressWidget(this);
     connect(this->progresswidget, SIGNAL(requestShow()), this, SLOT(showProgress()));
+  } catch (const HardWarningException&) {
+    exceptionCleanup();
+  }
+  csgworker->start();
+}
 
+void MainWindow::compileCSGThread(void)
+{
     GeometryEvaluator geomevaluator(this->tree);
 #ifdef ENABLE_OPENCSG
-    CSGTreeEvaluator csgrenderer(this->tree, &geomevaluator);
+    this->csgrenderer = new CSGTreeEvaluator(this->tree, &geomevaluator);
 #endif
 
     if (!isClosing) progress_report_prep(this->root_node, report_func, this);
@@ -1337,7 +1360,7 @@ void MainWindow::compileCSG()
     try {
 #ifdef ENABLE_OPENCSG
       this->processEvents();
-      this->csgRoot = csgrenderer.buildCSGTree(*root_node);
+      this->csgRoot = this->csgrenderer->buildCSGTree(*root_node);
 #endif
       renderStatistic.printCacheStatistic();
       this->processEvents();
@@ -1346,6 +1369,10 @@ void MainWindow::compileCSG()
     } catch (const HardWarningException&) {
       LOG("CSG generation cancelled due to hardwarning being enabled.");
     }
+}
+void MainWindow::compileCSGDone()
+{
+  try{
     progress_report_fin();
     updateStatusBar(nullptr);
 
@@ -1367,7 +1394,7 @@ void MainWindow::compileCSG()
       }
     }
 
-    const std::vector<std::shared_ptr<CSGNode>>& highlight_terms = csgrenderer.getHighlightNodes();
+    const std::vector<std::shared_ptr<CSGNode>>& highlight_terms = this->csgrenderer->getHighlightNodes();
     if (highlight_terms.size() > 0) {
       LOG("Compiling highlights (%1$d CSG Trees)...", highlight_terms.size());
       this->processEvents();
@@ -1382,8 +1409,7 @@ void MainWindow::compileCSG()
     } else {
       this->highlights_products.reset();
     }
-
-    const auto& background_terms = csgrenderer.getBackgroundNodes();
+    const auto& background_terms = this->csgrenderer->getBackgroundNodes();
     if (background_terms.size() > 0) {
       LOG("Compiling background (%1$d CSG Trees)...", background_terms.size());
       this->processEvents();
@@ -1435,6 +1461,8 @@ void MainWindow::compileCSG()
   } catch (const HardWarningException&) {
     exceptionCleanup();
   }
+  delete this->csgrenderer ;
+  csgRenderFinished();
 }
 
 void MainWindow::actionOpen()
@@ -2066,17 +2094,6 @@ void MainWindow::csgReloadRender()
 {
   if (this->root_node) compileCSG();
 
-  // Go to non-CGAL view mode
-  if (viewActionThrownTogether->isChecked()) {
-    viewModeThrownTogether();
-  } else {
-#ifdef ENABLE_OPENCSG
-    viewModePreview();
-#else
-    viewModeThrownTogether();
-#endif
-  }
-  compileEnded();
 }
 
 void MainWindow::prepareCompile(const char *afterCompileSlot, bool procevents, bool preview)
@@ -2116,7 +2133,10 @@ void MainWindow::actionRenderPreview()
 void MainWindow::csgRender()
 {
   if (this->root_node) compileCSG();
+}
 
+void MainWindow::csgRenderFinished()
+{
   // Go to non-CGAL view mode
   if (viewActionThrownTogether->isChecked()) {
     viewModeThrownTogether();
@@ -2662,6 +2682,193 @@ void MainWindow::actionDisplayCSGProducts()
   e->resize(600, 400);
   e->show();
   clearCurrentOutput();
+}
+
+void html_encode(std::string& data) {
+    std::string buffer;
+    buffer.reserve(data.size());
+    for(size_t pos = 0; pos != data.size(); ++pos) {
+        switch(data[pos]) {
+            case '\"': buffer.append("%22");        break;
+            case '<':  buffer.append("%3C");        break;
+            case '+':  buffer.append("%2b");        break;
+            case '>':  buffer.append("%3e");        break;
+            case ' ':  buffer.append("%20");        break;
+            case '&':  buffer.append("%26");        break;
+            case '\'': buffer.append("%27");        break;
+            case '%':  buffer.append("%%");         break;
+            default:   buffer.append(&data[pos], 1); break;
+        }
+    }
+    data.swap(buffer);
+}
+
+ShareDesignDialog *shareDesignDialog;
+void MainWindow::actionShareDesignPublish()
+{
+  QMessageBox::StandardButton disclaimer;
+  disclaimer = QMessageBox::question(this, "Disclaimer", "By Clicking Yes, you accept that:\n\
+\n\
+1) Your design will be public on pythonscad.org\n\
+2) it's on good purpose and not offending to anybody\n\
+3) you keep the copyright by your name \n\
+4) you accept that anybody can use it\n\
+5) no commerical use/adverisement\n\
+6) inapropriate content will be deleted without prior  notice\n\
+\n\
+\nProceed?", QMessageBox::Yes|QMessageBox::No);
+  if (disclaimer != QMessageBox::Yes) {
+    shareDesignDialog->close();
+    return;	  
+  }
+  int success=0;	
+  CURL *curl;
+  CURLcode res;
+  auto design = shareDesignDialog->getDesignName();
+  auto author = shareDesignDialog->getAuthorName();
+  std::string code=std::string(this->last_compiled_doc.toUtf8().constData());
+  html_encode(design);
+  html_encode(author);
+  html_encode(code);
+  std::string poststring="author=" + author +"&design=" + design + "&code="+code;
+
+  curl = curl_easy_init();
+  if(curl) {
+    curl_easy_setopt(curl, CURLOPT_URL, "https://pythonscad.org/share_design.php");
+//    curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, poststring.size());
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, poststring.c_str());
+    curl_easy_setopt(curl, CURLOPT_FORBID_REUSE, 1L);
+//    curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+ 
+    res = curl_easy_perform(curl);
+    /* Check for errors */
+    if(res != CURLE_OK) {
+      fprintf(stderr, "curl_easy_perform() failed: %s\n",
+              curl_easy_strerror(res));
+    }
+    else success=1;
+    
+    /* always cleanup */
+    curl_easy_cleanup(curl);
+  }
+  shareDesignDialog->close();
+  if(success) 
+    QMessageBox::information(this,"Share Design","Design successfully submitted");  
+  else QMessageBox::information(this,"Share Design","Error during submission");  
+}
+
+void MainWindow::actionShareDesign()
+{
+  shareDesignDialog = new ShareDesignDialog();
+  connect(shareDesignDialog->publishButton, SIGNAL(clicked()), this, SLOT(actionShareDesignPublish()));
+
+  if (shareDesignDialog->exec() == QDialog::Rejected) {
+    return;
+  };
+}
+
+LoadShareDesignDialog *loadShareDesignDialog;
+std::string actionLoadSharedDesignData;
+
+size_t actionLoadSharedDesignDataFunc(void *ptr, size_t size, size_t nmemb, struct string *s)
+{
+  actionLoadSharedDesignData += std::string((char *)ptr, size*nmemb);
+  return size*nmemb;
+}
+
+std::vector<std::vector<std::string>> loadShareDesignDatabase;
+
+void MainWindow::actionLoadShareDesignSelect()
+{
+  CURL *curl;
+  CURLcode res;
+  int success=0;
+  int selected =loadShareDesignDialog->list_design->currentRow();
+  if(selected < 0 || selected >= loadShareDesignDatabase.size()) return;
+  std::string url = "https://pythonscad.org/shared_designs/"+loadShareDesignDatabase[selected][2];
+  curl = curl_easy_init();
+  if(curl) {
+    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curl, CURLOPT_FORBID_REUSE, 1L);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, actionLoadSharedDesignDataFunc);
+ 
+    actionLoadSharedDesignData="";
+    res = curl_easy_perform(curl);
+    /* Check for errors */
+    if(res != CURLE_OK) {
+      fprintf(stderr, "curl_easy_perform() failed: %s\n",
+              curl_easy_strerror(res));
+    }
+    else success=1;
+    
+    /* always cleanup */
+    curl_easy_cleanup(curl);
+  }
+  this->activeEditor->setPlainText(QString(actionLoadSharedDesignData.c_str()));
+
+  loadShareDesignDialog->close();
+}
+
+void MainWindow::actionLoadShareDesign()
+{
+  CURL *curl;
+  CURLcode res;
+  int success=0;
+  curl = curl_easy_init();
+  if(curl) {
+    curl_easy_setopt(curl, CURLOPT_URL, "https://pythonscad.org/list_design.php");
+    curl_easy_setopt(curl, CURLOPT_FORBID_REUSE, 1L);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, actionLoadSharedDesignDataFunc);
+ 
+    actionLoadSharedDesignData="";
+    res = curl_easy_perform(curl);
+    /* Check for errors */
+    if(res != CURLE_OK) {
+      fprintf(stderr, "curl_easy_perform() failed: %s\n",
+              curl_easy_strerror(res));
+    }
+    else success=1;
+    
+    /* always cleanup */
+    curl_easy_cleanup(curl);
+  }
+
+  loadShareDesignDialog = new LoadShareDesignDialog();
+  // now json_decode
+  std::string word;
+  std::vector<std::string> words;
+  loadShareDesignDatabase.clear();
+  int in_string=0;
+  int level=0;
+  for(int i=0;i<actionLoadSharedDesignData.size();i++){
+    switch(actionLoadSharedDesignData[i])
+    {	  
+      case '[': level++; break;
+      case ']': 
+        if(level == 2) {
+          loadShareDesignDatabase.push_back(words);
+	  if(words.size() > 0) loadShareDesignDialog->list_design->addItem(QString(words[0].c_str()));
+
+          words.clear();	  
+	}		
+        level--; break;		
+      case '\'':
+        if(in_string){
+         words.push_back(word);
+         word="";	 
+        }		
+        in_string=1-in_string;		
+        break;	      
+      default:
+        if(in_string)word += actionLoadSharedDesignData[i];	      
+	break;
+	    
+    }
+  }
+  connect(loadShareDesignDialog->selectButton, SIGNAL(clicked()), this, SLOT(actionLoadShareDesignSelect()));
+  if (loadShareDesignDialog->exec() == QDialog::Rejected) {
+    return;
+  };
 }
 
 void MainWindow::actionCheckValidity()

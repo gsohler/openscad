@@ -124,7 +124,7 @@ PyObject *python_cube(PyObject *self, PyObject *args, PyObject *kwargs)
   return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
 }
 
-int sphereCalcInd(PolySetBuilder &builder, std::vector<Vector3d> &vertices, PyObject *func, Vector3d dir)
+Vector3d sphereCalcIndInt(PyObject *func, Vector3d dir)
 {
   dir.normalize();
   PyObject *dir_p= PyList_New(3);
@@ -133,8 +133,17 @@ int sphereCalcInd(PolySetBuilder &builder, std::vector<Vector3d> &vertices, PyOb
   PyObject* args = PyTuple_Pack(1,dir_p);
   PyObject* len_p = PyObject_CallObject(func, args);
   double len=0;
+  if(len_p == nullptr) {
+	  printf("Null\n");
+	  return dir;
+  }
   python_numberval(len_p, &len);
-  dir *= len;
+  return dir * len;
+}
+
+int sphereCalcInd(PolySetBuilder &builder, std::vector<Vector3d> &vertices, PyObject *func, Vector3d dir)
+{
+  dir = sphereCalcIndInt(func, dir);	
   int ind=builder.vertexIndex(dir);
   if(ind == vertices.size()) vertices.push_back(dir);
   return ind;
@@ -167,7 +176,6 @@ int operator==(const SphereEdgeDb &t1, const SphereEdgeDb &t2)
         return 0;
 }
 
-
 int sphereCalcSplitInd(PolySetBuilder &builder, std::vector<Vector3d> &vertices, std::unordered_map<SphereEdgeDb, int, boost::hash<SphereEdgeDb> > &edges, PyObject *func, int ind1, int ind2)
 {
   SphereEdgeDb edge(ind1, ind2);
@@ -179,14 +187,15 @@ int sphereCalcSplitInd(PolySetBuilder &builder, std::vector<Vector3d> &vertices,
   return result;
 }
 
-std::unique_ptr<const Geometry> sphereCreateFuncGeometry(void *funcptr, double fs)
+std::unique_ptr<const Geometry> sphereCreateFuncGeometry(void *funcptr, double fs, int n)
 {
+	printf("crerate sphere\n");
   PyObject *func = (PyObject *) funcptr;
-  PolySetBuilder builder;
-  std::vector<Vector3d> vertices;
   std::unordered_map<SphereEdgeDb, int, boost::hash<SphereEdgeDb> > edges;
 
-  std::vector<IndexedTriangle> tri_todo;
+  PolySetBuilder builder;
+  std::vector<Vector3d> vertices;
+
   int topind, botind, leftind, rightind, frontind, backind;
   leftind=sphereCalcInd(builder, vertices, func, Vector3d(-1,0,0));
   rightind=sphereCalcInd(builder, vertices, func, Vector3d(1,0,0));
@@ -194,91 +203,165 @@ std::unique_ptr<const Geometry> sphereCreateFuncGeometry(void *funcptr, double f
   backind=sphereCalcInd(builder, vertices, func, Vector3d(0,1,0));
   botind=sphereCalcInd(builder, vertices, func, Vector3d(0,0,-1));
   topind=sphereCalcInd(builder, vertices, func, Vector3d(0,0,1));
-  tri_todo.push_back(IndexedTriangle(leftind, frontind, topind));
-  tri_todo.push_back(IndexedTriangle(frontind, rightind, topind));
-  tri_todo.push_back(IndexedTriangle(rightind, backind, topind));
-  tri_todo.push_back(IndexedTriangle(backind, leftind, topind));
-  tri_todo.push_back(IndexedTriangle(leftind, botind, frontind));
-  tri_todo.push_back(IndexedTriangle(frontind, botind, rightind));
-  tri_todo.push_back(IndexedTriangle(rightind, botind, backind));
-  tri_todo.push_back(IndexedTriangle(backind, botind, leftind));
+
+  std::vector<IndexedTriangle> triangles;
+  std::vector<IndexedTriangle> tri_new;
+  tri_new.push_back(IndexedTriangle(leftind, frontind, topind));
+  tri_new.push_back(IndexedTriangle(frontind, rightind, topind));
+  tri_new.push_back(IndexedTriangle(rightind, backind, topind));
+  tri_new.push_back(IndexedTriangle(backind, leftind, topind));
+  tri_new.push_back(IndexedTriangle(leftind, botind, frontind));
+  tri_new.push_back(IndexedTriangle(frontind, botind, rightind));
+  tri_new.push_back(IndexedTriangle(rightind, botind, backind));
+  tri_new.push_back(IndexedTriangle(backind, botind, leftind));
 
   int round=0;
-  while(tri_todo.size() > 0) {
-    std::vector<IndexedTriangle> tri_new;
-    for(const IndexedTriangle & tri: tri_todo) {
-      double dist[3];
-      int splitind[3];
+  int i1, i2, imid;
+  Vector3d p1, p2, p3,pmin, pmax, pmid, pmid_test, dir1, dir2;
+  double dist,ang,ang_test;
+  do {
+    triangles = tri_new;	  
+    if(round == n) break;
+    tri_new.clear();
+    std::vector<int> midinds;
+    for(const IndexedTriangle & tri: triangles) {
+      int zeroang=0;	    
+      int midind=-1;
+      for(int i=0;i<3;i++) {
+        i1=tri[i];
+	i2=tri[(i+1)%3];
+        SphereEdgeDb edge(i1, i2);
+  	if(edges.count(edge) > 0) continue;
+        dist=(vertices[i1]-vertices[i2]).norm();
+	if(dist < fs) continue;
+	p1=vertices[i1];
+	p2=vertices[i2];
+	pmin=p1;
+	pmax=p2;
+	pmid=(pmin+pmax)/2;
+	pmid=sphereCalcIndInt(func, pmid);
+	dir1=(pmid-p1).normalized();
+	dir2=(p2-pmid).normalized();
+	ang=acos(dir1.dot(dir2));
+//	printf("ang=%g\n",ang*180/3.14);
+        if(ang < 0.001) { zeroang++; continue; }
+	do
+	{
+	  pmid_test=(pmin+pmid)/2;
+	  pmid_test=sphereCalcIndInt(func, pmid_test);
+	  dir1=(pmid_test-p1).normalized();
+	  dir2=(p2-pmid_test).normalized();
+	  ang_test=acos(dir1.dot(dir2));
+	  if(ang_test > ang) {
+		  pmax=pmid; ang=ang_test; pmid = pmid_test; 
+		  if((pmax-pmin).norm() > fs) continue;
+	  }
 
+ 	  pmid_test=(pmax+pmid)/2;
+ 	  pmid_test=sphereCalcIndInt(func, pmid_test);
+	  dir1=(pmid_test-p1).normalized();
+	  dir2=(p2-pmid_test).normalized();
+	  ang_test=acos(dir1.dot(dir2));
+	  if(ang_test > ang) {
+		  pmin=pmid; ang=ang_test; pmid = pmid_test;
+		  if((pmax-pmin).norm() > fs) continue;
+	  }
+	}
+        while(0);	
+
+  	imid=builder.vertexIndex(pmid);
+        if(imid == vertices.size()) vertices.push_back(pmid);
+	edges[edge]=imid;
+      }
+      if(zeroang == 3) {
+	p1=vertices[tri[0]];
+	p2=vertices[tri[1]];
+	p3=vertices[tri[2]];
+	pmid=(p1+p2+p3)/3.0;
+	pmid=sphereCalcIndInt(func, pmid);
+        Vector4d norm=calcTriangleNormal(vertices,{tri[0], tri[1], tri[2] });
+	if(fabs(pmid.dot(norm.head<3>())- norm[3]) > 1e-3) {
+  	  midind=builder.vertexIndex(pmid);
+          if(midind == vertices.size()) vertices.push_back(pmid);
+	}  
+      }
+      midinds.push_back(midind);
+    }
+    // create new triangles from split edges    
+    int ind=0;
+    for(const IndexedTriangle & tri: triangles) {
+
+      int splitind[3];	    
       for(int i=0;i<3;i++) {
         SphereEdgeDb e(tri[i], tri[(i+1)%3]);
         splitind[i] = edges.count(e) > 0?edges[e]:-1;
-        dist[i]=(vertices[tri[i]]-vertices[tri[(i+1)%3]]).norm();
       }
 
-      double mindist=dist[0], maxdist=dist[0];
-      for(int i=1;i<3;i++) {
-        if(dist[i] < mindist) mindist=dist[i];
-        if(dist[i] > maxdist) maxdist=dist[i];
+      if(midinds[ind] != -1) {
+        for(int i=0;i<3;i++) {	     
+          if(splitind[i] == -1) {		
+            tri_new.push_back(IndexedTriangle(tri[i], tri[(i+1)%3], midinds[ind]));
+	  }
+	  else {
+            tri_new.push_back(IndexedTriangle(tri[i], splitind[i], midinds[ind]));
+            tri_new.push_back(IndexedTriangle(splitind[i], tri[(i+1)%3], midinds[ind]));
+	  }  
+	}  
+        ind++;
+        continue;	
       }
-      if(mindist > fs){
-        if(maxdist/mindist < 1.41) {
-	  for(int i=0;i<3;i++)
-            splitind[i]=sphereCalcSplitInd(builder, vertices, edges, func, tri[i], tri[(i+1)%3]);
-	} else {
-	  double middist=sqrt(maxdist* mindist);
-	  for(int i=0;i<3;i++)
-            if(dist[i] > middist) splitind[i]=sphereCalcSplitInd(builder, vertices, edges, func, tri[i], tri[(i+1)%3]);
-	}
+
+      int bucket= ((splitind[0]!= -1)?1:0) | ((splitind[1]!= -1)?2:0) | ((splitind[2]!= -1)?4:0) ;
+      switch(bucket) {
+          case 0:		
+            tri_new.push_back(IndexedTriangle(tri[0], tri[1], tri[2]));
+	    break;
+	  case 1:
+            tri_new.push_back(IndexedTriangle(tri[0], splitind[0], tri[2]));
+            tri_new.push_back(IndexedTriangle(tri[2], splitind[0], tri[1]));
+	    break;
+	  case 2:
+            tri_new.push_back(IndexedTriangle(tri[1], splitind[1], tri[0]));
+            tri_new.push_back(IndexedTriangle(tri[0], splitind[1], tri[2]));
+	    break;
+	  case 3:
+            tri_new.push_back(IndexedTriangle(tri[0], splitind[0], tri[2]));
+            tri_new.push_back(IndexedTriangle(splitind[0], splitind[1],tri[2]));
+            tri_new.push_back(IndexedTriangle(splitind[0], tri[1],splitind[1]));
+	    break;
+	  case 4:
+            tri_new.push_back(IndexedTriangle(tri[2], splitind[2], tri[1]));
+            tri_new.push_back(IndexedTriangle(tri[1], splitind[2], tri[0]));
+	    break;
+	  case 5:
+            tri_new.push_back(IndexedTriangle(tri[0], splitind[0], splitind[2]));
+            tri_new.push_back(IndexedTriangle(splitind[0], tri[2], splitind[2]));
+            tri_new.push_back(IndexedTriangle(splitind[0], tri[1],tri[2]));
+	    break;
+	  case 6:
+            tri_new.push_back(IndexedTriangle(tri[0], tri[1], splitind[2]));
+            tri_new.push_back(IndexedTriangle(tri[1], splitind[1], splitind[2]));
+            tri_new.push_back(IndexedTriangle(splitind[1], tri[2],splitind[2]));
+	    break;
+	  case 7:
+            tri_new.push_back(IndexedTriangle(splitind[2], tri[0], splitind[0]));
+            tri_new.push_back(IndexedTriangle(splitind[0], tri[1], splitind[1]));
+            tri_new.push_back(IndexedTriangle(splitind[1], tri[2], splitind[2]));
+            tri_new.push_back(IndexedTriangle(splitind[0], splitind[1], splitind[2]));
+	    break;
       }
-      if(round < 7) {
-        splitind[0]=sphereCalcSplitInd(builder, vertices, edges, func, tri[0], tri[1]);
-        splitind[1]=sphereCalcSplitInd(builder, vertices, edges, func, tri[1], tri[2]);
-        splitind[2]=sphereCalcSplitInd(builder, vertices, edges, func, tri[2], tri[0]);
-      }
-      if(splitind[2] == -1 && splitind[1] == -1 && splitind[0] == -1) { // 0
-        builder.appendPolygon({tri[0], tri[1], tri[2]});
-      }
-      // irgendwo loecher TODO
-      if(splitind[2] == -1 && splitind[1] == -1 && splitind[0] != -1) { // 1
-        tri_new.push_back(IndexedTriangle(tri[0], splitind[0], tri[2]));
-        tri_new.push_back(IndexedTriangle(tri[2], splitind[0], tri[1]));
-      }
-      if(splitind[2] == -1 && splitind[1] != -1 && splitind[0] == -1) { // 2
-        tri_new.push_back(IndexedTriangle(tri[1], splitind[1], tri[0]));
-        tri_new.push_back(IndexedTriangle(tri[0], splitind[1], tri[2]));
-      }
-      if(splitind[2] == -1 && splitind[1] != -1 && splitind[0] != -1) { // 3
-        tri_new.push_back(IndexedTriangle(tri[0], splitind[0], tri[2]));
-        tri_new.push_back(IndexedTriangle(splitind[0], splitind[1],tri[2]));
-        tri_new.push_back(IndexedTriangle(splitind[0], tri[1],splitind[1]));
-      }
-      if(splitind[2] != -1 && splitind[1] == -1 && splitind[0] == -1) { // 4
-        tri_new.push_back(IndexedTriangle(tri[2], splitind[2], tri[1]));
-        tri_new.push_back(IndexedTriangle(tri[1], splitind[2], tri[0]));
-      }
-      if(splitind[2] != -1 && splitind[1] == -1 && splitind[0] != -1) { // 5
-        tri_new.push_back(IndexedTriangle(tri[0], splitind[0], splitind[2]));
-        tri_new.push_back(IndexedTriangle(splitind[0], tri[2], splitind[2]));
-        tri_new.push_back(IndexedTriangle(splitind[0], tri[1],tri[2]));
-      }
-      if(splitind[2] != -1 && splitind[1] != -1 && splitind[0] == -1) { // 6
-        tri_new.push_back(IndexedTriangle(tri[0], tri[1], splitind[2]));
-        tri_new.push_back(IndexedTriangle(tri[1], splitind[1], splitind[2]));
-        tri_new.push_back(IndexedTriangle(splitind[1], tri[1],splitind[2]));
-      }
-      if(splitind[2] != -1 && splitind[1] != -1 && splitind[0] != -1) { // 7
-        tri_new.push_back(IndexedTriangle(splitind[2], tri[0], splitind[0]));
-        tri_new.push_back(IndexedTriangle(splitind[0], tri[1], splitind[1]));
-        tri_new.push_back(IndexedTriangle(splitind[1], tri[2], splitind[2]));
-        tri_new.push_back(IndexedTriangle(splitind[0], splitind[1], splitind[2]));
-      }
-    }
-    tri_todo=tri_new;
+      ind++;
+    }  
+     
     round++;
-  }  
+  }
+  while(tri_new.size() != triangles.size());
+  for(const IndexedTriangle & tri: tri_new) {
+    builder.appendPolygon({tri[0], tri[1], tri[2]});
+  }
+  auto ps = builder.build();
 
-  return builder.build();
+  return ps; 
 }
 
 PyObject *python_sphere(PyObject *self, PyObject *args, PyObject *kwargs)

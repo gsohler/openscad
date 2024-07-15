@@ -86,7 +86,7 @@ class CSGLeaf : public CSGNode
 {
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-  CSGLeaf(const std::shared_ptr<const PolySet>& geom, Transform3d matrix, Color4f color, int textureind, std::string label, const int index);
+  CSGLeaf(const std::shared_ptr<const PolySet>& ps, Transform3d matrix, Color4f color, int textureind, std::string label, const int index);
   void initBoundingBox() override;
   [[nodiscard]] bool isEmptySet() const override;
   [[nodiscard]] std::string dump() const override;
