@@ -1193,6 +1193,7 @@ set(GUI_SOURCES
   src/gui/ErrorLog.cc
   src/gui/EventFilter.h
   src/gui/ExportPdfDialog.cc
+  src/gui/LoadShareDesignDialog.cc
   src/gui/ShareDesignDialog.cc
   src/gui/FontListDialog.cc
   src/gui/FontListTableView.cc
@@ -1259,6 +1260,7 @@ set(GUI_HEADERS
     src/gui/Editor.h
     src/gui/ErrorLog.h
     src/gui/EventFilter.h
+    src/gui/LoadShareDesignDialog.h
     src/gui/ShareDesignDialog.h
     src/gui/ExportPdfDialog.h
     src/gui/FontListDialog.h
@@ -1314,6 +1316,7 @@ set(GUI_UIS
     src/gui/ErrorLog.ui
     src/gui/ExportPdfDialog.ui
     src/gui/ShareDesignDialog.ui
+    src/gui/LoadShareDesignDialog.ui
     src/gui/FontListDialog.ui
     src/gui/LaunchingScreen.ui
     src/gui/LibraryInfoDialog.ui
