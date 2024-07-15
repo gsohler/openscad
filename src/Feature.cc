@@ -41,7 +41,6 @@ const Feature Feature::ExperimentalPredictibleOutput("predictible-output", "Atte
 const Feature Feature::ExperimentalRenderColors("render-colors", "Render with colors (only supported by some export formats e.g. OFF, 3MF).");
 #ifdef ENABLE_PYTHON
 const Feature Feature::ExperimentalPythonEngine("python-engine", "Enable experimental Python Engine (implies risk of malicious scripts downloaded).");
-const Feature Feature::ExperimentalColorCsg("color-csg", "Enable experimental Color CSG Renering");
 #endif
 const Feature Feature::ExperimentalPathExtrude("path-extrude", "Enable experimental <code> path_extrude </code> functions analogue to linear_extrude and rotate_extrude.");
 

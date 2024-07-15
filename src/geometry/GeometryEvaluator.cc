@@ -10,7 +10,6 @@
 #include "LinearExtrudeNode.h"
 #include "PathExtrudeNode.h"
 #include "RoofNode.h"
-#include "ColorNode.h"
 #include "roof_ss.h"
 #include "roof_vd.h"
 #include "RotateExtrudeNode.h"
@@ -1140,8 +1139,6 @@ std::vector<std::shared_ptr<const PolySet>>  offset3D_decompose(std::shared_ptr<
 		std::vector<Vector4d> faces_norm;
 		std::vector<int> faces_todo_face;
 		std::vector<int> faces_todo_edge;
-		printf("face included size is %d\n",faces_included.size());
-		int included_orgcount=faces_included.size();
 		for(unsigned int i=0;newfaceind == -1 && i<ps->indices.size();i++)
 		{
 			if(faces_included.count(i) == 0) {
@@ -1916,6 +1913,7 @@ GeometryEvaluator::ResultObject GeometryEvaluator::applyToChildren3D(const Abstr
   }
   case OpenSCADOperator::UNION:
   {
+
     const CsgOpNode *csgOpNode = dynamic_cast<const CsgOpNode *>(&node);
     Geometry::Geometries actualchildren;
     for (const auto& item : children) {
@@ -2334,40 +2332,6 @@ Response GeometryEvaluator::visit(State& state, const AbstractNode& node)
     std::shared_ptr<const Geometry> geom;
     if (!isSmartCached(node)) {
       geom = applyToChildren(node, OpenSCADOperator::UNION).constptr();
-    } else {
-      geom = smartCacheGet(node, state.preferNef());
-    }
-    addToParent(state, node, geom);
-    node.progress_report();
-  }
-  return Response::ContinueTraversal;
-}
-
-/*!
-   Custom nodes are handled here => implicit union
- */
-
-Response GeometryEvaluator::visit(State& state, const ColorNode& node)
-{
-  if (state.isPrefix()) {
-    if (isSmartCached(node)) return Response::PruneTraversal;
-    state.setPreferNef(true); // Improve quality of CSG by avoiding conversion loss
-  }
-  if (state.isPostfix()) {
-    std::shared_ptr<const Geometry> geom;
-    if (!isSmartCached(node)) {
-      ResultObject res = applyToChildren(node, OpenSCADOperator::UNION);
-      auto mutableGeom = res.asMutableGeometry();
-      if(std::shared_ptr<PolySet> ps = std::dynamic_pointer_cast<PolySet>(mutableGeom)) {
-        for(auto &mat: ps->mat) mat.color = node.color;		  
-	Material col;
-        geom = mutableGeom;
-      }
-      if(std::shared_ptr<ManifoldGeometry> mani = std::dynamic_pointer_cast<ManifoldGeometry>(mutableGeom)) {
-        for(auto &mat: mani->mat) mat.color = node.color;		  
-	Material col;
-        geom = mutableGeom;
-      }
     } else {
       geom = smartCacheGet(node, state.preferNef());
     }
@@ -2921,13 +2885,7 @@ static std::unique_ptr<Geometry> extrudePolygon(const PathExtrudeNode& node, con
   if(intersect == true && node.allow_intersect == false) {
   	return std::unique_ptr<PolySet>();
   }
-  auto ps = builder.build();
-  Material matcolor;
-  auto cs = ColorMap::inst()->defaultColorScheme();
-  matcolor.color = ColorMap::getColor(cs, RenderColor::OPENCSG_FACE_FRONT_COLOR);
-  ps->mat.push_back(matcolor);
-  for(int i=0;i<ps->indices.size();i++) ps->matind.push_back(0);
-  return ps;
+  return builder.build();
 }
 
 /*!
@@ -3216,31 +3174,23 @@ static std::unique_ptr<PolySet> debugObject(const DebugNode& node, const PolySet
   auto psx  = std::make_unique<PolySet>(ps->getDimension(), ps->convexValue());	  
   *psx = *ps;
 
-  int matind;
-  Material matcolor;
-  if(psx->matind.size() > psx->indices.size()) {
+  if(psx->color_indices.size() < psx->indices.size()) {
     auto cs = ColorMap::inst()->defaultColorScheme();
-    matcolor.color = ColorMap::getColor(cs, RenderColor::OPENCSG_FACE_FRONT_COLOR);
-    matind = psx->mat.size();
-    psx->mat.push_back(matcolor);    
-    while(psx->matind.size() < psx->indices.size()) {
-      psx->matind.push_back(matind);	  
+    Color4f  def_color = ColorMap::getColor(cs, RenderColor::OPENCSG_FACE_FRONT_COLOR);
+    int defind = psx->colors.size();
+    psx->colors.push_back(def_color);    
+    while(psx->color_indices.size() < psx->indices.size()) {
+      psx->color_indices.push_back(defind);	  
     }
   }
-  matcolor.color = Color4f(255,0,0,255);
-  matind = psx->mat.size();
-  psx->mat.push_back(matcolor);    
-//  for(int i=0;i<psx->mat.size();i++)
-//   printf("%g/%g/%g/%g\n",psx->mat[i].color[0],psx->mat[i].color[1],psx->mat[i].color[2],psx->mat[i].color[3]);
+  Color4f debug_color = Color4f(255,0,0,255);
+  int colorind = psx->colors.size();
+  psx->colors.push_back(debug_color);    
   for(int i=0;i<node.faces.size();i++) {
    int ind=node.faces[i];
-   if(ind >= 0 && ind<psx->matind.size())
-    psx->matind[ind] = matind;
+   psx->color_indices[ind] = colorind;
   }
-//  for(int i=0;i<psx->matind.size();i++) printf("%d ",psx->matind[i]);
-//  printf("\n");
 
-  printf("Created debug\n");
   return psx;
 }
 

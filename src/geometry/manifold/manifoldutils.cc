@@ -13,9 +13,7 @@
 #endif
 #include "PolySetUtils.h"
 #include "PolySet.h"
-#include "Material.h"
 #include "polygon.h"
-#include "Feature.h"
 
 using Error = manifold::Manifold::Error;
 
@@ -158,7 +156,6 @@ std::shared_ptr<ManifoldGeometry> createManifoldFromPolySet(const PolySet& ps)
   }
   const PolySet& triangle_set = ps.isTriangular() ? ps : *triangulated;
 
-  if( !Feature::ExperimentalColorCsg.is_enabled()) {
   auto mani = createManifoldFromTriangularPolySet(triangle_set);
   if (mani->getManifold().Status() == Error::NoError) {
     return mani;
@@ -187,6 +184,7 @@ std::shared_ptr<ManifoldGeometry> createManifoldFromPolySet(const PolySet& ps)
 
   // 2. If the PolySet couldn't be converted into a Manifold object, let's try to repair it.
   // We currently have to utilize some CGAL functions to do this.
+  {
   #ifdef ENABLE_CGAL
     PolySet psq(ps);
     std::vector<Vector3d> points3d;
@@ -227,33 +225,6 @@ std::shared_ptr<ManifoldGeometry> createManifoldFromPolySet(const PolySet& ps)
     return std::make_shared<ManifoldGeometry>();
   #endif
   }
-
-//  auto triangle_set = PolySetUtils::tessellate_faces(ps);
-  manifold::Mesh mesh;
-
-  mesh.vertPos.resize(triangle_set.vertices.size());
-  for(int i=0;i<triangle_set.vertices.size();i++) {
-    Vector3d pt=triangle_set.vertices[i];
-    mesh.vertPos[i] = glm::vec3((float) pt[0], (float) pt[1], (float) pt[2]);
-  }
-
-  mesh.triVerts.reserve(triangle_set.indices.size()); 
-  for(int i=0;i<triangle_set.indices.size();i++) {		
-    auto &tri = triangle_set.indices[i];	  
-    assert(tri.size() == 3);
-    mesh.triVerts.emplace_back(tri[0], tri[1], tri[2]);
-  }
-  manifold::MeshGL meshgl(mesh);
-  auto mani = std::make_shared<manifold::Manifold>(std::move(meshgl));
-  if (mani->Status() != Error::NoError) {
-    LOG(message_group::Error,
-        "[manifold] Surface_mesh -> Manifold conversion failed: %1$s", 
-        ManifoldUtils::statusToString(mani->Status()));
-  }
-  auto res = std::make_shared<ManifoldGeometry>(mani);
-  res->mat = triangle_set.mat;
-  res->matind = triangle_set.matind;
-  return res;
 }
 
 std::shared_ptr<const ManifoldGeometry> createManifoldFromGeometry(const std::shared_ptr<const Geometry>& geom) {

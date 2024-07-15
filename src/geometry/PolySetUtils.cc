@@ -15,7 +15,6 @@
 #ifdef ENABLE_MANIFOLD
 #include "ManifoldGeometry.h"
 #endif
-#include "Feature.h"
 
 namespace PolySetUtils {
 
@@ -58,103 +57,6 @@ std::unique_ptr<Polygon2d> project(const PolySet& ps) {
  */
 std::unique_ptr<PolySet> tessellate_faces(const PolySet& polyset)
 {
- if(Feature::ExperimentalColorCsg.is_enabled() ) {
-  assert(polyset.indices.size() == polyset.matind.size());
-  int degeneratePolygons = 0;
-  auto result = std::make_unique<PolySet>(3, polyset.convexValue());
-  result->setConvexity(polyset.getConvexity());
-  result->setTriangular(true);
-  // ideally this should not require a copy...
-  result->mat=polyset.mat;
-  if (polyset.isTriangular()) {
-    result->vertices = polyset.vertices;
-    result->indices = polyset.indices;
-    result->matind=polyset.matind;	    
-    return result;
-  }
-  result->vertices.reserve(polyset.vertices.size());
-  result->indices.reserve(polyset.indices.size());
-
-  std::vector<bool> used(polyset.vertices.size(), false);
-  // best estimate without iterating all polygons, to reduce reallocations
-  std::vector<IndexedFace> polygons;
-  std::vector<int> matind;
-  polygons.reserve(polyset.indices.size());
-  matind.reserve(polyset.indices.size());
-  int ind=0;
-  for (const auto& pgon : polyset.indices) {
-    if (pgon.size() < 3) {
-      degeneratePolygons++;
-      continue;
-    }
-    auto& currface = polygons.emplace_back();
-    auto& currmat = matind.emplace_back();
-    for (const auto& ind : pgon) {
-      const Vector3f v = polyset.vertices[ind].cast<float>();
-      if (currface.empty() || v != polyset.vertices[currface.back()].cast<float>())
-        currface.push_back(ind);
-    }
-    currmat = polyset.matind[ind];
-    const Vector3f head = polyset.vertices[currface.front()].cast<float>();
-    while (!currface.empty() && head == polyset.vertices[currface.back()].cast<float>())
-      currface.pop_back();
-    if (currface.size() < 3) {
-      polygons.pop_back();
-      matind.pop_back();
-      continue;
-    }
-    for (const auto& ind : currface)
-      used[ind] = true;
-    ind++;
-  }
-  // remove unreferenced vertices
-  std::vector<Vector3f> verts;
-  std::vector<int> indexMap(polyset.vertices.size());
-  verts.reserve(polyset.vertices.size());
-  for (size_t i = 0; i < polyset.vertices.size(); ++i) {
-    if (used[i]) {
-      indexMap[i] = verts.size();
-      verts.emplace_back(polyset.vertices[i].cast<float>());
-      result->vertices.push_back(polyset.vertices[i]);
-    }
-  }
-  if (verts.size() != polyset.vertices.size()) {
-    // only remap indices when some vertices are really removed
-    for (auto& face : polygons) {
-      for (auto& ind : face)
-        ind = indexMap[ind];
-    }
-  }
-
-  // we will reuse this memory instead of reallocating for each polygon
-  std::vector<IndexedTriangle> triangles;
-  std::vector<IndexedFace> facesBuffer(1);
-  ind=0;
-  for (const auto& face : polygons) {
-    if (face.size() == 3) {
-      // trivial case - triangles cannot be concave or have holes
-       result->indices.push_back({face[0],face[1],face[2]});
-    }
-    // Quads seem trivial, but can be concave, and can have degenerate cases.
-    // So everything more complex than triangles goes into the general case.
-    else {
-      triangles.clear();
-      facesBuffer[0] = face;
-      auto err = GeometryUtils::tessellatePolygonWithHoles(verts, facesBuffer, triangles, nullptr);
-      if (!err) {
-        for (const auto& t : triangles) {
-          result->indices.push_back({t[0],t[1],t[2]});
-	  result->matind.push_back(matind[ind]);
-        }
-      }
-    }
-    ind++;
-  }
-  if (degeneratePolygons > 0) {
-    LOG(message_group::Warning, "PolySet has degenerate polygons");
-  }
-  return result;
-  } else {
   int degeneratePolygons = 0;
   auto result = std::make_unique<PolySet>(3, polyset.convexValue());
   result->setConvexity(polyset.getConvexity());
@@ -255,7 +157,6 @@ std::unique_ptr<PolySet> tessellate_faces(const PolySet& polyset)
     LOG(message_group::Warning, "PolySet has degenerate polygons");
   }
   return result;
- }
 }
 
 bool is_approximately_convex(const PolySet& ps) {

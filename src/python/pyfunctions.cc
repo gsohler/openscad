@@ -1948,7 +1948,7 @@ PyObject *python_oo_oversample(PyObject *obj, PyObject *args, PyObject *kwargs)
   return python_oversample_core(obj,n,round);
 }
 
-PyObject *python_debug_core(PyObject *obj, std::vector<int> faces)
+PyObject *python_debug_core(PyObject *obj, PyObject *faces)
 {
   PyObject *dummydict;
   std::shared_ptr<AbstractNode> child = PyOpenSCADObjectToNodeMulti(obj, &dummydict);
@@ -1960,7 +1960,10 @@ PyObject *python_debug_core(PyObject *obj, std::vector<int> faces)
   DECLARE_INSTANCE
   auto node = std::make_shared<DebugNode>(instance);
   node->children.push_back(child);
-  node->faces = faces;
+  if(faces != nullptr) {
+    std::vector<int> intfaces = python_intlistval(faces);
+    node->faces = intfaces;
+  }  
   return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
 }
 
@@ -1974,8 +1977,7 @@ PyObject *python_debug(PyObject *self, PyObject *args, PyObject *kwargs)
     PyErr_SetString(PyExc_TypeError, "error duing parsing\n");
     return NULL;
   }
-  std::vector<int> intfaces = python_intlistval(faces);
-  return python_debug_core(obj,intfaces);
+  return python_debug_core(obj,faces);
 }
 
 PyObject *python_oo_debug(PyObject *self, PyObject *args, PyObject *kwargs)
@@ -1987,8 +1989,7 @@ PyObject *python_oo_debug(PyObject *self, PyObject *args, PyObject *kwargs)
     PyErr_SetString(PyExc_TypeError, "error duing parsing\n");
     return NULL;
   }
-  std::vector<int> intfaces = python_intlistval(faces);
-  return python_debug_core(self,intfaces);
+  return python_debug_core(self,faces);
 }
 
 

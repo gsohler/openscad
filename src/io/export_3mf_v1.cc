@@ -43,6 +43,22 @@ static uint32_t lib3mf_write_callback(const char *data, uint32_t bytes, std::ost
   return !(*stream);
 }
 
+void Export3mfInfo::writePropsFloat(void *pobj, const  char *name, float f) const
+{
+//	Lib3MF::PMeshObject  *obj = (Lib3MF::PMeshObject *) pobj;
+//	printf("Writing %s: %f\n",name, f);
+	//void SetObjectLevelProperty(const Lib3MF_uint32 nUniqueResourceID, const Lib3MF_uint32 nPropertyID);
+}
+void Export3mfInfo::writePropsLong(void *pobj, const  char *name, long l) const
+{
+//	printf("Writing %s: %d\n",name, l);
+}
+void Export3mfInfo::writePropsString(void *pobj, const  char *name, const char *val) const
+{
+//	printf("Writing %s: %s\n",name, val);
+}
+
+
 static uint32_t lib3mf_seek_callback(uint64_t pos, std::ostream *stream)
 {
   stream->seekp(pos);
@@ -73,35 +89,17 @@ static void export_3mf_error(std::string msg, PLib3MFModel *& model)
 /*
  * PolySet must be triangulated.
  */
-void Export3mfInfo::writePropsFloat(void *pobj, const  char *name, float f) const
-{
-//	Lib3MF::PMeshObject  *obj = (Lib3MF::PMeshObject *) pobj;
-//	printf("Writing %s: %f\n",name, f);
-	//void SetObjectLevelProperty(const Lib3MF_uint32 nUniqueResourceID, const Lib3MF_uint32 nPropertyID);
-}
-void Export3mfInfo::writePropsLong(void *pobj, const  char *name, long l) const
-{
-//	printf("Writing %s: %d\n",name, l);
-}
-void Export3mfInfo::writePropsString(void *pobj, const  char *name, const char *val) const
-{
-//	printf("Writing %s: %s\n",name, val);
-}
-
-static bool append_polyset(std::shared_ptr<const PolySet> ps, const Export3mfInfo &info, PLib3MFModelMeshObject *& model)
+static bool append_polyset(std::shared_ptr<const PolySet> ps, PLib3MFModelMeshObject *& model)
 {
   PLib3MFModelMeshObject *mesh;
   if (lib3mf_model_addmeshobject(model, &mesh) != LIB3MF_OK) {
     export_3mf_error("Can't add mesh to 3MF model.", model);
     return false;
   }
-  if (lib3mf_object_setnameutf8(mesh, info.name.c_str()) != LIB3MF_OK) {
+  if (lib3mf_object_setnameutf8(mesh, "OpenSCAD Model") != LIB3MF_OK) {
     export_3mf_error("Can't set name for 3MF model.", model);
     return false;
   }
-#ifdef ENABLE_PYTHON    
-    info.writeProps((void *) &mesh);
-#endif    
 
   auto vertexFunc = [&](const Vector3d& coords) -> bool {
     const auto f = coords.cast<float>();
@@ -130,41 +128,6 @@ static bool append_polyset(std::shared_ptr<const PolySet> ps, const Export3mfInf
       return false;
     }
   }
-/*
-  PLib3MFModelBaseMaterial *baseMaterial = nullptr;
-  lib3mf_model_addbasematerialgroup(model, &baseMaterial);
-
-  std::vector<int> ids;
-  int nBaseMaterialID;
-  for(int i=0;i<sorted_ps->mat.size();i++) {
-    //Lib3MFColor col;
-    //sLib3MFColor col;
-    wchar_t tempname[20];
-    swprintf(tempname,20,L"Material%d",i);
-    // Lib3MF_uint32 nBaseMaterialID = pBaseMaterial->AddMaterial(tempname, wrapper->FloatRGBAToColor(
-    // sorted_ps->mat[i].color[0], sorted_ps->mat[i].color[1], sorted_ps->mat[i].color[2], sorted_ps->mat[i].color[3]));
-    //lib3mf_floatrgbatocolor(out_ps->mat[i].color[0], out_ps->mat[i].color[1], out_ps->mat[i].color[2], out_ps->mat[i].color[3],&col)
-//    lib3mf_basematerialgroup_addmaterial(&baseMaterial, tempname, &col,&nBaseMaterialID);
-
-    lib3mf_basematerial_addmaterial(baseMaterial, tempname, 
-	sorted_ps->mat[i].color[0], sorted_ps->mat[i].color[1], sorted_ps->mat[i].color[2], sorted_ps->mat[i].color[3] ,
-	&nBaseMaterialID);
-
-    ids.push_back(nBaseMaterialID);
-  }
-  //mesh->SetObjectLevelProperty(pBaseMaterial->GetResourceID(), ids[0]);
-  // TODO enable lib3mf_meshobject_setobjectlevelproperty(meshobject, Lib3MF_uint32 nUniqueResourceID, ids[0]);
-
-  sLib3MFTriangleProperties tri_prop;
-  // tri_prop.m_ResourceID=pBaseMaterial->GetResourceID(); TODO activate 2x
-  for(int i=0;i<sorted_ps->matind.size();i++) {
-    tri_prop.m_PropertyIDs[0]=ids[out_ps->matind[i]];
-    tri_prop.m_PropertyIDs[1]=ids[out_ps->matind[i]];
-    tri_prop.m_PropertyIDs[2]=ids[out_ps->matind[i]];
-    //mesh->SetTriangleProperties(i,tri_prop);
-    lib3mf_meshobject_settriangleproperties(pMeshObject, i,&tri_prop); 
-  }
-*/
 
   PLib3MFModelBuildItem *builditem;
   if (lib3mf_model_addbuilditem(model, mesh, nullptr, &builditem) != LIB3MF_OK) {
@@ -176,7 +139,7 @@ static bool append_polyset(std::shared_ptr<const PolySet> ps, const Export3mfInf
 }
 
 #ifdef ENABLE_CGAL
-static bool append_nef(const CGAL_Nef_polyhedron& root_N, const Export3mfInfo &info, PLib3MFModelMeshObject *& model)
+static bool append_nef(const CGAL_Nef_polyhedron& root_N, PLib3MFModelMeshObject *& model)
 {
   if (!root_N.p3) {
     LOG(message_group::Export_Error, "Export failed, empty geometry.");
@@ -189,7 +152,7 @@ static bool append_nef(const CGAL_Nef_polyhedron& root_N, const Export3mfInfo &i
 
 
   if (std::shared_ptr<PolySet> ps = CGALUtils::createPolySetFromNefPolyhedron3(*root_N.p3)) {
-    return append_polyset(ps, info, model);
+    return append_polyset(ps, model);
   }
 
   export_3mf_error("Error converting NEF Polyhedron.", model);
@@ -197,24 +160,24 @@ static bool append_nef(const CGAL_Nef_polyhedron& root_N, const Export3mfInfo &i
 }
 #endif
 
-static bool append_3mf(const std::shared_ptr<const Geometry>& geom, const Export3mfInfo &info, PLib3MFModelMeshObject *& model)
+static bool append_3mf(const std::shared_ptr<const Geometry>& geom, PLib3MFModelMeshObject *& model)
 {
   if (const auto geomlist = std::dynamic_pointer_cast<const GeometryList>(geom)) {
     for (const auto& item : geomlist->getChildren()) {
-      if (!append_3mf(item.second, info, model)) return false;
+      if (!append_3mf(item.second, model)) return false;
     }
 #ifdef ENABLE_CGAL
   } else if (const auto N = std::dynamic_pointer_cast<const CGAL_Nef_polyhedron>(geom)) {
-    return append_nef(*N, info, model);
+    return append_nef(*N, model);
   } else if (const auto hybrid = std::dynamic_pointer_cast<const CGALHybridPolyhedron>(geom)) {
-    return append_polyset(hybrid->toPolySet(), info,  model);
+    return append_polyset(hybrid->toPolySet(), model);
 #endif
 #ifdef ENABLE_MANIFOLD
   } else if (const auto mani = std::dynamic_pointer_cast<const ManifoldGeometry>(geom)) {
-    return append_polyset(mani->toPolySet(), info, model);
+    return append_polyset(mani->toPolySet(), model);
 #endif
   } else if (const auto ps = std::dynamic_pointer_cast<const PolySet>(geom)) {
-    return append_polyset(PolySetUtils::tessellate_faces(*ps), info, model);
+    return append_polyset(PolySetUtils::tessellate_faces(*ps), model);
   } else if (std::dynamic_pointer_cast<const Polygon2d>(geom)) { // NOLINT(bugprone-branch-clone)
     assert(false && "Unsupported file format");
   } else { // NOLINT(bugprone-branch-clone)
@@ -250,7 +213,7 @@ void export_3mf(const std::vector<struct Export3mfInfo> & infos, std::ostream& o
   }
 
   for(auto &info : infos) {
-    if (!append_3mf(info.geom, info, model)) {
+    if (!append_3mf(info.geom, model)) {
       if (model) lib3mf_release(model);
       return;
     }
@@ -269,4 +232,6 @@ void export_3mf(const std::vector<struct Export3mfInfo> & infos, std::ostream& o
   if (result != LIB3MF_OK) {
     LOG(message_group::Export_Error, "Error writing 3MF model.");
   }
+
+
 }

@@ -38,7 +38,6 @@
 #include "Builtins.h"
 #include "handle_dep.h"
 #include "PolySetBuilder.h"
-#include "Renderer.h"
 
 
 
@@ -56,7 +55,6 @@
 
 using namespace libfive;
 
-// #define FAKE
 std::unique_ptr<const Geometry> FrepNode::createGeometry() const
 {
 	PolySetBuilder builder(0,0,3,true);
@@ -128,8 +126,7 @@ std::unique_ptr<const Geometry> FrepNode::createGeometry() const
 	builder.addVertex(Vector3d(-0.500000, -0.500000, 3.500000));
 	builder.addVertex(Vector3d(3.500000, 3.500000, 3.500000));
 	builder.addVertex(Vector3d(-0.500000, 3.500000, 3.500000));
-#else	
-	{
+#else		
                 mesh = Mesh::render(*tree[0], reg ,settings);
 		if(mesh != nullptr) {
 			libfive_tri t;
@@ -142,17 +139,13 @@ std::unique_ptr<const Geometry> FrepNode::createGeometry() const
 				}
 			}
 		}
-	}
 #endif		
 	} else if(exp->ob_type == &PyFunction_Type) {
-	} else {  }
+		printf("Python Function!\n");
+		mesh = NULL;
+	} else { printf("xxx\n"); }
 #endif	
 	auto p = builder.build();
-	Material matcolor;
-	auto cs = ColorMap::inst()->defaultColorScheme();
-	matcolor.color = ColorMap::getColor(cs, RenderColor::OPENCSG_FACE_FRONT_COLOR);
-	p->mat.push_back(matcolor);
-	for(int i=0;i<p->indices.size();i++) p->matind.push_back(0);
 	return p;
 }
 
@@ -541,7 +534,5 @@ PyObject *ifrep(const std::shared_ptr<const PolySet> &ps)
   evalCalled=0;
   return PyLibFiveObjectFromTree(&PyLibFiveType,oc);		  
 }
-
-
 #endif
 

@@ -12,7 +12,6 @@
 #ifdef ENABLE_CGAL
 #include "cgalutils.h"
 #endif
-#include "Feature.h"
 
 namespace {
 
@@ -114,17 +113,81 @@ std::shared_ptr<PolySet> ManifoldGeometry::toPolySet() const {
         mesh.vertProperties[i],
         mesh.vertProperties[i + 1],
         mesh.vertProperties[i + 2]);
-  for (size_t i = 0; i < mesh.triVerts.size(); i += 3){
-    ps->indices.push_back({
-        static_cast<int>(mesh.triVerts[i]),
-        static_cast<int>(mesh.triVerts[i + 1]),
-        static_cast<int>(mesh.triVerts[i + 2])});
-  }
-  if(Feature::ExperimentalColorCsg.is_enabled() ) {
-    ps->matind.clear();
+
+  if (Feature::ExperimentalRenderColors.is_enabled()) {
+    ps->colors.reserve(originalIDToColor_.size());
+    ps->color_indices.reserve(ps->indices.size());
+
+    auto colorScheme = ColorMap::inst()->findColorScheme(RenderSettings::inst()->colorscheme);
+    int32_t faceFrontColorIndex = -1;
+    int32_t faceBackColorIndex = -1;
+
+    std::map<Color4f, int32_t> colorToIndex;
+    std::map<uint32_t, int32_t> originalIDToColorIndex;
+
+    auto getFaceFrontColorIndex = [&]() -> int {
+      if (faceFrontColorIndex < 0) {
+        faceFrontColorIndex = ps->colors.size();
+        ps->colors.push_back(ColorMap::getColor(*colorScheme, RenderColor::CGAL_FACE_FRONT_COLOR));
+      }
+      return faceFrontColorIndex;
+    };
+    auto getFaceBackColorIndex = [&]() -> int {
+      if (faceBackColorIndex < 0) {
+        faceBackColorIndex = ps->colors.size();
+        ps->colors.push_back(ColorMap::getColor(*colorScheme, RenderColor::CGAL_FACE_BACK_COLOR));
+      }
+      return faceBackColorIndex;
+    };
+
+    auto getColorIndex = [&](uint32_t originalID) -> int32_t {
+      if (subtractedIDs_.find(originalID) != subtractedIDs_.end()) {
+        return getFaceBackColorIndex();
+      }
+      auto colorIndexIt = originalIDToColorIndex.find(originalID);
+      if (colorIndexIt != originalIDToColorIndex.end()) {
+        return colorIndexIt->second;
+      }
+      auto colorIt = originalIDToColor_.find(originalID);
+      if (colorIt == originalIDToColor_.end()) {
+        return getFaceFrontColorIndex();
+      }
+      const auto & color = colorIt->second;
+      
+      auto pair = colorToIndex.insert({color, ps->colors.size()});
+      if (pair.second) {
+        ps->colors.push_back(color);
+      }
+      int32_t color_index = pair.first->second;
+      originalIDToColorIndex[originalID] = color_index;
+      return color_index;
+    };
+
+    auto start = mesh.runIndex[0];
+    for (int run = 0, numRun = mesh.runIndex.size() - 1; run < numRun; ++run) {
+      const auto id = mesh.runOriginalID[run];
+      const auto end = mesh.runIndex[run + 1];
+      const size_t numTri = (end - start) / 3;
+      if (numTri == 0) {
+        continue;
+      }
+
+      auto colorIndex = getColorIndex(id);
+      for (int i = start; i < end; i += 3) {
+        ps->indices.push_back({
+            static_cast<int>(mesh.triVerts[i]),
+            static_cast<int>(mesh.triVerts[i + 1]),
+            static_cast<int>(mesh.triVerts[i + 2])});
+        ps->color_indices.push_back(colorIndex);
+      }
+      start = end;
+    }
+  } else {
     for (size_t i = 0; i < mesh.triVerts.size(); i += 3)
-      ps->matind.push_back(this->matind[mesh.faceID[i/3]]);
-    ps->mat = this->mat;
+      ps->indices.push_back({
+          static_cast<int>(mesh.triVerts[i]),
+          static_cast<int>(mesh.triVerts[i + 1]),
+          static_cast<int>(mesh.triVerts[i + 2])});
   }
   return ps;
 }
@@ -203,7 +266,7 @@ ManifoldGeometry ManifoldGeometry::binOp(const ManifoldGeometry& lhs, const Mani
   return {mani, originalIDs, originalIDToColor, subtractedIDs};
 }
 
-std::shared_ptr<const ManifoldGeometry> minkowskiOp(const ManifoldGeometry& lhs, const ManifoldGeometry& rhs) {
+std::shared_ptr<ManifoldGeometry> minkowskiOp(const ManifoldGeometry& lhs, const ManifoldGeometry& rhs) {
 // FIXME: How to deal with operation not supported?
 #ifdef ENABLE_CGAL
   auto lhs_nef = std::shared_ptr<CGAL_Nef_polyhedron>(CGALUtils::createNefPolyhedronFromPolySet(*lhs.toPolySet()));

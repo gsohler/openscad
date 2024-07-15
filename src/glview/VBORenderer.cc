@@ -239,7 +239,7 @@ Vector3d uniqueMultiply(std::unordered_map<Vector3d, Vector3d>& vert_mult_map,
 // This will usually create a new VertexState and append it to the
 // vertex states in the given vertex_array
 void VBORenderer::create_surface(const PolySet& ps, VertexArray& vertex_array,
-                                 csgmode_e csgmode, const Transform3d& m, const Color4f& color) const
+                                 csgmode_e csgmode, const Transform3d& m, const Color4f& default_color) const
 {
   std::shared_ptr<VertexData> vertex_data = vertex_array.data();
 
@@ -259,18 +259,19 @@ void VBORenderer::create_surface(const PolySet& ps, VertexArray& vertex_array,
     elements_offset = vertex_array.elementsOffset();
     vertex_array.elementsMap().clear();
   }
-  Color4f color_eff;
-  int ind=0;
-  for (const auto& poly : ps.indices) {
-    color_eff = color;
-    if(ind < ps.matind.size() && csgmode == CSGMODE_USEMATIND )
-	    color_eff=ps.mat[ps.matind[ind]].color;
+
+  auto has_colors = !ps.color_indices.empty();
+
+  for (int i = 0, n = ps.indices.size(); i < n; i++) {
+    const auto& poly = ps.indices[i];
+    const auto color_index = has_colors && i < ps.color_indices.size() ? ps.color_indices[i] : -1;
+    const auto & color = color_index >= 0 && color_index < ps.colors.size() ? ps.colors[color_index] : default_color;
     if (poly.size() == 3) {
       Vector3d p0 = uniqueMultiply(vert_mult_map, ps.vertices[poly.at(0)], m);
       Vector3d p1 = uniqueMultiply(vert_mult_map, ps.vertices[poly.at(1)], m);
       Vector3d p2 = uniqueMultiply(vert_mult_map, ps.vertices[poly.at(2)], m);
 
-      create_triangle(vertex_array, color_eff, p0, p1, p2,
+      create_triangle(vertex_array, color, p0, p1, p2,
                       0, poly.size(), false, mirrored);
       triangle_count++;
     } else if (poly.size() == 4) {
@@ -279,9 +280,9 @@ void VBORenderer::create_surface(const PolySet& ps, VertexArray& vertex_array,
       Vector3d p2 = uniqueMultiply(vert_mult_map, ps.vertices[poly.at(2)], m);
       Vector3d p3 = uniqueMultiply(vert_mult_map, ps.vertices[poly.at(3)], m);
 
-      create_triangle(vertex_array, color_eff, p0, p1, p3,
+      create_triangle(vertex_array, color, p0, p1, p3,
                       0, poly.size(), false, mirrored);
-      create_triangle(vertex_array, color_eff, p2, p3, p1,
+      create_triangle(vertex_array, color, p2, p3, p1,
                       1, poly.size(), false, mirrored);
       triangle_count += 2;
     } else {
@@ -295,12 +296,11 @@ void VBORenderer::create_surface(const PolySet& ps, VertexArray& vertex_array,
         Vector3d p1 = uniqueMultiply(vert_mult_map, ps.vertices[poly.at(i % poly.size())], m);
         Vector3d p2 = uniqueMultiply(vert_mult_map, ps.vertices[poly.at(i - 1)], m);
 
-        create_triangle(vertex_array, color_eff, p0, p2, p1,
+        create_triangle(vertex_array, color, p0, p2, p1,
                         i - 1, poly.size(), false, mirrored);
         triangle_count++;
       }
     }
-    ind++;
   }
 
   GLenum elements_type = 0;
