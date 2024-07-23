@@ -116,9 +116,10 @@
 #include <fcntl.h>
 #ifdef ENABLE_PYTHON
 #include "python/python_public.h"
-#include "nettle/sha2.h"
-#include "nettle/base64.h"
+//#include "nettle/sha2.h"
+//#include "nettle/base64.h"
 
+/*
 std::string SHA256HashString(std::string aString){
     uint8_t  digest[SHA256_DIGEST_SIZE];
     sha256_ctx sha256_ctx;
@@ -136,7 +137,7 @@ std::string SHA256HashString(std::string aString){
     base64_encode_final(&base64_ctx, digest_base64);		    
     return digest_base64;
 }
-
+*/
 #endif
 
 #define ENABLE_3D_PRINTING
@@ -1469,9 +1470,9 @@ void MainWindow::actionOpen()
 {
   auto fileInfoList = UIUtils::openFiles(this);
   for (auto& i : fileInfoList) {
-    if (!i.exists()) {
-      return;
-    }
+//    if (!i.exists()) {
+//      return;
+//    }
     tabManager->open(i.filePath());
   }
 }
@@ -1485,9 +1486,9 @@ void MainWindow::actionOpenWindow()
 {
   auto fileInfoList = UIUtils::openFiles(this);
   for (auto& i : fileInfoList) {
-    if (!i.exists()) {
-      return;
-    }
+//    if (!i.exists()) {
+//      return;
+//    }
     new MainWindow(QStringList(i.filePath()));
   }
 }
@@ -1570,10 +1571,10 @@ void MainWindow::writeBackup(QFile *file)
 void MainWindow::saveBackup()
 {
   auto path = PlatformUtils::backupPath();
-  if ((!fs::exists(path)) && (!PlatformUtils::createBackupPath())) {
-    LOG(message_group::UI_Warning, "Cannot create backup path: %1$s", path);
-    return;
-  }
+//  if ((!fs::exists(path)) && (!PlatformUtils::createBackupPath())) {
+//    LOG(message_group::UI_Warning, "Cannot create backup path: %1$s", path);
+//    return;
+//  }
 
   auto backupPath = QString::fromLocal8Bit(path.c_str());
   if (!backupPath.endsWith("/")) backupPath.append("/");
@@ -1891,6 +1892,8 @@ bool MainWindow::fileChangedOnDisk()
 
 #ifdef ENABLE_PYTHON
 bool MainWindow::trust_python_file(const std::string &file,  const std::string &content) {
+  return true;
+#if 0
   QSettingsCached settings;
   char setting_key[256];
   if(python_trusted) return true;
@@ -1944,6 +1947,7 @@ bool MainWindow::trust_python_file(const std::string &file,  const std::string &
     return false;
   }
   return false;
+#endif
 }
 #endif
 

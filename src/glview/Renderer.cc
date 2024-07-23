@@ -5,7 +5,7 @@
 #include "printutils.h"
 #include "PlatformUtils.h"
 #include "system-gl.h"
-#include "TextureNode.h"
+//#include "TextureNode.h"
 
 #include <Eigen/LU>
 #include <fstream>
@@ -110,10 +110,10 @@ void Renderer::setupShader() {
   renderer_shader.data.csg_rendering.tex1 = glGetUniformLocation(edgeshader_prog, "tex1"); //4 
   renderer_shader.data.csg_rendering.texturefactor = glGetUniformLocation(edgeshader_prog, "textureFactor"); // 5
   renderer_shader.data.csg_rendering.barycentric = glGetAttribLocation(edgeshader_prog, "barycentric"); // 6
-  if(textures.size() > 0) { // TODO prevent bug, segfault
-    glUniform1f(renderer_shader.data.csg_rendering.texturefactor , 0.0);
-    glUniform1i(renderer_shader.data.csg_rendering.tex1 , 0);
-  }
+//  if(textures.size() > 0) { // TODO prevent bug, segfault
+//    glUniform1f(renderer_shader.data.csg_rendering.texturefactor , 0.0);
+//    glUniform1i(renderer_shader.data.csg_rendering.tex1 , 0);
+//  }
 
 }
 
@@ -171,8 +171,8 @@ void Renderer::setColor(const float color[4],const int &textureind, const shader
     if(textureind == 0){
     	    glUniform1f(shaderinfo->data.csg_rendering.texturefactor, 0.0);
     } else {
-            glBindTexture(GL_TEXTURE_2D, textureIDs[textureind-1]);
-    	    glUniform1f(shaderinfo->data.csg_rendering.texturefactor, 1.0);
+//            glBindTexture(GL_TEXTURE_2D, textureIDs[textureind-1]);
+//    	    glUniform1f(shaderinfo->data.csg_rendering.texturefactor, 1.0);
     }
   }
 #endif

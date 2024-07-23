@@ -510,7 +510,7 @@ if(ENABLE_PYTHON)
   if(APPLE) # Nettle
     target_include_directories(OpenSCADPy PRIVATE "/usr/local/include")
     target_link_directories(OpenSCADPy PRIVATE "/usr/local/lib")
-    target_link_libraries(OpenSCADPy PRIVATE "libnettle.a")
+#    target_link_libraries(OpenSCADPy PRIVATE "libnettle.a")
   else()
     target_include_directories(OpenSCADPy PRIVATE ${Nettle_INCLUDE_DIRS})
     target_link_libraries(OpenSCADPy PRIVATE ${Nettle_LIBRARIES})
@@ -626,7 +626,7 @@ message(STATUS "Bison: ${BISON_VERSION}")
 if(APPLE)
     target_include_directories(OpenSCAD PRIVATE "/usr/local/include")
     target_link_directories(OpenSCAD PRIVATE "/usr/local/lib")
-    target_link_libraries(OpenSCAD PRIVATE "libjpeg.a")
+#    target_link_libraries(OpenSCAD PRIVATE "libjpeg.a")
 else()	
   find_package(JPEG REQUIRED QUIET)
   target_include_directories(OpenSCAD SYSTEM PRIVATE ${JPEG_INCLUDE_DIRS})
@@ -891,7 +891,7 @@ set(CORE_SOURCES
   src/core/ColorNode.cc
   src/core/PullNode.cc
   src/core/WrapNode.cc
-  src/core/TextureNode.cc
+#  src/core/TextureNode.cc
   src/core/Context.cc
   src/core/ContextFrame.cc
   src/core/ContextMemoryManager.cc

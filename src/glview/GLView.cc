@@ -7,7 +7,7 @@
 #include "degree_trig.h"
 #include <cmath>
 #include <cstdio>
-#include "TextureNode.h"
+//#include "TextureNode.h"
 #ifdef ENABLE_OPENCSG
 #include <opencsg.h>
 #endif
@@ -281,12 +281,12 @@ void GLView::initializeGL()
 #ifdef ENABLE_OPENCSG
   enable_opencsg_shaders();
 #endif
-  glEnable(GL_TEXTURE_2D);
-  glGenTextures(TEXTURES_NUM, textureIDs); 
+//  glEnable(GL_TEXTURE_2D);
+//  glGenTextures(TEXTURES_NUM, textureIDs); 
 }
-
 void GLView::loadTextures(void)
 {
+/*
   int i;
   int len=textures.size();
   if(len >  TEXTURES_NUM) len=TEXTURES_NUM;
@@ -301,8 +301,8 @@ void GLView::loadTextures(void)
 	  glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 	  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, TEXTURE_SIZE, TEXTURE_SIZE, 0, GL_RGB, GL_UNSIGNED_BYTE, textureBitmap);
   }
+*/
 }
-
 void GLView::showSmallaxes(const Color4f& col)
 {
   auto dpi = this->getDPI();
