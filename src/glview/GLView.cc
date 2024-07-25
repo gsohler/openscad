@@ -459,6 +459,7 @@ void GLView::showObject(const SelectedObject &obj, const Vector3d &eyedir)
 	Vector3d diff=obj.p2-obj.p1;
 	Vector3d wdir=eyedir.cross(diff).normalized()*vd/2.0;
         glBegin(GL_QUADS);
+	glNormal3f(wdir[0], wdir[1], wdir[2]);
         glVertex3d(obj.p1[0]-wdir[0],obj.p1[1]-wdir[1],obj.p1[2]-wdir[2]);
         glVertex3d(obj.p2[0]-wdir[0],obj.p2[1]-wdir[1],obj.p2[2]-wdir[2]);
         glVertex3d(obj.p2[0]+wdir[0],obj.p2[1]+wdir[1],obj.p2[2]+wdir[2]);
@@ -466,6 +467,20 @@ void GLView::showObject(const SelectedObject &obj, const Vector3d &eyedir)
         glEnd();
       }	
       break;	
+   case SelectionType::SELECTION_FACE:
+      {
+        Vector3d n=(obj.p2-obj.p1).cross(obj.p3-obj.p1).normalized();
+	Vector3d p1=obj.p1+n*1e-3;
+	Vector3d p2=obj.p2+n*1e-3;
+	Vector3d p3=obj.p3+n*1e-3;
+        glBegin(GL_TRIANGLES);
+
+	glNormal3f(n[0], n[1], n[2]);
+        glVertex3d(p1[0],p1[1],p1[2]);
+        glVertex3d(p2[0],p2[1],p2[2]);
+        glVertex3d(p3[0],p3[1],p3[2]);
+	glEnd();
+      }
   }
 }
 

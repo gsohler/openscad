@@ -305,6 +305,7 @@ BoundingBox CGALRenderer::getBoundingBox() const {
   return bbox;
 }
 
+int linsystem( Vector3d v1,Vector3d v2,Vector3d v3,Vector3d pt,Vector3d &res,double *detptr=NULL);
 std::shared_ptr<SelectedObject>
 CGALRenderer::findModelObject(Vector3d near_pt, Vector3d far_pt, int mouse_x,
                               int mouse_y, double tolerance) {
@@ -312,6 +313,7 @@ CGALRenderer::findModelObject(Vector3d near_pt, Vector3d far_pt, int mouse_x,
   double dist_nearest = std::numeric_limits<double>::max();
   Vector3d pt1_nearest;
   Vector3d pt2_nearest;
+  Vector3d pt3_nearest;
   const auto find_nearest_point = [&](const std::vector<Vector3d> &vertices){
     for (const Vector3d &pt : vertices) {
       SelectedObject ruler = calculateLinePointDistance(near_pt, far_pt, pt, dist_near);
@@ -343,7 +345,7 @@ CGALRenderer::findModelObject(Vector3d near_pt, Vector3d far_pt, int mouse_x,
         int ind2 = poly[(i + 1) % poly.size()];
         double dist_lat;
         double dist_norm = fabs(calculateLineLineDistance(
-            vertices[ind1], vertices[ind2], near_pt, far_pt, dist_lat));
+            vertices[ind1], vertices[ind2], near_pt, far_pt, dist_lat)); // TODO naehcstgelegene line
         if (dist_lat >= 0 && dist_lat <= 1 && dist_norm < tolerance) {
           dist_nearest = dist_lat;
           pt1_nearest = vertices[ind1];
@@ -363,6 +365,51 @@ CGALRenderer::findModelObject(Vector3d near_pt, Vector3d far_pt, int mouse_x,
       .type = SelectionType::SELECTION_SEGMENT,
       .p1 = pt1_nearest,
       .p2 = pt2_nearest,
+    };
+    return std::make_shared<SelectedObject>(obj);
+  }
+
+  const auto find_nearest_face = [&](const std::vector<Vector3d> &vertices, const PolygonIndices& indices) {
+    Vector3d v1 = near_pt - far_pt;
+    for (const auto &poly : indices) {
+      if(poly.size() < 3) continue;
+      // assume polygon is convex
+      for (int i = 0; i < poly.size()-2; i++) {
+        int ind1 = poly[0];
+        int ind2 = poly[i+1];
+        int ind3 = poly[i+2];
+	Vector3d v2=vertices[ind2] - vertices[ind1];
+	Vector3d v3=vertices[ind3] - vertices[ind1];
+	Vector3d total = far_pt - vertices[ind1];
+
+	Vector3d res;
+	if(linsystem(v1, v2, v3, total, res)) continue;
+        if(res[0] > 0) continue;
+        if(res[1] < 0 || res[2] < 0) continue;
+        if(res[1] + res[2] > 1) continue;	
+	double dist = res[0];
+	if(dist < dist_nearest) {
+	  dist_nearest = dist;
+          pt1_nearest = vertices[ind1];
+          pt2_nearest = vertices[ind2];
+          pt3_nearest = vertices[ind3];
+	}  
+      }
+    }
+  };
+
+  for (const std::shared_ptr<const PolySet> &ps : this->polysets) {
+    find_nearest_face(ps->vertices, ps->indices);
+  }
+  for (const auto &[polygon, ps] : this->polygons) {
+    find_nearest_face(ps->vertices, ps->indices);
+  }
+  if (dist_nearest < std::numeric_limits<double>::max()) {
+    SelectedObject obj = {
+      .type = SelectionType::SELECTION_FACE,
+      .p1 = pt1_nearest,
+      .p2 = pt2_nearest,
+      .p3 = pt3_nearest,
     };
     return std::make_shared<SelectedObject>(obj);
   }

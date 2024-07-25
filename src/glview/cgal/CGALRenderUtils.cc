@@ -84,3 +84,16 @@ SelectedObject calculateSegSegDistance(const Vector3d &l1b, const Vector3d &l1e,
 
 	return ruler;
 }
+
+SelectedObject calculatePointFaceDistance(const Vector3d &pt, const Vector3d &p1, const Vector3d &p2, const Vector3d &p3)
+{
+	SelectedObject ruler;
+	ruler.type =  SelectionType::SELECTION_SEGMENT;
+	ruler.p1=pt;
+	Vector3d n=(p2-p1).cross(p3-p1).normalized();
+	double dist=fabs((pt-p1).dot(n));
+	ruler.p2=pt+n*dist;
+	return ruler;
+}
+
+

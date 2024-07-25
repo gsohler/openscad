@@ -122,6 +122,19 @@ QString Measurement::statemachine(QPoint mouse)
         if(obj1.type == SelectionType::SELECTION_SEGMENT && obj2.type == SelectionType::SELECTION_SEGMENT){
           ruler =calculateSegSegDistance(obj1.p1, obj1.p2,obj2.p1,obj2.p2);
 	}
+        if(obj1.type == SelectionType::SELECTION_POINT && obj2.type == SelectionType::SELECTION_FACE){
+          ruler =calculatePointFaceDistance(obj1.p1, obj2.p1, obj2.p2, obj2.p3);
+	}
+        if(obj1.type == SelectionType::SELECTION_FACE && obj2.type == SelectionType::SELECTION_POINT){
+          ruler =calculatePointFaceDistance(obj2.p1, obj1.p1, obj1.p2, obj1.p3);
+	}
+        if(obj1.type == SelectionType::SELECTION_FACE && obj2.type == SelectionType::SELECTION_FACE){
+	  Vector3d n1=(obj1.p2-obj1.p1).cross(obj1.p3-obj1.p1).normalized();
+	  Vector3d n2=(obj2.p2-obj2.p1).cross(obj2.p3-obj2.p1).normalized();
+	  if(fabs(n1.dot(n2)) < 0.999)
+          	return QString("Faces are not parallel");
+          ruler =calculatePointFaceDistance(obj1.p1, obj2.p1, obj2.p2, obj2.p3);
+	}
 
         if(ruler.type != SelectionType::SELECTION_INVALID) {
 	  dist =(ruler.p2-ruler.p1).norm();
@@ -148,6 +161,12 @@ QString Measurement::statemachine(QPoint mouse)
           return display_angle(obj1.p1,obj2.p1,obj2.p1,obj2.p2);
         else if(obj1.type == SelectionType::SELECTION_SEGMENT && obj2.type == SelectionType::SELECTION_SEGMENT)
 	  return display_angle(obj1.p1,obj1.p2,obj2.p1,obj2.p2);
+        else if(obj1.type == SelectionType::SELECTION_FACE && obj2.type == SelectionType::SELECTION_FACE) {
+	  Vector3d n1=(obj1.p2-obj1.p1).cross(obj1.p3-obj1.p1).normalized();
+	  Vector3d n2=(obj2.p2-obj2.p1).cross(obj2.p3-obj2.p1).normalized();
+          double ang=180-acos(n1.dot(n2))*180.0/G_PI;
+          return QString("Angle  is %1 Degrees").arg(ang);
+	}
         else qglview->measure_state = MEASURE_ANG3;
       }
       break;

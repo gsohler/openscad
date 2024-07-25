@@ -191,6 +191,11 @@ void QGLView::paintGL()
 		  .arg(shown_obj->p2[0]).arg(shown_obj->p2[1]).arg(shown_obj->p2[2]);
           statusLabel->setText(status);
 	  break;
+        case SelectionType::SELECTION_FACE:
+	  status=QString("Face selected\n");
+          statusLabel->setText(status);
+	  break;
+
       } 
       return;
     }
