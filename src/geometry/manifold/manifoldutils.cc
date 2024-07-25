@@ -68,6 +68,7 @@ std::shared_ptr<ManifoldGeometry> createManifoldFromSurfaceMesh(const TriangleMe
     LOG(message_group::Error,
         "[manifold] Surface_mesh -> Manifold conversion failed: %1$s", 
         ManifoldUtils::statusToString(mani->Status()));
+    return nullptr;
   }
   std::set<uint32_t> originalIDs;
   auto id = mani->OriginalID();
@@ -100,45 +101,37 @@ std::shared_ptr<ManifoldGeometry> createManifoldFromTriangularPolySet(const Poly
   std::set<uint32_t> originalIDs;
   std::map<uint32_t, Color4f> originalIDToColor;
 
-  if (!Feature::ExperimentalRenderColors.is_enabled()) {
-    for (const auto& face : ps.indices) {
+  std::map<std::optional<Color4f>, std::vector<size_t>> colorToFaceIndices;
+  for (size_t i = 0, n = ps.indices.size(); i < n; i++) {
+    auto color_index = i < ps.color_indices.size() ? ps.color_indices[i] : -1;
+    std::optional<Color4f> color;
+    if (color_index >= 0) {
+      color = ps.colors[color_index];
+    }
+    colorToFaceIndices[color].push_back(i);
+  }
+  auto next_id = manifold::Manifold::ReserveIDs(colorToFaceIndices.size());
+  for (const auto& [color, faceIndices] : colorToFaceIndices) {
+    
+    auto id = next_id++;
+    if (color.has_value()) {
+      originalIDToColor[id] = color.value();
+    }
+
+    mesh.runIndex.push_back(mesh.triVerts.size());
+    mesh.runOriginalID.push_back(id);
+    originalIDs.insert(id);
+    
+    for (size_t faceIndex : faceIndices) {
+      auto & face = ps.indices[faceIndex];
       assert(face.size() == 3);
       mesh.triVerts.push_back(face[0]);
       mesh.triVerts.push_back(face[1]);
       mesh.triVerts.push_back(face[2]);
     }
-  } else {
-    std::map<std::optional<Color4f>, std::vector<size_t>> colorToFaceIndices;
-    for (size_t i = 0, n = ps.indices.size(); i < n; i++) {
-      auto color_index = i < ps.color_indices.size() ? ps.color_indices[i] : -1;
-      std::optional<Color4f> color;
-      if (color_index >= 0) {
-        color = ps.colors[color_index];
-      }
-      colorToFaceIndices[color].push_back(i);
-    }
-    auto next_id = manifold::Manifold::ReserveIDs(colorToFaceIndices.size());
-    for (const auto& [color, faceIndices] : colorToFaceIndices) {
-      
-      auto id = next_id++;
-      if (color.has_value()) {
-        originalIDToColor[id] = color.value();
-      }
-
-      mesh.runIndex.push_back(mesh.triVerts.size());
-      mesh.runOriginalID.push_back(id);
-      originalIDs.insert(id);
-      
-      for (size_t faceIndex : faceIndices) {
-        auto & face = ps.indices[faceIndex];
-        assert(face.size() == 3);
-        mesh.triVerts.push_back(face[0]);
-        mesh.triVerts.push_back(face[1]);
-        mesh.triVerts.push_back(face[2]);
-      }
-    }
-    mesh.runIndex.push_back(mesh.triVerts.size());
   }
+  mesh.runIndex.push_back(mesh.triVerts.size());
+
   auto mani = std::make_shared<const manifold::Manifold>(std::move(mesh));
   return std::make_shared<ManifoldGeometry>(mani, originalIDs, originalIDToColor);
 }
@@ -169,9 +162,8 @@ std::shared_ptr<ManifoldGeometry> createManifoldFromPolySet(const PolySet& ps)
   // vertex positions (touching cubes, donut with vertex in the center etc.)
   PolySetBuilder builder(ps.vertices.size(), ps.indices.size(),
                          ps.getDimension(), ps.convexValue());
-  builder.appendPolySet(ps);
-  std::unique_ptr<PolySet> rebuilt_ps = builder.build();
-  rebuilt_ps->setTriangular(ps.isTriangular());
+  builder.appendPolySet(triangle_set);
+  const std::unique_ptr<PolySet> rebuilt_ps = builder.build();
   mani = createManifoldFromTriangularPolySet(*rebuilt_ps);
   if (mani->getManifold().Status() == Error::NoError) {
     return mani;
@@ -184,8 +176,8 @@ std::shared_ptr<ManifoldGeometry> createManifoldFromPolySet(const PolySet& ps)
 
   // 2. If the PolySet couldn't be converted into a Manifold object, let's try to repair it.
   // We currently have to utilize some CGAL functions to do this.
-  {
-  #ifdef ENABLE_CGAL
+#ifdef ENABLE_CGAL
+  try {
     PolySet psq(ps);
     std::vector<Vector3d> points3d;
     psq.quantizeVertices(&points3d);
@@ -221,10 +213,11 @@ std::shared_ptr<ManifoldGeometry> createManifoldFromPolySet(const PolySet& ps)
     auto geom = createManifoldFromSurfaceMesh(m);
     // TODO: preserve color if polyset is fully monochrome, or maybe pass colors around in surface mesh?
     return geom;
-  #else
-    return std::make_shared<ManifoldGeometry>();
-  #endif
+  } catch (const std::exception& e) {
+    LOG(message_group::Error, "[manifold] CGAL error: %1$s", e.what());
   }
+#endif
+  return std::make_shared<ManifoldGeometry>();
 }
 
 std::shared_ptr<const ManifoldGeometry> createManifoldFromGeometry(const std::shared_ptr<const Geometry>& geom) {

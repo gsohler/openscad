@@ -183,9 +183,8 @@ void GLView::paintGL()
     showObject(obj,eyedir);
   }
   glColor3f(0,1,0);
-  for (const SelectedObject obj: this->shown_obj) {
-    showObject(obj,eyedir);
-  }
+  if(shown_obj != nullptr)
+    showObject(*shown_obj,eyedir);
 #ifdef ENABLE_PYTHON 
   if(this->handle_mode) {
     glColor3f(0,0,1);
@@ -433,6 +432,9 @@ void GLView::showObject(const SelectedObject &obj, const Vector3d &eyedir)
     case SelectionType::SELECTION_POINT:
     case SelectionType::SELECTION_HANDLE:
     {
+      if(obj.pt.size() < 1) break;
+      Vector3d p1=obj.pt[0];
+
       double n=1/sqrt(3);
       // create an octaeder	   
       //x- x+ y- y+ z- z+
@@ -443,30 +445,47 @@ void GLView::showObject(const SelectedObject &obj, const Vector3d &eyedir)
 	for(int j=0;j<3;j++) {
 	  int code=sequence[i*3+j];
           switch(code) {
-		case 0: glVertex3d(obj.p1[0]-vd,obj.p1[1],obj.p1[2]); break;
-		case 1: glVertex3d(obj.p1[0]+vd,obj.p1[1],obj.p1[2]); break;
-		case 2: glVertex3d(obj.p1[0],obj.p1[1]-vd,obj.p1[2]); break;
-		case 3: glVertex3d(obj.p1[0],obj.p1[1]+vd,obj.p1[2]); break;
-		case 4: glVertex3d(obj.p1[0],obj.p1[1],obj.p1[2]-vd); break;
-		case 5: glVertex3d(obj.p1[0],obj.p1[1],obj.p1[2]+vd); break;
+		case 0: glVertex3d(p1[0]-vd,p1[1],p1[2]); break;
+		case 1: glVertex3d(p1[0]+vd,p1[1],p1[2]); break;
+		case 2: glVertex3d(p1[0],p1[1]-vd,p1[2]); break;
+		case 3: glVertex3d(p1[0],p1[1]+vd,p1[2]); break;
+		case 4: glVertex3d(p1[0],p1[1],p1[2]-vd); break;
+		case 5: glVertex3d(p1[0],p1[1],p1[2]+vd); break;
           }		
 	}	
       }	
       glEnd();
      }
      break;	
-   case SelectionType::SELECTION_LINE:
+   case SelectionType::SELECTION_SEGMENT:
      {
-	Vector3d diff=obj.p2-obj.p1;
+        if(obj.pt.size() < 2) break;
+	Vector3d p1=obj.pt[0];
+	Vector3d p2=obj.pt[1];
+	Vector3d diff=p2-p1;
 	Vector3d wdir=eyedir.cross(diff).normalized()*vd/2.0;
         glBegin(GL_QUADS);
-        glVertex3d(obj.p1[0]-wdir[0],obj.p1[1]-wdir[1],obj.p1[2]-wdir[2]);
-        glVertex3d(obj.p2[0]-wdir[0],obj.p2[1]-wdir[1],obj.p2[2]-wdir[2]);
-        glVertex3d(obj.p2[0]+wdir[0],obj.p2[1]+wdir[1],obj.p2[2]+wdir[2]);
-        glVertex3d(obj.p1[0]+wdir[0],obj.p1[1]+wdir[1],obj.p1[2]+wdir[2]);
+	glNormal3f(wdir[0], wdir[1], wdir[2]);
+        glVertex3d(p1[0]-wdir[0],p1[1]-wdir[1],p1[2]-wdir[2]);
+        glVertex3d(p2[0]-wdir[0],p2[1]-wdir[1],p2[2]-wdir[2]);
+        glVertex3d(p2[0]+wdir[0],p2[1]+wdir[1],p2[2]+wdir[2]);
+        glVertex3d(p1[0]+wdir[0],p1[1]+wdir[1],p1[2]+wdir[2]);
         glEnd();
       }	
       break;	
+   case SelectionType::SELECTION_FACE:
+      {
+        if(obj.pt.size() < 2) break;
+
+        Vector3d n=(obj.pt[1]-obj.pt[0]).cross(obj.pt[2]-obj.pt[0]).normalized();
+        glBegin(GL_TRIANGLES);
+	glNormal3f(n[0], n[1], n[2]);
+	for(const auto pt: obj.pt) {
+	  Vector3d px=pt+n*1e-3;
+          glVertex3d(px[0],px[1],px[2]);
+	} 
+	glEnd();
+      }
   }
 }
 

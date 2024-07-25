@@ -2442,12 +2442,12 @@ void MainWindow::actionFindHandle()
 void MainWindow::leftClick(QPoint mouse) 
 {
   QString str = meas.statemachine(mouse);
-  if(str.size() > 0) {
+  if(!str.isEmpty()) {
     this->qglview->measure_state = MEASURE_IDLE;
     if(str.startsWith("I:")) {
       this->activeEditor->insert(QString(str.toStdString().c_str()+2));
       this->qglview->selected_obj.clear();
-      this->qglview->shown_obj.clear();
+      this->qglview->shown_obj = nullptr;
       this->qglview->update();
       this->qglview->measure_state = MEASURE_IDLE;
       this->qglview->handle_mode=false;
@@ -2540,7 +2540,7 @@ void MainWindow::rightClick(QPoint mouse)
 void MainWindow::measureFinished(void)
 {
   this->qglview->selected_obj.clear();
-  this->qglview->shown_obj.clear();
+  this->qglview->shown_obj = nullptr;
   this->qglview->update();
   this->qglview->measure_state = MEASURE_IDLE;
   this->qglview->handle_mode=false;
