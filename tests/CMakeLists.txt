@@ -1600,17 +1600,17 @@ list(APPEND NEF3_BROKEN_TESTS
 
 # Platform specific test disable
 if(APPLE)
-  set_tests_properties(
-    ${NEF3_BROKEN_TESTS}
-    # Python not enabled for MAC yet
-    cgalpngtest_python_primitives
-    echotest_python_abuse
-    # issue3158 test failing on macos, see: https://github.com/openscad/openscad/issues/4509
-    opencsgtest_issue3158
-    # On macOS, GL_POINTS are sometimes circular even though GL_POINT_SMOOTH is disabled
-    openscad-viewoptions-wireframe_view-options-tests
-    PROPERTIES DISABLED TRUE
-  )
+#  set_tests_properties(
+#    ${NEF3_BROKEN_TESTS}
+#    # Python not enabled for MAC yet
+#    cgalpngtest_python_primitives
+#    echotest_python_abuse
+#    # issue3158 test failing on macos, see: https://github.com/openscad/openscad/issues/4509
+#    opencsgtest_issue3158
+#    # On macOS, GL_POINTS are sometimes circular even though GL_POINT_SMOOTH is disabled
+#    openscad-viewoptions-wireframe_view-options-tests
+#    PROPERTIES DISABLED TRUE
+#  )
 elseif(UNIX)
   set_tests_properties(
     ${NEF3_BROKEN_TESTS}
