@@ -182,13 +182,13 @@ void QGLView::paintGL()
     if(this->shown_obj != nullptr) {
       switch(this->shown_obj->type) {
         case SelectionType::SELECTION_POINT:
-          status = QString("Point (%1/%2/%3)").arg(shown_obj->p1[0]).arg(shown_obj->p1[1]).arg(shown_obj->p1[2]);
+          status = QString("Point (%1/%2/%3)").arg(shown_obj->pt[0][0]).arg(shown_obj->pt[0][1]).arg(shown_obj->pt[0][2]);
           statusLabel->setText(status);
 	  break;
         case SelectionType::SELECTION_SEGMENT:
           status = QString("Segment (%1/%2/%3) - (%4/%5/%6)")
-		  .arg(shown_obj->p1[0]).arg(shown_obj->p1[1]).arg(shown_obj->p1[2])
-		  .arg(shown_obj->p2[0]).arg(shown_obj->p2[1]).arg(shown_obj->p2[2]);
+		  .arg(shown_obj->pt[0][0]).arg(shown_obj->pt[0][1]).arg(shown_obj->pt[0][2])
+		  .arg(shown_obj->pt[1][0]).arg(shown_obj->pt[1][1]).arg(shown_obj->pt[1][2]);
           statusLabel->setText(status);
 	  break;
         case SelectionType::SELECTION_FACE:
@@ -574,8 +574,8 @@ std::shared_ptr<SelectedObject> QGLView::findObject(int mouse_x, int mouse_y)
     int found_ind=-1;
     for(int i=0;i<python_result_handle.size();i++) 
     {    
-      SelectedObject dist= calculateLinePointDistance(near_pt, far_pt, python_result_handle[i].p1, dist_near);
-      double dist_pt=(dist.p1-dist.p2).norm();
+      SelectedObject dist= calculateLinePointDistance(near_pt, far_pt, python_result_handle[i].pt[0], dist_near);
+      double dist_pt=(dist.pt[0]-dist.pt[1]).norm();
       if(dist_pt < tolerance  ) {
         if(isnan(dist_nearest) || dist_near < dist_nearest)
         {

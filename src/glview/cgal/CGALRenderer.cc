@@ -314,10 +314,11 @@ CGALRenderer::findModelObject(Vector3d near_pt, Vector3d far_pt, int mouse_x,
   Vector3d pt1_nearest;
   Vector3d pt2_nearest;
   Vector3d pt3_nearest;
+  std::vector<Vector3d> pts_nearest;
   const auto find_nearest_point = [&](const std::vector<Vector3d> &vertices){
     for (const Vector3d &pt : vertices) {
       SelectedObject ruler = calculateLinePointDistance(near_pt, far_pt, pt, dist_near);
-      double dist_pt = (ruler.p1-ruler.p2).norm();
+      double dist_pt = (ruler.pt[0]-ruler.pt[1]).norm();
       if (dist_pt < tolerance && dist_near < dist_nearest) {
         dist_nearest = dist_near;
         pt1_nearest = pt;
@@ -333,8 +334,9 @@ CGALRenderer::findModelObject(Vector3d near_pt, Vector3d far_pt, int mouse_x,
   if (dist_nearest < std::numeric_limits<double>::max()) {
     SelectedObject obj = {
       .type = SelectionType::SELECTION_POINT,
-      .p1 = pt1_nearest
     };
+    obj.pt.push_back(pt1_nearest);
+
     return std::make_shared<SelectedObject>(obj);
   }
 
@@ -363,9 +365,9 @@ CGALRenderer::findModelObject(Vector3d near_pt, Vector3d far_pt, int mouse_x,
   if (dist_nearest < std::numeric_limits<double>::max()) {
     SelectedObject obj = {
       .type = SelectionType::SELECTION_SEGMENT,
-      .p1 = pt1_nearest,
-      .p2 = pt2_nearest,
     };
+    obj.pt.push_back(pt1_nearest);
+    obj.pt.push_back(pt2_nearest);
     return std::make_shared<SelectedObject>(obj);
   }
 
@@ -390,9 +392,9 @@ CGALRenderer::findModelObject(Vector3d near_pt, Vector3d far_pt, int mouse_x,
 	double dist = res[0];
 	if(dist < dist_nearest) {
 	  dist_nearest = dist;
-          pt1_nearest = vertices[ind1];
-          pt2_nearest = vertices[ind2];
-          pt3_nearest = vertices[ind3];
+	  pts_nearest.clear();
+	  for(const auto ind: poly)
+  	    pts_nearest.push_back(vertices[ind]);
 	}  
       }
     }
@@ -407,10 +409,8 @@ CGALRenderer::findModelObject(Vector3d near_pt, Vector3d far_pt, int mouse_x,
   if (dist_nearest < std::numeric_limits<double>::max()) {
     SelectedObject obj = {
       .type = SelectionType::SELECTION_FACE,
-      .p1 = pt1_nearest,
-      .p2 = pt2_nearest,
-      .p3 = pt3_nearest,
     };
+    obj.pt=pts_nearest;
     return std::make_shared<SelectedObject>(obj);
   }
   return nullptr;

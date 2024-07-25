@@ -70,15 +70,16 @@ QString Measurement::statemachine(QPoint mouse)
 	Vector3d side1, side2;
   	ruler = {
             .type = SelectionType::SELECTION_SEGMENT,
-            .p1 = p1,
-            .p2 = p2
         };
+	ruler.pt.push_back(p1);
+	ruler.pt.push_back(p2);
 	this->qglview->selected_obj.push_back(ruler);
 	ruler = {
             .type = SelectionType::SELECTION_SEGMENT,
-            .p1 = p3,
-            .p2 = p4
         };
+	ruler.pt.clear();
+	ruler.pt.push_back(p3);
+	ruler.pt.push_back(p4);
 	this->qglview->selected_obj.push_back(ruler);
 
         side1=(p2-p1).normalized();
@@ -109,35 +110,35 @@ QString Measurement::statemachine(QPoint mouse)
         if(obj1.type == SelectionType::SELECTION_POINT && obj2.type == SelectionType::SELECTION_POINT){
 	  ruler = {
             .type = SelectionType::SELECTION_SEGMENT,
-            .p1 = obj1.p1,
-            .p2 = obj2.p1
           };
+	  ruler.pt.push_back(obj1.pt[0]);
+	  ruler.pt.push_back(obj2.pt[0]);
 	}  
         if(obj1.type == SelectionType::SELECTION_POINT && obj2.type == SelectionType::SELECTION_SEGMENT){
-	  ruler =calculateLinePointDistance(obj2.p1, obj2.p2,obj1.p1, lat);
+	  ruler =calculateLinePointDistance(obj2.pt[0], obj2.pt[1],obj1.pt[0], lat);
 	}  
         if(obj1.type == SelectionType::SELECTION_SEGMENT && obj2.type == SelectionType::SELECTION_POINT){
-	  ruler =calculateLinePointDistance(obj1.p1, obj1.p2,obj2.p1, lat);
+	  ruler =calculateLinePointDistance(obj1.pt[0], obj1.pt[1],obj2.pt[0], lat);
 	}  
         if(obj1.type == SelectionType::SELECTION_SEGMENT && obj2.type == SelectionType::SELECTION_SEGMENT){
-          ruler =calculateSegSegDistance(obj1.p1, obj1.p2,obj2.p1,obj2.p2);
+          ruler =calculateSegSegDistance(obj1.pt[0], obj1.pt[1],obj2.pt[0],obj2.pt[1]);
 	}
         if(obj1.type == SelectionType::SELECTION_POINT && obj2.type == SelectionType::SELECTION_FACE){
-          ruler =calculatePointFaceDistance(obj1.p1, obj2.p1, obj2.p2, obj2.p3);
+          ruler =calculatePointFaceDistance(obj1.pt[0], obj2.pt[0], obj2.pt[1], obj2.pt[2]);
 	}
         if(obj1.type == SelectionType::SELECTION_FACE && obj2.type == SelectionType::SELECTION_POINT){
-          ruler =calculatePointFaceDistance(obj2.p1, obj1.p1, obj1.p2, obj1.p3);
+          ruler =calculatePointFaceDistance(obj2.pt[0], obj1.pt[0], obj1.pt[1], obj1.pt[2]);
 	}
         if(obj1.type == SelectionType::SELECTION_FACE && obj2.type == SelectionType::SELECTION_FACE){
-	  Vector3d n1=(obj1.p2-obj1.p1).cross(obj1.p3-obj1.p1).normalized();
-	  Vector3d n2=(obj2.p2-obj2.p1).cross(obj2.p3-obj2.p1).normalized();
+	  Vector3d n1=(obj1.pt[1]-obj1.pt[0]).cross(obj1.pt[2]-obj1.pt[0]).normalized();
+	  Vector3d n2=(obj2.pt[1]-obj2.pt[0]).cross(obj2.pt[2]-obj2.pt[0]).normalized();
 	  if(fabs(n1.dot(n2)) < 0.999)
           	return QString("Faces are not parallel");
-          ruler =calculatePointFaceDistance(obj1.p1, obj2.p1, obj2.p2, obj2.p3);
+          ruler =calculatePointFaceDistance(obj1.pt[0], obj2.pt[0], obj2.pt[1], obj2.pt[2]);
 	}
 
         if(ruler.type != SelectionType::SELECTION_INVALID) {
-	  dist =(ruler.p2-ruler.p1).norm();
+	  dist =(ruler.pt[1]-ruler.pt[0]).norm();
 	  qglview->selected_obj.push_back(ruler);
           return QString("Distance is %1").arg(fabs(dist));
         }
@@ -156,14 +157,14 @@ QString Measurement::statemachine(QPoint mouse)
         obj1=qglview->selected_obj[0];
         obj2=qglview->selected_obj[1];
         if(obj1.type == SelectionType::SELECTION_SEGMENT && obj2.type == SelectionType::SELECTION_POINT)
-	  return display_angle(obj1.p1, obj1.p2, obj1.p2, obj2.p1);
+	  return display_angle(obj1.pt[0], obj1.pt[1], obj1.pt[1], obj2.pt[0]);
         else if(obj1.type == SelectionType::SELECTION_POINT && obj2.type == SelectionType::SELECTION_SEGMENT)
-          return display_angle(obj1.p1,obj2.p1,obj2.p1,obj2.p2);
+          return display_angle(obj1.pt[0],obj2.pt[0],obj2.pt[0],obj2.pt[1]);
         else if(obj1.type == SelectionType::SELECTION_SEGMENT && obj2.type == SelectionType::SELECTION_SEGMENT)
-	  return display_angle(obj1.p1,obj1.p2,obj2.p1,obj2.p2);
+	  return display_angle(obj1.pt[0],obj1.pt[1],obj2.pt[0],obj2.pt[1]);
         else if(obj1.type == SelectionType::SELECTION_FACE && obj2.type == SelectionType::SELECTION_FACE) {
-	  Vector3d n1=(obj1.p2-obj1.p1).cross(obj1.p3-obj1.p1).normalized();
-	  Vector3d n2=(obj2.p2-obj2.p1).cross(obj2.p3-obj2.p1).normalized();
+	  Vector3d n1=(obj1.pt[1]-obj1.pt[0]).cross(obj1.pt[2]-obj1.pt[0]).normalized();
+	  Vector3d n2=(obj2.pt[1]-obj2.pt[0]).cross(obj2.pt[2]-obj2.pt[0]).normalized();
           double ang=180-acos(n1.dot(n2))*180.0/G_PI;
           return QString("Angle  is %1 Degrees").arg(ang);
 	}
@@ -176,7 +177,7 @@ QString Measurement::statemachine(QPoint mouse)
         obj2=qglview->selected_obj[1];
         obj3=qglview->selected_obj[2];
         if(obj1.type == SelectionType::SELECTION_POINT && obj2.type == SelectionType::SELECTION_POINT && obj3.type == SelectionType::SELECTION_POINT)
-	  return display_angle(obj1.p1,obj2.p1,obj2.p1,obj3.p1);
+	  return display_angle(obj1.pt[0],obj2.pt[0],obj2.pt[0],obj3.pt[0]);
 	break;
       }
       break;

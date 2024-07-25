@@ -38,8 +38,8 @@ SelectedObject calculateLinePointDistance(const Vector3d &l1, const Vector3d &l2
     double l=d.norm();
     d.normalize();
     dist_lat = std::clamp((pt-l1).dot(d),0.0,l);
-    ruler.p1 = l1 + d * dist_lat;
-    ruler.p2 = pt;
+    ruler.pt.push_back(l1 + d * dist_lat);
+    ruler.pt.push_back(pt);
     return ruler;
 }
 
@@ -51,7 +51,7 @@ double calculateLineLineDistance(const Vector3d &l1b, const Vector3d &l1e, const
 	if(n.norm() == 0) {
 		double dummy;
 		SelectedObject rul = calculateLinePointDistance(l1b,l1e,l2b,dummy);
-		return (rul.p1-rul.p2).norm();
+		return (rul.pt[0]-rul.pt[1]).norm();
 	}
 	double t=n.norm();
 	n.normalize();
@@ -79,8 +79,8 @@ SelectedObject calculateSegSegDistance(const Vector3d &l1b, const Vector3d &l1e,
 	}
 	double d1=std::clamp(res[0],0.0,1.0);
         double d2=std::clamp(res[2],0.0,1.0);
-	ruler.p1=l1b + v1*d1;
-	ruler.p2=l2e - v2*d2;
+	ruler.pt.push_back(l1b + v1*d1);
+	ruler.pt.push_back(l2e - v2*d2);
 
 	return ruler;
 }
@@ -89,10 +89,10 @@ SelectedObject calculatePointFaceDistance(const Vector3d &pt, const Vector3d &p1
 {
 	SelectedObject ruler;
 	ruler.type =  SelectionType::SELECTION_SEGMENT;
-	ruler.p1=pt;
+	ruler.pt.push_back(pt);
 	Vector3d n=(p2-p1).cross(p3-p1).normalized();
 	double dist=fabs((pt-p1).dot(n));
-	ruler.p2=pt+n*dist;
+	ruler.pt.push_back(pt+n*dist);
 	return ruler;
 }
 
