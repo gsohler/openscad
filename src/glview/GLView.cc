@@ -486,6 +486,8 @@ void GLView::showObject(const SelectedObject &obj, const Vector3d &eyedir)
 	} 
 	glEnd();
       }
+    case SelectionType::SELECTION_INVALID:
+     break;
   }
 }
 
