@@ -552,7 +552,7 @@ std::unique_ptr<Geometry> extrudePolygon(const LinearExtrudeNode& node, const Po
     is_segmented = true;
   }
 
-#ifdef ENABLE_PYTHON
+#ifdef PYTHON_ENMABLE
   if(node.profile_func != nullptr){
     is_segmented = true;
     seg_poly = python_getprofile(node.profile_func, node.fn, 0);
