@@ -25,7 +25,7 @@ import os
 import subprocess
 import re
 
-DEBUG = False
+DEBUG = True
 
 cxxlib = None
 
