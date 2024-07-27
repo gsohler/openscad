@@ -195,9 +195,11 @@ std::unique_ptr<const Geometry> SphereNode::createGeometry() const
     return PolySet::createEmpty();
   }
   auto num_fragments = Calc::get_fragments_from_r(r, 360.0, fn, fs, fa);
+#ifdef PYTHON_ENABLED
   if(this->r_func != nullptr) {
     return sphereCreateFuncGeometry(this->r_func, fs,fn);
   }
+#endif
   size_t num_rings = (num_fragments + 1) / 2;
   // Uncomment the following three lines to enable experimental sphere
   // tessellation
