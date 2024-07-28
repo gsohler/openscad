@@ -201,7 +201,7 @@ void OpenCSGRenderer::createCSGVBOProducts(
         if (color[3] == 1.0f) {
           // object is opaque, draw normally
           create_surface(*csgobj.leaf->polyset, vertex_array, csgmode,
-                         csgobj.leaf->matrix, last_color);
+                         csgobj.leaf->matrix, last_color, override_color);
           std::shared_ptr<OpenCSGVertexState> surface =
               std::dynamic_pointer_cast<OpenCSGVertexState>(
                   vertex_states->back());

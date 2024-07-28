@@ -243,7 +243,8 @@ Vector3d uniqueMultiply(std::unordered_map<Vector3d, Vector3d>& vert_mult_map,
 // This will usually create a new VertexState and append it to the
 // vertex states in the given vertex_array
 void VBORenderer::create_surface(const PolySet& ps, VertexArray& vertex_array,
-                                 csgmode_e csgmode, const Transform3d& m, const Color4f& default_color) const
+                                 csgmode_e csgmode, const Transform3d& m,
+                                 const Color4f& default_color, bool force_default_color) const
 {
   std::shared_ptr<VertexData> vertex_data = vertex_array.data();
 

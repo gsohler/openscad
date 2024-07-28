@@ -126,13 +126,10 @@ PyObject *python_cube(PyObject *self, PyObject *args, PyObject *kwargs)
 
 Vector3d sphereCalcIndInt(PyObject *func, Vector3d dir)
 {
-
   dir.normalize();
-if(pythonInitDict == NULL)  initPython(0.0);
-  PyObject *dir_p= PyList_New(3); // TODO crash
-  for(int i=0;i<3;i++) {
+  PyObject *dir_p= PyList_New(3);
+  for(int i=0;i<3;i++)
     PyList_SetItem(dir_p,i,PyFloat_FromDouble(dir[i]));
-  }
   PyObject* args = PyTuple_Pack(1,dir_p);
   PyObject* len_p = PyObject_CallObject(func, args);
   double len=0;
@@ -191,10 +188,6 @@ int sphereCalcSplitInd(PolySetBuilder &builder, std::vector<Vector3d> &vertices,
 
 std::unique_ptr<const Geometry> sphereCreateFuncGeometry(void *funcptr, double fs, int n)
 {
-<<<<<<< HEAD
-	printf("crerate sphere\n");
-=======
->>>>>>> 54ad90547341614b8c84a00b4b2083e6bd441b71
   PyObject *func = (PyObject *) funcptr;
   std::unordered_map<SphereEdgeDb, int, boost::hash<SphereEdgeDb> > edges;
 
@@ -3000,10 +2993,6 @@ PyObject *python_texture(PyObject *self, PyObject *args, PyObject *kwargs)
   textures.push_back(txt);
   return Py_None;
 }
-<<<<<<< HEAD
-
-=======
->>>>>>> 54ad90547341614b8c84a00b4b2083e6bd441b71
 PyObject *python_textmetrics(PyObject *self, PyObject *args, PyObject *kwargs)
 {
   DECLARE_INSTANCE

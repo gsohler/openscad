@@ -136,6 +136,7 @@ std::string SHA256HashString(std::string aString){
     base64_encode_final(&base64_ctx, digest_base64);		    
     return digest_base64;
 }
+
 #endif
 
 #define ENABLE_3D_PRINTING
