@@ -119,7 +119,6 @@
 #include "nettle/sha2.h"
 #include "nettle/base64.h"
 
-/*
 std::string SHA256HashString(std::string aString){
     uint8_t  digest[SHA256_DIGEST_SIZE];
     sha256_ctx sha256_ctx;
@@ -137,7 +136,6 @@ std::string SHA256HashString(std::string aString){
     base64_encode_final(&base64_ctx, digest_base64);		    
     return digest_base64;
 }
-
 #endif
 
 #define ENABLE_3D_PRINTING
@@ -1346,7 +1344,10 @@ void MainWindow::compileCSG()
   } catch (const HardWarningException&) {
     exceptionCleanup();
   }
-  csgworker->start();
+//  csgworker->start();
+  compileCSGThread();
+  compileCSGDone();
+
 }
 
 void MainWindow::compileCSGThread(void)
@@ -1892,8 +1893,6 @@ bool MainWindow::fileChangedOnDisk()
 
 #ifdef ENABLE_PYTHON
 bool MainWindow::trust_python_file(const std::string &file,  const std::string &content) {
-  return true;
-#if 0
   QSettingsCached settings;
   char setting_key[256];
   if(python_trusted) return true;
@@ -1947,7 +1946,6 @@ bool MainWindow::trust_python_file(const std::string &file,  const std::string &
     return false;
   }
   return false;
-#endif
 }
 #endif
 
