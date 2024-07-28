@@ -909,13 +909,7 @@ list(APPEND SCADFILES_DIFFERENT_MANIFOLD_PREVIEW_EXPECTATIONS
 )
 
 list(APPEND SCADFILES_FAILING_WITH_MANIFOLD
-  # https://github.com/openscad/openscad/issues/5215
-  ${TEST_SCAD_DIR}/3D/issues/issue1137.scad
-  # https://github.com/openscad/openscad/issues/5217
-  ${TEST_SCAD_DIR}/3D/features/color-tests2.scad
-  # https://github.com/openscad/openscad/issues/5218
-  ${TEST_SCAD_DIR}/3D/issues/issue913.scad
-  ${TEST_SCAD_DIR}/3D/features/minkowski3-erosion.scad
+  # Add any tests failing just w/ Manifold here.
 )
 
 list(APPEND RENDERMANIFOLDTEST_FILES ${RENDERTEST_FILES})
@@ -1542,6 +1536,16 @@ set_tests_properties(
   throwntogethertest_issue2090
   csgrendertest_issue2090
 
+  # https://github.com/openscad/openscad/issues/2841
+  rendertest_issue2841
+  previewtest_issue2841
+  csgrendertest_issue2841
+  throwntogethertest_issue2841
+  rendertest_issue2841b
+  previewtest_issue2841b
+  throwntogethertest_issue2841b
+  csgrendertest_issue2841b
+  
   PROPERTIES DISABLED TRUE
 )
 if (EXPERIMENTAL)
@@ -1566,6 +1570,10 @@ set_tests_properties(
 
   # https://github.com/openscad/openscad/issues/909
   amfrendermanifoldtest_bad-stl-wing
+
+  # https://github.com/openscad/openscad/issues/2841
+  rendermanifoldtest_issue2841b
+  previewmanifoldtest_issue2841b
 
   PROPERTIES DISABLED TRUE
 )
@@ -1594,7 +1602,7 @@ else()
     throwntogethertest_import_3mf-tests
     PROPERTIES DISABLED TRUE
   )
-endif(NOT LIB3MF_FOUND)
+endif(LIB3MF_FOUND)
 
 list(APPEND NEF3_BROKEN_TESTS
   rendertest_nef3_broken

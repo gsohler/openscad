@@ -195,7 +195,7 @@ std::unique_ptr<const Geometry> SphereNode::createGeometry() const
     return PolySet::createEmpty();
   }
   auto num_fragments = Calc::get_fragments_from_r(r, 360.0, fn, fs, fa);
-#ifdef ENABLE_PYTHON
+#ifdef PYTHON_ENABLED
   if(this->r_func != nullptr) {
     return sphereCreateFuncGeometry(this->r_func, fs,fn);
   }
