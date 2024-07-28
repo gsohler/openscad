@@ -510,7 +510,7 @@ if(ENABLE_PYTHON)
   if(APPLE) # Nettle
     target_include_directories(OpenSCADPy PRIVATE "/usr/local/include")
     target_link_directories(OpenSCADPy PRIVATE "/usr/local/lib")
-#    target_link_libraries(OpenSCADPy PRIVATE "libnettle.a")
+    target_link_libraries(OpenSCADPy PRIVATE "libnettle.a")
   else()
     target_include_directories(OpenSCADPy PRIVATE ${Nettle_INCLUDE_DIRS})
     target_link_libraries(OpenSCADPy PRIVATE ${Nettle_LIBRARIES})

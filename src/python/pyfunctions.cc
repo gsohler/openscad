@@ -61,7 +61,7 @@ extern bool parse(SourceFile *& file, const std::string& text, const std::string
 #include "SurfaceNode.h"
 #include "TextNode.h"
 #include "OffsetNode.h"
-//#include "TextureNode.h"
+#include "TextureNode.h"
 #include <hash.h>
 #include <PolySetUtils.h>
 #include "ProjectionNode.h"
@@ -126,15 +126,17 @@ PyObject *python_cube(PyObject *self, PyObject *args, PyObject *kwargs)
 
 Vector3d sphereCalcIndInt(PyObject *func, Vector3d dir)
 {
+
   dir.normalize();
-  PyObject *dir_p= PyList_New(3);
-  for(int i=0;i<3;i++)
+if(pythonInitDict == NULL)  initPython(0.0);
+  PyObject *dir_p= PyList_New(3); // TODO crash
+  for(int i=0;i<3;i++) {
     PyList_SetItem(dir_p,i,PyFloat_FromDouble(dir[i]));
+  }
   PyObject* args = PyTuple_Pack(1,dir_p);
   PyObject* len_p = PyObject_CallObject(func, args);
   double len=0;
   if(len_p == nullptr) {
-	  printf("Null\n");
 	  return dir;
   }
   python_numberval(len_p, &len);
@@ -179,22 +181,20 @@ int operator==(const SphereEdgeDb &t1, const SphereEdgeDb &t2)
 int sphereCalcSplitInd(PolySetBuilder &builder, std::vector<Vector3d> &vertices, std::unordered_map<SphereEdgeDb, int, boost::hash<SphereEdgeDb> > &edges, PyObject *func, int ind1, int ind2)
 {
   SphereEdgeDb edge(ind1, ind2);
-//  if(edges.count(edge) > 0) {
-//    return 0; // edges[edge];
-//  }
+  if(edges.count(edge) > 0) {
+    return edges[edge];
+  }
   int result = sphereCalcInd(builder, vertices, func, vertices[ind1]+vertices[ind2]);
-  //edges[edge]=result;
+  edges[edge]=result;
   return result;
 }
 
 std::unique_ptr<const Geometry> sphereCreateFuncGeometry(void *funcptr, double fs, int n)
 {
-  PolySetBuilder builder;
-#if 0
-	printf("crerate sphere\n");
   PyObject *func = (PyObject *) funcptr;
   std::unordered_map<SphereEdgeDb, int, boost::hash<SphereEdgeDb> > edges;
 
+  PolySetBuilder builder;
   std::vector<Vector3d> vertices;
 
   int topind, botind, leftind, rightind, frontind, backind;
@@ -215,6 +215,7 @@ std::unique_ptr<const Geometry> sphereCreateFuncGeometry(void *funcptr, double f
   tri_new.push_back(IndexedTriangle(frontind, botind, rightind));
   tri_new.push_back(IndexedTriangle(rightind, botind, backind));
   tri_new.push_back(IndexedTriangle(backind, botind, leftind));
+
   int round=0;
   int i1, i2, imid;
   Vector3d p1, p2, p3,pmin, pmax, pmid, pmid_test, dir1, dir2;
@@ -359,9 +360,7 @@ std::unique_ptr<const Geometry> sphereCreateFuncGeometry(void *funcptr, double f
   for(const IndexedTriangle & tri: tri_new) {
     builder.appendPolygon({tri[0], tri[1], tri[2]});
   }
-#endif
   auto ps = builder.build();
-
   return ps; 
 }
 
@@ -2978,7 +2977,7 @@ PyObject *python_text(PyObject *self, PyObject *args, PyObject *kwargs)
 
   return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
 }
-#if 0
+
 PyObject *python_texture(PyObject *self, PyObject *args, PyObject *kwargs)
 {
   DECLARE_INSTANCE
@@ -2997,7 +2996,6 @@ PyObject *python_texture(PyObject *self, PyObject *args, PyObject *kwargs)
   textures.push_back(txt);
   return Py_None;
 }
-#endif
 PyObject *python_textmetrics(PyObject *self, PyObject *args, PyObject *kwargs)
 {
   DECLARE_INSTANCE
@@ -3617,7 +3615,7 @@ PyMethodDef PyOpenSCADFunctions[] = {
 
   {"projection", (PyCFunction) python_projection, METH_VARARGS | METH_KEYWORDS, "Projection Object."},
   {"surface", (PyCFunction) python_surface, METH_VARARGS | METH_KEYWORDS, "Surface Object."},
-//  {"texture", (PyCFunction) python_texture, METH_VARARGS | METH_KEYWORDS, "Include a texture."},
+  {"texture", (PyCFunction) python_texture, METH_VARARGS | METH_KEYWORDS, "Include a texture."},
   {"mesh", (PyCFunction) python_mesh, METH_VARARGS | METH_KEYWORDS, "exports mesh."},
   {"oversample", (PyCFunction) python_oversample, METH_VARARGS | METH_KEYWORDS, "oversample."},
   {"debug", (PyCFunction) python_debug, METH_VARARGS | METH_KEYWORDS, "debug a face."},
