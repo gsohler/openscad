@@ -179,12 +179,16 @@ void OpenCSGRenderer::createCSGVBOProducts(
         csgmode_e csgmode = get_csgmode(highlight_mode, background_mode);
 
         ColorMode colormode = ColorMode::NONE;
+        bool override_color;
         if (highlight_mode) {
           colormode = ColorMode::HIGHLIGHT;
+          override_color = true;
         } else if (background_mode) {
           colormode = ColorMode::BACKGROUND;
+          override_color = true;
         } else {
           colormode = ColorMode::MATERIAL;
+          override_color = c.isValid();
         }
 
         Color4f color;

@@ -46,6 +46,10 @@ void VBORenderer::resize(int w, int h)
 
 bool VBORenderer::getShaderColor(Renderer::ColorMode colormode, const Color4f& color, Color4f& outcolor) const
 {
+  if ((colormode != ColorMode::BACKGROUND) && (colormode != ColorMode::HIGHLIGHT) && color.isValid()) {
+    outcolor = color;
+    return true;
+  }
   Color4f basecol;
   if (Renderer::getColor(colormode, basecol)) {
     if (colormode == ColorMode::BACKGROUND || colormode != ColorMode::HIGHLIGHT) {
