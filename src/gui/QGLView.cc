@@ -195,6 +195,10 @@ void QGLView::paintGL()
 	  status=QString("Face selected\n");
           statusLabel->setText(status);
 	  break;
+        case SelectionType::SELECTION_HANDLE:
+          break;
+        case SelectionType::SELECTION_INVALID:
+          break;
 
       } 
       return;

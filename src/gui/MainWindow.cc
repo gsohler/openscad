@@ -1345,7 +1345,13 @@ void MainWindow::compileCSG()
   } catch (const HardWarningException&) {
     exceptionCleanup();
   }
+#ifdef APPLE
+  // threads is an issue on mac for direct python calls
+  compileCSGThread();
+  compileCSGDone();
+#else
   csgworker->start();
+#endif
 }
 
 void MainWindow::compileCSGThread(void)
