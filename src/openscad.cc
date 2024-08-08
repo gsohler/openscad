@@ -603,8 +603,10 @@ int do_export(const CommandLine& cmd, const RenderVariables& render_variables, F
         LOG("Converted to backend-specific geometry");
       }
     }
-    if (!checkAndExport(root_geom,  export_format, cmd.is_stdout, filename_str)) {
-      return 1;
+    if (is3D(export_format)) {
+      if (!checkAndExport(root_geom,  export_format, cmd.is_stdout, filename_str)) {
+        return 1;
+      }
     }
 
 
