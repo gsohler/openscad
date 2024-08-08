@@ -1708,6 +1708,134 @@ PyObject *python_oo_export(PyObject *obj, PyObject *args, PyObject *kwargs)
   return python_export_core(obj, file);
 }
 
+PyObject *python_find_face_core(PyObject *obj, PyObject *vec_p)
+{
+  Vector3d vec;	
+  double dummy;
+  PyObject *child_dict;	  
+  if(python_vectorval(vec_p, &vec[0], &vec[1], &vec[2], &dummy)) return Py_None;
+  std::shared_ptr<AbstractNode> child = PyOpenSCADObjectToNodeMulti(obj, &child_dict);
+
+  if(child == nullptr ) return Py_None;
+
+
+  Tree tree(child, "");
+  GeometryEvaluator geomevaluator(tree);
+  std::shared_ptr<const Geometry> geom = geomevaluator.evaluateGeometry(*tree.root(), true);
+  std::shared_ptr<const PolySet> ps = PolySetUtils::getGeometryAsPolySet(geom);
+
+  double dmax=-1;
+  Vector4d vectormax;
+  for(auto ind: ps->indices) {
+    Vector4d norm =calcTriangleNormal(ps->vertices,ind);
+    double d=norm.head<3>().dot(vec);
+    if(d > dmax) {
+      dmax = d;	    
+      vectormax=norm;
+    }
+
+  }
+  PyObject *coord = PyList_New(4);
+  for(int i=0;i<4;i++) 
+    PyList_SetItem(coord, i, PyFloat_FromDouble(vectormax[i]));
+  return coord;
+}
+
+PyObject *python_find_face(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+  char *kwlist[] = {"obj", "vec", NULL};
+  PyObject *obj = nullptr;
+  PyObject *vec = nullptr;
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OO", kwlist, &obj, &vec
+                                   ))  {
+    PyErr_SetString(PyExc_TypeError, "Error during parsing find_face(object)");
+    return NULL;
+  }
+  return python_find_face_core(obj, vec);
+}
+
+PyObject *python_oo_find_face(PyObject *obj, PyObject *args, PyObject *kwargs)
+{
+  char *kwlist[] = {"vec", NULL};
+  PyObject *vec = nullptr;
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O", kwlist, &vec
+                                   ))  {
+    PyErr_SetString(PyExc_TypeError, "Error during parsing find_face(object)");
+    return NULL;
+  }
+  return python_find_face_core(obj, vec);
+}
+
+PyObject *python_sitonto_core(PyObject *pyobj, PyObject *vecx_p, PyObject *vecy_p, PyObject *vecz_p)
+{
+  Vector4d vecx, vecy, vecz;
+  Vector3d cut;
+  double dummy;
+  if(python_vectorval(vecx_p, &vecx[0], &vecx[1], &vecx[2], &vecx[3])) return Py_None;
+  if(python_vectorval(vecy_p, &vecy[0], &vecy[1], &vecy[2], &vecy[3])) return Py_None;
+  if(python_vectorval(vecz_p, &vecz[0], &vecz[1], &vecz[2], &vecz[3])) return Py_None;
+
+  if(cut_face_face_face(
+			  vecx.head<3>()*vecx[3], vecx.head<3>(),
+			  vecy.head<3>()*vecy[3], vecy.head<3>(),
+			  vecz.head<3>()*vecz[3], vecz.head<3>(),
+			  cut)) return Py_None;
+  DECLARE_INSTANCE
+  auto node = std::make_shared<TransformNode>(instance, "sitontonode");
+  std::shared_ptr<AbstractNode> child;
+  PyObject *dummydict;
+  child = PyOpenSCADObjectToNodeMulti(pyobj, &dummydict);
+  node->setPyName(child->getPyName());
+  if (child == NULL) {
+    PyErr_SetString(PyExc_TypeError, "Invalid type for Object in multmatrix");
+    return NULL;
+  }
+  Matrix4d mat;
+  Vector3d vecx_n = vecz.head<3>().cross(vecy.head<3>()).normalized();
+  Vector3d vecy_n = vecx.head<3>().cross(vecz.head<3>()).normalized();
+  if(vecx.head<3>().cross(vecy.head<3>()).dot(vecz.head<3>()) < 0){
+    vecx_n = -vecx_n;
+    vecy_n = -vecy_n;    
+  }
+  mat <<	vecx_n[0],vecy_n[0],vecz[0],cut[0],
+		vecx_n[1],vecy_n[1],vecz[1],cut[1],
+		vecx_n[2],vecy_n[2],vecz[2],cut[2],
+		0,0,0      ,1;
+ 
+  node->matrix = mat;
+  node->children.push_back(child);
+  return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
+}
+
+PyObject *python_sitonto(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+  char *kwlist[] = {"obj", "vecz","vecx","vecy", NULL};
+  PyObject *obj = nullptr;
+  PyObject *vecx = nullptr;
+  PyObject *vecy = nullptr;
+  PyObject *vecz = nullptr;
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OOOO", kwlist, &obj, &vecz, &vecx, &vecy
+                                   ))  {
+    PyErr_SetString(PyExc_TypeError, "Error during parsing sitonto(object)");
+    return NULL;
+  }
+  return python_sitonto_core(obj, vecx, vecy, vecz);
+}
+
+PyObject *python_oo_sitonto(PyObject *obj, PyObject *args, PyObject *kwargs)
+{
+  char *kwlist[] = {"vecz"," vecx", "vecy",  NULL};
+  PyObject *vecx = nullptr;
+  PyObject *vecy = nullptr;
+  PyObject *vecz = nullptr;
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OOO", kwlist, &vecz, &vecx, &vecy
+                                   ))  {
+    PyErr_SetString(PyExc_TypeError, "Error during parsing sitonto(object)");
+    return NULL;
+  }
+  return python_sitonto_core(obj, vecx, vecy, vecz);
+}
+
 
 PyObject *python__getitem__(PyObject *dict, PyObject *key)
 {
@@ -3593,6 +3721,8 @@ PyMethodDef PyOpenSCADFunctions[] = {
   {"output", (PyCFunction) python_output, METH_VARARGS | METH_KEYWORDS, "Output the result."},
   {"show", (PyCFunction) python_output, METH_VARARGS | METH_KEYWORDS, "Output the result."},
   {"export", (PyCFunction) python_export, METH_VARARGS | METH_KEYWORDS, "Export the result."},
+  {"find_face", (PyCFunction) python_find_face, METH_VARARGS | METH_KEYWORDS, "find_face."},
+  {"sitonto", (PyCFunction) python_sitonto, METH_VARARGS | METH_KEYWORDS, "sitonto"},
 
   {"linear_extrude", (PyCFunction) python_linear_extrude, METH_VARARGS | METH_KEYWORDS, "Linear_extrude Object."},
   {"rotate_extrude", (PyCFunction) python_rotate_extrude, METH_VARARGS | METH_KEYWORDS, "Rotate_extrude Object."},
@@ -3657,6 +3787,8 @@ PyMethodDef PyOpenSCADMethods[] = {
   OO_METHOD_ENTRY(output,"Output Object")	
   OO_METHOD_ENTRY(show,"Output Object")	
   OO_METHOD_ENTRY(export,"Export Object")	
+  OO_METHOD_ENTRY(find_face,"Find Face")	
+  OO_METHOD_ENTRY(sitonto,"Sit onto")	
 
   OO_METHOD_ENTRY(linear_extrude,"Linear_extrude Object")	
   OO_METHOD_ENTRY(rotate_extrude,"Rotate_extrude Object")	
