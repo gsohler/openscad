@@ -1532,7 +1532,7 @@ endif()
 
 # Packaging: CPACK_* settings should be configured before `include(CPack)`
 include(InstallRequiredSystemLibraries)
-set(CPACK_PACKAGE_NAME "OpenSCAD")
+set(CPACK_PACKAGE_NAME "PythonSCAD")
 set(CPACK_PACKAGE_VENDOR "The OpenSCAD Developers")
 set(CPACK_PACKAGE_VERSION "${OPENSCAD_VERSION}")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "The Programmer's Solid 3D CAD Modeler")
@@ -1540,7 +1540,7 @@ set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "The Programmer's Solid 3D CAD Modeler")
 if(MXECROSS)
   set(CPACK_GENERATOR ZIP;NSIS)
   set(CPACK_SYSTEM_NAME ${PACKAGE_ARCH})
-  set(CPACK_PACKAGE_EXECUTABLES "openscad;${CPACK_PACKAGE_NAME}${SNAPSHOT_NAME_SUFFIX}")
+  set(CPACK_PACKAGE_EXECUTABLES "bin\\openscad;${CPACK_PACKAGE_NAME}${SNAPSHOT_NAME_SUFFIX}")
   set(CPACK_PACKAGE_INSTALL_DIRECTORY "${CPACK_PACKAGE_NAME}${SNAPSHOT_NAME_SUFFIX}")
   set(CPACK_PACKAGE_INSTALL_REGISTRY_KEY "${CPACK_PACKAGE_NAME}${SNAPSHOT_NAME_SUFFIX}")
   if("${CMAKE_VERSION}" VERSION_GREATER_EQUAL "3.22")
@@ -1558,6 +1558,10 @@ if(MXECROSS)
   set(CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS "\
     !include \\\"${CMAKE_BINARY_DIR}/nsis-extra-uninstall-commands.nsh\\\"\
   ")
+  set (CPACK_NSIS_MODIFY_PATH "ON")
+  set(CPACK_NSIS_CREATE_ICONS_EXTRA
+	  "CreateShortCut '$INSTDIR\\\\OpenSCAD.lnk'   '$INSTDIR\\\\bin\\\\OpenSCAD.exe' '' "
+  )
 endif()
 set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/COPYING")
 # None of config time variables are available for CPACK_PROJECT_CONFIG_FILE, so we configure it now with values.
