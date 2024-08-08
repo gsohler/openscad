@@ -190,5 +190,5 @@ std::string PathExtrudeNode::toString() const
 
 void register_builtin_path_extrude()
 {
-  Builtins::init("path_extrude", new BuiltinModule(builtin_path_extrude,&Feature::ExperimentalPathExtrude), { "path_extrude(profile,path)", });
+  Builtins::init("path_extrude", new BuiltinModule(builtin_path_extrude));
 }
