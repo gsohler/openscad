@@ -75,6 +75,7 @@ extern bool parse(SourceFile *& file, const std::string& text, const std::string
 #include "handle_dep.h"
 #include <fstream>
 #include <ostream>
+#include <boost/functional/hash.hpp>
 
 //using namespace boost::assign; // bring 'operator+=()' into scope
 
