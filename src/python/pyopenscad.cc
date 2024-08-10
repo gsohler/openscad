@@ -180,7 +180,7 @@ std::string python_hierdump(const std::shared_ptr<AbstractNode> &node)
   else if(children.size() < 2) dump += python_hierdump(children[0]);
   else {
    dump += "{ ";	  
-   for(int i=0;i<children.size();i++) dump += python_hierdump(children[i]);
+   for(unsigned int i=0;i<children.size();i++) dump += python_hierdump(children[i]);
    dump += " }";	  
   }
 
@@ -214,7 +214,7 @@ void python_retrieve_pyname(const std::shared_ptr<AbstractNode> &node)
   std::string name;	
   int level=-1;
   std::string my_code = python_hierdump(node);
-  for(int i=0;i<mapping_code.size();i++) {
+  for(unsigned int i=0;i<mapping_code.size();i++) {
     if(mapping_code[i] == my_code) {
       if(level == -1 || level > mapping_level[i]) {	    
         name=mapping_name[i];	    
@@ -338,7 +338,7 @@ Outline2d python_getprofile(void *v_cbfunc, int fn, double arg)
 	PyObject* polygon = PyObject_CallObject(cbfunc, args);
         Py_XDECREF(args);
 	if(polygon == NULL) { // TODO fix
-		for(unsigned int i=0;i < fn;i++) {
+		for(unsigned int i=0;i < (unsigned int) fn;i++) {
 			double ang=360.0*(i/(double) fn);
 			PyObject* args = PyTuple_Pack(2,PyFloat_FromDouble(arg),PyFloat_FromDouble(ang));
 			Py_XINCREF(args);
@@ -419,7 +419,7 @@ PyObject *python_callfunction(const std::shared_ptr<const Context> &cxt , const 
   }
 
   PyObject *args = PyTuple_New(op_args.size());
-  for(int i=0;i<op_args.size();i++)
+  for(unsigned int i=0;i<op_args.size();i++)
   {
     Assignment *op_arg=op_args[i].get();
 
@@ -701,9 +701,6 @@ sys.stderr = stderr_bak\n\
 #endif
     PyObject *result = PyRun_String(code.c_str(), Py_file_input, pythonInitDict, pythonInitDict); /* actual code is run here */
 
-    PyObject *key, *value;
-    Py_ssize_t pos = 0;
-    PyObject *pFunc;
 
     if(result  == nullptr) PyErr_Print();
     PyRun_SimpleString(python_exit_code);
