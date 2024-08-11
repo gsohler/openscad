@@ -1964,9 +1964,7 @@ void MainWindow::recomputePythonActive()
   if (fname != NULL) {
     if(boost::algorithm::ends_with(fname, ".py")) {
 	    std::string content = std::string(this->last_compiled_doc.toUtf8().constData());
-      if (
-        Feature::ExperimentalPythonEngine.is_enabled() 
-		&& trust_python_file(std::string(fname), content)) this->python_active = true;
+      if ( trust_python_file(std::string(fname), content)) this->python_active = true;
       else LOG(message_group::Warning, Location::NONE, "", "Python is not enabled");
     }
   }
