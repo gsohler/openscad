@@ -3239,13 +3239,13 @@ std::shared_ptr<const Geometry> GeometryEvaluator::projectionCut(const Projectio
   std::shared_ptr<const Geometry> geom;
   std::shared_ptr<const Geometry> newgeom = applyToChildren3D(node, OpenSCADOperator::UNION).constptr();
   if (newgeom) {
-#ifdef ENABLE_MANIFOLD
-    if (Feature::ExperimentalManifold.is_enabled()) {
-      auto manifold = ManifoldUtils::createManifoldFromGeometry(newgeom);
-      auto poly2d = manifold->slice();
-      return std::shared_ptr<const Polygon2d>(ClipperUtils::sanitize(poly2d));
-    }
-#endif
+//#ifdef ENABLE_MANIFOLD
+//    if (Feature::ExperimentalManifold.is_enabled()) {
+//      auto manifold = ManifoldUtils::createManifoldFromGeometry(newgeom);
+//      auto poly2d = manifold->slice();
+//      return std::shared_ptr<const Polygon2d>(ClipperUtils::sanitize(poly2d));
+//    }
+//#endif
 #ifdef ENABLE_CGAL
     auto Nptr = CGALUtils::getNefPolyhedronFromGeometry(newgeom);
     if (Nptr && !Nptr->isEmpty()) {
@@ -3262,18 +3262,18 @@ std::shared_ptr<const Geometry> GeometryEvaluator::projectionCut(const Projectio
 
 std::shared_ptr<const Geometry> GeometryEvaluator::projectionNoCut(const ProjectionNode& node)
 {
-#ifdef ENABLE_MANIFOLD
-  if (Feature::ExperimentalManifold.is_enabled()) {
-    std::shared_ptr<const Geometry> newgeom = applyToChildren3D(node, OpenSCADOperator::UNION).constptr();
-    if (newgeom) {
-        auto manifold = ManifoldUtils::createManifoldFromGeometry(newgeom);
-        auto poly2d = manifold->project();
-        return std::shared_ptr<const Polygon2d>(ClipperUtils::sanitize(poly2d));
-    } else {
-      return std::make_shared<Polygon2d>();
-    }
-  }
-#endif
+//#ifdef ENABLE_MANIFOLD
+//  if (Feature::ExperimentalManifold.is_enabled()) {
+//    std::shared_ptr<const Geometry> newgeom = applyToChildren3D(node, OpenSCADOperator::UNION).constptr();
+//    if (newgeom) {
+//        auto manifold = ManifoldUtils::createManifoldFromGeometry(newgeom);
+//        auto poly2d = manifold->project();
+//        return std::shared_ptr<const Polygon2d>(ClipperUtils::sanitize(poly2d));
+//    } else {
+//      return std::make_shared<Polygon2d>();
+//    }
+//  }
+//#endif
 
   std::shared_ptr<const Geometry> geom;
   std::vector<std::unique_ptr<Polygon2d>> tmp_geom;
