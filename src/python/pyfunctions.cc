@@ -3473,19 +3473,12 @@ PyObject *python_align_core(PyObject *obj, PyObject *pyrefmat, PyObject *pydstma
   DECLARE_INSTANCE
   auto multmatnode = std::make_shared<TransformNode>(instance, "align");
   multmatnode->children.push_back(dstnode);
-
   Matrix4d mat;
   Matrix4d MT=Matrix4d::Identity();
 
-  if(pyrefmat != nullptr) {
-    if(python_tomatrix(pyrefmat, mat)) return Py_None;
-    MT = MT * mat;	  
-  }
+  if(!python_tomatrix(pyrefmat, mat)) MT = MT * mat;	  
+  if(!python_tomatrix(pydstmat, mat)) MT = MT * mat.inverse();	  
 
-  if(pydstmat != nullptr) {
-    if(python_tomatrix(pydstmat, mat)) return Py_None;
-    MT = MT * mat.inverse();	  
-  }
   multmatnode -> matrix = MT ;
   multmatnode->setPyName(dstnode->getPyName());
 
