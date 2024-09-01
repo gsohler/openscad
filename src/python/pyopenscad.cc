@@ -425,7 +425,7 @@ PyObject *python_callfunction(const std::shared_ptr<const Context> &cxt , const 
 
     std::shared_ptr<Expression> expr=op_arg->getExpr();
     Value val = expr.get()->evaluate(cxt);
-    PyObject *value=NULL;
+    PyObject *value=nullptr;
     switch(val.type())
     {
       case Value::Type::NUMBER:
@@ -441,7 +441,6 @@ PyObject *python_callfunction(const std::shared_ptr<const Context> &cxt , const 
     }
     if(value != nullptr) {
       PyTuple_SetItem(args, i, value);
-      Py_XDECREF(value);
     }
 
   }
