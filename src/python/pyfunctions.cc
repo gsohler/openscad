@@ -3855,6 +3855,7 @@ PyMethodDef PyOpenSCADMethods[] = {
   OO_METHOD_ENTRY(back,"Back Object")	
   OO_METHOD_ENTRY(front,"Front Object")	
   OO_METHOD_ENTRY(up,"Up Object")	
+  OO_METHOD_ENTRY(down,"Lower Object")	
 
   OO_METHOD_ENTRY(union,"Union Object")	
   OO_METHOD_ENTRY(difference,"Difference Object")	
