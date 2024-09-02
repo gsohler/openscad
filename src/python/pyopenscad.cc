@@ -511,6 +511,7 @@ Value python_convertresult(PyObject *arg)
     }
     return std::move(vec);
   } else if(PyFloat_Check(arg)) { return { PyFloat_AsDouble(arg) }; }
+  else if(PyLong_Check(arg))  { return { (double) PyLong_AsLong(arg) }; }
   else if(PyUnicode_Check(arg)) {
     PyObject* repr = PyObject_Repr(arg);
     PyObject* strobj = PyUnicode_AsEncodedString(repr, "utf-8", "~");
