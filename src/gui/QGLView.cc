@@ -182,16 +182,19 @@ void QGLView::paintGL()
     if(this->shown_obj != nullptr) {
       switch(this->shown_obj->type) {
         case SelectionType::SELECTION_POINT:
+          if(shown_obj->pt.size() < 1) break;		
           status = QString("Point (%1/%2/%3)").arg(shown_obj->pt[0][0]).arg(shown_obj->pt[0][1]).arg(shown_obj->pt[0][2]);
           statusLabel->setText(status);
 	  break;
         case SelectionType::SELECTION_SEGMENT:
+          if(shown_obj->pt.size() < 2) break;		
           status = QString("Segment (%1/%2/%3) - (%4/%5/%6)")
 		  .arg(shown_obj->pt[0][0]).arg(shown_obj->pt[0][1]).arg(shown_obj->pt[0][2])
 		  .arg(shown_obj->pt[1][0]).arg(shown_obj->pt[1][1]).arg(shown_obj->pt[1][2]);
           statusLabel->setText(status);
 	  break;
         case SelectionType::SELECTION_FACE:
+          if(shown_obj->pt.size() < 3) break;		
 	  status=QString("Face selected\n");
           statusLabel->setText(status);
 	  break;
@@ -572,6 +575,7 @@ std::shared_ptr<SelectedObject> QGLView::findObject(int mouse_x, int mouse_y)
 #ifdef ENABLE_PYTHON  
   if(handle_mode) {
     SelectedObject result;
+    result.type = SelectionType::SELECTION_HANDLE;
     double dist_near;
     double dist_nearest=NAN;
     std::string dist_name;
