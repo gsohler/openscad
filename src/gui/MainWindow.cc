@@ -54,6 +54,8 @@
 #include "FontListDialog.h"
 #include "LibraryInfoDialog.h"
 #include "ScintillaEditor.h"
+#include "fileutils.h"
+#include "fstream"
 #ifdef ENABLE_OPENCSG
 #include "CSGTreeEvaluator.h"
 #include "OpenCSGRenderer.h"
@@ -283,9 +285,100 @@ void addExportActions(const MainWindow *mainWindow, QToolBar *toolbar, QAction *
 
 } // namespace
 
+void MainWindow::addMenuItemCB(QString callback)
+{
+  const char *cbstr = callback.toStdString().c_str();
+  std::string content = loadInitFile();
+  if(content.size() == 0) return;
+  initPython(0.0);
+  evaluatePython(content);
+  evaluatePython(cbstr);
+  finishPython();
+}
+
+void MainWindow::addMenuItem(const char * menuname, const char *itemname, const char *callback)
+{
+
+  // Find or create menu
+  QMenu *menu_found = nullptr;
+  foreach (QAction *menu, menubar->actions()) {
+        if (menu->menu()) {
+            const char *menutext = qUtf8Printable(menu->text());
+            if(strstr(menutext,menuname) != nullptr)
+		menu_found = (QMenu *) menu;
+        }
+    }
+
+  if(menu_found == nullptr) {
+  	menu_found = new QMenu(menubar);
+	menu_found->setObjectName(QString(menuname));
+	menu_found->setTitle(q_(menuname, nullptr));
+	menu_found->show();
+	menubar->addAction(menu_found->menuAction());
+//	menubar->addMenu(menu_found);
+  }
+
+  menu_found = menu_File;
+
+  // Create Menu Item
+  QAction *my_menu_item = new QAction(this);
+  my_menu_item->setObjectName(itemname);
+  my_menu_item->setText(q_(itemname, nullptr));
+  connect(my_menu_item, SIGNAL(triggered()), addmenu_mapper, SLOT(map()));
+  addmenu_mapper->setMapping(my_menu_item, callback);
+  menu_found->addAction(my_menu_item);
+
+//  menubar->show();
+}
+#ifdef ENABLE_PYTHON
+
+MainWindow *addmenuitem_this = nullptr;
+void  add_menuitem_trampoline(const char *menuname, const char *itemname, const char *callback)
+{
+  if(addmenuitem_this == nullptr) return;	
+  addmenuitem_this->addMenuItem(menuname, itemname, callback);
+}
+
+std::string MainWindow::loadInitFile(void) {
+  std::string path = lookup_file(".pythonscadrc", ".","");
+  if(path.size() == 0) return "";
+  std::ifstream fh(path);
+
+  // confirm file opening
+  if (!fh.is_open()) return "";
+  std::string line, content;
+  while (getline(fh, line)) {
+    content += line;
+    content += "\n";
+  }
+  return content;
+}
+
+void MainWindow::customSetup(void)
+{
+  // check if .pythonscadrc is available and readable
+  //
+  std::string content = loadInitFile();
+  if(content == "") return;
+
+  this->addmenu_mapper = new QSignalMapper(this);
+  connect (this->addmenu_mapper, SIGNAL(mapped(QString)), this, SLOT(addMenuItemCB(QString))) ;
+  initPython(0.0);
+  evaluatePython(content);
+  addmenuitem_this = this;
+  evaluatePython("setup()");
+  addmenuitem_this = nullptr;
+  finishPython();
+}
+
+#endif
+
 MainWindow::MainWindow(const QStringList& filenames)
 {
   setupUi(this);
+#ifdef ENABLE_PYTHON  
+  customSetup();
+#endif  
 
   consoleUpdater = new QTimer(this);
   consoleUpdater->setSingleShot(true);

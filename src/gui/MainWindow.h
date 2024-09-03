@@ -22,6 +22,7 @@
 #include <QMutex>
 #include <QSoundEffect>
 #include <QTime>
+#include <QSignalMapper>
 
 #ifdef STATIC_QT_SVG_PLUGIN
 #include <QtPlugin>
@@ -96,6 +97,9 @@ public:
   int compileWarnings;
 
   MainWindow(const QStringList& filenames);
+  std::string loadInitFile(void);
+  void customSetup(void);
+  void addMenuItem(const char *menuname, const char *itemname, const char *callback);
   ~MainWindow() override;
 
 private:
@@ -117,6 +121,7 @@ private slots:
   void setCursor();
   void measureFinished();
   void errorLogOutput(const Message& log_msg);
+  void addMenuItemCB(QString function);
 
 public:
   static void consoleOutput(const Message& msgObj, void *userdata);
@@ -303,6 +308,7 @@ public:
 
   QList<double> getTranslation() const;
   QList<double> getRotation() const;
+  QSignalMapper *addmenu_mapper;
 
 public slots:
   void actionReloadRenderPreview();

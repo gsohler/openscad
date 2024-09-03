@@ -1507,6 +1507,7 @@ PyObject *python_oo_wrap(PyObject *obj, PyObject *args, PyObject *kwargs)
   return python_wrap_core(obj, r, fn, fa, fs);
 }
 
+std::shared_ptr<AbstractNode> python_result_node_bak; // TODO why is that needed ? python_result_nose is nullptr
 PyObject *python_output_core(PyObject *obj)
 {
   PyObject *child_dict;
@@ -1518,6 +1519,7 @@ PyObject *python_output_core(PyObject *obj)
   PyObject *key, *value;
   Py_ssize_t pos = 0;
   python_result_node = child;
+  python_result_node_bak = child;
   mapping_name.clear();
   mapping_code.clear();
   mapping_level.clear();
@@ -3767,6 +3769,34 @@ PyObject *python_nb_invert(PyObject *arg) { return python_debug_modifier(arg,0);
 PyObject *python_nb_neg(PyObject *arg) { return python_debug_modifier(arg,1); }
 PyObject *python_nb_pos(PyObject *arg) { return python_debug_modifier(arg,2); }
 
+extern void  add_menuitem_trampoline(const char *menuname, const char *itemname, const char *callback);
+PyObject *python_add_menuitem(PyObject *self, PyObject *args, PyObject *kwargs, int mode)
+{
+  char *kwlist[] = {"menuname","itemname","callback", NULL};
+  const char *menuname = nullptr, *itemname = nullptr, *callback = nullptr;
+
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "sss", kwlist,
+                                   &menuname, &itemname, &callback
+                                   )) {
+    PyErr_SetString(PyExc_TypeError, "Error during parsing add_menuitem");
+    return NULL;
+  }
+  add_menuitem_trampoline(menuname, itemname, callback);
+  return Py_None;
+}
+
+PyObject *python_model(PyObject *self, PyObject *args, PyObject *kwargs, int mode)
+{
+  char *kwlist[] = {NULL};
+
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "", kwlist)) {
+    PyErr_SetString(PyExc_TypeError, "Error during parsing model");
+    return NULL;
+  }
+  if(python_result_node_bak == nullptr) return Py_None;
+  return PyOpenSCADObjectFromNode(&PyOpenSCADType, python_result_node_bak);
+}
+
 PyMethodDef PyOpenSCADFunctions[] = {
   {"square", (PyCFunction) python_square, METH_VARARGS | METH_KEYWORDS, "Create Square."},
   {"circle", (PyCFunction) python_circle, METH_VARARGS | METH_KEYWORDS, "Create Circle."},
@@ -3841,6 +3871,8 @@ PyMethodDef PyOpenSCADFunctions[] = {
   {"add_parameter", (PyCFunction) python_add_parameter, METH_VARARGS | METH_KEYWORDS, "Add Parameter for Customizer."},
   {"scad", (PyCFunction) python_scad, METH_VARARGS | METH_KEYWORDS, "Source OpenSCAD code."},
   {"align", (PyCFunction) python_align, METH_VARARGS | METH_KEYWORDS, "Align Object to another."},
+  {"add_menuitem", (PyCFunction) python_add_menuitem, METH_VARARGS | METH_KEYWORDS, "Add Menuitem to the the openscad window."},
+  {"model", (PyCFunction) python_model, METH_VARARGS | METH_KEYWORDS, "Yield Model"},
   {NULL, NULL, 0, NULL}
 };
 
