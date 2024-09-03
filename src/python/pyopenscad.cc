@@ -265,22 +265,22 @@ std::vector<int>  python_intlistval(PyObject *list)
  * Tries to extract an 3D vector out of a python list
  */
 
-int python_vectorval(PyObject *vec, double *x, double *y, double *z, double *w)
+int python_vectorval(PyObject *vec, int minval, int maxval, double *x, double *y, double *z, double *w)
 {
-  *x = 1.0;
-  *y = 1.0;
   if(w != NULL ) *w = 0;
   if (PyList_Check(vec)) {
+    if(PyList_Size(vec) < minval || PyList_Size(vec) > maxval) return 1;
+    	  
     if (PyList_Size(vec) >= 1) {
       if (python_numberval(PyList_GetItem(vec, 0), x)) return 1;
     }
     if (PyList_Size(vec) >= 2) {
       if (python_numberval(PyList_GetItem(vec, 1), y)) return 1;
     }
-    if (PyList_Check(vec) && PyList_Size(vec) >= 3) {
+    if (PyList_Size(vec) >= 3) {
       if (python_numberval(PyList_GetItem(vec, 2), z)) return 1;
     }
-    if (PyList_Check(vec) && PyList_Size(vec) >= 4 && w != NULL) {
+    if (PyList_Size(vec) >= 4 && w != NULL) {
       if (python_numberval(PyList_GetItem(vec, 3), w)) return 1;
     }
     return 0;

@@ -104,7 +104,7 @@ PyObject *python_cube(PyObject *self, PyObject *args, PyObject *kwargs)
   }	  
 
   if (size != NULL) {
-    if (python_vectorval(size, &(node->x), &(node->y), &(node->z))) {
+    if (python_vectorval(size, 3, 3, &(node->x), &(node->y), &(node->z))) {
       PyErr_SetString(PyExc_TypeError, "Invalid Cube dimensions");
       return NULL;
     }
@@ -611,8 +611,8 @@ PyObject *python_frep(PyObject *self, PyObject *args, PyObject *kwargs)
 				   &bmin, &bmax, &res
 				   )) return NULL;
 
-  python_vectorval(bmin, &(node->x1), &(node->y1), &(node->z1));
-  python_vectorval(bmax, &(node->x2), &(node->y2), &(node->z2));
+  python_vectorval(bmin, 3, 3, &(node->x1), &(node->y1), &(node->z1));
+  python_vectorval(bmax, 3, 3, &(node->x2), &(node->y2), &(node->z2));
   node->res = res;
 
   if(expression->ob_type == &PyLibFiveType) {
@@ -671,7 +671,7 @@ PyObject *python_square(PyObject *self, PyObject *args, PyObject *kwargs)
     return NULL;
   }
   if (dim != NULL) {
-    if (python_vectorval(dim, &(node->x), &(node->y), &z)) {
+    if (python_vectorval(dim, 2, 2, &(node->x), &(node->y), &z)) {
       PyErr_SetString(PyExc_TypeError, "Invalid Square dimensions");
       return NULL;
     }
@@ -899,8 +899,8 @@ PyObject *python_scale_sub(PyObject *obj, Vector3d scalevec)
 PyObject *python_scale_core(PyObject *obj, PyObject *val_v)
 {
  
-  double x, y, z;
-  if (python_vectorval(val_v, &x, &y, &z)) {
+  double x=1, y=1, z=1;
+  if (python_vectorval(val_v, 2, 3, &x, &y, &z)) {
     PyErr_SetString(PyExc_TypeError, "Invalid vector specifiaction in scale, use 1 to 3 ordinates.");
     return NULL;
   }
@@ -1107,8 +1107,8 @@ PyObject *python_mirror_sub(PyObject *obj, Matrix4d &m)
 PyObject *python_mirror_core(PyObject *obj, PyObject *val_v)
 {
   Vector3d mirrorvec;
-  double x = 1.0, y = 1.0, z = 1.0;
-  if (python_vectorval(val_v, &x, &y, &z)) {
+  double x = 1.0, y = 0.0, z = 0.0;
+  if (python_vectorval(val_v, 2, 3, &x, &y, &z)) {
     PyErr_SetString(PyExc_TypeError, "Invalid vector specifiaction in mirror");
     return NULL;
   }
@@ -1201,7 +1201,7 @@ PyObject *python_translate_sub(PyObject *obj, Vector3d translatevec)
 PyObject *python_translate_core(PyObject *obj, PyObject *v) 
 {
   double x = 0, y = 0, z = 0;
-  if (python_vectorval(v, &x, &y, &z)) {
+  if (python_vectorval(v, 1, 3, &x, &y, &z)) {
     PyErr_SetString(PyExc_TypeError, "Invalid vector specifiaction in trans");
     return NULL;
   }
@@ -1410,13 +1410,13 @@ PyObject *python_pull_core(PyObject *obj, PyObject *anchor, PyObject *dir)
   }
 
   double x = 0, y = 0, z = 0;
-  if (python_vectorval(anchor, &x, &y, &z)) {
+  if (python_vectorval(anchor, 3, 3, &x, &y, &z)) {
     PyErr_SetString(PyExc_TypeError, "Invalid vector specifiaction in anchor\n");
     return NULL;
   }
   node->anchor = Vector3d(x,y,z);
 
-  if (python_vectorval(dir, &x, &y, &z)) {
+  if (python_vectorval(dir, 3, 3, &x, &y, &z)) {
     PyErr_SetString(PyExc_TypeError, "Invalid vector specifiaction in dir\n");
     return NULL;
   }
@@ -1708,7 +1708,7 @@ PyObject *python_find_face_core(PyObject *obj, PyObject *vec_p)
   Vector3d vec;	
   double dummy;
   PyObject *child_dict;	  
-  if(python_vectorval(vec_p, &vec[0], &vec[1], &vec[2], &dummy)) return Py_None;
+  if(python_vectorval(vec_p, 3, 3, &vec[0], &vec[1], &vec[2], &dummy)) return Py_None;
   std::shared_ptr<AbstractNode> child = PyOpenSCADObjectToNodeMulti(obj, &child_dict);
 
   if(child == nullptr ) return Py_None;
@@ -1765,9 +1765,9 @@ PyObject *python_sitonto_core(PyObject *pyobj, PyObject *vecx_p, PyObject *vecy_
 {
   Vector4d vecx, vecy, vecz;
   Vector3d cut;
-  if(python_vectorval(vecx_p, &vecx[0], &vecx[1], &vecx[2], &vecx[3])) return Py_None;
-  if(python_vectorval(vecy_p, &vecy[0], &vecy[1], &vecy[2], &vecy[3])) return Py_None;
-  if(python_vectorval(vecz_p, &vecz[0], &vecz[1], &vecz[2], &vecz[3])) return Py_None;
+  if(python_vectorval(vecx_p, 3, 3, &vecx[0], &vecx[1], &vecx[2], &vecx[3])) return Py_None;
+  if(python_vectorval(vecy_p, 3, 3, &vecy[0], &vecy[1], &vecy[2], &vecy[3])) return Py_None;
+  if(python_vectorval(vecz_p, 3, 3, &vecz[0], &vecz[1], &vecz[2], &vecz[3])) return Py_None;
 
   if(cut_face_face_face(
 			  vecx.head<3>()*vecx[3], vecx.head<3>(),
@@ -2209,7 +2209,7 @@ PyObject *rotate_extrude_core(PyObject *obj, char *layer, int convexity, double 
   }
   double dummy;
   Vector3d v;
-  if(vp != nullptr && !python_vectorval(vp,&v[0],&v[1],&v[2],&dummy )){
+  if(vp != nullptr && !python_vectorval(vp,3, 3, &v[0],&v[1],&v[2],&dummy )){
     node->v = v;	  
   }
   if(method != nullptr) node->method=method; else node->method = "centered";
@@ -2304,7 +2304,7 @@ PyObject *linear_extrude_core(PyObject *obj, PyObject *height, char *layer, int 
   double dummy;
   if(!python_numberval(height, &height_vec[2])) {
     node->height = height_vec;
-  } else if(!python_vectorval(height, &height_vec[0], &height_vec[1], &height_vec[2], &dummy)) {
+  } else if(!python_vectorval(height, 3, 3, &height_vec[0], &height_vec[1], &height_vec[2], &dummy)) {
     node->height = height_vec;
   }
 
@@ -2422,7 +2422,7 @@ PyObject *path_extrude_core(PyObject *obj, PyObject *path, PyObject *xdir, int c
 	   for(int i=0;i<n;i++) {
 	  	PyObject *point=PyList_GetItem(path, i);
 		double x,y,z,w=0;
-  		if(python_vectorval(point,&x,&y,&z,&w )){
+  		if(python_vectorval(point,3, 4, &x,&y,&z,&w )){
 			PyErr_SetString(PyExc_TypeError,"Cannot parse vector in path_extrude path\n");
 			return NULL;
 		}
@@ -2438,7 +2438,7 @@ PyObject *path_extrude_core(PyObject *obj, PyObject *path, PyObject *xdir, int c
    if (closed == Py_True) node->closed = true;
    if (allow_intersect == Py_True) node->allow_intersect = true;
    if(xdir != NULL) {
-	   if(python_vectorval(xdir,&(node->xdir_x), &(node->xdir_y),&(node->xdir_z))) {
+	   if(python_vectorval(xdir,3, 3, &(node->xdir_x), &(node->xdir_y),&(node->xdir_z))) {
     		PyErr_SetString(PyExc_TypeError,"error in path_extrude xdir parameter\n");
 		return NULL;
 	   }
@@ -2458,7 +2458,7 @@ PyObject *path_extrude_core(PyObject *obj, PyObject *path, PyObject *xdir, int c
   node->origin_x=0.0; node->origin_y=0.0;
   if(origin != NULL) {
 	  double dummy;
-	  if(python_vectorval(origin,&(node->origin_x), &(node->origin_y), &dummy)) {
+	  if(python_vectorval(origin,2, 2, &(node->origin_x), &(node->origin_y), &dummy)) {
     		PyErr_SetString(PyExc_TypeError,"error in path_extrude origin parameter\n");
 		return NULL;
 	  }
@@ -2467,7 +2467,7 @@ PyObject *path_extrude_core(PyObject *obj, PyObject *path, PyObject *xdir, int c
   node->scale_x=1.0; node->scale_y=1.0;
   if(scale != NULL) {
 	  double dummy;
-	  if(python_vectorval(scale,&(node->scale_x), &(node->scale_y), &dummy)) {
+	  if(python_vectorval(scale,2, 2, &(node->scale_x), &(node->scale_y), &dummy)) {
     		PyErr_SetString(PyExc_TypeError,"error in path_extrude scale parameter\n");
 		return NULL;
 	  }
@@ -2791,8 +2791,8 @@ PyObject *python_nb_sub_vec3(PyObject *arg1, PyObject *arg2, int mode) // 0: tra
   std::shared_ptr<AbstractNode> child;
   PyObject *dummydict;	  
 
-  double x, y, z;
-  if (!python_vectorval(arg2, &x, &y, &z)) {
+  double x=0, y=0, z=0 ;
+  if (!python_vectorval(arg2, 2, 3, &x, &y, &z)) {
     child = PyOpenSCADObjectToNodeMulti(arg1, &dummydict);
     if (child == NULL) {
       PyErr_SetString(PyExc_TypeError, "invalid argument left to operator");
@@ -2920,7 +2920,7 @@ PyObject *python_resize_core(PyObject *obj, PyObject *newsize, PyObject *autosiz
 
   if (newsize != NULL) {
     double x, y, z;
-    if (python_vectorval(newsize, &x, &y, &z)) {
+    if (python_vectorval(newsize, 3, 3, &x, &y, &z)) {
       PyErr_SetString(PyExc_TypeError, "Invalid resize dimensions");
       return NULL;
     }

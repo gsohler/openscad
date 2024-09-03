@@ -40,7 +40,7 @@ std::shared_ptr<AbstractNode> python_modulefunc(const ModuleInstantiation *modul
 std::vector<int> python_intlistval(PyObject *list);
 
 Value python_functionfunc(const FunctionCall *call,const std::shared_ptr<const Context> &context);
-int python_vectorval(PyObject *vec, double *x, double *y, double *z, double *w=NULL);
+int python_vectorval(PyObject *vec, int minarg, int maxarg, double *x, double *y, double *z, double *w=NULL);
 int python_numberval(PyObject *number, double *result);
 void get_fnas(double& fn, double& fa, double& fs);
 void python_retrieve_pyname(const std::shared_ptr<AbstractNode> &node);
