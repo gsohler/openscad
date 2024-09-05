@@ -76,6 +76,7 @@ extern bool parse(SourceFile *& file, const std::string& text, const std::string
 #include <fstream>
 #include <ostream>
 #include <boost/functional/hash.hpp>
+#include <ScopeContext.h>
 
 //using namespace boost::assign; // bring 'operator+=()' into scope
 
@@ -3716,6 +3717,43 @@ PyObject *python_scad(PyObject *self, PyObject *args, PyObject *kwargs)
   return PyOpenSCADObjectFromNode(&PyOpenSCADType,resultnode);
 }
 
+PyObject *python_use(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+  DECLARE_INSTANCE
+  char *kwlist[] = {"file", NULL};
+  const char *file = NULL;
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s", kwlist,
+                                   &file
+                                   )) {
+    PyErr_SetString(PyExc_TypeError, "Error during parsing osuse(path)");
+    return NULL;
+  }
+  const std::string filename = lookup_file(file, ".",".");
+  SourceFile *source_file = new SourceFile(".","."); // filename, filename);
+  source_file->registerUse(std::string(filename), Location::NONE);
+  source_file->handleDependencies(true);
+  EvaluationSession session{"."};
+
+  ContextHandle<BuiltinContext> c_handle{Context::create<BuiltinContext>(&session)};
+  std::shared_ptr<const BuiltinContext> cxt = *c_handle;
+
+  ContextHandle<FileContext> fc_handle{Context::create<FileContext>(cxt, source_file)};
+  std::shared_ptr<const FileContext> file_cxt = *fc_handle;
+ 
+  auto namelist = file_cxt->list_local_modules();
+  PyObject *dict;
+  dict = PyDict_New();
+  for(std::string name: namelist) {
+    boost::optional<InstantiableModule> mod = file_cxt->lookup_local_module(name, Location::NONE);
+    DECLARE_INSTANCE
+    auto resultnode = mod->module->instantiate(mod->defining_context, instance, cxt);
+    PyObject *value = PyOpenSCADObjectFromNode(&PyOpenSCADType,resultnode);
+    PyDict_SetItemString(dict, name.c_str(), value);
+  }
+  return (PyObject *)dict;
+
+}
+
 PyObject *python_debug_modifier(PyObject *arg,int mode) {
   DECLARE_INSTANCE
   PyObject *dummydict;
@@ -3866,6 +3904,7 @@ PyMethodDef PyOpenSCADFunctions[] = {
   {"group", (PyCFunction) python_group, METH_VARARGS | METH_KEYWORDS, "Group Object."},
   {"render", (PyCFunction) python_render, METH_VARARGS | METH_KEYWORDS, "Render Object."},
   {"osimport", (PyCFunction) python_import, METH_VARARGS | METH_KEYWORDS, "Import Object."},
+  {"osuse", (PyCFunction) python_use, METH_VARARGS | METH_KEYWORDS, "Import OpenSCAD Library."},
   {"version", (PyCFunction) python_version, METH_VARARGS | METH_KEYWORDS, "Output openscad Version."},
   {"version_num", (PyCFunction) python_version_num, METH_VARARGS | METH_KEYWORDS, "Output openscad Version."},
   {"add_parameter", (PyCFunction) python_add_parameter, METH_VARARGS | METH_KEYWORDS, "Add Parameter for Customizer."},
