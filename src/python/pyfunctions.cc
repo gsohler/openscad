@@ -37,8 +37,8 @@
 #include <PolySetBuilder.h>
 extern bool parse(SourceFile *& file, const std::string& text, const std::string& filename, const std::string& mainFile, int debug);
 
+#include <src/python/pydata.h>
 #ifdef ENABLE_LIBFIVE
-#include <src/python/pylibfive.h>
 #include "src/python/FrepNode.h"
 #endif
 #include "GeometryUtils.h"
@@ -616,7 +616,7 @@ PyObject *python_frep(PyObject *self, PyObject *args, PyObject *kwargs)
   python_vectorval(bmax, 3, 3, &(node->x2), &(node->y2), &(node->z2));
   node->res = res;
 
-  if(expression->ob_type == &PyLibFiveType) {
+  if(expression->ob_type == &PyDataType) {
   	node->expression = expression;
   } else if(expression->ob_type == &PyFunction_Type) {
   	node->expression = expression;

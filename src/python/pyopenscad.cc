@@ -546,10 +546,8 @@ Value python_functionfunc(const FunctionCall *call,const std::shared_ptr<const C
   return res;
 }
 
-#ifdef ENABLE_LIBFIVE
-extern PyObject *PyInit_libfive(void);
-PyMODINIT_FUNC PyInit_PyLibFive(void);
-#endif
+extern PyObject *PyInit_data(void);
+PyMODINIT_FUNC PyInit_PyData(void);
 /*
  * Main python evaluation entry
  */
@@ -592,9 +590,7 @@ void initPython(double time)
     set_object_callback(openscad_object_callback);
 #endif
     PyImport_AppendInittab("openscad", &PyInit_openscad);
-#ifdef ENABLE_LIBFIVE	    
-    PyImport_AppendInittab("libfive", &PyInit_libfive);
-#endif	    
+    PyImport_AppendInittab("libfive", &PyInit_data);
     PyConfig config;
     PyConfig_InitPythonConfig(&config);
     char libdir[256];
@@ -618,9 +614,7 @@ void initPython(double time)
     Py_XINCREF(pythonInitDict);
     pythonRuntimeInitialized = pythonInitDict != nullptr;
     PyInit_PyOpenSCAD();
-#ifdef ENABLE_LIBFIVE	    
-    PyInit_PyLibFive();
-#endif	    
+    PyInit_PyData();
     PyRun_String("from builtins import *\n", Py_file_input, pythonInitDict, pythonInitDict);
     PyObject *key, *value;
     Py_ssize_t pos = 0;

@@ -3,35 +3,39 @@
 // Purpose: Extend openscad with an python interpreter
 
 #include <Python.h>
-#include "pylibfive.h"
-#include <libfive/tree/opcode.hpp>
+#include "pydata.h"
 
+#ifdef ENABLE_LIBFIVE
+#include <libfive/tree/opcode.hpp>
 using namespace libfive;
+#endif
 
 // https://docs.python.it/html/ext/dnt-basics.html
 
-void PyLibFiveObject_dealloc(PyObject *self)
+void PyDataObject_dealloc(PyObject *self)
 {
 //  Py_XDECREF(self->dict);
 //  Py_TYPE(self)->tp_free((PyObject *)self);
 }
 
-static PyObject *PyLibFiveObject_new(PyTypeObject *type, PyObject *args,  PyObject *kwds)
+static PyObject *PyDataObject_new(PyTypeObject *type, PyObject *args,  PyObject *kwds)
 {
-  PyLibFiveObject *self;
-  self = (PyLibFiveObject *)  type->tp_alloc(type, 0);
+  PyDataObject *self;
+  self = (PyDataObject *)  type->tp_alloc(type, 0);
   self->tree = 0;
   Py_XINCREF(self);
   return (PyObject *)self;
 }
 
-PyObject *PyLibFiveObjectFromTree(PyTypeObject *type, const std::vector<Tree *> &tree)
+#ifdef ENABLE_LIBFIVE
+
+PyObject *PyDataObjectFromTree(PyTypeObject *type, const std::vector<Tree *> &tree)
 {
   if(tree.size() == 0) {
     return Py_None;	  
   } else if(tree.size() == 1) {
-    PyLibFiveObject *res;
-    res = (PyLibFiveObject *)  type->tp_alloc(type, 0);
+    PyDataObject *res;
+    res = (PyDataObject *)  type->tp_alloc(type, 0);
     if (res != NULL) {
       res->tree = tree[0];
       Py_XINCREF(res);
@@ -40,8 +44,8 @@ PyObject *PyLibFiveObjectFromTree(PyTypeObject *type, const std::vector<Tree *> 
   } else {
     PyObject  *res = PyTuple_New(tree.size());
     for(int i=0;i<tree.size();i++) {
-      PyLibFiveObject *sub;
-      sub = (PyLibFiveObject *)  type->tp_alloc(type, 0);
+      PyDataObject *sub;
+      sub = (PyDataObject *)  type->tp_alloc(type, 0);
       if (sub != NULL) {
         sub->tree = tree[i];
         Py_XINCREF(sub);
@@ -54,11 +58,11 @@ PyObject *PyLibFiveObjectFromTree(PyTypeObject *type, const std::vector<Tree *> 
   return Py_None;
 }
 
-std::vector<libfive::Tree *> PyLibFiveObjectToTree(PyObject *obj)
+std::vector<libfive::Tree *> PyDataObjectToTree(PyObject *obj)
 {
   std::vector<Tree *> result;
-  if(obj != NULL && obj->ob_type == &PyLibFiveType) {
-        result.push_back(((PyLibFiveObject *) obj)->tree);
+  if(obj != NULL && obj->ob_type == &PyDataType) {
+        result.push_back(((PyDataObject *) obj)->tree);
   } else if(PyLong_Check(obj)) { 
   	result.push_back(new Tree(libfive::Tree(PyLong_AsLong(obj))));
   } else if(PyFloat_Check(obj)) { 
@@ -66,13 +70,13 @@ std::vector<libfive::Tree *> PyLibFiveObjectToTree(PyObject *obj)
   } else if(PyTuple_Check(obj)){
 	  for(int i=0;i<PyTuple_Size(obj);i++) {
 		PyObject *x=PyTuple_GetItem(obj,i);
-		std::vector<Tree *> sub = PyLibFiveObjectToTree(x);
+		std::vector<Tree *> sub = PyDataObjectToTree(x);
 		result.insert(result.end(), sub.begin(), sub.end());
 	  }
   } else if(PyList_Check(obj)){
 	  for(int i=0;i<PyList_Size(obj);i++) {
 		PyObject *x=PyList_GetItem(obj,i);
-		std::vector<Tree *> sub = PyLibFiveObjectToTree(x);
+		std::vector<Tree *> sub = PyDataObjectToTree(x);
 		result.insert(result.end(), sub.begin(), sub.end());
 	  }
   } else {
@@ -82,16 +86,18 @@ std::vector<libfive::Tree *> PyLibFiveObjectToTree(PyObject *obj)
   return result;
 }
 
-static int PyLibFiveInit(PyLibFiveObject *self, PyObject *arfs, PyObject *kwds)
+#endif
+static int PyDataInit(PyDataObject *self, PyObject *arfs, PyObject *kwds)
 {
   return 0;
 }
 
+#ifdef ENABLE_LIBFIVE
 PyObject *python_lv_void_int(PyObject *self, PyObject *args, PyObject *kwargs,Tree *t)
 {
   std::vector<Tree *> vec;
   vec.push_back(t);
-  return PyLibFiveObjectFromTree(&PyLibFiveType, vec);
+  return PyDataObjectFromTree(&PyDataType, vec);
 }
 
 
@@ -102,13 +108,13 @@ PyObject *python_lv_un_int(PyObject *self, PyObject *args, PyObject *kwargs,libf
 
   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O", kwlist, &arg)) return NULL;
 
-  std::vector<libfive::Tree *> tv = PyLibFiveObjectToTree(arg);
+  std::vector<libfive::Tree *> tv = PyDataObjectToTree(arg);
   std::vector<libfive::Tree *> res;
   for(int i=0;i<tv.size();i++) {
 	  libfive::Tree *sub = new Tree(Tree::unary(op, *(tv[i])));
     res.push_back(sub);
   }
-  return PyLibFiveObjectFromTree(&PyLibFiveType, res);
+  return PyDataObjectFromTree(&PyDataType, res);
 }
 
 PyObject *python_lv_bin_int(PyObject *self, PyObject *args, PyObject *kwargs,libfive::Opcode::Opcode op)
@@ -123,8 +129,8 @@ PyObject *python_lv_bin_int(PyObject *self, PyObject *args, PyObject *kwargs,lib
                                    &arg2
 				   )) return NULL;
 
-  std::vector<Tree *> a1 = PyLibFiveObjectToTree(arg1);
-  std::vector<Tree *> a2 = PyLibFiveObjectToTree(arg2);
+  std::vector<Tree *> a1 = PyDataObjectToTree(arg1);
+  std::vector<Tree *> a2 = PyDataObjectToTree(arg2);
   std::vector<Tree *> res;
   if(a1.size() == a2.size()) {
     for(int i=0;i<a1.size();i++) {		 
@@ -146,32 +152,32 @@ PyObject *python_lv_bin_int(PyObject *self, PyObject *args, PyObject *kwargs,lib
   if(PyTuple_Size(args) == 0) return Py_None;
   obj= PyTuple_GetItem(args, 0);
 //  Py_INCREF(obj);
-  Tree res = PyLibFiveObjectToTree(obj);
+  Tree res = PyDataObjectToTree(obj);
   for(i=1;i<PyTuple_Size(args);i++)
   {
   	obj= PyTuple_GetItem(args, i);
   	//Py_INCREF(obj);
-  	Tree tmp = PyLibFiveObjectToTree(obj);
+  	Tree tmp = PyDataObjectToTree(obj);
   	Tree res = libfive_tree_binary(op, res,tmp);
   }
 #endif
-  return PyLibFiveObjectFromTree(&PyLibFiveType, res);
+  return PyDataObjectFromTree(&PyDataType, res);
 }
 
 PyObject *python_lv_unop_int(PyObject *arg, libfive::Opcode::Opcode op)
 {
-  std::vector<libfive::Tree *>t = PyLibFiveObjectToTree(arg);
+  std::vector<libfive::Tree *>t = PyDataObjectToTree(arg);
   std::vector<Tree *> res;
   for(int i=0;i<t.size();i++) {
     res.push_back( new Tree(Tree::unary(op, *(t[i]))));
   }  
-  return PyLibFiveObjectFromTree(&PyLibFiveType, res);
+  return PyDataObjectFromTree(&PyDataType, res);
 }
 
 PyObject *python_lv_binop_int(PyObject *arg1, PyObject *arg2, libfive::Opcode::Opcode op)
 {
-  std::vector<libfive::Tree *> t1 = PyLibFiveObjectToTree(arg1);
-  std::vector<libfive::Tree *> t2 = PyLibFiveObjectToTree(arg2);
+  std::vector<libfive::Tree *> t1 = PyDataObjectToTree(arg1);
+  std::vector<libfive::Tree *> t2 = PyDataObjectToTree(arg2);
 
   std::vector<libfive::Tree *> res ;
   if(t1.size() == t2.size()) {
@@ -188,7 +194,7 @@ PyObject *python_lv_binop_int(PyObject *arg1, PyObject *arg2, libfive::Opcode::O
     return Py_None;		    
   }
 
-  return PyLibFiveObjectFromTree(&PyLibFiveType, res);
+  return PyDataObjectFromTree(&PyDataType, res);
 }
 
 Tree lv_x = Tree::X();
@@ -220,15 +226,18 @@ PyObject *python_lv_print(PyObject *self, PyObject *args, PyObject *kwargs)
   char *kwlist[] = {"arg",  NULL};
   PyObject *arg = NULL;
 
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O!", kwlist, &PyLibFiveType, &arg)) return NULL;
-  std::vector<Tree *> tv = PyLibFiveObjectToTree(arg);
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O!", kwlist, &PyDataType, &arg)) return NULL;
+  std::vector<Tree *> tv = PyDataObjectToTree(arg);
   for(int i=0;i<tv.size();i++){
 //    printf("tree %d: %s\n",i,libfive_tree_print(tv[i]));
   }
   return Py_None;
 }
 
-static PyMethodDef PyLibFiveFunctions[] = {
+#endif
+
+static PyMethodDef PyDataFunctions[] = {
+#ifdef ENABLE_LIBFIVE	
   {"x", (PyCFunction) python_lv_x, METH_VARARGS | METH_KEYWORDS, "Get X."},
   {"y", (PyCFunction) python_lv_y, METH_VARARGS | METH_KEYWORDS, "Get Y."},
   {"z", (PyCFunction) python_lv_z, METH_VARARGS | METH_KEYWORDS, "Get Z."},
@@ -250,18 +259,27 @@ static PyMethodDef PyLibFiveFunctions[] = {
   {"comp", (PyCFunction) python_lv_comp, METH_VARARGS | METH_KEYWORDS, "Compare"},
   {"atan2", (PyCFunction) python_lv_atan2, METH_VARARGS | METH_KEYWORDS, "Atan2"},
   {"print", (PyCFunction) python_lv_print, METH_VARARGS | METH_KEYWORDS, "Print"},
+#endif  
   {NULL, NULL, 0, NULL}
 };
 
+#ifdef ENABLE_LIBFIVE
 PyObject *python_lv_add(PyObject *arg1, PyObject *arg2) { return python_lv_binop_int(arg1, arg2,  Opcode::OP_ADD); }
 PyObject *python_lv_substract(PyObject *arg1, PyObject *arg2) { return python_lv_binop_int(arg1, arg2,  Opcode::OP_SUB); }
 PyObject *python_lv_multiply(PyObject *arg1, PyObject *arg2) { return python_lv_binop_int(arg1, arg2,  Opcode::OP_MUL); }
 PyObject *python_lv_remainder(PyObject *arg1, PyObject *arg2) { return python_lv_binop_int(arg1, arg2,  Opcode::OP_MOD); }
 PyObject *python_lv_divide(PyObject *arg1, PyObject *arg2) { return python_lv_binop_int(arg1, arg2,  Opcode::OP_DIV); }
 PyObject *python_lv_negate(PyObject *arg) { return python_lv_unop_int(arg, Opcode::OP_NEG); }
+#else
+PyObject *python_lv_add(PyObject *arg1, PyObject *arg2) { return Py_None; }
+PyObject *python_lv_substract(PyObject *arg1, PyObject *arg2) { return Py_None; }
+PyObject *python_lv_multiply(PyObject *arg1, PyObject *arg2) { return  Py_None; }
+PyObject *python_lv_remainder(PyObject *arg1, PyObject *arg2) { return Py_None; }
+PyObject *python_lv_divide(PyObject *arg1, PyObject *arg2) { return  Py_None; }
+PyObject *python_lv_negate(PyObject *arg) { return  Py_None; }
+#endif
 
-
-PyNumberMethods PyLibFiveNumbers =
+PyNumberMethods PyDataNumbers =
 {
   &python_lv_add,
   &python_lv_substract,
@@ -305,18 +323,18 @@ PyNumberMethods PyLibFiveNumbers =
   0, /* binaryfunc nb_inplace_matrix_multiply; */
 };
 
-PyTypeObject PyLibFiveType = {
+PyTypeObject PyDataType = {
     PyVarObject_HEAD_INIT(NULL, 0)
-    "PyLibFive",             			/* tp_name */
-    sizeof(PyLibFiveObject), 			/* tp_basicsize */
+    "PyData",             			/* tp_name */
+    sizeof(PyDataObject), 			/* tp_basicsize */
     0,                         			/* tp_itemsize */
-    PyLibFiveObject_dealloc,			/* tp_dealloc */
+    PyDataObject_dealloc,			/* tp_dealloc */
     0,                         			/* tp_print */
     0,                         			/* tp_getattr */
     0,                         			/* tp_setattr */
     0,                         			/* tp_reserved */
     0,                         			/* tp_repr */
-    &PyLibFiveNumbers, 				/* tp_as_number */
+    &PyDataNumbers, 				/* tp_as_number */
     0,                         			/* tp_as_sequence */
     0,		        			/* tp_as_mapping */
     0,                         			/* tp_hash  */
@@ -341,35 +359,35 @@ PyTypeObject PyLibFiveType = {
     0,                         			/* tp_descr_get */
     0,                         			/* tp_descr_set */
     0,                         			/* tp_dictoffset */
-    (initproc) PyLibFiveInit,      		/* tp_init */
+    (initproc) PyDataInit,      		/* tp_init */
     0,                         			/* tp_alloc */
-    PyLibFiveObject_new,                	/* tp_new */
+    PyDataObject_new,                	/* tp_new */
 };
 
 
-static PyModuleDef LibFiveModule = {
+static PyModuleDef DataModule = {
   PyModuleDef_HEAD_INIT,
-  "LibFive",
+  "Data",
   "Example module that creates an extension type.",
   -1,
-  PyLibFiveFunctions,
+  PyDataFunctions,
   NULL, NULL, NULL, NULL
 };
 
-PyMODINIT_FUNC PyInit_PyLibFive(void)
+PyMODINIT_FUNC PyInit_PyData(void)
 {
   PyObject *m;
-  if (PyType_Ready(&PyLibFiveType) < 0) return NULL;
-  m = PyModule_Create(&LibFiveModule);
+  if (PyType_Ready(&PyDataType) < 0) return NULL;
+  m = PyModule_Create(&DataModule);
   if (m == NULL) return NULL;
 
-  Py_INCREF(&PyLibFiveType);
-  PyModule_AddObject(m, "openscad", (PyObject *)&PyLibFiveType);
+  Py_INCREF(&PyDataType);
+  PyModule_AddObject(m, "openscad", (PyObject *)&PyDataType);
   return m;
 }
 
-PyObject *PyInit_libfive(void)
+PyObject *PyInit_data(void)
 {
-  return PyModule_Create(&LibFiveModule);
+  return PyModule_Create(&DataModule);
 }
 

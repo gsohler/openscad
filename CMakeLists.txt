@@ -435,10 +435,10 @@ endif()
 if(ENABLE_PYTHON)
   SET(PYTHON_SOURCES
     src/python/pyopenscad.cc
+    src/python/pydata.cc 
     src/python/pyfunctions.cc)
   if(ENABLE_LIBFIVE)
     list(APPEND PYTHON_SOURCES
-      src/python/pylibfive.cc 
       src/python/FrepNode.cc)
   endif()
   add_library(OpenSCADPy
