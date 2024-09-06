@@ -22,10 +22,35 @@ static PyObject *PyDataObject_new(PyTypeObject *type, PyObject *args,  PyObject 
 {
   PyDataObject *self;
   self = (PyDataObject *)  type->tp_alloc(type, 0);
-  self->tree = 0;
+  self->data_type=DATA_TYPE_UNKNOWN;
+  self->data = 0;
   Py_XINCREF(self);
   return (PyObject *)self;
 }
+
+PyObject *PyDataObjectFromModule(PyTypeObject *type, boost::optional<InstantiableModule> mod)
+{
+  PyDataObject *res;
+  res = (PyDataObject *)  type->tp_alloc(type, 0);
+  if (res != NULL) {
+    res->data = (void *) &mod;
+    res->data_type = DATA_TYPE_SCADMODULE;
+    Py_XINCREF(res);
+    return (PyObject *)res;
+  }
+  return Py_None;
+}
+
+boost::optional<InstantiableModule> PyDataObjectToModule(PyObject *obj)
+{
+  if(obj != NULL && obj->ob_type == &PyDataType) {
+	PyDataObject * dataobj = (PyDataObject *) obj;
+        if(dataobj->data_type == DATA_TYPE_SCADMODULE) return *((boost::optional<InstantiableModule> *) dataobj->data);
+  }
+  boost::optional<InstantiableModule> res;
+  return res;
+}
+
 
 #ifdef ENABLE_LIBFIVE
 
@@ -37,7 +62,8 @@ PyObject *PyDataObjectFromTree(PyTypeObject *type, const std::vector<Tree *> &tr
     PyDataObject *res;
     res = (PyDataObject *)  type->tp_alloc(type, 0);
     if (res != NULL) {
-      res->tree = tree[0];
+      res->data = (void *) tree[0];
+      res->data_type = DATA_TYPE_LIBFIVE;
       Py_XINCREF(res);
       return (PyObject *)res;
     }
@@ -47,7 +73,8 @@ PyObject *PyDataObjectFromTree(PyTypeObject *type, const std::vector<Tree *> &tr
       PyDataObject *sub;
       sub = (PyDataObject *)  type->tp_alloc(type, 0);
       if (sub != NULL) {
-        sub->tree = tree[i];
+        sub->data = tree[i];
+	sub->data_type = DATA_TYPE_LIBFIVE;
         Py_XINCREF(sub);
 	PyTuple_SetItem(res,i,(PyObject *) sub);
       }
@@ -62,7 +89,8 @@ std::vector<libfive::Tree *> PyDataObjectToTree(PyObject *obj)
 {
   std::vector<Tree *> result;
   if(obj != NULL && obj->ob_type == &PyDataType) {
-        result.push_back(((PyDataObject *) obj)->tree);
+	PyDataObject * dataobj = (PyDataObject *) obj;
+        if(dataobj->data_type == DATA_TYPE_LIBFIVE) result.push_back((libfive::Tree *) dataobj->data);
   } else if(PyLong_Check(obj)) { 
   	result.push_back(new Tree(libfive::Tree(PyLong_AsLong(obj))));
   } else if(PyFloat_Check(obj)) { 
