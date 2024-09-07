@@ -3743,14 +3743,14 @@ PyObject *python_use(PyObject *self, PyObject *args, PyObject *kwargs)
   auto namelist = file_cxt->list_local_modules();
   PyObject *dict;
   dict = PyDict_New();
+  std::shared_ptr<AbstractNode> empty;
+  PyOpenSCADObject *result = (PyOpenSCADObject *) PyOpenSCADObjectFromNode(&PyOpenSCADType, empty); 
+
   for(std::string name: namelist) {
     boost::optional<InstantiableModule> mod = file_cxt->lookup_local_module(name, Location::NONE);
-    DECLARE_INSTANCE
-    auto resultnode = mod->module->instantiate(mod->defining_context, instance, cxt);
-    PyObject *value = PyOpenSCADObjectFromNode(&PyOpenSCADType,resultnode);
-    PyDict_SetItemString(dict, name.c_str(), value);
+    PyDict_SetItemString(result->dict, name.c_str(),PyDataObjectFromModule(&PyDataType, mod) );
   }
-  return (PyObject *)dict;
+  return (PyObject *) result;
 
 }
 
@@ -3765,7 +3765,7 @@ PyObject *python_debug_modifier(PyObject *arg,int mode) {
   }
   auto node = std::make_shared<CsgOpNode>(instance, OpenSCADOperator::UNION);
   node->children.push_back(child);
-  return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
+  return PyOpenSCADObjectFromNode(&PyOpenSCADType, node); // TODO 1st loswerden
 }
 
 PyObject *python_debug_modifier_func(PyObject *self, PyObject *args, PyObject *kwargs, int mode)

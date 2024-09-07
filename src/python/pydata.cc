@@ -5,9 +5,14 @@
 #include <Python.h>
 #include "pydata.h"
 
+#include "Assignment.h"
+#include "ModuleInstantiation.h"
+#include "BuiltinContext.h"
+#include "Expression.h"
+PyObject *PyOpenSCADObjectFromNode(PyTypeObject *type, const std::shared_ptr<AbstractNode> &node);
+
 #ifdef ENABLE_LIBFIVE
 #include <libfive/tree/opcode.hpp>
-using namespace libfive;
 #endif
 
 // https://docs.python.it/html/ext/dnt-basics.html
@@ -33,8 +38,8 @@ PyObject *PyDataObjectFromModule(PyTypeObject *type, boost::optional<Instantiabl
   PyDataObject *res;
   res = (PyDataObject *)  type->tp_alloc(type, 0);
   if (res != NULL) {
-    res->data = (void *) &mod;
     res->data_type = DATA_TYPE_SCADMODULE;
+    res->data = (void *) mod->module;
     Py_XINCREF(res);
     return (PyObject *)res;
   }
@@ -44,8 +49,13 @@ PyObject *PyDataObjectFromModule(PyTypeObject *type, boost::optional<Instantiabl
 boost::optional<InstantiableModule> PyDataObjectToModule(PyObject *obj)
 {
   if(obj != NULL && obj->ob_type == &PyDataType) {
-	PyDataObject * dataobj = (PyDataObject *) obj;
-        if(dataobj->data_type == DATA_TYPE_SCADMODULE) return *((boost::optional<InstantiableModule> *) dataobj->data);
+    PyDataObject * dataobj = (PyDataObject *) obj;
+    if(dataobj->data_type == DATA_TYPE_SCADMODULE) {
+     InstantiableModule m;
+     m.module=(AbstractModule *)  dataobj->data;
+     boost::optional<InstantiableModule> res(m);
+     return res;
+    }
   }
   boost::optional<InstantiableModule> res;
   return res;
@@ -54,7 +64,7 @@ boost::optional<InstantiableModule> PyDataObjectToModule(PyObject *obj)
 
 #ifdef ENABLE_LIBFIVE
 
-PyObject *PyDataObjectFromTree(PyTypeObject *type, const std::vector<Tree *> &tree)
+PyObject *PyDataObjectFromTree(PyTypeObject *type, const std::vector<libfive::Tree *> &tree)
 {
   if(tree.size() == 0) {
     return Py_None;	  
@@ -87,24 +97,24 @@ PyObject *PyDataObjectFromTree(PyTypeObject *type, const std::vector<Tree *> &tr
 
 std::vector<libfive::Tree *> PyDataObjectToTree(PyObject *obj)
 {
-  std::vector<Tree *> result;
+  std::vector<libfive::Tree *> result;
   if(obj != NULL && obj->ob_type == &PyDataType) {
 	PyDataObject * dataobj = (PyDataObject *) obj;
         if(dataobj->data_type == DATA_TYPE_LIBFIVE) result.push_back((libfive::Tree *) dataobj->data);
   } else if(PyLong_Check(obj)) { 
-  	result.push_back(new Tree(libfive::Tree(PyLong_AsLong(obj))));
+  	result.push_back(new libfive::Tree(libfive::Tree(PyLong_AsLong(obj))));
   } else if(PyFloat_Check(obj)) { 
-  	result.push_back(new Tree(libfive::Tree(PyFloat_AsDouble(obj))));
+  	result.push_back(new libfive::Tree(libfive::Tree(PyFloat_AsDouble(obj))));
   } else if(PyTuple_Check(obj)){
 	  for(int i=0;i<PyTuple_Size(obj);i++) {
 		PyObject *x=PyTuple_GetItem(obj,i);
-		std::vector<Tree *> sub = PyDataObjectToTree(x);
+		std::vector<libfive::Tree *> sub = PyDataObjectToTree(x);
 		result.insert(result.end(), sub.begin(), sub.end());
 	  }
   } else if(PyList_Check(obj)){
 	  for(int i=0;i<PyList_Size(obj);i++) {
 		PyObject *x=PyList_GetItem(obj,i);
-		std::vector<Tree *> sub = PyDataObjectToTree(x);
+		std::vector<libfive::Tree *> sub = PyDataObjectToTree(x);
 		result.insert(result.end(), sub.begin(), sub.end());
 	  }
   } else {
@@ -121,9 +131,9 @@ static int PyDataInit(PyDataObject *self, PyObject *arfs, PyObject *kwds)
 }
 
 #ifdef ENABLE_LIBFIVE
-PyObject *python_lv_void_int(PyObject *self, PyObject *args, PyObject *kwargs,Tree *t)
+PyObject *python_lv_void_int(PyObject *self, PyObject *args, PyObject *kwargs,libfive::Tree *t)
 {
-  std::vector<Tree *> vec;
+  std::vector<libfive::Tree *> vec;
   vec.push_back(t);
   return PyDataObjectFromTree(&PyDataType, vec);
 }
@@ -139,7 +149,7 @@ PyObject *python_lv_un_int(PyObject *self, PyObject *args, PyObject *kwargs,libf
   std::vector<libfive::Tree *> tv = PyDataObjectToTree(arg);
   std::vector<libfive::Tree *> res;
   for(int i=0;i<tv.size();i++) {
-	  libfive::Tree *sub = new Tree(Tree::unary(op, *(tv[i])));
+	  libfive::Tree *sub = new libfive::Tree(libfive::Tree::unary(op, *(tv[i])));
     res.push_back(sub);
   }
   return PyDataObjectFromTree(&PyDataType, res);
@@ -157,17 +167,17 @@ PyObject *python_lv_bin_int(PyObject *self, PyObject *args, PyObject *kwargs,lib
                                    &arg2
 				   )) return NULL;
 
-  std::vector<Tree *> a1 = PyDataObjectToTree(arg1);
-  std::vector<Tree *> a2 = PyDataObjectToTree(arg2);
-  std::vector<Tree *> res;
+  std::vector<libfive::Tree *> a1 = PyDataObjectToTree(arg1);
+  std::vector<libfive::Tree *> a2 = PyDataObjectToTree(arg2);
+  std::vector<libfive::Tree *> res;
   if(a1.size() == a2.size()) {
     for(int i=0;i<a1.size();i++) {		 
-      res.push_back(new Tree(Tree::binary(op, *a1[i],*a2[i])));
+      res.push_back(new libfive::Tree(libfive::Tree::binary(op, *a1[i],*a2[i])));
     }
   }
   else if(a2.size() == 1) {
     for(int i=0;i<a1.size();i++) {		 
-      res.push_back(new Tree(Tree::binary(op, *a1[i],*a2[0])));
+      res.push_back(new libfive::Tree(libfive::Tree::binary(op, *a1[i],*a2[0])));
     }
   } else { 
     printf("Cannot handle  bin %d binop %d \n",a1.size(), a2.size());
@@ -195,9 +205,9 @@ PyObject *python_lv_bin_int(PyObject *self, PyObject *args, PyObject *kwargs,lib
 PyObject *python_lv_unop_int(PyObject *arg, libfive::Opcode::Opcode op)
 {
   std::vector<libfive::Tree *>t = PyDataObjectToTree(arg);
-  std::vector<Tree *> res;
+  std::vector<libfive::Tree *> res;
   for(int i=0;i<t.size();i++) {
-    res.push_back( new Tree(Tree::unary(op, *(t[i]))));
+    res.push_back( new libfive::Tree(libfive::Tree::unary(op, *(t[i]))));
   }  
   return PyDataObjectFromTree(&PyDataType, res);
 }
@@ -210,12 +220,12 @@ PyObject *python_lv_binop_int(PyObject *arg1, PyObject *arg2, libfive::Opcode::O
   std::vector<libfive::Tree *> res ;
   if(t1.size() == t2.size()) {
     for(int i=0;i<t1.size();i++) {		 
-      res.push_back(new Tree(Tree::binary(op, *(t1[i]),*(t2[i]))));
+      res.push_back(new libfive::Tree(libfive::Tree::binary(op, *(t1[i]),*(t2[i]))));
     }
   }
   else if(t2.size() == 1) {
     for(int i=0;i<t1.size();i++) {		 
-      res.push_back(new Tree(Tree::binary(op, *(t1[i]),*(t2[0]))));
+      res.push_back(new libfive::Tree(libfive::Tree::binary(op, *(t1[i]),*(t2[0]))));
     }
   } else { 
     printf("Cannot handle  bin %d binop %d \n",t1.size(), t2.size());
@@ -225,29 +235,29 @@ PyObject *python_lv_binop_int(PyObject *arg1, PyObject *arg2, libfive::Opcode::O
   return PyDataObjectFromTree(&PyDataType, res);
 }
 
-Tree lv_x = Tree::X();
-Tree lv_y = Tree::Y();
-Tree lv_z = Tree::Z();
+libfive::Tree lv_x = libfive::Tree::X();
+libfive::Tree lv_y = libfive::Tree::Y();
+libfive::Tree lv_z = libfive::Tree::Z();
 PyObject *python_lv_x(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_void_int(self, args, kwargs,&lv_x); }
 PyObject *python_lv_y(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_void_int(self, args, kwargs,&lv_y); }
 PyObject *python_lv_z(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_void_int(self, args, kwargs,&lv_z); }
-PyObject *python_lv_sqrt(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_un_int(self, args, kwargs,Opcode::OP_SQRT); }
-PyObject *python_lv_square(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_un_int(self, args, kwargs,Opcode::OP_SQUARE); }
-PyObject *python_lv_abs(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_un_int(self, args, kwargs,Opcode::OP_ABS); }
-PyObject *python_lv_max(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_bin_int(self, args, kwargs,Opcode::OP_MAX); }
-PyObject *python_lv_min(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_bin_int(self, args, kwargs,Opcode::OP_MIN); }
-PyObject *python_lv_pow(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_bin_int(self, args, kwargs,Opcode::OP_POW); }
-PyObject *python_lv_comp(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_bin_int(self, args, kwargs,Opcode::OP_COMPARE); }
-PyObject *python_lv_atan2(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_bin_int(self, args, kwargs,Opcode::OP_ATAN2); }
+PyObject *python_lv_sqrt(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_un_int(self, args, kwargs,libfive::Opcode::OP_SQRT); }
+PyObject *python_lv_square(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_un_int(self, args, kwargs,libfive::Opcode::OP_SQUARE); }
+PyObject *python_lv_abs(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_un_int(self, args, kwargs,libfive::Opcode::OP_ABS); }
+PyObject *python_lv_max(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_bin_int(self, args, kwargs,libfive::Opcode::OP_MAX); }
+PyObject *python_lv_min(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_bin_int(self, args, kwargs,libfive::Opcode::OP_MIN); }
+PyObject *python_lv_pow(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_bin_int(self, args, kwargs,libfive::Opcode::OP_POW); }
+PyObject *python_lv_comp(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_bin_int(self, args, kwargs,libfive::Opcode::OP_COMPARE); }
+PyObject *python_lv_atan2(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_bin_int(self, args, kwargs,libfive::Opcode::OP_ATAN2); }
 
-PyObject *python_lv_sin(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_un_int(self, args, kwargs,Opcode::OP_SIN); }
-PyObject *python_lv_cos(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_un_int(self, args, kwargs,Opcode::OP_COS); }
-PyObject *python_lv_tan(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_un_int(self, args, kwargs,Opcode::OP_TAN); }
-PyObject *python_lv_asin(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_un_int(self, args, kwargs,Opcode::OP_ASIN); }
-PyObject *python_lv_acos(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_un_int(self, args, kwargs,Opcode::OP_ACOS); }
-PyObject *python_lv_atan(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_un_int(self, args, kwargs,Opcode::OP_ATAN); }
-PyObject *python_lv_exp(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_un_int(self, args, kwargs,Opcode::OP_EXP); }
-PyObject *python_lv_log(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_un_int(self, args, kwargs,Opcode::OP_LOG); }
+PyObject *python_lv_sin(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_un_int(self, args, kwargs,libfive::Opcode::OP_SIN); }
+PyObject *python_lv_cos(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_un_int(self, args, kwargs,libfive::Opcode::OP_COS); }
+PyObject *python_lv_tan(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_un_int(self, args, kwargs,libfive::Opcode::OP_TAN); }
+PyObject *python_lv_asin(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_un_int(self, args, kwargs,libfive::Opcode::OP_ASIN); }
+PyObject *python_lv_acos(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_un_int(self, args, kwargs,libfive::Opcode::OP_ACOS); }
+PyObject *python_lv_atan(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_un_int(self, args, kwargs,libfive::Opcode::OP_ATAN); }
+PyObject *python_lv_exp(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_un_int(self, args, kwargs,libfive::Opcode::OP_EXP); }
+PyObject *python_lv_log(PyObject *self, PyObject *args, PyObject *kwargs) { return python_lv_un_int(self, args, kwargs,libfive::Opcode::OP_LOG); }
 
 PyObject *python_lv_print(PyObject *self, PyObject *args, PyObject *kwargs)
 {
@@ -255,7 +265,7 @@ PyObject *python_lv_print(PyObject *self, PyObject *args, PyObject *kwargs)
   PyObject *arg = NULL;
 
   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O!", kwlist, &PyDataType, &arg)) return NULL;
-  std::vector<Tree *> tv = PyDataObjectToTree(arg);
+  std::vector<libfive::Tree *> tv = PyDataObjectToTree(arg);
   for(int i=0;i<tv.size();i++){
 //    printf("tree %d: %s\n",i,libfive_tree_print(tv[i]));
   }
@@ -292,12 +302,12 @@ static PyMethodDef PyDataFunctions[] = {
 };
 
 #ifdef ENABLE_LIBFIVE
-PyObject *python_lv_add(PyObject *arg1, PyObject *arg2) { return python_lv_binop_int(arg1, arg2,  Opcode::OP_ADD); }
-PyObject *python_lv_substract(PyObject *arg1, PyObject *arg2) { return python_lv_binop_int(arg1, arg2,  Opcode::OP_SUB); }
-PyObject *python_lv_multiply(PyObject *arg1, PyObject *arg2) { return python_lv_binop_int(arg1, arg2,  Opcode::OP_MUL); }
-PyObject *python_lv_remainder(PyObject *arg1, PyObject *arg2) { return python_lv_binop_int(arg1, arg2,  Opcode::OP_MOD); }
-PyObject *python_lv_divide(PyObject *arg1, PyObject *arg2) { return python_lv_binop_int(arg1, arg2,  Opcode::OP_DIV); }
-PyObject *python_lv_negate(PyObject *arg) { return python_lv_unop_int(arg, Opcode::OP_NEG); }
+PyObject *python_lv_add(PyObject *arg1, PyObject *arg2) { return python_lv_binop_int(arg1, arg2,  libfive::Opcode::OP_ADD); }
+PyObject *python_lv_substract(PyObject *arg1, PyObject *arg2) { return python_lv_binop_int(arg1, arg2,  libfive::Opcode::OP_SUB); }
+PyObject *python_lv_multiply(PyObject *arg1, PyObject *arg2) { return python_lv_binop_int(arg1, arg2,  libfive::Opcode::OP_MUL); }
+PyObject *python_lv_remainder(PyObject *arg1, PyObject *arg2) { return python_lv_binop_int(arg1, arg2,  libfive::Opcode::OP_MOD); }
+PyObject *python_lv_divide(PyObject *arg1, PyObject *arg2) { return python_lv_binop_int(arg1, arg2,  libfive::Opcode::OP_DIV); }
+PyObject *python_lv_negate(PyObject *arg) { return python_lv_unop_int(arg, libfive::Opcode::OP_NEG); }
 #else
 PyObject *python_lv_add(PyObject *arg1, PyObject *arg2) { return Py_None; }
 PyObject *python_lv_substract(PyObject *arg1, PyObject *arg2) { return Py_None; }
@@ -306,6 +316,32 @@ PyObject *python_lv_remainder(PyObject *arg1, PyObject *arg2) { return Py_None; 
 PyObject *python_lv_divide(PyObject *arg1, PyObject *arg2) { return  Py_None; }
 PyObject *python_lv_negate(PyObject *arg) { return  Py_None; }
 #endif
+
+extern PyTypeObject PyOpenSCADType;
+Value python_convertresult(PyObject *arg);
+
+PyObject *PyDataObject_call(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+//  printf("Call %d\n",PyTuple_Size(args));
+  AssignmentList pargs;
+  for(int i=0;i<PyTuple_Size(args);i++) {
+    Value val = python_convertresult(PyTuple_GetItem(args,i));	  
+    std::shared_ptr<Literal> lit = std::make_shared<Literal>(std::move(val), Location::NONE);
+    std::shared_ptr<Assignment> ass  = std::make_shared<Assignment>(std::string(""),lit);
+    pargs.push_back(ass);
+  }
+
+  boost::optional<InstantiableModule> mod =PyDataObjectToModule(self);
+  std::string instance_name; 
+  ModuleInstantiation *instance = new ModuleInstantiation(instance_name,pargs, Location::NONE);
+
+  EvaluationSession session{"."};
+  ContextHandle<BuiltinContext> c_handle{Context::create<BuiltinContext>(&session)};
+  std::shared_ptr<const BuiltinContext> cxt = *c_handle;
+
+  auto resultnode = mod->module->instantiate(cxt, instance, cxt);
+  return PyOpenSCADObjectFromNode(&PyOpenSCADType, resultnode);
+}
 
 PyNumberMethods PyDataNumbers =
 {
@@ -366,7 +402,7 @@ PyTypeObject PyDataType = {
     0,                         			/* tp_as_sequence */
     0,		        			/* tp_as_mapping */
     0,                         			/* tp_hash  */
-    0,                         			/* tp_call */
+    PyDataObject_call,         			/* tp_call */
     0,                         			/* tp_str */
     0,                         			/* tp_getattro */
     0,                         			/* tp_setattro */
