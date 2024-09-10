@@ -15,11 +15,8 @@
 
 typedef struct {
   PyObject_HEAD
-#ifdef ENABLE_LIBFIVE	  
   void *data;
   int data_type;  
-//  libfive::Tree *tree;
-#endif  
   /* Type-specific fields go here. */
 } PyDataObject;
 
