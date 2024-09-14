@@ -171,20 +171,8 @@ void GLView::paintGL()
   glLineWidth(2);
   glColor3d(1.0, 0.0, 0.0);
 
-  if (this->renderer) {
-#if defined(ENABLE_OPENCSG)
-    // FIXME: This belongs in the OpenCSG renderer, but it doesn't know about this ID yet
-    OpenCSG::setContext(this->opencsg_id);
-#endif
-    this->renderer->prepare(showfaces, showedges);
-    this->renderer->draw(showfaces, showedges);
-  }
-  Vector3d eyedir(this->modelview[2],this->modelview[6],this->modelview[10]);
-  glColor3f(1,0,0);
-  for (const SelectedObject &obj:this->selected_obj) {
-    showObject(obj,eyedir);
-  }
   glColor3f(0,1,0);
+  Vector3d eyedir(this->modelview[2],this->modelview[6],this->modelview[10]);
   if(shown_obj != nullptr)
     showObject(*shown_obj,eyedir);
 #ifdef ENABLE_PYTHON 
@@ -195,6 +183,24 @@ void GLView::paintGL()
     }
   }  
 #endif  
+
+  if (this->renderer) {
+#if defined(ENABLE_OPENCSG)
+    // FIXME: This belongs in the OpenCSG renderer, but it doesn't know about this ID yet
+    OpenCSG::setContext(this->opencsg_id);
+#endif
+    if(this->handle_mode) {
+      glEnable(GL_BLEND);
+      glBlendFunc(GL_DST_COLOR, GL_ONE_MINUS_DST_COLOR); 
+    }  
+    this->renderer->prepare(showfaces, showedges);
+    this->renderer->draw(showfaces, showedges);
+    if(this->handle_mode) glDisable(GL_BLEND);
+  }
+  glColor3f(1,0,0);
+  for (const SelectedObject &obj:this->selected_obj) {
+    showObject(obj,eyedir);
+  }
   glDisable(GL_LIGHTING);
   if (showaxes) GLView::showSmallaxes(axescolor);
 }
@@ -429,7 +435,8 @@ void GLView::showCrosshairs(const Color4f& col)
 
 void GLView::showObject(const SelectedObject &obj, const Vector3d &eyedir)
 {
-  auto vd = cam.zoomValue()/200.0;
+  auto dpi = this->getDPI();
+  auto vd = cam.zoomValue()/100.0;
   switch(obj.type) {
     case SelectionType::SELECTION_POINT:
     case SelectionType::SELECTION_HANDLE:
@@ -457,6 +464,21 @@ void GLView::showObject(const SelectedObject &obj, const Vector3d &eyedir)
 	}	
       }	
       glEnd();
+      if(obj.type != SelectionType::SELECTION_HANDLE) break;
+      glLineWidth(dpi);
+      glBegin(GL_LINES);
+      for(int i=0;i<3;i++) {
+        switch(i) {
+          case 0: glColor3d(1.0, 0.0, 0.0); break;
+          case 1: glColor3d(0.0, 1.0, 0.0); break;
+          case 2: glColor3d(0.0, 0.0, 1.0); break;
+        }
+        glVertex3d(obj.pt[0][0], obj.pt[0][1], obj.pt[0][2]); 
+        glVertex3d(obj.pt[0][0]+obj.pt[i+1][0]*5*dpi, obj.pt[0][1] + obj.pt[i+1][1]*5*dpi, obj.pt[0][2] + obj.pt[i+1][2]*5*dpi);
+      }
+      glEnd();
+
+
      }
      break;	
    case SelectionType::SELECTION_SEGMENT:

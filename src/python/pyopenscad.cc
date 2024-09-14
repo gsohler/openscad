@@ -230,6 +230,7 @@ void python_retrieve_pyname(const std::shared_ptr<AbstractNode> &node)
 
 int python_numberval(PyObject *number, double *result)
 {
+  if(number == nullptr) return 1;
   if(number == Py_False) return 1;
   if(number == Py_True) return 1;
   if(number == Py_None) return 1;

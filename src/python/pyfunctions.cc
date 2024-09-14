@@ -382,8 +382,10 @@ PyObject *python_sphere(PyObject *self, PyObject *args, PyObject *kwargs)
     PyErr_SetString(PyExc_TypeError, "Error during parsing sphere(r|d)");
     return NULL;
   } 
-  if(python_numberval(rp, &r))
-  if(rp->ob_type == &PyFunction_Type) node->r_func = rp;
+  if(rp != nullptr) {
+    if(python_numberval(rp, &r))
+    if(rp->ob_type == &PyFunction_Type) node->r_func = rp;
+  }
   if (!isnan(r)) {
     if(r <= 0) {
       PyErr_SetString(PyExc_TypeError, "Parameter r must be positive");
@@ -1536,6 +1538,9 @@ PyObject *python_output_core(PyObject *obj)
        const char *value_str =  PyBytes_AS_STRING(value1);
        sel.pt.clear();
        sel.pt.push_back(Vector3d(raw(0,3),raw(1,3),raw(2,3)));
+       sel.pt.push_back(Vector3d(raw(0,0),raw(1,0),raw(2,0)));
+       sel.pt.push_back(Vector3d(raw(0,1),raw(1,1),raw(2,1)));
+       sel.pt.push_back(Vector3d(raw(0,2),raw(1,2),raw(2,2)));
        sel.type=SelectionType::SELECTION_HANDLE;
        sel.name=varname+"."+value_str;
        python_result_handle.push_back(sel);
