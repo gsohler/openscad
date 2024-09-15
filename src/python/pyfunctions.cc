@@ -1863,9 +1863,9 @@ int python__setitem__(PyObject *dict, PyObject *key, PyObject *v)
 
 PyObject *python_color_core(PyObject *obj, char *colorname, double alpha, int textureind)
 {
-  PyObject *dummydict;
+  PyObject *child_dict;
   std::shared_ptr<AbstractNode> child;
-  child = PyOpenSCADObjectToNodeMulti(obj, &dummydict);
+  child = PyOpenSCADObjectToNodeMulti(obj, &child_dict);
   if (child == NULL) {
     PyErr_SetString(PyExc_TypeError, "Invalid type for Object in color");
     return NULL;
@@ -1909,7 +1909,17 @@ if(colorname != NULL) {
 	node->color[2]=0.5;
 }
   node->children.push_back(child);
-  return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
+
+  PyObject *pyresult = PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
+  if(child_dict != nullptr ) {
+    PyObject *key, *value;
+    Py_ssize_t pos = 0;
+     while(PyDict_Next(child_dict, &pos, &key, &value)) {
+       PyDict_SetItem(((PyOpenSCADObject *) pyresult)->dict, key, value);
+    }
+  }
+  return pyresult;
+
 }
 
 PyObject *python_color(PyObject *self, PyObject *args, PyObject *kwargs)
