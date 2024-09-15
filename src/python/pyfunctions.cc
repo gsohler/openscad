@@ -3631,7 +3631,7 @@ PyObject *do_import_python(PyObject *self, PyObject *args, PyObject *kwargs, Imp
 }
 
 PyObject *python_import(PyObject *self, PyObject *args, PyObject *kwargs) {
-  return do_import_python(self, args, kwargs, ImportType::STL);
+  return do_import_python(self, args, kwargs, ImportType::UNKNOWN);
 }
 
 PyObject *python_str(PyObject *self) {

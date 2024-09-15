@@ -64,7 +64,7 @@ public:
   bool python_active;
   std::string trusted_edit_document_name;
   std::string untrusted_edit_document_name;
-  bool trust_python_file(const std::string &file, const std::string &content);
+  bool trust_python_file(const std::string& file, const std::string& content);
 #endif
   Tree tree;
   EditorInterface *activeEditor;
@@ -105,6 +105,8 @@ public:
 private:
   volatile bool isClosing = false;
   void consoleOutputRaw(const QString& msg);
+  void clearAllSelectionIndicators();
+  void setSelectionIndicatorStatus(int nodeIndex, EditorSelectionIndicatorStatus status);
 
 protected:
   void closeEvent(QCloseEvent *event) override;
@@ -118,7 +120,8 @@ private slots:
   void showProgress();
   void openCSGSettingsChanged();
   void consoleOutput(const Message& msgObj);
-  void setCursor();
+  void setSelection(int index);
+  void onHoveredObjectInSelectionMenu();
   void measureFinished();
   void errorLogOutput(const Message& log_msg);
   void addMenuItemCB(QString function);
@@ -388,6 +391,7 @@ private:
   std::shared_ptr<CSGProducts> root_products;
   std::shared_ptr<CSGProducts> highlights_products;
   std::shared_ptr<CSGProducts> background_products;
+  int currently_selected_object {-1};
 
   char const *afterCompileSlot;
   bool procevents{false};
