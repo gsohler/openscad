@@ -60,11 +60,10 @@ void PrintInitDialog::on_octoPrintButton_clicked()
   this->okButton->setEnabled(true);
 }
 
-void PrintInitDialog::on_CuraButton_clicked()
+void PrintInitDialog::on_LocalSlicerButton_clicked()
 {
-  printf("CURA\n");	
-  this->textBrowser->setSource(QUrl{"qrc:/html/CuraInfo.html"});
-  this->result = print_service_t::CURA;
+  this->textBrowser->setSource(QUrl{"qrc:/html/LocalSlicerInfo.html"});
+  this->result = print_service_t::LOCALSLICER;
   this->okButton->setEnabled(true);
 }
 
