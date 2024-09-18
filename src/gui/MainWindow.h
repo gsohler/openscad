@@ -254,7 +254,7 @@ private slots:
   void csgReloadRender();
   void action3DPrint();
   void sendToOctoPrint();
-  void sendToCura();
+  void sendToLocalSlicer();
   void sendToPrintService();
   void actionRender();
   void actionRenderDone(const std::shared_ptr<const Geometry>&);
@@ -412,6 +412,7 @@ private:
   paperOrientations orientationsString2Enum(QString current);
 
   QSoundEffect *renderCompleteSoundEffect;
+  std::vector<std::shared_ptr<QTemporaryFile>> allTempFiles;
 
 signals:
   void highlightError(int);
