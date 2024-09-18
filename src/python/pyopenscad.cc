@@ -180,7 +180,7 @@ std::string python_hierdump(const std::shared_ptr<AbstractNode> &node)
   else if(children.size() < 2) dump += python_hierdump(children[0]);
   else {
    dump += "{ ";	  
-   for(int i=0;i<children.size();i++) dump += python_hierdump(children[i]);
+   for(unsigned int i=0;i<children.size();i++) dump += python_hierdump(children[i]);
    dump += " }";	  
   }
 
@@ -214,7 +214,7 @@ void python_retrieve_pyname(const std::shared_ptr<AbstractNode> &node)
   std::string name;	
   int level=-1;
   std::string my_code = python_hierdump(node);
-  for(int i=0;i<mapping_code.size();i++) {
+  for(unsigned int i=0;i<mapping_code.size();i++) {
     if(mapping_code[i] == my_code) {
       if(level == -1 || level > mapping_level[i]) {	    
         name=mapping_name[i];	    
@@ -230,6 +230,7 @@ void python_retrieve_pyname(const std::shared_ptr<AbstractNode> &node)
 
 int python_numberval(PyObject *number, double *result)
 {
+  if(number == nullptr) return 1;
   if(number == Py_False) return 1;
   if(number == Py_True) return 1;
   if(number == Py_None) return 1;
@@ -265,22 +266,22 @@ std::vector<int>  python_intlistval(PyObject *list)
  * Tries to extract an 3D vector out of a python list
  */
 
-int python_vectorval(PyObject *vec, double *x, double *y, double *z, double *w)
+int python_vectorval(PyObject *vec, int minval, int maxval, double *x, double *y, double *z, double *w)
 {
-  *x = 1.0;
-  *y = 1.0;
   if(w != NULL ) *w = 0;
   if (PyList_Check(vec)) {
+    if(PyList_Size(vec) < minval || PyList_Size(vec) > maxval) return 1;
+    	  
     if (PyList_Size(vec) >= 1) {
       if (python_numberval(PyList_GetItem(vec, 0), x)) return 1;
     }
     if (PyList_Size(vec) >= 2) {
       if (python_numberval(PyList_GetItem(vec, 1), y)) return 1;
     }
-    if (PyList_Check(vec) && PyList_Size(vec) >= 3) {
+    if (PyList_Size(vec) >= 3) {
       if (python_numberval(PyList_GetItem(vec, 2), z)) return 1;
     }
-    if (PyList_Check(vec) && PyList_Size(vec) >= 4 && w != NULL) {
+    if (PyList_Size(vec) >= 4 && w != NULL) {
       if (python_numberval(PyList_GetItem(vec, 3), w)) return 1;
     }
     return 0;
@@ -338,7 +339,7 @@ Outline2d python_getprofile(void *v_cbfunc, int fn, double arg)
 	PyObject* polygon = PyObject_CallObject(cbfunc, args);
         Py_XDECREF(args);
 	if(polygon == NULL) { // TODO fix
-		for(unsigned int i=0;i < fn;i++) {
+		for(unsigned int i=0;i < (unsigned int) fn;i++) {
 			double ang=360.0*(i/(double) fn);
 			PyObject* args = PyTuple_Pack(2,PyFloat_FromDouble(arg),PyFloat_FromDouble(ang));
 			Py_XINCREF(args);
@@ -419,13 +420,13 @@ PyObject *python_callfunction(const std::shared_ptr<const Context> &cxt , const 
   }
 
   PyObject *args = PyTuple_New(op_args.size());
-  for(int i=0;i<op_args.size();i++)
+  for(unsigned int i=0;i<op_args.size();i++)
   {
     Assignment *op_arg=op_args[i].get();
 
     std::shared_ptr<Expression> expr=op_arg->getExpr();
     Value val = expr.get()->evaluate(cxt);
-    PyObject *value=NULL;
+    PyObject *value=nullptr;
     switch(val.type())
     {
       case Value::Type::NUMBER:
@@ -441,7 +442,6 @@ PyObject *python_callfunction(const std::shared_ptr<const Context> &cxt , const 
     }
     if(value != nullptr) {
       PyTuple_SetItem(args, i, value);
-      Py_XDECREF(value);
     }
 
   }
@@ -512,6 +512,7 @@ Value python_convertresult(PyObject *arg)
     }
     return std::move(vec);
   } else if(PyFloat_Check(arg)) { return { PyFloat_AsDouble(arg) }; }
+  else if(PyLong_Check(arg))  { return { (double) PyLong_AsLong(arg) }; }
   else if(PyUnicode_Check(arg)) {
     PyObject* repr = PyObject_Repr(arg);
     PyObject* strobj = PyUnicode_AsEncodedString(repr, "utf-8", "~");
@@ -546,10 +547,8 @@ Value python_functionfunc(const FunctionCall *call,const std::shared_ptr<const C
   return res;
 }
 
-#ifdef ENABLE_LIBFIVE
-extern PyObject *PyInit_libfive(void);
-PyMODINIT_FUNC PyInit_PyLibFive(void);
-#endif
+extern PyObject *PyInit_data(void);
+PyMODINIT_FUNC PyInit_PyData(void);
 /*
  * Main python evaluation entry
  */
@@ -592,9 +591,7 @@ void initPython(double time)
     set_object_callback(openscad_object_callback);
 #endif
     PyImport_AppendInittab("openscad", &PyInit_openscad);
-#ifdef ENABLE_LIBFIVE	    
-    PyImport_AppendInittab("libfive", &PyInit_libfive);
-#endif	    
+    PyImport_AppendInittab("libfive", &PyInit_data);
     PyConfig config;
     PyConfig_InitPythonConfig(&config);
     char libdir[256];
@@ -618,9 +615,7 @@ void initPython(double time)
     Py_XINCREF(pythonInitDict);
     pythonRuntimeInitialized = pythonInitDict != nullptr;
     PyInit_PyOpenSCAD();
-#ifdef ENABLE_LIBFIVE	    
-    PyInit_PyLibFive();
-#endif	    
+    PyInit_PyData();
     PyRun_String("from builtins import *\n", Py_file_input, pythonInitDict, pythonInitDict);
     PyObject *key, *value;
     Py_ssize_t pos = 0;
@@ -701,9 +696,6 @@ sys.stderr = stderr_bak\n\
 #endif
     PyObject *result = PyRun_String(code.c_str(), Py_file_input, pythonInitDict, pythonInitDict); /* actual code is run here */
 
-    PyObject *key, *value;
-    Py_ssize_t pos = 0;
-    PyObject *pFunc;
 
     if(result  == nullptr) PyErr_Print();
     PyRun_SimpleString(python_exit_code);

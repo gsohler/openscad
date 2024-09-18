@@ -54,6 +54,8 @@
 #include "FontListDialog.h"
 #include "LibraryInfoDialog.h"
 #include "ScintillaEditor.h"
+#include "fileutils.h"
+#include "fstream"
 #ifdef ENABLE_OPENCSG
 #include "CSGTreeEvaluator.h"
 #include "OpenCSGRenderer.h"
@@ -105,6 +107,7 @@
 #include <QDockWidget>
 #include <QClipboard>
 #include <QToolTip>
+#include <QProcess>
 #include <memory>
 #include <string>
 #include "QWordSearchField.h"
@@ -137,7 +140,7 @@ std::string SHA256HashString(std::string aString){
     return digest_base64;
 }
 
-#endif
+#endif // ifdef ENABLE_PYTHON
 
 #define ENABLE_3D_PRINTING
 #include "OctoPrint.h"
@@ -283,9 +286,100 @@ void addExportActions(const MainWindow *mainWindow, QToolBar *toolbar, QAction *
 
 } // namespace
 
+void MainWindow::addMenuItemCB(QString callback)
+{
+  const char *cbstr = callback.toStdString().c_str();
+  std::string content = loadInitFile();
+  if(content.size() == 0) return;
+  initPython(0.0);
+  evaluatePython(content);
+  evaluatePython(cbstr);
+  finishPython();
+}
+
+void MainWindow::addMenuItem(const char * menuname, const char *itemname, const char *callback)
+{
+
+  // Find or create menu
+  QMenu *menu_found = nullptr;
+  foreach (QAction *menu, menubar->actions()) {
+        if (menu->menu()) {
+            const char *menutext = qUtf8Printable(menu->text());
+            if(strstr(menutext,menuname) != nullptr)
+		menu_found = (QMenu *) menu;
+        }
+    }
+
+  if(menu_found == nullptr) {
+  	menu_found = new QMenu(menubar);
+	menu_found->setObjectName(QString(menuname));
+	menu_found->setTitle(q_(menuname, nullptr));
+	menu_found->show();
+	menubar->addAction(menu_found->menuAction());
+//	menubar->addMenu(menu_found);
+  }
+
+  menu_found = menu_File;
+
+  // Create Menu Item
+  QAction *my_menu_item = new QAction(this);
+  my_menu_item->setObjectName(itemname);
+  my_menu_item->setText(q_(itemname, nullptr));
+  connect(my_menu_item, SIGNAL(triggered()), addmenu_mapper, SLOT(map()));
+  addmenu_mapper->setMapping(my_menu_item, callback);
+  menu_found->addAction(my_menu_item);
+
+//  menubar->show();
+}
+#ifdef ENABLE_PYTHON
+
+MainWindow *addmenuitem_this = nullptr;
+void  add_menuitem_trampoline(const char *menuname, const char *itemname, const char *callback)
+{
+  if(addmenuitem_this == nullptr) return;	
+  addmenuitem_this->addMenuItem(menuname, itemname, callback);
+}
+
+std::string MainWindow::loadInitFile(void) {
+  std::string path = lookup_file(".pythonscadrc", ".","");
+  if(path.size() == 0) return "";
+  std::ifstream fh(path);
+
+  // confirm file opening
+  if (!fh.is_open()) return "";
+  std::string line, content;
+  while (getline(fh, line)) {
+    content += line;
+    content += "\n";
+  }
+  return content;
+}
+
+void MainWindow::customSetup(void)
+{
+  // check if .pythonscadrc is available and readable
+  //
+  std::string content = loadInitFile();
+  if(content == "") return;
+
+  this->addmenu_mapper = new QSignalMapper(this);
+  connect (this->addmenu_mapper, SIGNAL(mapped(QString)), this, SLOT(addMenuItemCB(QString))) ;
+  initPython(0.0);
+  evaluatePython(content);
+  addmenuitem_this = this;
+  evaluatePython("setup()");
+  addmenuitem_this = nullptr;
+  finishPython();
+}
+
+#endif
+
 MainWindow::MainWindow(const QStringList& filenames)
 {
   setupUi(this);
+#ifdef ENABLE_PYTHON  
+  customSetup();
+#endif  
 
   consoleUpdater = new QTimer(this);
   consoleUpdater->setSingleShot(true);
@@ -1412,6 +1506,7 @@ void MainWindow::compileCSGDone()
     } else {
       this->highlights_products.reset();
     }
+
     const auto& background_terms = this->csgrenderer->getBackgroundNodes();
     if (background_terms.size() > 0) {
       LOG("Compiling background (%1$d CSG Trees)...", background_terms.size());
@@ -1445,10 +1540,10 @@ void MainWindow::compileCSGDone()
 #else
       this->opencsgRenderer = std::make_shared<OpenCSGRenderer>(this->root_products,
                                                                 this->highlights_products,
-                                                						    this->background_products);
+                                                                this->background_products);
 #endif
     }
-#endif
+#endif // ifdef ENABLE_OPENCSG
 #ifdef USE_LEGACY_RENDERERS
     this->thrownTogetherRenderer = std::make_shared<LegacyThrownTogetherRenderer>(this->root_products,
                                                                                   this->highlights_products,
@@ -1616,10 +1711,10 @@ void MainWindow::actionSaveAs()
 void MainWindow::actionRevokeTrustedFiles()
 {
   QSettingsCached settings;
-#ifdef ENABLE_PYTHON  
+#ifdef ENABLE_PYTHON
   python_trusted = false;
-  this->trusted_edit_document_name="";
-#endif  
+  this->trusted_edit_document_name = "";
+#endif
   settings.remove("python_hash");
   QMessageBox::information(this, _("Trusted Files"), "All trusted python files revoked", QMessageBox::Ok);
 
@@ -1893,24 +1988,24 @@ bool MainWindow::fileChangedOnDisk()
  */
 
 #ifdef ENABLE_PYTHON
-bool MainWindow::trust_python_file(const std::string &file,  const std::string &content) {
+bool MainWindow::trust_python_file(const std::string& file,  const std::string& content) {
   QSettingsCached settings;
   char setting_key[256];
-  if(python_trusted) return true;
+  if (python_trusted) return true;
 
   std::string act_hash, ref_hash;
-  snprintf(setting_key,sizeof(setting_key)-1,"python_hash/%s",file.c_str());
+  snprintf(setting_key, sizeof(setting_key) - 1, "python_hash/%s", file.c_str());
   act_hash = SHA256HashString(content);
 
-  if(file == this->untrusted_edit_document_name) return false;
-  
-  if(file == this->trusted_edit_document_name) {
-    settings.setValue(setting_key,act_hash.c_str());
+  if (file == this->untrusted_edit_document_name) return false;
+
+  if (file == this->trusted_edit_document_name) {
+    settings.setValue(setting_key, act_hash.c_str());
     return true;
   }
 
-  if(content.size() <= 1) { // 1st character already typed
-    this->trusted_edit_document_name=file;
+  if (content.size() <= 1) { // 1st character already typed
+    this->trusted_edit_document_name = file;
     return true;
   }
   if(content == "from openscad import *\n") { // 1st character already typed
@@ -1918,32 +2013,32 @@ bool MainWindow::trust_python_file(const std::string &file,  const std::string &
     return true;
   }
 
-  if(settings.contains(setting_key)) {
-    QString str=settings.value(setting_key).toString();
+  if (settings.contains(setting_key)) {
+    QString str = settings.value(setting_key).toString();
     QByteArray ba = str.toLocal8Bit();
     ref_hash = std::string(ba.data());
   }
- 
-  if(act_hash == ref_hash) {
-	  this->trusted_edit_document_name=file;
-	  return true;
+
+  if (act_hash == ref_hash) {
+    this->trusted_edit_document_name = file;
+    return true;
   }
 
   auto ret = QMessageBox::warning(this, "Application",
-    _( "Python files can potentially contain harmful stuff.\n"
-    "Do you trust this file ?\n"), QMessageBox::Yes  | QMessageBox::YesAll | QMessageBox::No);
-  if (ret == QMessageBox::YesAll)  {
+                                  _("Python files can potentially contain harmful stuff.\n"
+                                    "Do you trust this file ?\n"), QMessageBox::Yes | QMessageBox::YesAll | QMessageBox::No);
+  if (ret == QMessageBox::YesAll) {
     python_trusted = true;
     return true;
   }
-  if (ret == QMessageBox::Yes)  {
-    this->trusted_edit_document_name=file;
-    settings.setValue(setting_key,act_hash.c_str());
+  if (ret == QMessageBox::Yes) {
+    this->trusted_edit_document_name = file;
+    settings.setValue(setting_key, act_hash.c_str());
     return true;
   }
 
   if (ret == QMessageBox::No) {
-    this->untrusted_edit_document_name=file;
+    this->untrusted_edit_document_name = file;
     return false;
   }
   return false;
@@ -1961,9 +2056,7 @@ void MainWindow::recomputePythonActive()
   if (fname != NULL) {
     if(boost::algorithm::ends_with(fname, ".py")) {
 	    std::string content = std::string(this->last_compiled_doc.toUtf8().constData());
-      if (
-        Feature::ExperimentalPythonEngine.is_enabled() 
-		&& trust_python_file(std::string(fname), content)) this->python_active = true;
+      if ( trust_python_file(std::string(fname), content)) this->python_active = true;
       else LOG(message_group::Warning, Location::NONE, "", "Python is not enabled");
     }
   }
@@ -2193,6 +2286,9 @@ void MainWindow::action3DPrint()
     LOG("Sending design to OctoPrint...");
     sendToOctoPrint();
     break;
+  case print_service_t::LOCALSLICER:
+    sendToLocalSlicer();
+    break;    
   default:
     break;
   }
@@ -2283,6 +2379,55 @@ void MainWindow::sendToOctoPrint()
   }
 
   updateStatusBar(nullptr);
+#endif // ifdef ENABLE_3D_PRINTING
+}
+
+void MainWindow::sendToLocalSlicer(void)
+{
+#ifdef ENABLE_3D_PRINTING
+  const QString slicer = QString::fromStdString(Settings::Settings::localSlicerExecutable.value());
+
+ const QString fileFormat = QString::fromStdString(Settings::Settings::octoPrintFileFormat.value());
+  FileFormat exportFileFormat{FileFormat::STL};
+  if (fileFormat == "OBJ") {
+    exportFileFormat = FileFormat::OBJ;
+  } else if (fileFormat == "OFF") {
+    exportFileFormat = FileFormat::OFF;
+  } else if (fileFormat == "ASCIISTL") {
+    exportFileFormat = FileFormat::ASCIISTL;
+  } else if (fileFormat == "AMF") {
+    exportFileFormat = FileFormat::AMF;
+  } else if (fileFormat == "3MF") {
+    exportFileFormat = FileFormat::_3MF;
+  } else {
+    exportFileFormat = FileFormat::STL;
+  }
+
+  std::shared_ptr<QTemporaryFile> exportFile = std::shared_ptr<QTemporaryFile>(new QTemporaryFile({QDir::temp().filePath("OpenSCAD.XXXXXX."+fileFormat.toLower())}));
+  exportFile->setAutoRemove(false);
+  if (!exportFile->open()) {
+    LOG("Could not open temporary file.");
+    return;
+  }
+  const QString exportFileName = exportFile->fileName();
+  exportFile->close();
+
+  QString userFileName;
+  if (activeEditor->filepath.isEmpty()) {
+    userFileName = exportFileName;
+  } else {
+    QFileInfo fileInfo{activeEditor->filepath};
+    userFileName = fileInfo.baseName() + fileFormat.toLower();
+  }
+
+  ExportInfo exportInfo = createExportInfo(exportFileFormat, exportFileName, activeEditor->filepath);
+  exportFileByName(this->root_geom, exportInfo);
+
+  QProcess process(this);
+  if(!process.startDetached(slicer, {exportFileName})) {
+    LOG(message_group::Error, "Could not start Slicer.  Is it installed?");
+  }
+  this->allTempFiles.push_back(exportFile);				   
 #endif // ifdef ENABLE_3D_PRINTING
 }
 
@@ -2438,7 +2583,7 @@ void MainWindow::actionFindHandle()
   qglview->handle_mode=true;
 }
 
-void MainWindow::leftClick(QPoint mouse) 
+void MainWindow::leftClick(QPoint mouse)
 {
   QString str = meas.statemachine(mouse);
   if(!str.isEmpty()) {
@@ -2504,22 +2649,31 @@ void MainWindow::rightClick(QPoint mouse)
       auto location = step->modinst->location();
       ss.str("");
 
+      // Remove the "module" prefix if any as it induce confusion between the module declaration and instanciation
+      int first_position = (step->verbose_name().find("module") == std::string::npos)? 0 : 7;
+      std::string name = step->verbose_name().substr(first_position);
+
+      // It happens that the verbose_name is empty (eg: in for loops), when this happens instead of letting
+      // empty entry in the menu we prefer using the name in the modinstanciation.
+      if (step->verbose_name().empty()) name = step->modinst->name();
+
       // Check if the path is contained in a library (using parsersettings.h)
       fs::path libpath;
       if(!location.filePath().empty()) libpath = get_library_for_path(location.filePath());
       if (!libpath.empty()) {
         // Display the library (without making the window too wide!)
-        ss << step->verbose_name() << " (library "
+        ss << name << " (library "
            << location.fileName().substr(libpath.string().length() + 1) << ":"
            << location.firstLine() << ")";
       } else if (activeEditor->filepath.toStdString() == location.fileName()) {
-        ss << step->verbose_name() << " (" << location.filePath().filename().string() << ":"
+        // removes the "module" prefix if any as it makes it not clear if it is module declaration or call.
+        ss << name << " (" << location.filePath().filename().string() << ":"
            << location.firstLine() << ")";
       } else {
-        auto relname = boostfs_uncomplete(location.filePath(), fs::path(activeEditor->filepath.toStdString()).parent_path())
+        auto relative_filename = boostfs_uncomplete(location.filePath(), fs::path(activeEditor->filepath.toStdString()).parent_path())
           .generic_string();
         // Set the displayed name relative to the active editor window
-        ss << step->verbose_name() << " (" << relname << ":" << location.firstLine() << ")";
+        ss << name << " (" << relative_filename << ":" << location.firstLine() << ")";
       }
 
       // Prepare the action to be sent
@@ -2534,6 +2688,8 @@ void MainWindow::rightClick(QPoint mouse)
     }
 
     tracemenu.exec(this->qglview->mapToGlobal(mouse));
+  } else {
+    clearAllSelectionIndicators();
   }
 }
 void MainWindow::measureFinished(void)
@@ -2545,29 +2701,161 @@ void MainWindow::measureFinished(void)
   this->qglview->handle_mode=false;
 }
 
-/**
- * Expects the sender to have properties "file", "line" and "column" defined
- */
-void MainWindow::setCursor()
+void MainWindow::clearAllSelectionIndicators()
 {
-  auto *action = qobject_cast<QAction *>(sender());
-  if (!action || !action->property("file").isValid() || !action->property("line").isValid() ||
-      !action->property("column").isValid()) {
-    return;
+  this->activeEditor->clearAllSelectionIndicators();
+}
+
+void findNodesWithSameMod(std::shared_ptr<const AbstractNode> tree,
+                          std::shared_ptr<const AbstractNode> node_mod,
+                          std::vector<std::shared_ptr<const AbstractNode>>& nodes){
+  if (node_mod->modinst == tree->modinst) {
+    nodes.push_back(tree);
+  }
+  for (auto step : tree->children) {
+    findNodesWithSameMod(step, node_mod, nodes);
+  }
+}
+
+void getCodeLocation(const AbstractNode *self, int currentLevel,  int includeLevel, int *firstLine, int *firstColumn, int *lastLine, int *lastColumn, int nestedModuleDepth)
+{
+  auto location = self->modinst->location();
+  if (currentLevel >= includeLevel && nestedModuleDepth == 0) {
+    if (*firstLine < 0 || *firstLine > location.firstLine()) {
+      *firstLine = location.firstLine();
+      *firstColumn = location.firstColumn();
+    } else if (*firstLine == location.firstLine() && *firstColumn > location.firstColumn())   {
+      *firstColumn = location.firstColumn();
+    }
+
+    if (*lastLine < 0 || *lastLine < location.lastLine()) {
+      *lastLine = location.lastLine();
+      *lastColumn = location.lastColumn();
+    } else {
+      if (*firstLine < 0 || *firstLine > location.firstLine()) {
+        *firstLine = location.firstLine();
+        *firstColumn = location.firstColumn();
+      } else if (*firstLine == location.firstLine() && *firstColumn > location.firstColumn())   {
+        *firstColumn = location.firstColumn();
+      }
+      if (*lastLine < 0 || *lastLine < location.lastLine()) {
+        *lastLine = location.lastLine();
+        *lastColumn = location.lastColumn();
+      } else if (*lastLine == location.lastLine() && *lastColumn < location.lastColumn())   {
+        *lastColumn = location.lastColumn();
+      }
+    }
   }
 
-  auto file = action->property("file").toString();
-  auto line = action->property("line").toInt();
-  auto column = action->property("column").toInt();
+  if (self->verbose_name().rfind("module", 0) == 0) {
+    nestedModuleDepth++;
+  }
+  if (self->modinst->name() == "children") {
+    nestedModuleDepth--;
+  }
+
+  if (nestedModuleDepth >= 0) {
+    for (const auto& node : self->children) {
+      getCodeLocation(node.get(), currentLevel + 1, includeLevel, firstLine,  firstColumn, lastLine, lastColumn, nestedModuleDepth);
+    }
+  }
+}
+
+void MainWindow::setSelectionIndicatorStatus(int nodeIndex, EditorSelectionIndicatorStatus status)
+{
+  std::deque<std::shared_ptr<const AbstractNode>> stack;
+  this->root_node->getNodeByID(nodeIndex, stack);
+
+  int level = 1;
+
+  // first we flags all the nodes in the stack of the provided index
+  // ends at size - 1 because we are not doing anything for the root node.
+  // starts at 1 because we will process this one after later
+  for (int i = 1; i < stack.size() - 1; i++) {
+    auto node = stack[i];
+
+    auto& location = node->modinst->location();
+    if (location.filePath().compare(activeEditor->filepath.toStdString()) != 0) {
+      std::cout << "--->>> Line of code in a different file -- PATH -- " << location.fileName() << std::endl;
+      node->modinst->print(std::cout, "");
+      level++;
+      continue;
+    }
+
+    if (node->verbose_name().rfind("module", 0) == 0 || node->modinst->name() == "children") {
+      this->activeEditor->setSelectionIndicatorStatus(
+        status, level,
+        location.firstLine() - 1, location.firstColumn() - 1, location.lastLine() - 1, location.lastColumn() - 1);
+      level++;
+    }
+  }
+
+  auto& node = stack[0];
+  auto location = node->modinst->location();
+  auto line = location.firstLine();
+  auto column = location.firstColumn();
+  auto lastLine = location.lastLine();
+  auto lastColumn = location.lastColumn();
+
+  // Update the location returned by location to cover the whole section.
+  getCodeLocation(node.get(), 0, 0, &line, &column, &lastLine, &lastColumn, 0);
+
+  this->activeEditor->setSelectionIndicatorStatus(status, 0, line - 1, column - 1, lastLine - 1, lastColumn - 1);
+}
+
+void MainWindow::setSelection(int index)
+{
+  if (currently_selected_object == index) return;
+
+  std::deque<std::shared_ptr<const AbstractNode>> path;
+  std::shared_ptr<const AbstractNode> selected_node = root_node->getNodeByID(index, path);
+
+  if (!selected_node) return;
+
+  currently_selected_object = index;
+
+  auto location = selected_node->modinst->location();
+  auto file = location.fileName();
+  auto line = location.firstLine();
+  auto column = location.firstColumn();
 
   // Unsaved files do have the pwd as current path, therefore we will not open a new
   // tab on click
-  if (!fs::is_directory(fs::path(file.toStdString()))) {
-    this->tabManager->open(file);
+  if (!fs::is_directory(fs::path(file))) {
+    tabManager->open(QString::fromStdString(file));
   }
 
-  // move the cursor, the editor is 0 based whereby location is 1 based
-  this->activeEditor->setCursorPosition(line - 1, column - 1);
+  // removes all previsly configure selection indicators.
+  clearAllSelectionIndicators();
+
+  std::vector<std::shared_ptr<const AbstractNode>> nodesSameModule{};
+  findNodesWithSameMod(root_node, selected_node, nodesSameModule);
+
+  // highlight in the text editor all the text fragment of the hierarchy of object with same mode.
+  for (auto element : nodesSameModule) {
+    if (element->index() != currently_selected_object) {
+      setSelectionIndicatorStatus(element->index(), EditorSelectionIndicatorStatus::IMPACTED);
+    }
+  }
+
+  // highlight in the text editor only the fragment correponding to the selected stack.
+  // this step must be done after all the impacted element have been marked.
+  setSelectionIndicatorStatus(currently_selected_object, EditorSelectionIndicatorStatus::SELECTED);
+
+  activeEditor->setCursorPosition(line - 1, column - 1);
+}
+
+/**
+ * Expects the sender to have properties "id" defined
+ */
+void MainWindow::onHoveredObjectInSelectionMenu()
+{
+  auto *action = qobject_cast<QAction *>(sender());
+  if (!action || !action->property("id").isValid()) {
+    return;
+  }
+
+  setSelection(action->property("id").toInt());
 }
 
 void MainWindow::setLastFocus(QWidget *widget) {
@@ -2964,9 +3252,9 @@ bool MainWindow::canExport(unsigned int dim)
 }
 
 void MainWindow::actionExport(FileFormat format, const char *type_name, const char *suffix, unsigned int dim){
-  ExportPdfOptions* empty = nullptr;
+  ExportPdfOptions *empty = nullptr;
   actionExport(format, type_name, suffix, dim, empty);
-};
+}
 
 void MainWindow::actionExport(FileFormat format, const char *type_name, const char *suffix, unsigned int dim, ExportPdfOptions *options)
 {
@@ -2978,7 +3266,7 @@ void MainWindow::actionExport(FileFormat format, const char *type_name, const ch
 
   //Return if something is wrong and we can't export.
   if (!canExport(dim)) return;
-  
+
   auto title = QString(_("Export %1 File")).arg(type_name);
   auto filter = QString(_("%1 Files (*%2)")).arg(type_name, suffix);
   auto exportFilename = QFileDialog::getSaveFileName(this, title, exportPath(suffix), filter);
@@ -2990,8 +3278,8 @@ void MainWindow::actionExport(FileFormat format, const char *type_name, const ch
 
   ExportInfo exportInfo = createExportInfo(format, exportFilename, activeEditor->filepath);
   // Add options
-exportInfo.options=options;
-  
+  exportInfo.options = options;
+
   bool exportResult = exportFileByName(this->root_geom, exportInfo);
 
   if (exportResult) fileExportedMessage(type_name, exportFilename);
@@ -3050,44 +3338,44 @@ void MainWindow::actionExportSVG()
 void MainWindow::actionExportPDF()
 {
 
-ExportPdfOptions exportPdfOptions;
-QSettingsCached settings;
+  ExportPdfOptions exportPdfOptions;
+  QSettingsCached settings;
 
 // Prepopulated with default values in export.h
-auto exportPdfDialog = new ExportPdfDialog();
+  auto exportPdfDialog = new ExportPdfDialog();
 
 // Get current settings or defaults
 //  modify the two enums (next two rows) to explicitly use default by lookup to string (see the later set methods).
-exportPdfDialog->setPaperSize(sizeString2Enum(settings.value("exportPdfOpts/paperSize",
-	QString::fromStdString(paperSizeStrings[static_cast<int>(exportPdfOptions.paperSize)])).toString()));  // enum map
-exportPdfDialog->setOrientation(orientationsString2Enum(settings.value("exportPdfOpts/orientation",
-	QString::fromStdString(paperOrientationsStrings[static_cast<int>(exportPdfOptions.Orientation)])).toString()));  // enum map
-exportPdfDialog->setShowDsnFn(settings.value("exportPdfOpts/showDsgnFN",exportPdfOptions.showDsgnFN).toBool());
-exportPdfDialog->setShowScale(settings.value("exportPdfOpts/showScale",exportPdfOptions.showScale).toBool());
-exportPdfDialog->setShowScaleMsg(settings.value("exportPdfOpts/showScaleMsg",exportPdfOptions.showScaleMsg).toBool());
-exportPdfDialog->setShowGrid(settings.value("exportPdfOpts/showGrid",exportPdfOptions.showGrid).toBool());
-exportPdfDialog->setGridSize(settings.value("exportPdfOpts/gridSize",exportPdfOptions.gridSize).toDouble());
+  exportPdfDialog->setPaperSize(sizeString2Enum(settings.value("exportPdfOpts/paperSize",
+                                                               QString::fromStdString(paperSizeStrings[static_cast<int>(exportPdfOptions.paperSize)])).toString())); // enum map
+  exportPdfDialog->setOrientation(orientationsString2Enum(settings.value("exportPdfOpts/orientation",
+                                                                         QString::fromStdString(paperOrientationsStrings[static_cast<int>(exportPdfOptions.Orientation)])).toString())); // enum map
+  exportPdfDialog->setShowDsnFn(settings.value("exportPdfOpts/showDsgnFN", exportPdfOptions.showDsgnFN).toBool());
+  exportPdfDialog->setShowScale(settings.value("exportPdfOpts/showScale", exportPdfOptions.showScale).toBool());
+  exportPdfDialog->setShowScaleMsg(settings.value("exportPdfOpts/showScaleMsg", exportPdfOptions.showScaleMsg).toBool());
+  exportPdfDialog->setShowGrid(settings.value("exportPdfOpts/showGrid", exportPdfOptions.showGrid).toBool());
+  exportPdfDialog->setGridSize(settings.value("exportPdfOpts/gridSize", exportPdfOptions.gridSize).toDouble());
 
 
-if (exportPdfDialog->exec() == QDialog::Rejected) {
-  return;
-}; 
+  if (exportPdfDialog->exec() == QDialog::Rejected) {
+    return;
+  }
 
-exportPdfOptions.paperSize=exportPdfDialog->getPaperSize();
-exportPdfOptions.Orientation=exportPdfDialog->getOrientation();
-exportPdfOptions.showDsgnFN=exportPdfDialog->getShowDsnFn();
-exportPdfOptions.showScale=exportPdfDialog->getShowScale();
-exportPdfOptions.showScaleMsg=exportPdfDialog->getShowScaleMsg();
-exportPdfOptions.showGrid=exportPdfDialog->getShowGrid();
-exportPdfOptions.gridSize=exportPdfDialog->getGridSize();
+  exportPdfOptions.paperSize = exportPdfDialog->getPaperSize();
+  exportPdfOptions.Orientation = exportPdfDialog->getOrientation();
+  exportPdfOptions.showDsgnFN = exportPdfDialog->getShowDsnFn();
+  exportPdfOptions.showScale = exportPdfDialog->getShowScale();
+  exportPdfOptions.showScaleMsg = exportPdfDialog->getShowScaleMsg();
+  exportPdfOptions.showGrid = exportPdfDialog->getShowGrid();
+  exportPdfOptions.gridSize = exportPdfDialog->getGridSize();
 
-settings.setValue("exportPdfOpts/paperSize",QString::fromStdString(paperSizeStrings[static_cast<int>( exportPdfDialog->getPaperSize())]));
-settings.setValue("exportPdfOpts/orientation",QString::fromStdString(paperOrientationsStrings[static_cast<int>(exportPdfDialog->getOrientation())]));
-settings.setValue("exportPdfOpts/showDsgnFN",exportPdfDialog->getShowDsnFn());
-settings.setValue("exportPdfOpts/showScale",exportPdfDialog->getShowScale());
-settings.setValue("exportPdfOpts/showScaleMsg",exportPdfDialog->getShowScaleMsg());
-settings.setValue("exportPdfOpts/showGrid",exportPdfDialog->getShowGrid());
-settings.setValue("exportPdfOpts/gridSize",exportPdfDialog->getGridSize());
+  settings.setValue("exportPdfOpts/paperSize", QString::fromStdString(paperSizeStrings[static_cast<int>(exportPdfDialog->getPaperSize())]));
+  settings.setValue("exportPdfOpts/orientation", QString::fromStdString(paperOrientationsStrings[static_cast<int>(exportPdfDialog->getOrientation())]));
+  settings.setValue("exportPdfOpts/showDsgnFN", exportPdfDialog->getShowDsnFn());
+  settings.setValue("exportPdfOpts/showScale", exportPdfDialog->getShowScale());
+  settings.setValue("exportPdfOpts/showScaleMsg", exportPdfDialog->getShowScaleMsg());
+  settings.setValue("exportPdfOpts/showGrid", exportPdfDialog->getShowGrid());
+  settings.setValue("exportPdfOpts/gridSize", exportPdfDialog->getGridSize());
 
 actionExport(FileFormat::PDF, "PDF", ".pdf", 0, &exportPdfOptions);
 
@@ -3275,6 +3563,9 @@ void MainWindow::editorContentChanged()
   auto current_doc = activeEditor->toPlainText();
   if (current_doc != last_compiled_doc) {
     animateWidget->editorContentChanged();
+
+    // removes the live selection feedbacks in both the 3d view and editor.
+    clearAllSelectionIndicators();
   }
 }
 
@@ -3865,6 +4156,9 @@ void MainWindow::quit()
 #ifdef Q_OS_MACOS
   CocoaUtils::endApplication();
 #endif
+  for(auto &temp: this->allTempFiles) {
+    temp->setAutoRemove(true);
+  }
 }
 
 void MainWindow::consoleOutput(const Message& msgObj, void *userdata)
@@ -3959,16 +4253,16 @@ void MainWindow::jumpToLine(int line, int col)
 }
 
 paperSizes MainWindow::sizeString2Enum(QString current){
-   for(size_t i = 0; i < paperSizeStrings.size(); i++){
-       if (current.toStdString()==paperSizeStrings[i]) return static_cast<paperSizes>(i);
-   };
-   return paperSizes::A4;
-};
+  for (size_t i = 0; i < paperSizeStrings.size(); i++) {
+    if (current.toStdString() == paperSizeStrings[i]) return static_cast<paperSizes>(i);
+  }
+  return paperSizes::A4;
+}
 
 paperOrientations MainWindow::orientationsString2Enum(QString current){
-   for(size_t i = 0; i < paperOrientationsStrings.size(); i++){
-       if (current.toStdString()==paperOrientationsStrings[i]) return static_cast<paperOrientations>(i);
-   };
-   return paperOrientations::PORTRAIT;
-};
+  for (size_t i = 0; i < paperOrientationsStrings.size(); i++) {
+    if (current.toStdString() == paperOrientationsStrings[i]) return static_cast<paperOrientations>(i);
+  }
+  return paperOrientations::PORTRAIT;
+}
 

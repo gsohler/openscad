@@ -22,6 +22,7 @@
 #include <QMutex>
 #include <QSoundEffect>
 #include <QTime>
+#include <QSignalMapper>
 
 #ifdef STATIC_QT_SVG_PLUGIN
 #include <QtPlugin>
@@ -63,7 +64,7 @@ public:
   bool python_active;
   std::string trusted_edit_document_name;
   std::string untrusted_edit_document_name;
-  bool trust_python_file(const std::string &file, const std::string &content);
+  bool trust_python_file(const std::string& file, const std::string& content);
 #endif
   Tree tree;
   EditorInterface *activeEditor;
@@ -96,11 +97,16 @@ public:
   int compileWarnings;
 
   MainWindow(const QStringList& filenames);
+  std::string loadInitFile(void);
+  void customSetup(void);
+  void addMenuItem(const char *menuname, const char *itemname, const char *callback);
   ~MainWindow() override;
 
 private:
   volatile bool isClosing = false;
   void consoleOutputRaw(const QString& msg);
+  void clearAllSelectionIndicators();
+  void setSelectionIndicatorStatus(int nodeIndex, EditorSelectionIndicatorStatus status);
 
 protected:
   void closeEvent(QCloseEvent *event) override;
@@ -114,9 +120,11 @@ private slots:
   void showProgress();
   void openCSGSettingsChanged();
   void consoleOutput(const Message& msgObj);
-  void setCursor();
+  void setSelection(int index);
+  void onHoveredObjectInSelectionMenu();
   void measureFinished();
   void errorLogOutput(const Message& log_msg);
+  void addMenuItemCB(QString function);
 
 public:
   static void consoleOutput(const Message& msgObj, void *userdata);
@@ -246,6 +254,7 @@ private slots:
   void csgReloadRender();
   void action3DPrint();
   void sendToOctoPrint();
+  void sendToLocalSlicer();
   void sendToPrintService();
   void actionRender();
   void actionRenderDone(const std::shared_ptr<const Geometry>&);
@@ -303,6 +312,7 @@ public:
 
   QList<double> getTranslation() const;
   QList<double> getRotation() const;
+  QSignalMapper *addmenu_mapper;
 
 public slots:
   void actionReloadRenderPreview();
@@ -382,6 +392,7 @@ private:
   std::shared_ptr<CSGProducts> root_products;
   std::shared_ptr<CSGProducts> highlights_products;
   std::shared_ptr<CSGProducts> background_products;
+  int currently_selected_object {-1};
 
   char const *afterCompileSlot;
   bool procevents{false};
@@ -401,6 +412,7 @@ private:
   paperOrientations orientationsString2Enum(QString current);
 
   QSoundEffect *renderCompleteSoundEffect;
+  std::vector<std::shared_ptr<QTemporaryFile>> allTempFiles;
 
 signals:
   void highlightError(int);
