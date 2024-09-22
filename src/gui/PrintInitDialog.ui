@@ -99,20 +99,7 @@
         </property>
        </widget>
       </item>
-      <item>
-       <widget class="QPushButton" name="LocalSlicerButton">
-        <property name="text">
-         <string>Send to local Slicer</string>
-        </property>
-        <property name="checkable">
-         <bool>true</bool>
-        </property>
-        <property name="autoExclusive">
-         <bool>true</bool>
-        </property>
-       </widget>
-      </item>
-      <item>
+      <item row="0" column="3">
        <spacer name="horizontalSpacer">
         <property name="orientation">
          <enum>Qt::Horizontal</enum>
