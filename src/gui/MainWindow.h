@@ -419,7 +419,7 @@ private:
   paperOrientations orientationsString2Enum(const QString& current);
 
   QSoundEffect *renderCompleteSoundEffect;
-  std::vector<std::shared_ptr<QTemporaryFile>> allTempFiles;
+  std::vector<std::unique_ptr<QTemporaryFile>> allTempFiles;
 
 signals:
   void highlightError(int);

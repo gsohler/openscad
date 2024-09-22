@@ -117,7 +117,7 @@ SettingsEntryBool Settings::enableLineNumbers("editor", "enableLineNumbers", tru
 SettingsEntryBool Settings::enableNumberScrollWheel("editor", "enableNumberScrollWheel", true);
 SettingsEntryEnum Settings::modifierNumberScrollWheel("editor", "modifierNumberScrollWheel", {{"Alt", _("Alt")}, {"Left Mouse Button", _("Left Mouse Button")}, {"Either", _("Either")}}, "Alt");
 
-
+SettingsEntryEnum Settings::defaultPrintService("printing", "printService", {{"NONE", _("NONE")}, {"PRINT_SERVICE", _("External Print Service")}, {"OCTOPRINT", _("OctoPrint")}, {"LOCALSLICER", _("Local Slicer")}}, "NONE");
 SettingsEntryString Settings::octoPrintUrl("printing", "octoPrintUrl", "");
 SettingsEntryString Settings::octoPrintApiKey("printing", "octoPrintApiKey", "");
 SettingsEntryEnum Settings::octoPrintFileFormat("printing", "octoPrintFileFormat", {{"STL", "STL"}, {"OFF", "OFF"}, {"AMF", "AMF"}, {"3MF", "3MF"}}, "STL");
@@ -128,6 +128,8 @@ SettingsEntryString Settings::octoPrintSlicerProfile("printing", "octoPrintSlice
 SettingsEntryString Settings::octoPrintSlicerProfileDesc("printing", "octoPrintSlicerProfileDesc", "");
 
 SettingsEntryString Settings::localSlicerExecutable("printing", "localSlicerExecutable", "");
+SettingsEntryEnum Settings::localSlicerFileFormat("printing", "localSlicerFileFormat", {{"STL", "STL"}, {"OFF", "OFF"}, {"AMF", "AMF"}, {"3MF", "3MF"}}, "STL");
+
 SettingsEntryBool Settings::exportUseAsciiSTL("export", "useAsciiSTL", false);
 SettingsEntryEnum Settings::toolbarExport3D("advanced", "toolbarExport3D", {{"none", "none"}, {"STL", "STL"}, {"OFF", "OFF"}, {"WRL", "WRL"}, {"AMF", "AMF"}, {"3MF", "3MF"}}, "STL");
 SettingsEntryEnum Settings::toolbarExport2D("advanced", "toolbarExport2D", {{"none", "none"}, {"DXF", "DXF"}, {"SVG", "SVG"}, {"PDF", "PDF"}}, "none");
