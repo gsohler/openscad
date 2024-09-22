@@ -10,6 +10,8 @@
 #include <cmath>
 #include <cstdio>
 #include "TextureNode.h"
+#include <string>
+
 #ifdef ENABLE_OPENCSG
 #include <opencsg.h>
 #endif
@@ -445,7 +447,7 @@ void GLView::showObject(const SelectedObject &obj, const Vector3d &eyedir)
       Vector3d p1=obj.pt[0];
 
       double n=1/sqrt(3);
-      // create an octaeder	   
+      // create an octaeder
       //x- x+ y- y+ z- z+
       int sequence[]={ 2, 0, 4, 1, 2, 4, 0, 3, 4, 3, 1, 4, 0, 2, 5, 2, 1, 5, 3, 0, 5, 1, 3, 5 };
       glBegin(GL_TRIANGLES);

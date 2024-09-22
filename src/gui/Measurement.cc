@@ -26,6 +26,8 @@
 
 #include "Measurement.h"
 
+#include <string>
+
 Measurement::Measurement()
 {
 }

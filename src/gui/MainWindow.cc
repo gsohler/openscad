@@ -28,6 +28,8 @@
 #endif
 #include <iostream>
 #include <memory>
+#include <string>
+#include <vector>
 
 #include "boost-utils.h"
 #include "Builtins.h"

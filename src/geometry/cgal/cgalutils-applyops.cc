@@ -28,10 +28,12 @@
 #include "Reindexer.h"
 #include "GeometryUtils.h"
 
+#include <cstddef>
 #include <memory>
 #include <map>
 #include <queue>
 #include <unordered_set>
+#include <vector>
 
 namespace CGALUtils {
 
@@ -166,11 +168,3 @@ std::shared_ptr<const Geometry> applyOperator3D(const CsgOpNode &node, const Geo
 
 
 #endif // ENABLE_CGAL
-
-
-
-
-
-
-
-

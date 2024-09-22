@@ -27,8 +27,11 @@
 #include "GeometryUtils.h"
 #include "linalg.h"
 #include "node.h"
-#include <sstream>
 
+#include <cstddef>
+#include <sstream>
+#include <string>
+#include <vector>
 
 class CubeNode : public LeafNode
 {
@@ -184,4 +187,3 @@ public:
   std::vector<std::vector<size_t>> paths;
   int convexity = 1;
 };
-

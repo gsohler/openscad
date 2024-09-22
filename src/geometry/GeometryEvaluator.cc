@@ -54,6 +54,9 @@
 #ifdef ENABLE_PYTHON
 #include <src/python/python_public.h>
 #endif
+#include <cstddef>
+#include <vector>
+
 class Geometry;
 class Polygon2d;
 class Tree;

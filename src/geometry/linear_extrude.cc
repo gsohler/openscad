@@ -1,6 +1,9 @@
 #include "linear_extrude.h"
 
+#include <cstddef>
 #include <queue>
+#include <vector>
+
 #include <boost/logic/tribool.hpp>
 
 #include "GeometryUtils.h"
@@ -13,7 +16,7 @@
 #include "Feature.h"
 
 namespace {
-  
+
 /*
   Compare Euclidean length of vectors
   Return:
@@ -311,7 +314,7 @@ std::unique_ptr<PolySet> assemblePolySetForManifold(
 
   // LOG(PolySetUtils::polySetToPolyhedronSource(*final_polyset));
 
-  return final_polyset; 
+  return final_polyset;
 }
 
 std::unique_ptr<PolySet> assemblePolySetForCGAL(const Polygon2d& polyref,
@@ -401,7 +404,7 @@ void add_slice_indices(PolygonIndices &indices, int slice_idx, int slice_stride,
       Vector2d curr2 = trans2 * o.vertices[i % o.vertices.size()];
       int curr_idx = curr_outline + (i % o.vertices.size());
       int prev_idx = curr_outline + i - 1;
-      
+
       int diff_sign = sgn_vdiff(prev1 - curr2, curr1 - prev2);
       bool splitfirst = diff_sign == -1 || (diff_sign == 0 && !flip);
 
@@ -643,7 +646,7 @@ std::unique_ptr<Geometry> extrudePolygon(const LinearExtrudeNode& node, const Po
   else
 #endif
   return assemblePolySetForCGAL(polyref, vertices, indices,
-                                node.convexity, isConvex, 
+                                node.convexity, isConvex,
                                 node.scale_x, node.scale_y,
                                 h1, h2, node.twist);
 }

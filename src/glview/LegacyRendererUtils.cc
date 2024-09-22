@@ -8,6 +8,7 @@
 #include "TextureNode.h"
 
 #include <Eigen/LU>
+#include <cstddef>
 #include <fstream>
 
 
