@@ -36,7 +36,7 @@ std::shared_ptr<AbstractNode> PyOpenSCADObjectToNodeMulti(PyObject *object, PyOb
 int python_more_obj(std::vector<std::shared_ptr<AbstractNode>>& children, PyObject *more_obj);
 Outline2d python_getprofile(void *cbfunc, int fn, double arg);
 double python_doublefunc(void *cbfunc, double arg);
-std::shared_ptr<AbstractNode> python_modulefunc(const ModuleInstantiation *module,const std::shared_ptr<const Context> &context, int *modulefound);
+std::shared_ptr<AbstractNode> python_modulefunc(const ModuleInstantiation *module,const std::shared_ptr<const Context> &context, std::string &error);
 std::vector<int> python_intlistval(PyObject *list);
 
 Value python_functionfunc(const FunctionCall *call,const std::shared_ptr<const Context> &context);

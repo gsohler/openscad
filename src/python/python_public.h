@@ -18,7 +18,7 @@ std::string evaluatePython(const std::string &code);
 std::shared_ptr<AbstractNode>
 python_modulefunc(const ModuleInstantiation *module,
                   const std::shared_ptr<const Context> &context,
-                  int *modulefound);
+                  std::string &error);
 
 Value python_functionfunc(const FunctionCall *call,
                           const std::shared_ptr<const Context> &context);
