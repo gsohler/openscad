@@ -1,5 +1,5 @@
-#include "CGALRenderUtils.h"
-#include "Selection.h"
+#include "glview/cgal/CGALRenderUtils.h"
+#include "core/Selection.h"
 
 
 // this function resolves a 3x3 linear eqauation system

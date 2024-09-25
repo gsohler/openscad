@@ -17,11 +17,9 @@
 #include <Qsci/qsciscintilla.h>
 #include <Qsci/qscilexerpython.h>
 
-#include "Editor.h"
-#include "MainWindow.h"
-#include "memory.h"
-#include "ScadApi.h"
-#include "MainWindow.h"
+#include "gui/Editor.h"
+#include "gui/MainWindow.h"
+#include "gui/ScadApi.h"
 
 // don't need the full definition, because it confuses Qt
 class ScadLexer;
