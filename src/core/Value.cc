@@ -24,6 +24,8 @@
  *
  */
 
+#include <utility>
+#include <cstdint>
 #include <cassert>
 #include <cstddef>
 #include <memory>
