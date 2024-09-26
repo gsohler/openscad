@@ -7,6 +7,7 @@
 #include "glview/system-gl.h"
 #include "core/TextureNode.h"
 
+#include <sstream>
 #include <Eigen/LU>
 #include <fstream>
 #include <string>

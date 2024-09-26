@@ -22,30 +22,36 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-#include <cstdlib>
+#include <sstream>
 #include <string>
-#include <iostream>
 
-#include "libsvg/group.h"
+#include "libsvg/tspan.h"
+#include "libsvg/util.h"
 
 namespace libsvg {
 
-const std::string group::name("g");
+const std::string tspan::name("tspan");
 
 void
-group::set_attrs(attr_map_t& attrs, void *context)
+tspan::set_attrs(attr_map_t& attrs, void *context)
 {
   shape::set_attrs(attrs, context);
+  this->x = parse_double(attrs["x"]);
+  this->y = parse_double(attrs["y"]);
+  this->dx = parse_double(attrs["dx"]);
+  this->dy = parse_double(attrs["dy"]);
 }
 
 const std::string
-group::dump() const
+tspan::dump() const
 {
   std::stringstream s;
   s << get_name()
     << ": x = " << this->x
-    << ": y = " << this->y;
+    << ": y = " << this->y
+    << ": dx = " << this->dx
+    << ": dy = " << this->dy;
   return s.str();
 }
 
-}
+} // namespace libsvg

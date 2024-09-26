@@ -22,34 +22,39 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
+#include <sstream>
 #include <string>
-
-#include "libsvg/tspan.h"
+#include "libsvg/line.h"
 #include "libsvg/util.h"
 
 namespace libsvg {
 
-const std::string tspan::name("tspan");
+const std::string line::name("line");
 
 void
-tspan::set_attrs(attr_map_t& attrs, void *context)
+line::set_attrs(attr_map_t& attrs, void *context)
 {
   shape::set_attrs(attrs, context);
-  this->x = parse_double(attrs["x"]);
-  this->y = parse_double(attrs["y"]);
-  this->dx = parse_double(attrs["dx"]);
-  this->dy = parse_double(attrs["dy"]);
+  this->x = parse_double(attrs["x1"]);
+  this->y = parse_double(attrs["y1"]);
+  this->x2 = parse_double(attrs["x2"]);
+  this->y2 = parse_double(attrs["y2"]);
+
+  path_t path;
+  path.push_back(Eigen::Vector3d(x, y, 0));
+  path.push_back(Eigen::Vector3d(x2, y2, 0));
+  offset_path(path_list, path, get_stroke_width(), get_stroke_linecap());
 }
 
 const std::string
-tspan::dump() const
+line::dump() const
 {
   std::stringstream s;
   s << get_name()
-    << ": x = " << this->x
-    << ": y = " << this->y
-    << ": dx = " << this->dx
-    << ": dy = " << this->dy;
+    << ": x1 = " << this->x
+    << ": y1 = " << this->y
+    << ": x2 = " << this->x2
+    << ": y2 = " << this->y2;
   return s.str();
 }
 

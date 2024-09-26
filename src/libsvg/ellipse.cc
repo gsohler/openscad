@@ -22,51 +22,41 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
+#include <sstream>
 #include <cstdlib>
 #include <string>
 #include <iostream>
 
-#include "libsvg/svgpage.h"
+#include "libsvg/ellipse.h"
+#include "libsvg/util.h"
 
 namespace libsvg {
 
-const std::string svgpage::name("svg");
-
-svgpage::svgpage() : width({0.0, unit_t::UNDEFINED}), height({0.0, unit_t::UNDEFINED})
-{
-}
+const std::string ellipse::name("ellipse");
 
 void
-svgpage::set_attrs(attr_map_t& attrs, void *context)
+ellipse::set_attrs(attr_map_t& attrs, void *context)
 {
-  this->x = 0;
-  this->y = 0;
-  this->width = parse_length(attrs["width"]);
-  this->height = parse_length(attrs["height"]);
-  this->viewbox = parse_viewbox(attrs["viewBox"]);
-  this->alignment = parse_alignment(attrs["preserveAspectRatio"]);
+  shape::set_attrs(attrs, context);
+  this->x = parse_double(attrs["cx"]);
+  this->y = parse_double(attrs["cy"]);
+  this->rx = parse_double(attrs["rx"]);
+  this->ry = parse_double(attrs["ry"]);
 
-  const auto *ctx = reinterpret_cast<const fnContext *>(context);
-  selected = (ctx->selector) ? ctx->selector(this) : false;
+  path_t path;
+  draw_ellipse(path, get_x(), get_y(), get_radius_x(), get_radius_y(), context);
+  path_list.push_back(path);
 }
 
 const std::string
-svgpage::dump() const
+ellipse::dump() const
 {
   std::stringstream s;
   s << get_name()
     << ": x = " << this->x
     << ": y = " << this->y
-    << ": width = " << this->width
-    << ": height = " << this->height
-    << ": viewbox = " << this->viewbox.x
-    << "," << this->viewbox.y
-    << "," << this->viewbox.width
-    << "," << this->viewbox.height
-    << (this->viewbox.is_valid ? " (valid)" : " (invalid)")
-    << ": alignment = " << this->alignment.x
-    << "," << this->alignment.y
-    << (this->alignment.meet ? " meet" : " slice");
+    << ": rx = " << this->rx
+    << ": ry = " << this->ry;
   return s.str();
 }
 

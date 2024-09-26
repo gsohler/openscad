@@ -22,33 +22,37 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-#include <string>
-#include "libsvg/text.h"
+#include "libsvg/circle.h"
 #include "libsvg/util.h"
+
+#include <sstream>
+#include <string>
 
 namespace libsvg {
 
-const std::string text::name("text");
+const std::string circle::name("circle");
 
 void
-text::set_attrs(attr_map_t& attrs, void *context)
+circle::set_attrs(attr_map_t& attrs, void *context)
 {
   shape::set_attrs(attrs, context);
-  this->x = parse_double(attrs["x"]);
-  this->y = parse_double(attrs["y"]);
-  this->dx = parse_double(attrs["dx"]);
-  this->dy = parse_double(attrs["dy"]);
+  this->x = parse_double(attrs["cx"]);
+  this->y = parse_double(attrs["cy"]);
+  this->r = parse_double(attrs["r"]);
+
+  path_t path;
+  draw_ellipse(path, get_x(), get_y(), get_radius(), get_radius(), context);
+  path_list.push_back(path);
 }
 
 const std::string
-text::dump() const
+circle::dump() const
 {
   std::stringstream s;
   s << get_name()
     << ": x = " << this->x
     << ": y = " << this->y
-    << ": dx = " << this->dx
-    << ": dy = " << this->dy;
+    << ": r = " << this->r;
   return s.str();
 }
 

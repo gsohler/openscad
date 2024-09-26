@@ -26,6 +26,7 @@
 #ifdef _WIN32
 #include "winsock2.h"
 #endif
+#include <sstream>
 #include <iostream>
 #include <memory>
 #include <string>

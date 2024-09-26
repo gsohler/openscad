@@ -22,39 +22,31 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
+#include <sstream>
+#include <cstdlib>
 #include <string>
-#include "libsvg/line.h"
-#include "libsvg/util.h"
+#include <iostream>
+
+#include "libsvg/group.h"
 
 namespace libsvg {
 
-const std::string line::name("line");
+const std::string group::name("g");
 
 void
-line::set_attrs(attr_map_t& attrs, void *context)
+group::set_attrs(attr_map_t& attrs, void *context)
 {
   shape::set_attrs(attrs, context);
-  this->x = parse_double(attrs["x1"]);
-  this->y = parse_double(attrs["y1"]);
-  this->x2 = parse_double(attrs["x2"]);
-  this->y2 = parse_double(attrs["y2"]);
-
-  path_t path;
-  path.push_back(Eigen::Vector3d(x, y, 0));
-  path.push_back(Eigen::Vector3d(x2, y2, 0));
-  offset_path(path_list, path, get_stroke_width(), get_stroke_linecap());
 }
 
 const std::string
-line::dump() const
+group::dump() const
 {
   std::stringstream s;
   s << get_name()
-    << ": x1 = " << this->x
-    << ": y1 = " << this->y
-    << ": x2 = " << this->x2
-    << ": y2 = " << this->y2;
+    << ": x = " << this->x
+    << ": y = " << this->y;
   return s.str();
 }
 
-} // namespace libsvg
+}

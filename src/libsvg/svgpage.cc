@@ -22,28 +22,53 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-#include "libsvg/data.h"
-
+#include <sstream>
+#include <cstdlib>
 #include <string>
+#include <iostream>
+
+#include "libsvg/svgpage.h"
 
 namespace libsvg {
 
-const std::string data::name("data");
+const std::string svgpage::name("svg");
+
+svgpage::svgpage() : width({0.0, unit_t::UNDEFINED}), height({0.0, unit_t::UNDEFINED})
+{
+}
 
 void
-data::set_attrs(attr_map_t& attrs, void *context)
+svgpage::set_attrs(attr_map_t& attrs, void *context)
 {
-  shape::set_attrs(attrs, context);
-  this->text = attrs["text"];
+  this->x = 0;
+  this->y = 0;
+  this->width = parse_length(attrs["width"]);
+  this->height = parse_length(attrs["height"]);
+  this->viewbox = parse_viewbox(attrs["viewBox"]);
+  this->alignment = parse_alignment(attrs["preserveAspectRatio"]);
+
+  const auto *ctx = reinterpret_cast<const fnContext *>(context);
+  selected = (ctx->selector) ? ctx->selector(this) : false;
 }
 
 const std::string
-data::dump() const
+svgpage::dump() const
 {
   std::stringstream s;
   s << get_name()
-    << ": text = '" << this->text << "'";
+    << ": x = " << this->x
+    << ": y = " << this->y
+    << ": width = " << this->width
+    << ": height = " << this->height
+    << ": viewbox = " << this->viewbox.x
+    << "," << this->viewbox.y
+    << "," << this->viewbox.width
+    << "," << this->viewbox.height
+    << (this->viewbox.is_valid ? " (valid)" : " (invalid)")
+    << ": alignment = " << this->alignment.x
+    << "," << this->alignment.y
+    << (this->alignment.meet ? " meet" : " slice");
   return s.str();
 }
 
-}
+} // namespace libsvg
