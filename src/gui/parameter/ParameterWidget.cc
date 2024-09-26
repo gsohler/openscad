@@ -236,7 +236,6 @@ void ParameterWidget::parameterModified(bool immediate)
 {
   auto *widget = (ParameterVirtualWidget *)sender();
   ParameterObject *parameter = widget->getParameter();
-  printf("parametermodified\n");
 
   // When attempting to modify the design default, create a new set to edit.
   if (comboBoxPreset->currentIndex() == 0) {

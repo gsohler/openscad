@@ -3683,11 +3683,11 @@ PyObject *python_add_parameter(PyObject *self, PyObject *args, PyObject *kwargs,
 
   if(found){
     AnnotationList annotationList;
-    annotationList.push_back(Annotation("Parameter",std::make_shared<Literal>("Parameter")));
-    annotationList.push_back(Annotation("Description",std::make_shared<Literal>("Description")));
-    annotationList.push_back(Annotation("Group",std::make_shared<Literal>("Group")));
+//    annotationList.push_back(Annotation("Parameter",std::make_shared<Literal>("Parameter")));
+//    annotationList.push_back(Annotation("Description",std::make_shared<Literal>("Description")));
+//    annotationList.push_back(Annotation("Group",std::make_shared<Literal>("Group")));
     auto assignment = std::make_shared<Assignment>(name,lit);
-    assignment->addAnnotations(&annotationList);
+//    assignment->addAnnotations(&annotationList);
     customizer_parameters.push_back(assignment);
     PyObject *value_effective = value;
     for(unsigned int i=0;i<customizer_parameters_finished.size();i++) {
@@ -3695,8 +3695,10 @@ PyObject *python_add_parameter(PyObject *self, PyObject *args, PyObject *kwargs,
       {
         auto expr = customizer_parameters_finished[i]->getExpr();
         const auto &lit=std::dynamic_pointer_cast<Literal>(expr);
-        if(lit->isDouble()) value_effective=PyFloat_FromDouble(lit->toDouble());
-        if(lit->isString()) value_effective=PyUnicode_FromString(lit->toString().c_str());
+	if(lit != nullptr) {
+	  if(lit->isDouble()) value_effective=PyFloat_FromDouble(lit->toDouble());
+          if(lit->isString()) value_effective=PyUnicode_FromString(lit->toString().c_str());
+	  }  
       }
     }
     PyObject *maindict = PyModule_GetDict(pythonMainModule);
