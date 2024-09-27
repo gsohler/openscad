@@ -28,6 +28,7 @@
 #endif
 #include "gui/MainWindow.h"
 
+#include <exception>
 #include <sstream>
 #include <iostream>
 #include <memory>
