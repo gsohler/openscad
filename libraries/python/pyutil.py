@@ -12,11 +12,9 @@ def loft_prepare(solid1, solid2,n):
             loft_ang.append(ang)
     for i in range(n):
          ang=3.14159265359*(2*i/n-1)
-         print(ang)
          if ang not in loft_ang:
              loft_ang.append(ang)               
     loft_ang.sort()
-    print(loft_ang)
     
     loft_data= [loft_ang]
     for set in  loft_pts1, loft_pts2:
