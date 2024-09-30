@@ -585,9 +585,6 @@ std::unique_ptr<Geometry> extrudePolygon(const LinearExtrudeNode& node, const Po
   PolygonIndices indices;
   indices.reserve(slice_stride * (num_slices + 1) * 2); // sides + endcaps
 
-//	lowerFace = alterprofile(python_getprofile(node.profile_func, node.fn, 0),lower_scalex, lower_scaley,node.origin_x, node.origin_y, 0, 0, lower_rot); TODO get custome profiles working later again
-//  upper_rot = python_doublefunc(node.twist_func, i/(double)slices);
-//  upperFace = alterprofile(python_getprofile(node.profile_func, node.fn, upper_h[2]), upper_scalex, upper_scaley , node.origin_x, node.origin_y, 0, 0, upper_rot);
   // Calculate all vertices
   Vector2d full_scale(1 - node.scale_x, 1 - node.scale_y);
   double full_rot = -node.twist;
@@ -648,8 +645,6 @@ std::unique_ptr<Geometry> extrudePolygon(const LinearExtrudeNode& node, const Po
   }
   else
 #endif
-  return assemblePolySetForCGAL(polyref, vertices, indices,
-                                node.convexity, isConvex,
-                                node.scale_x, node.scale_y,
-                                h1, h2, node.twist);
+  return assemblePolySetForManifold(polyref, vertices, indices,
+                                      node.convexity, isConvex, slice_stride * num_slices);
 }
