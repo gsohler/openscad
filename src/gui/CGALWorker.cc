@@ -9,6 +9,11 @@
 #include "utils/printutils.h"
 #include "utils/exceptions.h"
 
+#ifdef ENABLE_PYTHON
+extern "C" int PyGILState_Ensure(void);
+extern "C" int PyGILState_Release(void);
+#endif
+
 CGALWorker::CGALWorker()
 {
   this->tree = nullptr;
@@ -25,6 +30,9 @@ CGALWorker::~CGALWorker()
 
 void CGALWorker::start(const Tree& tree)
 {
+#ifdef ENABLE_PYTHON
+  PyGILState_Release();
+#endif
   this->tree = &tree;
   this->thread->start();
 }
@@ -32,6 +40,9 @@ void CGALWorker::start(const Tree& tree)
 void CGALWorker::work()
 {
   // this is a worker thread: we don't want any exceptions escaping and crashing the app.
+#ifdef ENABLE_PYTHON
+  PyGILState_Ensure();
+#endif
   std::shared_ptr<const Geometry> root_geom;
   try {
     GeometryEvaluator evaluator(*this->tree);
@@ -45,7 +56,9 @@ void CGALWorker::work()
   } catch (...) {
     LOG(message_group::Error, "Rendering cancelled by unknown exception.");
   }
-
+ #ifdef ENABLE_PYTHON
+   PyGILState_Release();
+ #endif
   emit done(root_geom);
   thread->quit();
 }
