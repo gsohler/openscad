@@ -284,6 +284,7 @@ private slots:
   void actionExportOFF();
   void actionExportWRL();
   void actionExportFoldable();
+  void actionExportPOV();
   void actionExportAMF();
   void actionExportDXF();
   void actionExportSVG();

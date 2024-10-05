@@ -66,7 +66,8 @@ return format == FileFormat::ASCIISTL ||
   format == FileFormat::NEFDBG ||
   format == FileFormat::PDF ||
   format == FileFormat::PS ||
-  format == FileFormat::NEF3;
+  format == FileFormat::NEF3 ||
+  format == FileFormat::POV;
 }
 
 bool is2D(const FileFormat format) {
@@ -112,6 +113,9 @@ void exportFile(const std::shared_ptr<const Geometry>& root_geom, std::ostream& 
     break;
   case FileFormat::PDF:
     export_pdf(root_geom, output, exportInfo);
+    break;
+  case FileFormat::POV:
+    export_pov(root_geom, output, exportInfo);
     break;
 #ifdef ENABLE_CGAL
   case FileFormat::NEFDBG:

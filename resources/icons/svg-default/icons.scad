@@ -27,6 +27,7 @@ icons = [
     ["export-csg"],
     ["export-pdf"],
     ["export-png"],
+    ["export-pov"],
     ["preview"],
     ["render"],
     ["send"],
@@ -85,6 +86,7 @@ icon(selected_icon) {
     export("CSG");
     export("PDF");
     export("PNG");
+    export("POV");
     preview();
     render_();
     send();
@@ -127,11 +129,8 @@ icon(selected_icon) {
     vcr_control_end();
     measure_dist();
     measure_ang();
-<<<<<<< HEAD
     find_handle();
-=======
 	edit_copy();
->>>>>>> master
 }
 
 if (list_icons) {
@@ -786,7 +785,6 @@ module measure_ang() {
     text("45", 40, font = export_font);
 }
 
-<<<<<<< HEAD
 module find_handle() {
     r = 0.4 * width;
     translate([width / 2, height / 2]) {
@@ -794,7 +792,6 @@ module find_handle() {
         
     }
 }
-=======
 module edit_copy() {
 union() {
 	difference() {
@@ -803,4 +800,3 @@ union() {
 	}
 	translate([32, -1]) scale(0.7) text_paper();
 }}
->>>>>>> master
