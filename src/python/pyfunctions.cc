@@ -188,7 +188,6 @@ int sphereCalcSplitInd(PolySetBuilder &builder, std::vector<Vector3d> &vertices,
 
 std::unique_ptr<const Geometry> sphereCreateFuncGeometry(void *funcptr, double fs, int n)
 {
-	printf("crerate sphere\n");
   PyObject *func = (PyObject *) funcptr;
   std::unordered_map<SphereEdgeDb, int, boost::hash<SphereEdgeDb> > edges;
 
