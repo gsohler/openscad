@@ -2419,6 +2419,8 @@ void MainWindow::sendToLocalSlicer()
     exportFileFormat = FileFormat::AMF;
   } else if (fileFormat == "3MF") {
     exportFileFormat = FileFormat::_3MF;
+  } else if (fileFormat == "POV") {
+    exportFileFormat = FileFormat::POV;
   } else {
     exportFileFormat = FileFormat::STL;
   }
