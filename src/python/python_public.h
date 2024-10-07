@@ -12,6 +12,8 @@ extern AssignmentList customizer_parameters_finished;
 void initPython(double time);
 
 void finishPython();
+void python_lock(void);
+void python_unlock(void);
 
 std::string evaluatePython(const std::string &code);
 

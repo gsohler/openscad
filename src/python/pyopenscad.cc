@@ -102,6 +102,18 @@ PyObject *PyOpenSCADObjectFromNode(PyTypeObject *type, const std::shared_ptr<Abs
   return nullptr;
 }
 
+void python_lock(void){
+#ifndef _WIN32	
+  PyGILState_Ensure();	
+#endif  
+}
+
+void python_unlock(void) {
+#ifndef _WIN32	
+  PyGILState_Release();	
+#endif  
+}
+
 /*
  *  parses either a PyOpenSCAD Object or an List of PyOpenScad Object and adds it to the list of supplied children, returns 1 on success
  */

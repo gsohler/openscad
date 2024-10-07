@@ -130,8 +130,6 @@
 #include <fcntl.h>
 #ifdef ENABLE_PYTHON
 #include "python/python_public.h"
-extern "C" int PyGILState_Ensure(void);
-extern "C" int PyGILState_Release(void);
 #include "nettle/sha2.h"
 #include "nettle/base64.h"
 
@@ -1500,7 +1498,7 @@ void MainWindow::compileCSGThread(void)
 void MainWindow::compileCSGDone()
 {
 #ifdef ENABLE_PYTHON
-  PyGILState_Ensure();	
+  python_lock();	
 #endif
   try{
     progress_report_fin();
@@ -2555,7 +2553,7 @@ void MainWindow::cgalRender()
 void MainWindow::actionRenderDone(const std::shared_ptr<const Geometry>& root_geom)
 {
 #ifdef ENABLE_PYTHON
-  PyGILState_Ensure();	
+  python_lock();	
 #endif
   progress_report_fin();
   if (root_geom) {
