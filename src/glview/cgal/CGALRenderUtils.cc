@@ -1,3 +1,4 @@
+#include <algorithm>
 #include "glview/cgal/CGALRenderUtils.h"
 #include "core/Selection.h"
 

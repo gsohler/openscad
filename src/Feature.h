@@ -48,7 +48,7 @@ private:
   static map_t feature_map;
   static list_t feature_list;
 
-  Feature(const std::string& name, std::string description);
+  Feature(const std::string& name, std::string description, bool hidden = false);
   virtual ~Feature() = default;
 };
 
