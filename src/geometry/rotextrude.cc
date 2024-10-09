@@ -11,7 +11,6 @@
 #include "calc.h"
 #include "degree_trig.h"
 #include "Feature.h"
-#define _USE_MATH_DEFINES
 #include <cmath>
 
 #include "manifoldutils.h"

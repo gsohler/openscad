@@ -102,15 +102,17 @@ PyObject *PyOpenSCADObjectFromNode(PyTypeObject *type, const std::shared_ptr<Abs
   return nullptr;
 }
 
+PyGILState_STATE gstate=PyGILState_LOCKED;
+
 void python_lock(void){
 #ifndef _WIN32	
-  PyGILState_Ensure();	
+  gstate = PyGILState_Ensure();	
 #endif  
 }
 
 void python_unlock(void) {
 #ifndef _WIN32	
-  PyGILState_Release();	
+  PyGILState_Release(gstate);	
 #endif  
 }
 
@@ -636,6 +638,7 @@ void initPython(double time)
       if(key_str != NULL) pythonInventory.push_back(key_str);
       Py_XDECREF(key1);
     }
+
   }
   char run_str[250];
   sprintf(run_str,"fa=12.0\nfn=0.0\nfs=2.0\nt=%g\nphi=%g",time,2*G_PI*time);
