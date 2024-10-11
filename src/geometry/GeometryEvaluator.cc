@@ -39,7 +39,6 @@
 #include <list>
 #include <utility>
 #include <memory>
-#include <ciso646> // C alternative tokens (xor)
 #include <algorithm>
 #include "utils/boost-utils.h"
 #include "geometry/boolean_utils.h"
