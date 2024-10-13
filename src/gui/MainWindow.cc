@@ -28,6 +28,22 @@
 #endif
 #include "gui/MainWindow.h"
 
+#include <QApplication>
+#include <QDialog>
+#include <QElapsedTimer>
+#include <QEvent>
+#include <QFont>
+#include <QFontMetrics>
+#include <QIcon>
+#include <QKeySequence>
+#include <QList>
+#include <QMetaObject>
+#include <QPoint>
+#include <QSoundEffect>
+#include <QStringList>
+#include <QTextEdit>
+#include <QToolBar>
+#include <QWidget>
 #include <deque>
 #include <cassert>
 #include <array>
