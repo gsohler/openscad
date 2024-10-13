@@ -77,6 +77,9 @@ extern bool parse(SourceFile *& file, const std::string& text, const std::string
 #include <ostream>
 #include <boost/functional/hash.hpp>
 #include <ScopeContext.h>
+#include "PlatformUtils.h"
+#include <iostream>
+#include <curl/curl.h>
 
 //using namespace boost::assign; // bring 'operator+=()' into scope
 
@@ -3633,6 +3636,69 @@ PyObject *python_import(PyObject *self, PyObject *args, PyObject *kwargs) {
   return do_import_python(self, args, kwargs, ImportType::UNKNOWN);
 }
 
+
+static size_t python_nimport_write(void *ptr, size_t size, size_t nmemb, void *stream)
+{
+	
+  size_t written = fwrite(ptr, size, nmemb, (FILE *)stream);
+  return written;
+}
+
+PyObject *python_nimport(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+  static bool called_already=false;	
+  char *kwlist[] = {"url", NULL};
+  const char *c_url = nullptr;
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s", kwlist,
+                                   &c_url)) {
+    PyErr_SetString(PyExc_TypeError, "Error during parsing osimport(filename)");
+    return NULL;
+  }
+  if(c_url == nullptr) return Py_None;
+
+  std::string url = c_url;
+  std::string filename , path, importcode;
+  filename = url.substr(url.find_last_of("/") + 1);
+  importcode = "import "+filename.substr(0,filename.find_last_of("."));
+
+#ifdef _WIN32
+    path =PlatformUtils::applicationPath() + "\\..\\libraries\\python\\" + filename;
+#else
+    path =PlatformUtils::applicationPath() + "/../libraries/python/" + filename;
+#endif   
+  bool do_download=false;
+  if(!called_already) {
+    do_download=true;	  
+  }
+  std::ifstream f(path.c_str());
+  if(!f.good()) {
+    do_download=true;	  
+  }
+
+  // TODO download
+  if(do_download) {
+    FILE *fh=fopen(path.c_str(),"wb");
+    if(fh != nullptr) {
+      CURL *curl = curl_easy_init();
+      if(curl) {
+        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, fh);
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, python_nimport_write);
+        curl_easy_setopt(curl, CURLOPT_FORBID_REUSE, 1L);
+ 
+        curl_easy_perform(curl);
+        curl_easy_cleanup(curl);
+      }	
+    }
+    fclose(fh);
+	  
+  }
+
+  PyRun_SimpleString(importcode.c_str());
+  called_already=true;
+  return Py_None;
+}
+
 PyObject *python_str(PyObject *self) {
 	char str[40];
   PyObject *dummydict;	  
@@ -3920,6 +3986,7 @@ PyMethodDef PyOpenSCADFunctions[] = {
   {"group", (PyCFunction) python_group, METH_VARARGS | METH_KEYWORDS, "Group Object."},
   {"render", (PyCFunction) python_render, METH_VARARGS | METH_KEYWORDS, "Render Object."},
   {"osimport", (PyCFunction) python_import, METH_VARARGS | METH_KEYWORDS, "Import Object."},
+  {"nimport", (PyCFunction) python_nimport, METH_VARARGS | METH_KEYWORDS, "Import Networked Object."},
   {"osuse", (PyCFunction) python_use, METH_VARARGS | METH_KEYWORDS, "Import OpenSCAD Library."},
   {"version", (PyCFunction) python_version, METH_VARARGS | METH_KEYWORDS, "Output openscad Version."},
   {"version_num", (PyCFunction) python_version_num, METH_VARARGS | METH_KEYWORDS, "Output openscad Version."},
