@@ -79,6 +79,7 @@ extern bool parse(SourceFile *& file, const std::string& text, const std::string
 #include <ScopeContext.h>
 #include "PlatformUtils.h"
 #include <iostream>
+#include <filesystem>
 #include <curl/curl.h>
 
 //using namespace boost::assign; // bring 'operator+=()' into scope
@@ -3659,7 +3660,7 @@ PyObject *python_nimport(PyObject *self, PyObject *args, PyObject *kwargs)
   std::string url = c_url;
   std::string filename , path, importcode;
   filename = url.substr(url.find_last_of("/") + 1);
-  importcode = "import "+filename.substr(0,filename.find_last_of("."));
+  importcode = "from "+filename.substr(0,filename.find_last_of("."))+" import *";
 
 #ifdef _WIN32
     path =PlatformUtils::applicationPath() + "\\..\\libraries\\python\\" + filename;
@@ -3677,7 +3678,8 @@ PyObject *python_nimport(PyObject *self, PyObject *args, PyObject *kwargs)
 
   // TODO download
   if(do_download) {
-    FILE *fh=fopen(path.c_str(),"wb");
+    CURLcode status;
+    FILE *fh=fopen((path+"_").c_str(),"wb");
     if(fh != nullptr) {
       CURL *curl = curl_easy_init();
       if(curl) {
@@ -3686,11 +3688,14 @@ PyObject *python_nimport(PyObject *self, PyObject *args, PyObject *kwargs)
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, python_nimport_write);
         curl_easy_setopt(curl, CURLOPT_FORBID_REUSE, 1L);
  
-        curl_easy_perform(curl);
+        status = curl_easy_perform(curl);
         curl_easy_cleanup(curl);
       }	
+      fclose(fh);
+      if(status == CURLE_OK) {
+        std::filesystem::rename(path+"_", path);	      
+      }
     }
-    fclose(fh);
 	  
   }
 

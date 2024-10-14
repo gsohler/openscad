@@ -167,6 +167,7 @@ void Preferences::init() {
 #endif
   addPrefPage(group, prefsActionInput, pageInput);
   addPrefPage(group, prefsActionInputButton, pageInputButton);
+  addPrefPage(group, prefsActionPython, pagePython);
   addPrefPage(group, prefsActionAdvanced, pageAdvanced);
 
   connect(group, SIGNAL(triggered(QAction*)), this, SLOT(actionTriggered(QAction*)));
@@ -223,6 +224,7 @@ void Preferences::init() {
   const QString profile = QString::fromStdString(Settings::Settings::octoPrintSlicerProfile.value());
   const QString profileDesc = QString::fromStdString(Settings::Settings::octoPrintSlicerProfileDesc.value());
   BlockSignals<QLineEdit *>(this->lineEditLocalSlicer)->setText(QString::fromStdString(Settings::Settings::localSlicerExecutable.value()));
+  BlockSignals<QTextEdit *>(this->textEditPythonImportList)->setText(QString::fromStdString(Settings::Settings::pythonNetworkImportList.value()));
   this->comboBoxOctoPrintSlicingEngine->clear();
   this->comboBoxOctoPrintSlicingEngine->addItem(_("<Default>"), QVariant{""});
   if (!slicer.isEmpty()) {
@@ -842,6 +844,12 @@ void Preferences::on_comboBoxLocalSlicerFileFormat_activated(int val)
 void Preferences::on_lineEditLocalSlicer_editingFinished()
 {
   Settings::Settings::localSlicerExecutable.setValue(this->lineEditLocalSlicer->text().toStdString());
+  writeSettings();
+}
+
+void Preferences::on_textEditPythonImportList_textChanged()
+{
+  Settings::Settings::pythonNetworkImportList.setValue(this->textEditPythonImportList->document()->toPlainText().toStdString());
   writeSettings();
 }
 

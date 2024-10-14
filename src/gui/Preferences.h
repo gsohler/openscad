@@ -129,6 +129,7 @@ public slots:
   void on_pushButtonOctoPrintApiKey_clicked();
   void on_pushButtonSelectLocalSlicerPath_clicked();
   void on_lineEditLocalSlicer_editingFinished();
+  void on_textEditPythonImportList_textChanged();
 
 signals:
   void requestRedraw() const;

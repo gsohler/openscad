@@ -131,6 +131,7 @@ SettingsEntryString Settings::octoPrintSlicerProfile("printing", "octoPrintSlice
 SettingsEntryString Settings::octoPrintSlicerProfileDesc("printing", "octoPrintSlicerProfileDesc", "");
 
 SettingsEntryString Settings::localSlicerExecutable("printing", "localSlicerExecutable", "");
+SettingsEntryString Settings::pythonNetworkImportList("python", "networkImportList", "");
 SettingsEntryEnum Settings::localSlicerFileFormat("printing", "localSlicerFileFormat", {{"STL", "STL"}, {"OFF", "OFF"}, {"AMF", "AMF"}, {"3MF", "3MF"}, {"POV", "POV"}}, "STL");
 
 SettingsEntryBool Settings::exportUseAsciiSTL("export", "useAsciiSTL", false);

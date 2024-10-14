@@ -189,6 +189,7 @@ public:
   static SettingsEntryString octoPrintSlicerProfile;
   static SettingsEntryString octoPrintSlicerProfileDesc;
   static SettingsEntryString localSlicerExecutable;
+  static SettingsEntryString pythonNetworkImportList;
 
   static SettingsEntryBool manifoldEnabled;
   static SettingsEntryBool exportUseAsciiSTL;

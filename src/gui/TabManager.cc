@@ -491,9 +491,18 @@ void TabManager::openTabFile(const QString& filename)
 {
   par->setCurrentOutput();
 #ifdef ENABLE_PYTHON
-  if(boost::algorithm::ends_with(filename, ".py"))
-    editor->setPlainText("from openscad import *\n");
-  else
+  if(boost::algorithm::ends_with(filename, ".py")) {
+    std::string templ="from openscad import *\n";	  
+    std::string libs = Settings::Settings::pythonNetworkImportList.value();
+    printf("libs is %s\n",libs.c_str());
+    std::stringstream ss(libs);
+    std::string word;
+    while(std::getline(ss,word,'\n')){
+      if(word.size() == 0) continue;	    
+      templ += "nimport(\"" + word + "\")\n";
+    }
+    editor->setPlainText(QString::fromStdString(templ));
+  } else
 #endif  
   editor->setPlainText("");
 

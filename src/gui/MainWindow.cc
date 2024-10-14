@@ -2056,7 +2056,7 @@ bool MainWindow::trust_python_file(const std::string& file,  const std::string& 
     this->trusted_edit_document_name = file;
     return true;
   }
-  if(content == "from openscad import *\n") { // 1st character already typed
+  if(content.rfind("from openscad import",0) == 0) { // 1st character already typed
     this->trusted_edit_document_name=file;
     return true;
   }
