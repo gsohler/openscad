@@ -168,6 +168,36 @@ std::string SHA256HashString(std::string aString){
     return digest_base64;
 }
 
+
+static size_t curl_download_write(void *ptr, size_t size, size_t nmemb, void *stream)
+{
+        
+  size_t written = fwrite(ptr, size, nmemb, (FILE *)stream);
+  return written;
+}
+	
+int curl_download(std::string url, std::string path)
+{
+    CURLcode status;
+    FILE *fh=fopen((path+"_").c_str(),"wb");
+    if(fh != nullptr) {
+      CURL *curl = curl_easy_init();
+      if(curl) {
+        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, fh);
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curl_download_write);
+        curl_easy_setopt(curl, CURLOPT_FORBID_REUSE, 1L);
+ 
+        status = curl_easy_perform(curl);
+        curl_easy_cleanup(curl);
+      }	
+      fclose(fh);
+      if(status == CURLE_OK) {
+        std::filesystem::rename(path+"_", path);	      
+      }
+    }
+    return 0;
+}
 #endif // ifdef ENABLE_PYTHON
 
 #define ENABLE_3D_PRINTING
