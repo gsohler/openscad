@@ -606,13 +606,15 @@ void initPython(double time)
     PyImport_AppendInittab("libfive", &PyInit_data);
     PyConfig config;
     PyConfig_InitPythonConfig(&config);
-    char libdir[256];
+    std::string libdir;
 #ifdef _WIN32
-    snprintf(libdir, 256, "%s\\..\\libraries\\python\\:.",PlatformUtils::applicationPath().c_str()); /* add libraries/python to python search path */
+    libdir= PlatformUtils::applicationPath()+"\\..\\libraries\\python:"+PlatformUtils::userLibraryPath()+":.";
 #else
-    snprintf(libdir, 256, "%s/../libraries/python/:.",PlatformUtils::applicationPath().c_str()); /* add libraries/python to python search path */
+    libdir= PlatformUtils::applicationPath()+"/../libraries/python:"+ PlatformUtils::userLibraryPath()+":.";
 #endif   
-    PyConfig_SetBytesString(&config, &config.pythonpath_env, libdir);
+//    libdir=PlatformUtils::userLibraryPath();
+    printf("libdir is %s\n",libdir.c_str());
+    PyConfig_SetBytesString(&config, &config.pythonpath_env, libdir.c_str());
     PyStatus status = Py_InitializeFromConfig(&config);
     if (PyStatus_Exception(status)) {
       LOG( message_group::Error, "Python not found. Is it installed ?");

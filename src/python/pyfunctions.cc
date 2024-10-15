@@ -3657,9 +3657,9 @@ PyObject *python_nimport(PyObject *self, PyObject *args, PyObject *kwargs)
   importcode = "from "+filename.substr(0,filename.find_last_of("."))+" import *";
 
 #ifdef _WIN32
-    path =PlatformUtils::applicationPath() + "\\..\\libraries\\python\\" + filename;
+    path =PlatformUtils::userLibraryPath() + "\\" + filename;
 #else
-    path =PlatformUtils::applicationPath() + "/../libraries/python/" + filename;
+    path =PlatformUtils::userLibraryPath() + "//" + filename;
 #endif   
   bool do_download=false;
   if(!called_already) {
