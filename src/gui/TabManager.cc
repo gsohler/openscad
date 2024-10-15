@@ -494,7 +494,6 @@ void TabManager::openTabFile(const QString& filename)
   if(boost::algorithm::ends_with(filename, ".py")) {
     std::string templ="from openscad import *\n";	  
     std::string libs = Settings::Settings::pythonNetworkImportList.value();
-    printf("libs is %s\n",libs.c_str());
     std::stringstream ss(libs);
     std::string word;
     while(std::getline(ss,word,'\n')){
