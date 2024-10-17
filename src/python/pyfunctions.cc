@@ -1205,6 +1205,7 @@ PyObject *python_translate_sub(PyObject *obj, Vector3d translatevec)
 
 PyObject *python_translate_core(PyObject *obj, PyObject *v) 
 {
+  if(v == nullptr) return obj;
   double x = 0, y = 0, z = 0;
   if (python_vectorval(v, 1, 3, &x, &y, &z)) {
     PyErr_SetString(PyExc_TypeError, "Invalid vector specifiaction in trans");
