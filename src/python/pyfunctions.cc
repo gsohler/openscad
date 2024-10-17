@@ -1876,7 +1876,7 @@ PyObject *python_color_core(PyObject *obj, PyObject *color, double alpha, int te
   DECLARE_INSTANCE
   auto node = std::make_shared<ColorNode>(instance);
 
-  Vector4d col(0,0,0,1);
+  Vector4d col(0,0,0,alpha);
   if(!python_vectorval(color, 3, 4, &col[0], &col[1], &col[2], &col[3])) {
 	  for(int i=0;i<4;i++) node->color[i] = col[i];
   }
@@ -1902,7 +1902,6 @@ PyObject *python_color_core(PyObject *obj, PyObject *color, double alpha, int te
     return nullptr;
   }
 	
-  node->color[3] = alpha;
   node->textureind=textureind;
   if(textureind != -1 && color == NULL) {
 	node->color[0]=0.5;
