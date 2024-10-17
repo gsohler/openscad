@@ -3656,15 +3656,12 @@ PyObject *python_nimport(PyObject *self, PyObject *args, PyObject *kwargs)
   filename = url.substr(url.find_last_of("/") + 1);
   importcode = "from "+filename.substr(0,filename.find_last_of("."))+" import *";
 
-#ifdef _WIN32
-    path =PlatformUtils::userLibraryPath() + "\\" + filename;
-#else
-    path =PlatformUtils::userLibraryPath() + "//" + filename;
-#endif   
-  bool do_download=false;
+  path =PlatformUtils::userLibraryPath() + "/" + filename;
+  bool do_download=false; 
   if(!called_already) {
     do_download=true;	  
   }
+  called_already=true; // TODO per file 
   std::ifstream f(path.c_str());
   if(!f.good()) {
     do_download=true;	  
@@ -3677,7 +3674,6 @@ PyObject *python_nimport(PyObject *self, PyObject *args, PyObject *kwargs)
   }
 
   PyRun_SimpleString(importcode.c_str());
-  called_already=true;
   return Py_None;
 }
 

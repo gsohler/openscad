@@ -608,7 +608,7 @@ void initPython(double time)
     PyConfig_InitPythonConfig(&config);
     std::string libdir;
 #ifdef _WIN32
-    libdir= PlatformUtils::applicationPath()+"\\..\\libraries\\python:"+PlatformUtils::userLibraryPath()+":.";
+    libdir= PlatformUtils::applicationPath()+"\\..\\libraries\\python;"+PlatformUtils::userLibraryPath()+";.";
 #else
     libdir= PlatformUtils::applicationPath()+"/../libraries/python:"+ PlatformUtils::userLibraryPath()+":.";
 #endif   
