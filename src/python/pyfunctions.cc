@@ -1863,7 +1863,7 @@ int python__setitem__(PyObject *dict, PyObject *key, PyObject *v)
 }
 
 
-PyObject *python_color_core(PyObject *obj, char *colorname, double alpha, int textureind)
+PyObject *python_color_core(PyObject *obj, PyObject *color, double alpha, int textureind)
 {
   PyObject *child_dict;
   std::shared_ptr<AbstractNode> child;
@@ -1875,41 +1875,39 @@ PyObject *python_color_core(PyObject *obj, char *colorname, double alpha, int te
   DECLARE_INSTANCE
   auto node = std::make_shared<ColorNode>(instance);
 
-  /*
-     if (parameters["c"].type() == Value::Type::VECTOR) {
-     const auto& vec = parameters["c"].toVector();
-     for (size_t i = 0; i < 4; ++i) {
-      node->color[i] = i < vec.size() ? (float)vec[i].toDouble() : 1.0f;
-      if (node->color[i] > 1 || node->color[i] < 0) {
-        LOG(message_group::Warning, inst->location(), parameters.documentRoot(), "color() expects numbers between 0.0 and 1.0. Value of %1$.1f is out of range", node->color[i]);
-      }
-     }
-     } else if (parameters["c"].type() == Value::Type::STRING) {
-   */
-if(colorname != NULL) {
-  boost::algorithm::to_lower(colorname);
-  if (webcolors.find(colorname) != webcolors.end()) {
-    node->color = webcolors.at(colorname);
-  } else {
-    // Try parsing it as a hex color such as "#rrggbb".
-    const auto hexColor = parse_hex_color(colorname);
-    if (hexColor) {
-      node->color = *hexColor;
-    } else {
-      PyErr_SetString(PyExc_TypeError, "Cannot parse color");
-//        LOG(message_group::Warning, inst->location(), parameters.documentRoot(), "Unable to parse color \"%1$s\"", colorname);
-//        LOG(message_group::None, Location::NONE, "", "Please see https://en.wikipedia.org/wiki/Web_colors");
-      return NULL;
-    }
+  Vector4d col(0,0,0,1);
+  if(!python_vectorval(color, 3, 4, &col[0], &col[1], &col[2], &col[3])) {
+	  for(int i=0;i<4;i++) node->color[i] = col[i];
   }
-}
+  else if(PyUnicode_Check(color)) {
+    PyObject* value = PyUnicode_AsEncodedString(color, "utf-8", "~");
+    char *colorname =  PyBytes_AS_STRING(value);
+    boost::algorithm::to_lower(colorname);
+    if (webcolors.find(colorname) != webcolors.end()) {
+      node->color = webcolors.at(colorname);
+    } else {
+    // Try parsing it as a hex color such as "#rrggbb".
+      const auto hexColor = parse_hex_color(colorname);
+      if (hexColor) {
+        node->color = *hexColor;
+      } else {
+	printf("Error created\n");
+        PyErr_SetString(PyExc_TypeError, "Cannot parse color");
+        return NULL;
+      }
+    }
+  } else {
+    PyErr_SetString(PyExc_TypeError, "Unknown color representation");
+    return nullptr;
+  }
+	
   node->color[3] = alpha;
   node->textureind=textureind;
-  if(textureind != -1 && colorname == NULL) {
+  if(textureind != -1 && color == NULL) {
 	node->color[0]=0.5;
 	node->color[1]=0.5;
 	node->color[2]=0.5;
-}
+  }
   node->children.push_back(child);
 
   PyObject *pyresult = PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
@@ -1928,32 +1926,32 @@ PyObject *python_color(PyObject *self, PyObject *args, PyObject *kwargs)
 {
   char *kwlist[] = {"obj", "c", "alpha", "texture",NULL};
   PyObject *obj = NULL;
-  char *colorname = NULL;
+  PyObject *color = NULL;
   double alpha = 1.0;
   int textureind=-1;
   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|sdi", kwlist,
                                    &obj,
-                                   &colorname, &alpha, &textureind
+                                   &color, &alpha, &textureind
                                    )) {
     PyErr_SetString(PyExc_TypeError, "error during parsing color");
     return NULL;
   }
-  return python_color_core(obj, colorname, alpha, textureind);
+  return python_color_core(obj, color, alpha, textureind);
 }
 
 PyObject *python_oo_color(PyObject *obj, PyObject *args, PyObject *kwargs)
 {
   char *kwlist[] = {"c", "alpha", "texture",NULL};
-  char *colorname = NULL;
+  PyObject *color = NULL;
   double alpha = 1.0;
   int textureind=-1;
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|sdi", kwlist,
-                                   &colorname, &alpha, &textureind
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|Odi", kwlist,
+                                   &color, &alpha, &textureind
                                    )) {
     PyErr_SetString(PyExc_TypeError, "error during parsing color");
     return NULL;
   }
-  return python_color_core(obj, colorname, alpha, textureind);
+  return python_color_core(obj, color, alpha, textureind);
 }
 
 typedef std::vector<int> intList;
