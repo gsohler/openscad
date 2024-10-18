@@ -1471,7 +1471,7 @@ PyObject *python_wrap_core(PyObject *obj, double r, double fn, double fa, double
   PyObject *dummydict;
   std::shared_ptr<AbstractNode> child = PyOpenSCADObjectToNodeMulti(obj, &dummydict);
   if (child == NULL) {
-    PyErr_SetString(PyExc_TypeError, "Invalid type for  Object in translate\n");
+    PyErr_SetString(PyExc_TypeError, "Invalid type for  Object in Wrap\n");
     return NULL;
   }
 
@@ -1886,6 +1886,7 @@ PyObject *python_color_core(PyObject *obj, PyObject *color, double alpha, int te
     boost::algorithm::to_lower(colorname);
     if (webcolors.find(colorname) != webcolors.end()) {
       node->color = webcolors.at(colorname);
+      node->color[3]=alpha;
     } else {
     // Try parsing it as a hex color such as "#rrggbb".
       const auto hexColor = parse_hex_color(colorname);

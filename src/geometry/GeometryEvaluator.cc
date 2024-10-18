@@ -1978,27 +1978,12 @@ GeometryEvaluator::ResultObject GeometryEvaluator::applyToChildren3D(const Abstr
 	break;
     }
  
-    if(std::shared_ptr<const PolySet> ps = std::dynamic_pointer_cast<const PolySet>(geom)) {
+    std::shared_ptr<const PolySet> ps= PolySetUtils::getGeometryAsPolySet(geom);
+    if(ps != nullptr) {
       auto ps_offset =  offset3D(ps,offNode->delta);
 
       geom = std::move(ps_offset);
       return ResultObject::mutableResult(geom);
-    } else if (std::dynamic_pointer_cast<const ManifoldGeometry>(geom)) {
-      auto ps = PolySetUtils::getGeometryAsPolySet(geom);
-      auto ps_offset =  offset3D(ps,offNode->delta);
-      geom = std::move(ps_offset);
-      return ResultObject::mutableResult(geom);
-    } else if(const auto geomlist = std::dynamic_pointer_cast<const GeometryList>(geom).get()) {
-//      for (const Geometry::GeometryItem& item : geomlist->getChildren()) { // TODO
-//      }
-        
-    } else if (std::shared_ptr<const CGAL_Nef_polyhedron> nef = std::dynamic_pointer_cast<const CGAL_Nef_polyhedron>(geom)) {
-      const CGAL_Nef_polyhedron nefcont=*(nef.get());
-      std::shared_ptr<PolySet> ps = CGALUtils::createPolySetFromNefPolyhedron3(*(nefcont.p3));
-      std::shared_ptr<const Geometry> ps_offset =  offset3D(ps,offNode->delta);
-      geom = std::move(ps_offset);
-      return ResultObject::mutableResult(geom);
-    } else if (const auto hybrid = std::dynamic_pointer_cast<const CGALHybridPolyhedron>(geom)) { // TODO
     }
   }
   default:
@@ -2163,12 +2148,6 @@ void GeometryEvaluator::smartCacheInsert(const AbstractNode& node,
       CGALCache::instance()->insert(key, geom);
     }
   } else if (!GeometryCache::instance()->contains(key)) {
-    // FIXME: Sanity-check Polygon2d as well?
-    // if (const auto ps = std::dynamic_pointer_cast<const PolySet>(geom)) {
-    //   assert(!ps->hasDegeneratePolygons());
-    // }
-
-    // Perhaps add acceptsGeometry() to GeometryCache as well?
     if (!GeometryCache::instance()->insert(key, geom)) {
       LOG(message_group::Warning, "GeometryEvaluator: Node didn't fit into cache.");
     }
@@ -3131,32 +3110,38 @@ static std::unique_ptr<PolySet> wrapObject(const WrapNode& node, const PolySet *
 	
         tmp1 = ps->vertices[p[forw_ind]];
         tmp2 = ps->vertices[p[(forw_ind+1)%n]];
-        forw_pt = tmp1 +(tmp2-tmp1)*(xnext-tmp1[0])/(tmp2[0]-tmp1[1]);
+        forw_pt = tmp1 +(tmp2-tmp1)*(xnext-tmp1[0])/(tmp2[0]-tmp1[0]);
         curslice.push_back(forw_pt);									      
         tmp1 = ps->vertices[p[back_ind]];
         tmp2 = ps->vertices[p[(back_ind+n-1)%n]];
-        back_pt = tmp1 +(tmp2-tmp1)*(xnext-tmp1[0])/(tmp2[0]-tmp1[1]);
+        back_pt = tmp1 +(tmp2-tmp1)*(xnext-tmp1[0])/(tmp2[0]-tmp1[0]);
         curslice.insert(curslice.begin(), back_pt);									      
       }  
 									      
       double ang, rad;
-      builder.beginPolygon(curslice.size());	  
+
       for(int j=0;j<curslice.size();j++) {
         auto &pt = curslice[j];
         ang=pt[0]/node.r;
         rad = node.r-pt[1];
-        Vector3d pt_trans=Vector3d(rad*cos(ang),rad*sin(ang),pt[2]);
-        builder.addVertex(pt_trans);	    
+        pt=Vector3d(rad*cos(ang),rad*sin(ang),pt[2]);
       }
-      builder.endPolygon();
+      for(int j=0;j<curslice.size()-2;j++) {
+        builder.beginPolygon(curslice.size());	  
+        builder.addVertex(curslice[0]);	    
+        builder.addVertex(curslice[j+1]);	    
+        builder.addVertex(curslice[j+2]);	    
+        builder.endPolygon();
+      }
+// TODO color alpha
       curslice.clear();
       xcur=xnext;
       curslice.push_back(back_pt);	    
       curslice.push_back(forw_pt);	    
     } while(end == 0);
-    continue;
   }
-  return builder.build();
+  auto ps1 = builder.build();
+  return ps1;
 }
 
 Response GeometryEvaluator::visit(State& state, const PullNode& node)
@@ -3164,7 +3149,8 @@ Response GeometryEvaluator::visit(State& state, const PullNode& node)
   std::shared_ptr<const Geometry> newgeom;
   std::shared_ptr<const Geometry> geom = applyToChildren3D(node, OpenSCADOperator::UNION).constptr();
   if (geom) {
-    if(std::shared_ptr<const PolySet> ps = std::dynamic_pointer_cast<const PolySet>(geom)) {
+    std::shared_ptr<const PolySet> ps=PolySetUtils::getGeometryAsPolySet(geom);
+    if(ps != nullptr) {
       std::unique_ptr<Geometry> ps_pulled =  pullObject(node,ps.get());
       newgeom = std::move(ps_pulled);
       addToParent(state, node, newgeom);
@@ -3224,7 +3210,11 @@ Response GeometryEvaluator::visit(State& state, const WrapNode& node)
   std::shared_ptr<const Geometry> newgeom;
   std::shared_ptr<const Geometry> geom = applyToChildren3D(node, OpenSCADOperator::UNION).constptr();
   if (geom) {
-    if(std::shared_ptr<const PolySet> ps = std::dynamic_pointer_cast<const PolySet>(geom)) {
+    std::shared_ptr<const PolySet> ps = std::dynamic_pointer_cast<const PolySet>(geom);
+    if(ps != nullptr) {
+       ps = PolySetUtils::tessellate_faces(*ps);
+    } else ps= PolySetUtils::getGeometryAsPolySet(geom);
+    if(ps != nullptr) { 
       std::unique_ptr<Geometry> ps_wrapped =  wrapObject(node,ps.get());
       newgeom = std::move(ps_wrapped);
       addToParent(state, node, newgeom);
