@@ -3483,6 +3483,10 @@ PyObject *python_group(PyObject *self, PyObject *args, PyObject *kwargs)
 
 PyObject *python_align_core(PyObject *obj, PyObject *pyrefmat, PyObject *pydstmat)
 {
+  if(obj->ob_type != &PyOpenSCADType) {
+    PyErr_SetString(PyExc_TypeError, "Must specify Object as 1st parameter");
+    return nullptr;
+  }
   PyObject *child_dict=nullptr;	  
   std::shared_ptr<AbstractNode> dstnode = PyOpenSCADObjectToNode(obj, &child_dict);
   if(dstnode == nullptr) {
