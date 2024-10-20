@@ -1025,7 +1025,7 @@ void ScintillaEditor::uncommentSelection()
   for (int line = lineFrom; line <= lineTo; ++line) {
     QString lineText = qsci->text(line);
     if (lineText.startsWith(commentString)) {
-      qsci->setSelection(line, 0, line, 2);
+      qsci->setSelection(line, 0, line, strlen(commentString));
       qsci->removeSelectedText();
     }
     // Handles the case where there's a comment without space
