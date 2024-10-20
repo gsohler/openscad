@@ -1297,8 +1297,8 @@ std::vector<std::shared_ptr<const PolySet>>  offset3D_decompose(std::shared_ptr<
 		decomposed->vertices = vertices1;
 		decomposed->indices = indices1;
 		results.push_back( std::shared_ptr<const PolySet>(decomposed));
-		printf("========================\n");
-		printf("Faces included size is %ld\n",faces_included.size());
+//		printf("========================\n");
+//		printf("Faces included size is %ld\n",faces_included.size());
 	}
 	return results;
 }
@@ -1307,7 +1307,7 @@ extern std::vector<SelectedObject> debug_pts;
 std::vector<IndexedFace>  offset3D_removeOverPoints(const std::vector<Vector3d> &vertices, std::vector<IndexedFace> indices,int  round)
 {
 	// go  thourh all indicices and calculate area
-	printf("Remove OverlapPoints\n");
+//	printf("Remove OverlapPoints\n");
 //	debug_pts.clear();
 
 	std::vector<IndexedFace> indicesNew;
@@ -1508,7 +1508,7 @@ std::vector<Vector3d> offset3D_offset(std::vector<Vector3d> vertices, std::vecto
 					face_vpos.push_back(pos);
 				}				
 	
-				printf("Special alg for Vertex %d\n",i);
+//				printf("Special alg for Vertex %d\n",i);
 	
 				IndexedFace mainfiller; // core of star
 
@@ -1557,7 +1557,7 @@ std::vector<Vector3d> offset3D_offset(std::vector<Vector3d> vertices, std::vecto
 							}
 						}
 					}
-					printf("bestpt is %g/%g/%g\n",bestpt[0], bestpt[1], bestpt[2]);
+//					printf("bestpt is %g/%g/%g\n",bestpt[0], bestpt[1], bestpt[2]);
 					mainfiller.insert(mainfiller.begin(),newind+j); // insert in reversed order
 					verticesNew[newind+j]=bestpt;
 					faces1best.push_back(face1best);
@@ -1569,7 +1569,7 @@ std::vector<Vector3d> offset3D_offset(std::vector<Vector3d> vertices, std::vecto
 					Vector3d diff2=(verticesNew[mainfiller[j+1]] - verticesNew[mainfiller[j+2]]);
 					area += diff1.cross(diff2);
 				}
-				printf("area is %g\n",area.norm());
+//				printf("area is %g\n",area.norm());
 				if(area.norm()  > 1e-6) { // only if points are actually diverging
 
 					for(unsigned int j=0;j<face_order.size();j++) {
@@ -1616,7 +1616,7 @@ std::vector<Vector3d> offset3D_offset(std::vector<Vector3d> vertices, std::vecto
 			continue;
 		}
 	}
-	printf("%ld Keile found\n",keile.size());
+//	printf("%ld Keile found\n",keile.size());
 	for(unsigned int i=0;i<keile.size();i++) {
 		int faceind=keile[i].ind1;
 		printf("keil faceind is %d\n",faceind);
@@ -1736,7 +1736,7 @@ void  offset3D_reindex(const std::vector<Vector3d> &vertices, std::vector<Indexe
 }
 
 std::shared_ptr<const Geometry> offset3D_convex(const std::shared_ptr<const PolySet> &ps,double off) {
-  printf("Running offset3D %ld polygons\n",ps->indices.size());
+//  printf("Running offset3D %ld polygons\n",ps->indices.size());
 //  if(off == 0) return ps;
   std::vector<Vector3d> verticesNew;
   std::vector<IndexedFace> indicesNew;
@@ -1778,7 +1778,7 @@ std::shared_ptr<const Geometry> offset3D_convex(const std::shared_ptr<const Poly
     }
     return geom;
   } else {
-    printf("Downsize %g\n",off);	  
+//    printf("Downsize %g\n",off);	  
 
     std::vector<Vector3d> vertices = ps->vertices;
     std::vector<IndexedFace> indices = ps->indices;
@@ -1787,36 +1787,36 @@ std::shared_ptr<const Geometry> offset3D_convex(const std::shared_ptr<const Poly
     std::vector<Vector4d> newNormals;
     do
     {
-      printf("New Round %d Vertices %ld Faces %ld\n=======================\n",round,vertices.size(), indices.size());	    
+//      printf("New Round %d Vertices %ld Faces %ld\n=======================\n",round,vertices.size(), indices.size());	    
 
       indices  = offset3D_removeOverPoints(vertices, indices,round);
-      printf("Reindex OP\n");
+//      printf("Reindex OP\n");
       offset3D_reindex(vertices, indices, verticesNew, indicesNew);
       vertices = verticesNew;
       indices = indicesNew;
 
-      printf("Normals OP\n");
+//      printf("Normals OP\n");
       normals = calcTriangleNormals(vertices, indices);
 
-      printf("Merge OP\n");
+//      printf("Merge OP\n");
       std::vector<int> faceParents;
       indicesNew  = mergeTriangles(indices,normals,newNormals, faceParents, vertices ); 
       normals = newNormals;									   
       indices = indicesNew;									       
 
-      printf("Remove Colinear Points\n");
+//      printf("Remove Colinear Points\n");
       offset3D_RemoveColinear(vertices, indices,pointToFaceInds, pointToFacePos);
 
       if(indices.size() == 0 || fabs(off) <  0.0001) break;
       if(round == 2) break;
 
-      printf("Offset OP\n");
+//      printf("Offset OP\n");
       verticesNew = offset3D_offset(vertices, indices, normals, pointToFaceInds, pointToFacePos, off,round);
       vertices = verticesNew;
       round++;
     }
     while(1);
-    offset_3D_dump(vertices, indices);
+//    offset_3D_dump(vertices, indices);
     // -------------------------------
     // Map all points and assemble
     // -------------------------------
@@ -1835,8 +1835,9 @@ std::shared_ptr<const Geometry> offset3D(const std::shared_ptr<const PolySet> &p
   if(!enabled) return offset3D_convex(ps, off);
 
 
-  std::vector<std::shared_ptr<const PolySet>> decomposed =  offset3D_decompose(ps);
-  printf("Decomposed into %ld parts\n",decomposed.size());
+  std::vector<std::shared_ptr<const PolySet>> decomposed;
+  decomposed.push_back(ps); //  =  offset3D_decompose(ps);
+//  printf("Decomposed into %ld parts\n",decomposed.size());
   if(decomposed.size() == 0) {
     PolySet *offset_result =  new PolySet(3, /* convex */ true);
     return std::shared_ptr<PolySet>(offset_result);

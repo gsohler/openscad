@@ -613,7 +613,6 @@ void initPython(double time)
     libdir= PlatformUtils::applicationPath()+"/../libraries/python:"+ PlatformUtils::userLibraryPath()+":.";
 #endif   
 //    libdir=PlatformUtils::userLibraryPath();
-    printf("libdir is %s\n",libdir.c_str());
     PyConfig_SetBytesString(&config, &config.pythonpath_env, libdir.c_str());
     PyStatus status = Py_InitializeFromConfig(&config);
     if (PyStatus_Exception(status)) {
