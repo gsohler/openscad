@@ -640,7 +640,7 @@ PyObject *python_ifrep(PyObject *self, PyObject *args, PyObject *kwargs)
   PyObject *object = NULL;
   PyObject *dummydict;
 
-  char *kwlist[] = {"obj"};
+  char *kwlist[] = {"obj", nullptr};
   std::shared_ptr<AbstractNode> child;
 
   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O!", kwlist,

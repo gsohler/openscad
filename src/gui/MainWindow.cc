@@ -194,15 +194,10 @@ int curl_download(std::string url, std::string path)
       fclose(fh);
       if(status == CURLE_OK) {
 	try {
-          printf("a\n");		
 	  if(std::filesystem::exists(path)) std::filesystem::remove(path);
-          printf("b\n");		
           std::filesystem::rename(path+"_", path);	      
-          printf("c\n");		
 	}catch(const std::exception& ex)
         {
-          printf("ex\n");		
-          printf("ex\n");		
 	  std::cerr << ex.what() << endl;
           LOG(message_group::Error, "Exception during installing file!");
         }  

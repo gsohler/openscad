@@ -289,7 +289,7 @@ int operator==(const TriCombineStub &t1, const TriCombineStub &t2)
 	return 0;
 }
 
-static indexedFaceList mergeTrianglesSub(const std::vector<IndexedFace> &triangles)
+static indexedFaceList mergeTrianglesSub(const std::vector<IndexedFace> &triangles, const std::vector<Vector3d> &vert)
 {
 	unsigned int i,j,n;
 	int ind1, ind2;
@@ -450,8 +450,25 @@ static indexedFaceList mergeTrianglesSub(const std::vector<IndexedFace> &triangl
 			}
 		}
 		while(repeat);
+		// Reduce colinear points
+		int n=poly.size();
+		IndexedFace poly_new;
+		int last=poly[n-1],cur=poly[0],next;
+		for(int i=0;i< n;i++) {
+			next=poly[(i+1)%n];
+			Vector3d p0=vert[last];
+			Vector3d p1=vert[cur];
+			Vector3d p2=vert[next];
+			if((p2-p1).cross(p1-p0).norm() > 0.00001) {
+				poly_new.push_back(cur);
+				last=cur;
+				cur=next;
+			} else {
+				cur=next;
+			}
+		}
 		
-		if(poly.size() > 2) result.push_back(poly);
+		if(poly_new.size() > 2) result.push_back(poly_new);
 	}
 	return result;
 }
@@ -526,7 +543,7 @@ std::vector<IndexedFace> mergeTriangles(const std::vector<IndexedFace> polygons,
 	newNormals.clear();
 	faceParents.clear();
 	for(unsigned int i=0;i<polygons_sorted.size();i++ ) {
-		indexedFaceList indices_sub = mergeTrianglesSub(polygons_sorted[i]);
+		indexedFaceList indices_sub = mergeTrianglesSub(polygons_sorted[i], vert);
 		int off=indices.size();
 		for(unsigned int j=0;j<indices_sub.size();j++) {
 			indices.push_back(indices_sub[j]);
@@ -1069,21 +1086,16 @@ typedef CGAL::Surface_mesh<Point_3> Surface_mesh;
 
 
 void offset3D_calculateNefPolyhedron_cgal(const std::vector<Vector4d> &faces,std::vector<Vector3d> &vertices, std::vector<IndexedFace> & indices) {
-  printf("1\n");
   Nef_polyhedron N1(Plane_3( 1, 0, 0,-1));
   Nef_polyhedron N2(Plane_3(-1, 0, 0,-1));
   Nef_polyhedron N3(Plane_3( 0, 1, 0,-1));
   Nef_polyhedron N4(Plane_3( 0,-1, 0,-1));
   Nef_polyhedron N5(Plane_3( 0, 0, 1,-1));
   Nef_polyhedron N6(Plane_3( 0, 0,-1,-1));
-  printf("x\n");
   Nef_polyhedron Cube = N1 * N2 * N3 * N4 * N5 * N6;
   printf("y\n");
   Surface_mesh resultMesh;	
-  printf("a\n");
   CGAL::convert_nef_polyhedron_to_polygon_mesh (Cube, resultMesh, true);
-  printf("b\n");
-  printf("size = %d\n",resultMesh.number_of_faces());
 
   vertices.clear();
  for (auto  vd : resultMesh.vertices()){
@@ -1629,7 +1641,7 @@ std::vector<Vector3d> offset3D_offset(std::vector<Vector3d> vertices, std::vecto
 				std::vector<IndexedFace> input;
 				input.push_back(indices[keile[i].ind2]);
 				input.push_back(indices[keile[i].ind1]);
-				output = mergeTrianglesSub(input);
+				output = mergeTrianglesSub(input, verticesNew);
 			}
 			if(output.size() == 1) {
 				printf("Successful merge #1 %d -> %d\n",keile[i].ind1, keile[i].ind2);
@@ -1641,7 +1653,7 @@ std::vector<Vector3d> offset3D_offset(std::vector<Vector3d> vertices, std::vecto
 				std::vector<IndexedFace> input;
 				input.push_back(indices[keile[i].ind3]);
 				input.push_back(indices[keile[i].ind1]);
-				output = mergeTrianglesSub(input);
+				output = mergeTrianglesSub(input, verticesNew);
 			}
 			if(output.size() == 1) {
 				printf("Successful merge #2 %d -> %d\n",keile[i].ind1, keile[i].ind3);
