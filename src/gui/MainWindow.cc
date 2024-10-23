@@ -145,17 +145,6 @@ extern bool python_trusted;
 #include "cryptopp/filters.h"
 #include "cryptopp/base64.h"
 
-std::string SHA256HashString(std::string aString){
-  std::string digest;
-  CryptoPP::SHA256 hash;
-
-  CryptoPP::StringSource foo(aString, true,
-                             new CryptoPP::HashFilter(hash,
-                                                      new CryptoPP::Base64Encoder(
-                                                        new CryptoPP::StringSink(digest))));
-
-  return digest;
-}
 
 #endif // ifdef ENABLE_PYTHON
 
@@ -344,6 +333,7 @@ MainWindow::MainWindow(const QStringList& filenames)
   const QString surfaceStatement = "surface(\"%1\");\n";
   const QString importFunction = "data = import(\"%1\");\n";
   knownFileExtensions["stl"] = importStatement;
+  knownFileExtensions["step"] = importStatement;
   knownFileExtensions["obj"] = importStatement;
   knownFileExtensions["3mf"] = importStatement;
   knownFileExtensions["off"] = importStatement;
@@ -1890,6 +1880,7 @@ bool MainWindow::fileChangedOnDisk()
 
 #ifdef ENABLE_PYTHON
 bool MainWindow::trust_python_file(const std::string& file,  const std::string& content) {
+/*	
   QSettingsCached settings;
   char setting_key[256];
   if (python_trusted) return true;
@@ -1939,6 +1930,8 @@ bool MainWindow::trust_python_file(const std::string& file,  const std::string& 
     return false;
   }
   return false;
+*/
+  return true;      	
 }
 #endif // ifdef ENABLE_PYTHON
 
