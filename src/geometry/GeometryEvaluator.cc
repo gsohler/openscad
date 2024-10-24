@@ -111,7 +111,18 @@ std::shared_ptr<const Geometry> GeometryEvaluator::evaluateGeometry(const Abstra
   }
   return result;
 }
+void vectorDump(const char *msg, const Vector3d &vec) {
+  printf("%s ",msg );
+    printf("(%g/%g/%g) ",vec[0], vec[1], vec[2]);    
+}
 
+void triangleDump(const char *msg, const IndexedFace &face, const std::vector<Vector3d> &vert) {
+  printf("%s ",msg );
+  for(int i=0;i<face.size();i++) {
+    const Vector3d &pt = vert[face[i]];
+    vectorDump(" ", pt);
+  }
+}
 
 Vector4d calcTriangleNormal(const std::vector<Vector3d> &vertices,const IndexedFace &pol)
 {
@@ -148,8 +159,9 @@ bool pointInPolygon(const std::vector<Vector3d> &vert, const IndexedFace &bnd, i
 	double dist;
 	n=bnd.size();
 	int cuts=0;
-	Vector3d fdir, fnorm, p1, p2;
+	Vector3d p1, p2;
 	Vector3d pt=vert[ptind];
+	Vector3d res;
 	if(n < 3) return false;
 	Vector3d raydir=vert[bnd[1]]-vert[bnd[0]];
 	Vector3d fn=raydir.cross(vert[bnd[1]]-vert[bnd[2]]).normalized();
@@ -158,23 +170,12 @@ bool pointInPolygon(const std::vector<Vector3d> &vert, const IndexedFace &bnd, i
 		// build fence side
 		const Vector3d &p1=vert[bnd[i]];
 		const Vector3d &p2=vert[bnd[(i+1)%n]];
-		fdir=p2-p1;
-		fnorm=fdir.cross(fn);
 
-		// make sure, fence is ahead
-		if(fabs(fnorm.dot(raydir)) < 1e-5) continue;
+                if(linsystem( p2-p1, raydir,fn,pt-p1,res)) continue;
 
-		dist = (pt-p1).dot(fnorm);
-		if(fnorm.dot(raydir) > 0) dist=-dist;
-		if(dist < 0) continue;
-
-		// make sure begin of fence is on the right
-		dist= (pt-p1).dot(fdir);
-		if(dist < 0) continue;
-
-		// make sure end of fence is on the left
-		dist= (pt-p2).dot(fdir);
-		if(dist > 0) continue;
+		if(res[1] > 0) continue; // not behind
+		if(res[0] < 0) continue; // within segment
+		if(res[0] > 1) continue;
 		cuts++;
 	}
 	return (cuts&1)?true:false;
@@ -2161,6 +2162,12 @@ void GeometryEvaluator::smartCacheInsert(const AbstractNode& node,
       CGALCache::instance()->insert(key, geom);
     }
   } else if (!GeometryCache::instance()->contains(key)) {
+    // FIXME: Sanity-check Polygon2d as well?
+    // if (const auto ps = std::dynamic_pointer_cast<const PolySet>(geom)) {
+    //   assert(!ps->hasDegeneratePolygons());
+    // }
+
+    // Perhaps add acceptsGeometry() to GeometryCache as well?
     if (!GeometryCache::instance()->insert(key, geom)) {
       LOG(message_group::Warning, "GeometryEvaluator: Node didn't fit into cache.");
     }
