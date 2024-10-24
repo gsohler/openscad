@@ -1612,12 +1612,9 @@ PyObject *python_export_core(PyObject *obj, char *file)
   std::string suffix = path.has_extension() ? path.extension().generic_string().substr(1) : "";
   boost::algorithm::to_lower(suffix);
 
-  ExportFileFormatOptions exportFileFormatOptions;
-
-  FileFormat exportFileFormat{FileFormat::STL};
-  const auto format_iter = exportFileFormatOptions.exportFileFormats.find(suffix);
-  if (format_iter != exportFileFormatOptions.exportFileFormats.end()) {
-    exportFileFormat = format_iter->second;
+  FileFormat exportFileFormat = FileFormat::BINARY_STL;
+  if (!fileformat::fromIdentifier(suffix, exportFileFormat)) {
+    LOG("Invalid suffix %1$s. Defaulting to binary STL.", suffix);
   }
 
   std::vector<Export3mfInfo> export3mfInfos;
@@ -1657,20 +1654,12 @@ PyObject *python_export_core(PyObject *obj, char *file)
   }  
 
 
-  ExportInfo exportInfo;
- 
-  exportInfo.format = exportFileFormat;
-  exportInfo.fileName = file;
-  exportInfo.displayName = file;
-  exportInfo.sourceFilePath = file;
-  exportInfo.sourceFileName = file;
-  exportInfo.useStdOut = false;
-  exportInfo.options = nullptr;
+  ExportInfo exportInfo = {.format = exportFileFormat, .sourceFilePath = file};
  
   if(exportFileFormat == FileFormat::_3MF) {
     std::ofstream fstream(file,  std::ios::out | std::ios::trunc | std::ios::binary);
     if (!fstream.is_open()) {
-      LOG(_("Can't open file \"%1$s\" for export"), exportInfo.displayName);
+      LOG(_("Can't open file \"%1$s\" for export"), file);
       return nullptr;
     }
     export_3mf(export3mfInfos, fstream);
@@ -1680,7 +1669,7 @@ PyObject *python_export_core(PyObject *obj, char *file)
       LOG("This Format can at most export one object");
       return nullptr;
     }	    
-    exportFileByName(export3mfInfos[0].geom, exportInfo);
+    exportFileByName(export3mfInfos[0].geom, file, exportInfo);
   }
   return Py_None;
 }
