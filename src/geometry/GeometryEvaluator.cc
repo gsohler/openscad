@@ -1868,7 +1868,7 @@ std::shared_ptr<const Geometry> offset3D(const std::shared_ptr<const PolySet> &p
   return geom;
 }
 
-std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> ps,  std::vector<bool> corner_selected, double r, int fn);
+std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> ps,  std::vector<bool> corner_selected, double r, int fn, double minang);
 
 Vector3d createFilletRound(Vector3d pt)
 {
@@ -1896,7 +1896,7 @@ std::unique_ptr<const Geometry> addFillets(std::shared_ptr<const Geometry> resul
   std::vector<bool> corner_selected;
   for(int i=0;i<psr->vertices.size();i++) corner_selected.push_back(points.count(createFilletRound(psr->vertices[i]))>0?true:false);
 
-  return  createFilletInt(psr,corner_selected, r, fn);
+  return  createFilletInt(psr,corner_selected, r, fn,30.0);
 
 }
 

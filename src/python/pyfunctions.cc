@@ -2127,13 +2127,14 @@ PyObject *python_oo_debug(PyObject *self, PyObject *args, PyObject *kwargs)
 }
 
 
-PyObject *python_fillet_core(PyObject *obj, double  r, int fn, PyObject *sel)
+PyObject *python_fillet_core(PyObject *obj, double  r, int fn, PyObject *sel, double minang)
 {
   PyObject *dummydict;
   DECLARE_INSTANCE
   auto node = std::make_shared<FilletNode>(instance);
   node->r = r;
   node->fn = fn;
+  node->minang=minang;
   if (obj != nullptr) node->children.push_back(PyOpenSCADObjectToNodeMulti(obj, &dummydict));
   else {	 
     PyErr_SetString(PyExc_TypeError, "Invalid type for  Object in fillet \n");
@@ -2150,31 +2151,33 @@ PyObject *python_fillet(PyObject *self, PyObject *args, PyObject *kwargs)
 {
   double r=1.0;
   double fn=NAN;
-  char *kwlist[] = {"obj", "r","sel","n", NULL};
+  double minang=30;
+  char *kwlist[] = {"obj", "r","sel","n", "minang", NULL};
   PyObject *obj = NULL;
   PyObject *sel = NULL;
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "Od|Od", kwlist, &obj,&r,&sel,&fn)) {
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "Od|Odd", kwlist, &obj,&r,&sel,&fn,&minang)) {
     PyErr_SetString(PyExc_TypeError, "error during parsing\n");
     return NULL;
   }
   double dummy;
   if(isnan(fn)) get_fnas(fn, dummy, dummy);
-  return python_fillet_core(obj,r,fn, sel);
+  return python_fillet_core(obj,r,fn, sel, minang);
 }
 
 PyObject *python_oo_fillet(PyObject *obj, PyObject *args, PyObject *kwargs)
 {
   double r=1.0;
   double fn=NAN;
+  double minang=30;
   PyObject *sel = nullptr;
-  char *kwlist[] = {"r","sel", "fn",NULL};
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "d|Od", kwlist,&r,&sel,&fn)) {
+  char *kwlist[] = {"r","sel", "fn","minang", NULL};
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "d|Odd", kwlist,&r,&sel,&fn,&minang)) {
     PyErr_SetString(PyExc_TypeError, "error during parsing\n");
     return NULL;
   }
   double dummy;
   if(isnan(fn)) get_fnas(fn, dummy, dummy);
-  return python_fillet_core(obj,r,fn,sel);
+  return python_fillet_core(obj,r,fn,sel, minang);
 }
 
 PyObject *rotate_extrude_core(PyObject *obj, char *layer, int convexity, double scale, double angle, PyObject *twist, PyObject *origin, PyObject *offset, PyObject *vp, char *method, double fn, double fa, double fs)

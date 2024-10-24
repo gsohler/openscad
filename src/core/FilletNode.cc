@@ -170,10 +170,13 @@ void bezier_patch(PolySetBuilder &builder, Vector3d center, Vector3d dir1, Vecto
   }
 }
 
-																											  //
+Vector3d createFilletLimit(Vector3d v, double r) {
+  return v.normalized()*r;
+}
 
-std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> ps,  std::vector<bool> corner_selected, double r, int bn)
+std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> ps,  std::vector<bool> corner_selected, double r, int bn, double minang)
 {
+  double cos_minang=cos(minang*3.1415/180.0);	
   std::vector<Vector4d> normals, newnormals;
   std::vector<int> faceParents;
   normals = calcTriangleNormals(ps->vertices, ps->indices);
@@ -196,21 +199,29 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
     }	    
   }
 
+  // create Edge DB
   std::unordered_map<EdgeKey, EdgeVal, boost::hash<EdgeKey> > edge_db;
-  edge_db= createEdgeDb(merged);
+  edge_db= createEdgeDb(merged); 
 
-  std::vector<std::vector<int>> corner_rounds ; // which rounded edges in a corner
+  // which rounded edges in a corner coner_rounds[vert]=[other_verts]
+  std::vector<std::vector<int>> corner_rounds ; 
   for(int i=0;i<ps->vertices.size();i++) corner_rounds.push_back(empty);				  
 
   std::vector<SearchReplace> sp;
-  // TODO select edges ( and by intersection , by number)
+  
   for(auto &e: edge_db) {
     if(corner_selected[e.first.ind1] && corner_selected[e.first.ind2])
     {
-      e.second.sel=1;
-
-      corner_rounds[e.first.ind1].push_back(e.first.ind2);
-      corner_rounds[e.first.ind2].push_back(e.first.ind1);
+      auto &facea =merged[e.second.facea];
+      auto &faceb =merged[e.second.faceb];
+      Vector3d fan=calcTriangleNormal(ps->vertices, facea).head<3>();
+      Vector3d fbn=calcTriangleNormal(ps->vertices, faceb).head<3>();
+      double d=fan.dot(fbn);
+      if(d < cos_minang) {
+        e.second.sel=1;
+        corner_rounds[e.first.ind1].push_back(e.first.ind2);
+        corner_rounds[e.first.ind2].push_back(e.first.ind1);
+      }	else e.second.sel=0;
     }		      
   }
 
@@ -226,7 +237,7 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
   // plan fillets of all edges now
   for(auto &e: edge_db) {
     if(e.second.sel == 1) {
-      Vector3d p1=ps->vertices[e.first.ind1];
+      Vector3d p1=ps->vertices[e.first.ind1]; // both ends of the selected edge
       Vector3d p2=ps->vertices[e.first.ind2];
       int debug=0;
       // if(debug) printf("====\nCreate rnd for %d %d %d %d\n",e.first.ind1, e.first.ind2, e.second.facea, e.second.faceb);	    
@@ -240,7 +251,7 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
 
       int facean=facea.size();
       int facebn=faceb.size();
-      double fanf=(faceParents[e.second.facea] != -1)?-1:1;
+      double fanf=(faceParents[e.second.facea] != -1)?-1:1; // is the edge part of a hole
       double fbnf=(faceParents[e.second.faceb] != -1)?-1:1;
       Vector3d fan=calcTriangleNormal(ps->vertices, facea).head<3>();
       Vector3d fbn=calcTriangleNormal(ps->vertices, faceb).head<3>();
@@ -254,10 +265,10 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
       indposbo = faceb[(e.second.posb+2)%facebn];
       indposbi = faceb[e.second.posb];
     
-      Vector3d e_fa1  = (ps->vertices[indposao]-ps->vertices[facea[e.second.posa]]).normalized()*r*fanf; // Facea neben ind1
+      Vector3d e_fa1  = createFilletLimit((ps->vertices[indposao]-ps->vertices[facea[e.second.posa]]), r)*fanf; // Facea neben ind1
       Vector3d e_fa1p = (ps->vertices[indposai]-ps->vertices[facea[e.second.posa]])*fanf; // Face1 nahe  richtung
 															   //
-      Vector3d e_fb1 =  (ps->vertices[indposbo]-ps->vertices[faceb[(e.second.posb+1)%facebn]]).normalized()*r*fbnf; // Faceb neben ind1
+      Vector3d e_fb1 =  createFilletLimit((ps->vertices[indposbo]-ps->vertices[faceb[(e.second.posb+1)%facebn]]),r)*fbnf; // Faceb neben ind1
       Vector3d e_fb1p = (ps->vertices[indposbi]-ps->vertices[faceb[(e.second.posb+1)%facebn]])*fbnf; 
 
       if(corner_rounds[e.first.ind1].size() == 2)
@@ -304,10 +315,10 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
       indposbo = faceb[(e.second.posb+facebn-1)%facebn];
       indposbi = faceb[(e.second.posb+1)%facebn];
 
-      Vector3d e_fa2 = (ps->vertices[indposao]-ps->vertices[facea[(e.second.posa+1)%facean]]).normalized()*r*fanf; // Face1 entfernte richtung
+      Vector3d e_fa2 = createFilletLimit((ps->vertices[indposao]-ps->vertices[facea[(e.second.posa+1)%facean]]),r)*fanf; // Face1 entfernte richtung
       Vector3d e_fa2p = (ps->vertices[indposai]-ps->vertices[facea[(e.second.posa+1)%facean]])*fanf; // Face1 entfernte richtung
 													       //
-      Vector3d e_fb2 = (ps->vertices[indposbo]-ps->vertices[faceb[(e.second.posb+0)%facebn]]).normalized()*r*fbnf; // Face2 entfernte Rcithung
+      Vector3d e_fb2 = createFilletLimit((ps->vertices[indposbo]-ps->vertices[faceb[(e.second.posb+0)%facebn]]),r)*fbnf; // Face2 entfernte Rcithung
       Vector3d e_fb2p = (ps->vertices[indposbi]-ps->vertices[faceb[(e.second.posb+0)%facebn]])*fbnf; // Face2 entfernte Rcithung
         	
 
@@ -355,8 +366,9 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
       }
       if(debug) printf("p2 fa %g/%g/%g fb  %g/%g/%g\n",e_fa2[0], e_fa2[1], e_fa2[2], e_fb2[0], e_fb2[1], e_fb2[2]);
 
+      // Calculate bezier patches
       for(int i=0;i<bn;i++) {
-        double f=(double)i/(double)(bn-1);		
+        double f=(double)i/(double)(bn-1); // from 0 to 1
         e.second.bez1.push_back(builder.vertexIndex(p1 + e_fa1 -2*f*e_fa1 + f*f*(e_fa1+e_fb1)));
         e.second.bez2.push_back(builder.vertexIndex(p2 + e_fa2 -2*f*e_fa2 + f*f*(e_fa2+e_fb2)));
       }
@@ -602,7 +614,7 @@ std::unique_ptr<const Geometry> FilletNode::createGeometry() const
       for(int i=0;i<ps->vertices.size();i++) 
         corner_selected.push_back(true);	      
   }
-  return createFilletInt(ps, corner_selected, this->r, this->fn);
+  return createFilletInt(ps, corner_selected, this->r, this->fn, this->minang);
 }
 
 
