@@ -117,9 +117,44 @@ PyObject *python_cube(PyObject *self, PyObject *args, PyObject *kwargs)
       PyErr_SetString(PyExc_TypeError, "Cube Dimensions must be positive");
       return NULL;
   }
-  if (center == Py_True)  node->center = 1;
-  else if (center == Py_False || center == NULL )  node->center = 0;
-  else {
+  for(int i=0;i<3;i++) node->center[i] = 1;
+  if (center == Py_False || center == NULL ) ;
+  else if (center == Py_True){
+    for(int i=0;i<3;i++) node->center[i] = 0;
+  } else if(PyUnicode_Check(center)) {
+    PyObject* centerval = PyUnicode_AsEncodedString(center, "utf-8", "~");
+    const char *centerstr =  PyBytes_AS_STRING(centerval);
+    if(centerstr == nullptr) {
+      PyErr_SetString(PyExc_TypeError, "Cannot parse center code");
+      return NULL;
+    }
+    if(strlen(centerstr) != 3) {
+      PyErr_SetString(PyExc_TypeError, "Center code must be exactly 3 characters");
+      return NULL;
+    }
+    for(int i=0;i<3;i++) {
+      switch(centerstr[i]) {
+        case '|': node->center[i] = 0; break;	      
+        case '0': node->center[i] = 0; break;	      
+        case ' ': node->center[i] = 0; break;	      
+        case '_': node->center[i] = 0; break;	      
+
+        case '>': node->center[i] = 1; break;	      
+        case ']': node->center[i] = 1; break;	      
+        case ')': node->center[i] = 1; break;	      
+        case '+': node->center[i] = 1; break;	      
+
+        case '<': node->center[i] = -1; break;	      
+        case '[': node->center[i] = -1; break;	      
+        case '(': node->center[i] = -1; break;	      
+        case '-': node->center[i] = -1; break;	      
+
+        default:		  
+          PyErr_SetString(PyExc_TypeError, "Center code chars not recognized, must be + - or 0");
+	  return NULL;
+      }	      
+    }
+  } else {
       PyErr_SetString(PyExc_TypeError, "Unknown Value for center parameter");
       return NULL;
   }
@@ -2794,7 +2829,7 @@ PyObject *python_nb_sub(PyObject *arg1, PyObject *arg2, OpenSCADOperator mode)
   return pyresult;
 }
 
-PyObject *python_nb_sub_vec3(PyObject *arg1, PyObject *arg2, int mode) // 0: translate, 1: scale
+PyObject *python_nb_sub_vec3(PyObject *arg1, PyObject *arg2, int mode) // 0: translate, 1: scale, 2: translateneg
 {
   DECLARE_INSTANCE
   std::shared_ptr<AbstractNode> child;
@@ -2807,9 +2842,10 @@ PyObject *python_nb_sub_vec3(PyObject *arg1, PyObject *arg2, int mode) // 0: tra
       PyErr_SetString(PyExc_TypeError, "invalid argument left to operator");
       return NULL;
     }
-    if(mode == 0) {
+    if(mode == 0 || mode == 2) {
 	    auto node = std::make_shared<TransformNode>(instance, "translate");
 	    Vector3d transvec(x, y, z);
+	    if(mode == 2) transvec = -transvec;
 	    node->matrix.translate(transvec);
 	    node->children.push_back(child);
 	    return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
@@ -2829,7 +2865,16 @@ PyObject *python_nb_sub_vec3(PyObject *arg1, PyObject *arg2, int mode) // 0: tra
 PyObject *python_nb_add(PyObject *arg1, PyObject *arg2) { return python_nb_sub_vec3(arg1, arg2, 0); }  // translate
 PyObject *python_nb_mul(PyObject *arg1, PyObject *arg2) { return python_nb_sub_vec3(arg1, arg2, 1); } // scale
 PyObject *python_nb_or(PyObject *arg1, PyObject *arg2) { return python_nb_sub(arg1, arg2,  OpenSCADOperator::UNION); }
-PyObject *python_nb_andnot(PyObject *arg1, PyObject *arg2) { return python_nb_sub(arg1, arg2,  OpenSCADOperator::DIFFERENCE); }
+PyObject *python_nb_subtract(PyObject *arg1, PyObject *arg2)
+{
+  double dmy;	
+  if(PyList_Check(arg2) && PyList_Size(arg2) > 0) {
+    if (!python_numberval(PyList_GetItem(arg2, 0), &dmy)){
+      return python_nb_sub_vec3(arg1, arg2, 2); 
+    }
+  }	  
+  return python_nb_sub(arg1, arg2,  OpenSCADOperator::DIFFERENCE); // if its solid
+}
 PyObject *python_nb_and(PyObject *arg1, PyObject *arg2) { return python_nb_sub(arg1, arg2,  OpenSCADOperator::INTERSECTION); }
 
 PyObject *python_csg_adv_sub(PyObject *self, PyObject *args, PyObject *kwargs, CgalAdvType mode)
@@ -4033,7 +4078,7 @@ PyMethodDef PyOpenSCADMethods[] = {
 PyNumberMethods PyOpenSCADNumbers =
 {
      python_nb_add,	//binaryfunc nb_add
-     python_nb_andnot,	//binaryfunc nb_subtract
+     python_nb_subtract,//binaryfunc nb_subtract
      python_nb_mul,	//binaryfunc nb_multiply
      0,			//binaryfunc nb_remainder
      0,			//binaryfunc nb_divmod

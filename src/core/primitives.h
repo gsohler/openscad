@@ -44,15 +44,26 @@ public:
     stream << "cube(size = ["
            << x << ", "
            << y << ", "
-           << z << "], center = "
-           << (center ? "true" : "false") << ")";
+           << z << "], center = " ;
+    if(center[0] == center[1] && center[1] == center[2])
+	    stream << (center[0] == 0) ? "true" : "false";
+    else {
+      stream << "\"";	      
+      for(int i = 0; i<3;i++) {
+        if(center[i] < 0) stream << "-";
+        if(center[i] == 0) stream << "|";	      
+        if(center[i] > 0) stream << "+";	      
+      }	      
+      stream << "\"";	      
+    }
+    stream << ")";
     return stream.str();
   }
   std::string name() const override { return "cube"; }
   std::unique_ptr<const Geometry> createGeometry() const override;
 
   double x = 1, y = 1, z = 1;
-  bool center = false;
+  int center[3] = {1,1,1} ; // -1 means negative side, 0 means centered, 1 means positive side
 };
 
 
