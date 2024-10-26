@@ -1529,7 +1529,7 @@ PyObject *python_wrap(PyObject *self, PyObject *args, PyObject *kwargs)
                                    &obj,
                                    &r, &fn, &fa, &fs
                                    )) {
-    PyErr_SetString(PyExc_TypeError, "error during parsing\n");
+    PyErr_SetString(PyExc_TypeError, "error during parsing wrap\n");
     return NULL;
   }
   return python_wrap_core(obj, r, fn,fa, fs);
@@ -3969,7 +3969,7 @@ PyMethodDef PyOpenSCADFunctions[] = {
   {"offset", (PyCFunction) python_offset, METH_VARARGS | METH_KEYWORDS, "Offset Object."},
   {"roof", (PyCFunction) python_roof, METH_VARARGS | METH_KEYWORDS, "Roof Object."},
   {"pull", (PyCFunction) python_pull, METH_VARARGS | METH_KEYWORDS, "Pull apart Object."},
-  {"wrap", (PyCFunction) python_pull, METH_VARARGS | METH_KEYWORDS, "Wrap Object around cylidner."},
+  {"wrap", (PyCFunction) python_wrap, METH_VARARGS | METH_KEYWORDS, "Wrap Object around cylidner."},
   {"color", (PyCFunction) python_color, METH_VARARGS | METH_KEYWORDS, "Color Object."},
   {"output", (PyCFunction) python_output, METH_VARARGS | METH_KEYWORDS, "Output the result."},
   {"show", (PyCFunction) python_output, METH_VARARGS | METH_KEYWORDS, "Output the result."},
