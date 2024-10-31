@@ -40,7 +40,7 @@
 #include <boost/bind/bind.hpp>
 #include <boost/range/adaptor/transformed.hpp>
 #include <boost/program_options.hpp>
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include <boost/optional.hpp>
 #include <boost/dll.hpp>
 
@@ -74,7 +74,7 @@
 #include "python/python_public.h"
 #endif
 namespace po = boost::program_options;
-namespace fs = boost::filesystem;
+namespace fs = std::filesystem;
 
 std::string commandline_commands;
 static bool arg_info = false;
