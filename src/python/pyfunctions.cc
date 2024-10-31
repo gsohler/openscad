@@ -139,15 +139,15 @@ PyObject *python_cube(PyObject *self, PyObject *args, PyObject *kwargs)
         case ' ': node->center[i] = 0; break;	      
         case '_': node->center[i] = 0; break;	      
 
-        case '>': node->center[i] = 1; break;	      
-        case ']': node->center[i] = 1; break;	      
-        case ')': node->center[i] = 1; break;	      
-        case '+': node->center[i] = 1; break;	      
+        case '>': node->center[i] = -1; break;	      
+        case ']': node->center[i] = -1; break;	      
+        case ')': node->center[i] = -1; break;	      
+        case '+': node->center[i] = -1; break;	      
 
-        case '<': node->center[i] = -1; break;	      
-        case '[': node->center[i] = -1; break;	      
-        case '(': node->center[i] = -1; break;	      
-        case '-': node->center[i] = -1; break;	      
+        case '<': node->center[i] = 1; break;	      
+        case '[': node->center[i] = 1; break;	      
+        case '(': node->center[i] = 1; break;	      
+        case '-': node->center[i] = 1; break;	      
 
         default:		  
           PyErr_SetString(PyExc_TypeError, "Center code chars not recognized, must be + - or 0");
