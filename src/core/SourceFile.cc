@@ -37,6 +37,7 @@
 #include <ostream>
 #include <memory>
 #include <boost/algorithm/string.hpp>
+#include <boost/filesystem.hpp>
 #include <filesystem>
 #include <string>
 #include <utility>

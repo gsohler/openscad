@@ -10,6 +10,7 @@
 #include <vector>
 #include <map>
 #include "GeometryUtils.h"
+#include <boost/functional/hash.hpp>
 
 class CGAL_Nef_polyhedron;
 class Polygon2d;
