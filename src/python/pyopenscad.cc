@@ -106,13 +106,13 @@ PyGILState_STATE gstate=PyGILState_LOCKED;
 
 void python_lock(void){
 #ifndef _WIN32	
-  gstate = PyGILState_Ensure();	
+//  gstate = PyGILState_Ensure();	
 #endif  
 }
 
 void python_unlock(void) {
 #ifndef _WIN32	
-  PyGILState_Release(gstate);	
+//  PyGILState_Release(gstate);	
 #endif  
 }
 
