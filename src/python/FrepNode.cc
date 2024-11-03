@@ -26,7 +26,7 @@
 
 #include "FrepNode.h"
 #ifdef ENABLE_PYTHON
-#include "pylibfive.h"
+#include "pydata.h"
 #endif
 
 #include "module.h"
@@ -74,8 +74,8 @@ std::unique_ptr<const Geometry> FrepNode::createGeometry() const
 	PyObject *exp = this->expression;
 	if(exp == NULL ) return std::unique_ptr<PolySet>();
 
-	if(exp->ob_type == &PyLibFiveType) {
-		std::vector<Tree *> tree = PyLibFiveObjectToTree(exp);
+	if(exp->ob_type == &PyDataType) {
+		std::vector<Tree *> tree = PyDataObjectToTree(exp);
 		// TODO fidget rein
 #ifdef FAKE
 	builder.beginPolygon(3);
@@ -150,7 +150,7 @@ std::unique_ptr<const Geometry> FrepNode::createGeometry() const
 }
 
 std::string FrepNode::toString() const  {
-	std::vector<Tree *> tv = PyLibFiveObjectToTree(this->expression);
+	std::vector<Tree *> tv = PyDataObjectToTree(this->expression);
 	std::ostringstream stream;
 	stream << "sdf( " ;
 	for(int i=0;i<tv.size();i++) stream << *(tv[i]);
@@ -532,7 +532,7 @@ PyObject *ifrep(const std::shared_ptr<const PolySet> &ps)
   oc.push_back(new Tree(t));
   printf("eval Called is %d\n",evalCalled);
   evalCalled=0;
-  return PyLibFiveObjectFromTree(&PyLibFiveType,oc);		  
+  return PyDataObjectFromTree(&PyDataType,oc);		  
 }
 #endif
 

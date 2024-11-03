@@ -1,3 +1,12 @@
+#include "gui/TabManager.h"
+
+#include <QApplication>
+#include <QPoint>
+#include <QTabBar>
+#include <QWidget>
+#include <cassert>
+#include <functional>
+#include <exception>
 #include <QFileInfo>
 #include <QFile>
 #include <QDir>
@@ -11,12 +20,13 @@
 #include <Qsci/qscicommand.h>
 #include <Qsci/qscicommandset.h>
 
-#include "Editor.h"
-#include "TabManager.h"
-#include "TabWidget.h"
-#include "ScintillaEditor.h"
-#include "Preferences.h"
-#include "MainWindow.h"
+#include "gui/Editor.h"
+#include "gui/TabWidget.h"
+#include "gui/ScintillaEditor.h"
+#include "gui/Preferences.h"
+#include "gui/MainWindow.h"
+
+#include <cstddef>
 
 TabManager::TabManager(MainWindow *o, const QString& filename)
 {
@@ -481,9 +491,17 @@ void TabManager::openTabFile(const QString& filename)
 {
   par->setCurrentOutput();
 #ifdef ENABLE_PYTHON
-  if(boost::algorithm::ends_with(filename, ".py"))
-    editor->setPlainText("from openscad import *\n");
-  else
+  if(boost::algorithm::ends_with(filename, ".py")) {
+    std::string templ="from openscad import *\n";	  
+    std::string libs = Settings::Settings::pythonNetworkImportList.value();
+    std::stringstream ss(libs);
+    std::string word;
+    while(std::getline(ss,word,'\n')){
+      if(word.size() == 0) continue;	    
+      templ += "nimport(\"" + word + "\")\n";
+    }
+    editor->setPlainText(QString::fromStdString(templ));
+  } else
 #endif  
   editor->setPlainText("");
 

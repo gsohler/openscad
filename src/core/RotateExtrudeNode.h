@@ -1,8 +1,10 @@
 #pragma once
 
-#include "node.h"
-#include "Value.h"
-#include "linalg.h"
+#include <string>
+
+#include "core/node.h"
+#include "core/Value.h"
+#include "geometry/linalg.h"
 
 #ifdef ENABLE_PYTHON
 #include <src/python/python_public.h>

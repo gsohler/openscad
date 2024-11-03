@@ -1,59 +1,68 @@
-#include "GeometryEvaluator.h"
-#include "Tree.h"
-#include "GeometryCache.h"
-#include "Polygon2d.h"
-#include "ModuleInstantiation.h"
-#include "State.h"
-#include "ColorNode.h"
-#include "OffsetNode.h"
-#include "TransformNode.h"
-#include "LinearExtrudeNode.h"
-#include "PathExtrudeNode.h"
-#include "RoofNode.h"
-#include "roof_ss.h"
-#include "roof_vd.h"
-#include "RotateExtrudeNode.h"
-#include "PullNode.h"
-#include "DebugNode.h"
-#include "WrapNode.h"
-#include "rotextrude.h"
-#include "CgalAdvNode.h"
-#include "ProjectionNode.h"
-#include "CsgOpNode.h"
-#include "TextNode.h"
-#include "RenderNode.h"
-#include "ClipperUtils.h"
-#include "PolySetUtils.h"
-#include "PolySet.h"
-#include "Renderer.h"
-#include "PolySetBuilder.h"
-#include "calc.h"
-#include "printutils.h"
-#include "calc.h"
-#include "DxfData.h"
-#include "degree_trig.h"
-#include <ciso646> // C alternative tokens (xor)
+#include "geometry/GeometryEvaluator.h"
+#include "core/Tree.h"
+#include "geometry/GeometryCache.h"
+#include "geometry/Polygon2d.h"
+#include "core/ModuleInstantiation.h"
+#include "core/State.h"
+#include "core/ColorNode.h"
+#include "core/OffsetNode.h"
+#include "core/TransformNode.h"
+#include "core/LinearExtrudeNode.h"
+#include "core/PathExtrudeNode.h"
+#include "core/RoofNode.h"
+#include "geometry/roof_ss.h"
+#include "geometry/roof_vd.h"
+#include "core/RotateExtrudeNode.h"
+#include "core/PullNode.h"
+#include "core/DebugNode.h"
+#include "core/WrapNode.h"
+#include "geometry/rotextrude.h"
+#include "core/CgalAdvNode.h"
+#include "core/ProjectionNode.h"
+#include "core/CsgOpNode.h"
+#include "core/TextNode.h"
+#include "core/RenderNode.h"
+#include "geometry/ClipperUtils.h"
+#include "geometry/PolySetUtils.h"
+#include "geometry/PolySet.h"
+#include "glview/Renderer.h"
+#include "geometry/PolySetBuilder.h"
+#include "utils/calc.h"
+#include "utils/printutils.h"
+#include "utils/calc.h"
+#include "io/DxfData.h"
+#include "glview/RenderSettings.h"
+#include "utils/degree_trig.h"
+#include <cmath>
+#include <iterator>
+#include <cassert>
+#include <list>
+#include <utility>
+#include <memory>
 #include <algorithm>
-#include "boost-utils.h"
+#include "utils/boost-utils.h"
+#include "geometry/boolean_utils.h"
 #include <hash.h>
-#include "boolean_utils.h"
-#include  "Selection.h"
+#include <Selection.h>
 #ifdef ENABLE_CGAL
-#include "CGALCache.h"
-#include "CGALHybridPolyhedron.h"
-#include "cgalutils.h"
+#include "geometry/cgal/CGALCache.h"
+#include "geometry/cgal/CGALHybridPolyhedron.h"
+#include "geometry/cgal/cgalutils.h"
 #include <CGAL/convex_hull_2.h>
 #include <CGAL/Point_2.h>
 #endif
 #ifdef ENABLE_MANIFOLD
-#include "manifoldutils.h"
+#include "geometry/manifold/manifoldutils.h"
 #endif
-#include "linear_extrude.h"
+#include "geometry/linear_extrude.h"
 
 
 #ifdef ENABLE_PYTHON
 #include <src/python/python_public.h>
 #endif
+#include <cstddef>
+#include <vector>
+
 class Geometry;
 class Polygon2d;
 class Tree;
@@ -102,7 +111,18 @@ std::shared_ptr<const Geometry> GeometryEvaluator::evaluateGeometry(const Abstra
   }
   return result;
 }
+void vectorDump(const char *msg, const Vector3d &vec) {
+  printf("%s ",msg );
+    printf("(%g/%g/%g) ",vec[0], vec[1], vec[2]);    
+}
 
+void triangleDump(const char *msg, const IndexedFace &face, const std::vector<Vector3d> &vert) {
+  printf("%s ",msg );
+  for(int i=0;i<face.size();i++) {
+    const Vector3d &pt = vert[face[i]];
+    vectorDump(" ", pt);
+  }
+}
 
 Vector4d calcTriangleNormal(const std::vector<Vector3d> &vertices,const IndexedFace &pol)
 {
@@ -139,8 +159,9 @@ bool pointInPolygon(const std::vector<Vector3d> &vert, const IndexedFace &bnd, i
 	double dist;
 	n=bnd.size();
 	int cuts=0;
-	Vector3d fdir, fnorm, p1, p2;
+	Vector3d p1, p2;
 	Vector3d pt=vert[ptind];
+	Vector3d res;
 	if(n < 3) return false;
 	Vector3d raydir=vert[bnd[1]]-vert[bnd[0]];
 	Vector3d fn=raydir.cross(vert[bnd[1]]-vert[bnd[2]]).normalized();
@@ -149,23 +170,12 @@ bool pointInPolygon(const std::vector<Vector3d> &vert, const IndexedFace &bnd, i
 		// build fence side
 		const Vector3d &p1=vert[bnd[i]];
 		const Vector3d &p2=vert[bnd[(i+1)%n]];
-		fdir=p2-p1;
-		fnorm=fdir.cross(fn);
 
-		// make sure, fence is ahead
-		if(fabs(fnorm.dot(raydir)) < 1e-5) continue;
+                if(linsystem( p2-p1, raydir,fn,pt-p1,res)) continue;
 
-		dist = (pt-p1).dot(fnorm);
-		if(fnorm.dot(raydir) > 0) dist=-dist;
-		if(dist < 0) continue;
-
-		// make sure begin of fence is on the right
-		dist= (pt-p1).dot(fdir);
-		if(dist < 0) continue;
-
-		// make sure end of fence is on the left
-		dist= (pt-p2).dot(fdir);
-		if(dist > 0) continue;
+		if(res[1] > 0) continue; // not behind
+		if(res[0] < 0) continue; // within segment
+		if(res[0] > 1) continue;
 		cuts++;
 	}
 	return (cuts&1)?true:false;
@@ -280,7 +290,7 @@ int operator==(const TriCombineStub &t1, const TriCombineStub &t2)
 	return 0;
 }
 
-static indexedFaceList mergeTrianglesSub(const std::vector<IndexedFace> &triangles)
+static indexedFaceList mergeTrianglesSub(const std::vector<IndexedFace> &triangles, const std::vector<Vector3d> &vert)
 {
 	unsigned int i,j,n;
 	int ind1, ind2;
@@ -441,8 +451,25 @@ static indexedFaceList mergeTrianglesSub(const std::vector<IndexedFace> &triangl
 			}
 		}
 		while(repeat);
+		// Reduce colinear points
+		int n=poly.size();
+		IndexedFace poly_new;
+		int last=poly[n-1],cur=poly[0],next;
+		for(int i=0;i< n;i++) {
+			next=poly[(i+1)%n];
+			Vector3d p0=vert[last];
+			Vector3d p1=vert[cur];
+			Vector3d p2=vert[next];
+			if((p2-p1).cross(p1-p0).norm() > 0.00001) {
+				poly_new.push_back(cur);
+				last=cur;
+				cur=next;
+			} else {
+				cur=next;
+			}
+		}
 		
-		if(poly.size() > 2) result.push_back(poly);
+		if(poly_new.size() > 2) result.push_back(poly_new);
 	}
 	return result;
 }
@@ -517,7 +544,7 @@ std::vector<IndexedFace> mergeTriangles(const std::vector<IndexedFace> polygons,
 	newNormals.clear();
 	faceParents.clear();
 	for(unsigned int i=0;i<polygons_sorted.size();i++ ) {
-		indexedFaceList indices_sub = mergeTrianglesSub(polygons_sorted[i]);
+		indexedFaceList indices_sub = mergeTrianglesSub(polygons_sorted[i], vert);
 		int off=indices.size();
 		for(unsigned int j=0;j<indices_sub.size();j++) {
 			indices.push_back(indices_sub[j]);
@@ -1060,21 +1087,16 @@ typedef CGAL::Surface_mesh<Point_3> Surface_mesh;
 
 
 void offset3D_calculateNefPolyhedron_cgal(const std::vector<Vector4d> &faces,std::vector<Vector3d> &vertices, std::vector<IndexedFace> & indices) {
-  printf("1\n");
   Nef_polyhedron N1(Plane_3( 1, 0, 0,-1));
   Nef_polyhedron N2(Plane_3(-1, 0, 0,-1));
   Nef_polyhedron N3(Plane_3( 0, 1, 0,-1));
   Nef_polyhedron N4(Plane_3( 0,-1, 0,-1));
   Nef_polyhedron N5(Plane_3( 0, 0, 1,-1));
   Nef_polyhedron N6(Plane_3( 0, 0,-1,-1));
-  printf("x\n");
   Nef_polyhedron Cube = N1 * N2 * N3 * N4 * N5 * N6;
   printf("y\n");
   Surface_mesh resultMesh;	
-  printf("a\n");
   CGAL::convert_nef_polyhedron_to_polygon_mesh (Cube, resultMesh, true);
-  printf("b\n");
-  printf("size = %d\n",resultMesh.number_of_faces());
 
   vertices.clear();
  for (auto  vd : resultMesh.vertices()){
@@ -1288,8 +1310,8 @@ std::vector<std::shared_ptr<const PolySet>>  offset3D_decompose(std::shared_ptr<
 		decomposed->vertices = vertices1;
 		decomposed->indices = indices1;
 		results.push_back( std::shared_ptr<const PolySet>(decomposed));
-		printf("========================\n");
-		printf("Faces included size is %ld\n",faces_included.size());
+//		printf("========================\n");
+//		printf("Faces included size is %ld\n",faces_included.size());
 	}
 	return results;
 }
@@ -1298,7 +1320,7 @@ extern std::vector<SelectedObject> debug_pts;
 std::vector<IndexedFace>  offset3D_removeOverPoints(const std::vector<Vector3d> &vertices, std::vector<IndexedFace> indices,int  round)
 {
 	// go  thourh all indicices and calculate area
-	printf("Remove OverlapPoints\n");
+//	printf("Remove OverlapPoints\n");
 //	debug_pts.clear();
 
 	std::vector<IndexedFace> indicesNew;
@@ -1499,7 +1521,7 @@ std::vector<Vector3d> offset3D_offset(std::vector<Vector3d> vertices, std::vecto
 					face_vpos.push_back(pos);
 				}				
 	
-				printf("Special alg for Vertex %d\n",i);
+//				printf("Special alg for Vertex %d\n",i);
 	
 				IndexedFace mainfiller; // core of star
 
@@ -1548,7 +1570,7 @@ std::vector<Vector3d> offset3D_offset(std::vector<Vector3d> vertices, std::vecto
 							}
 						}
 					}
-					printf("bestpt is %g/%g/%g\n",bestpt[0], bestpt[1], bestpt[2]);
+//					printf("bestpt is %g/%g/%g\n",bestpt[0], bestpt[1], bestpt[2]);
 					mainfiller.insert(mainfiller.begin(),newind+j); // insert in reversed order
 					verticesNew[newind+j]=bestpt;
 					faces1best.push_back(face1best);
@@ -1560,7 +1582,7 @@ std::vector<Vector3d> offset3D_offset(std::vector<Vector3d> vertices, std::vecto
 					Vector3d diff2=(verticesNew[mainfiller[j+1]] - verticesNew[mainfiller[j+2]]);
 					area += diff1.cross(diff2);
 				}
-				printf("area is %g\n",area.norm());
+//				printf("area is %g\n",area.norm());
 				if(area.norm()  > 1e-6) { // only if points are actually diverging
 
 					for(unsigned int j=0;j<face_order.size();j++) {
@@ -1607,7 +1629,7 @@ std::vector<Vector3d> offset3D_offset(std::vector<Vector3d> vertices, std::vecto
 			continue;
 		}
 	}
-	printf("%ld Keile found\n",keile.size());
+//	printf("%ld Keile found\n",keile.size());
 	for(unsigned int i=0;i<keile.size();i++) {
 		int faceind=keile[i].ind1;
 		printf("keil faceind is %d\n",faceind);
@@ -1620,7 +1642,7 @@ std::vector<Vector3d> offset3D_offset(std::vector<Vector3d> vertices, std::vecto
 				std::vector<IndexedFace> input;
 				input.push_back(indices[keile[i].ind2]);
 				input.push_back(indices[keile[i].ind1]);
-				output = mergeTrianglesSub(input);
+				output = mergeTrianglesSub(input, verticesNew);
 			}
 			if(output.size() == 1) {
 				printf("Successful merge #1 %d -> %d\n",keile[i].ind1, keile[i].ind2);
@@ -1632,7 +1654,7 @@ std::vector<Vector3d> offset3D_offset(std::vector<Vector3d> vertices, std::vecto
 				std::vector<IndexedFace> input;
 				input.push_back(indices[keile[i].ind3]);
 				input.push_back(indices[keile[i].ind1]);
-				output = mergeTrianglesSub(input);
+				output = mergeTrianglesSub(input, verticesNew);
 			}
 			if(output.size() == 1) {
 				printf("Successful merge #2 %d -> %d\n",keile[i].ind1, keile[i].ind3);
@@ -1727,7 +1749,7 @@ void  offset3D_reindex(const std::vector<Vector3d> &vertices, std::vector<Indexe
 }
 
 std::shared_ptr<const Geometry> offset3D_convex(const std::shared_ptr<const PolySet> &ps,double off) {
-  printf("Running offset3D %ld polygons\n",ps->indices.size());
+//  printf("Running offset3D %ld polygons\n",ps->indices.size());
 //  if(off == 0) return ps;
   std::vector<Vector3d> verticesNew;
   std::vector<IndexedFace> indicesNew;
@@ -1769,7 +1791,7 @@ std::shared_ptr<const Geometry> offset3D_convex(const std::shared_ptr<const Poly
     }
     return geom;
   } else {
-    printf("Downsize %g\n",off);	  
+//    printf("Downsize %g\n",off);	  
 
     std::vector<Vector3d> vertices = ps->vertices;
     std::vector<IndexedFace> indices = ps->indices;
@@ -1778,36 +1800,36 @@ std::shared_ptr<const Geometry> offset3D_convex(const std::shared_ptr<const Poly
     std::vector<Vector4d> newNormals;
     do
     {
-      printf("New Round %d Vertices %ld Faces %ld\n=======================\n",round,vertices.size(), indices.size());	    
+//      printf("New Round %d Vertices %ld Faces %ld\n=======================\n",round,vertices.size(), indices.size());	    
 
       indices  = offset3D_removeOverPoints(vertices, indices,round);
-      printf("Reindex OP\n");
+//      printf("Reindex OP\n");
       offset3D_reindex(vertices, indices, verticesNew, indicesNew);
       vertices = verticesNew;
       indices = indicesNew;
 
-      printf("Normals OP\n");
+//      printf("Normals OP\n");
       normals = calcTriangleNormals(vertices, indices);
 
-      printf("Merge OP\n");
+//      printf("Merge OP\n");
       std::vector<int> faceParents;
       indicesNew  = mergeTriangles(indices,normals,newNormals, faceParents, vertices ); 
       normals = newNormals;									   
       indices = indicesNew;									       
 
-      printf("Remove Colinear Points\n");
+//      printf("Remove Colinear Points\n");
       offset3D_RemoveColinear(vertices, indices,pointToFaceInds, pointToFacePos);
 
       if(indices.size() == 0 || fabs(off) <  0.0001) break;
       if(round == 2) break;
 
-      printf("Offset OP\n");
+//      printf("Offset OP\n");
       verticesNew = offset3D_offset(vertices, indices, normals, pointToFaceInds, pointToFacePos, off,round);
       vertices = verticesNew;
       round++;
     }
     while(1);
-    offset_3D_dump(vertices, indices);
+//    offset_3D_dump(vertices, indices);
     // -------------------------------
     // Map all points and assemble
     // -------------------------------
@@ -1826,8 +1848,9 @@ std::shared_ptr<const Geometry> offset3D(const std::shared_ptr<const PolySet> &p
   if(!enabled) return offset3D_convex(ps, off);
 
 
-  std::vector<std::shared_ptr<const PolySet>> decomposed =  offset3D_decompose(ps);
-  printf("Decomposed into %ld parts\n",decomposed.size());
+  std::vector<std::shared_ptr<const PolySet>> decomposed;
+  decomposed.push_back(ps); //  =  offset3D_decompose(ps);
+//  printf("Decomposed into %ld parts\n",decomposed.size());
   if(decomposed.size() == 0) {
     PolySet *offset_result =  new PolySet(3, /* convex */ true);
     return std::shared_ptr<PolySet>(offset_result);
@@ -1846,7 +1869,7 @@ std::shared_ptr<const Geometry> offset3D(const std::shared_ptr<const PolySet> &p
   return geom;
 }
 
-std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> ps,  std::vector<bool> corner_selected, double r, int fn);
+std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> ps,  std::vector<bool> corner_selected, double r, int fn, double minang);
 
 Vector3d createFilletRound(Vector3d pt)
 {
@@ -1874,7 +1897,7 @@ std::unique_ptr<const Geometry> addFillets(std::shared_ptr<const Geometry> resul
   std::vector<bool> corner_selected;
   for(int i=0;i<psr->vertices.size();i++) corner_selected.push_back(points.count(createFilletRound(psr->vertices[i]))>0?true:false);
 
-  return  createFilletInt(psr,corner_selected, r, fn);
+  return  createFilletInt(psr,corner_selected, r, fn,30.0);
 
 }
 
@@ -1922,7 +1945,7 @@ GeometryEvaluator::ResultObject GeometryEvaluator::applyToChildren3D(const Abstr
     if (actualchildren.empty()) return {};
     if (actualchildren.size() == 1) return ResultObject::constResult(actualchildren.front().second);
 #ifdef ENABLE_MANIFOLD
-    if (Feature::ExperimentalManifold.is_enabled()) {
+    if (RenderSettings::inst()->backend3D == RenderBackend3D::ManifoldBackend) {
       std::shared_ptr<const ManifoldGeometry> csgResult = ManifoldUtils::applyOperator3DManifold(actualchildren, op);	    
       if(csgOpNode != nullptr && csgOpNode->r != 0){
         std::unique_ptr<const Geometry> geom_u = addFillets(csgResult, actualchildren, csgOpNode->r, csgOpNode->fn);
@@ -1969,33 +1992,18 @@ GeometryEvaluator::ResultObject GeometryEvaluator::applyToChildren3D(const Abstr
 	break;
     }
  
-    if(std::shared_ptr<const PolySet> ps = std::dynamic_pointer_cast<const PolySet>(geom)) {
+    std::shared_ptr<const PolySet> ps= PolySetUtils::getGeometryAsPolySet(geom);
+    if(ps != nullptr) {
       auto ps_offset =  offset3D(ps,offNode->delta);
 
       geom = std::move(ps_offset);
       return ResultObject::mutableResult(geom);
-    } else if (std::dynamic_pointer_cast<const ManifoldGeometry>(geom)) {
-      auto ps = PolySetUtils::getGeometryAsPolySet(geom);
-      auto ps_offset =  offset3D(ps,offNode->delta);
-      geom = std::move(ps_offset);
-      return ResultObject::mutableResult(geom);
-    } else if(const auto geomlist = std::dynamic_pointer_cast<const GeometryList>(geom).get()) {
-//      for (const Geometry::GeometryItem& item : geomlist->getChildren()) { // TODO
-//      }
-        
-    } else if (std::shared_ptr<const CGAL_Nef_polyhedron> nef = std::dynamic_pointer_cast<const CGAL_Nef_polyhedron>(geom)) {
-      const CGAL_Nef_polyhedron nefcont=*(nef.get());
-      std::shared_ptr<PolySet> ps = CGALUtils::createPolySetFromNefPolyhedron3(*(nefcont.p3));
-      std::shared_ptr<const Geometry> ps_offset =  offset3D(ps,offNode->delta);
-      geom = std::move(ps_offset);
-      return ResultObject::mutableResult(geom);
-    } else if (const auto hybrid = std::dynamic_pointer_cast<const CGALHybridPolyhedron>(geom)) { // TODO
     }
   }
   default:
   {
 #ifdef ENABLE_MANIFOLD
-    if (Feature::ExperimentalManifold.is_enabled()) {
+    if (RenderSettings::inst()->backend3D == RenderBackend3D::ManifoldBackend) {
       std::shared_ptr<const ManifoldGeometry> csgResult = ManifoldUtils::applyOperator3DManifold(children, op);	    
       const CsgOpNode *csgOpNode = dynamic_cast<const CsgOpNode *>(&node);
       if(csgOpNode->r != 0){
@@ -3122,32 +3130,38 @@ static std::unique_ptr<PolySet> wrapObject(const WrapNode& node, const PolySet *
 	
         tmp1 = ps->vertices[p[forw_ind]];
         tmp2 = ps->vertices[p[(forw_ind+1)%n]];
-        forw_pt = tmp1 +(tmp2-tmp1)*(xnext-tmp1[0])/(tmp2[0]-tmp1[1]);
+        forw_pt = tmp1 +(tmp2-tmp1)*(xnext-tmp1[0])/(tmp2[0]-tmp1[0]);
         curslice.push_back(forw_pt);									      
         tmp1 = ps->vertices[p[back_ind]];
         tmp2 = ps->vertices[p[(back_ind+n-1)%n]];
-        back_pt = tmp1 +(tmp2-tmp1)*(xnext-tmp1[0])/(tmp2[0]-tmp1[1]);
+        back_pt = tmp1 +(tmp2-tmp1)*(xnext-tmp1[0])/(tmp2[0]-tmp1[0]);
         curslice.insert(curslice.begin(), back_pt);									      
       }  
 									      
       double ang, rad;
-      builder.beginPolygon(curslice.size());	  
+
       for(int j=0;j<curslice.size();j++) {
         auto &pt = curslice[j];
         ang=pt[0]/node.r;
         rad = node.r-pt[1];
-        Vector3d pt_trans=Vector3d(rad*cos(ang),rad*sin(ang),pt[2]);
-        builder.addVertex(pt_trans);	    
+        pt=Vector3d(rad*cos(ang),rad*sin(ang),pt[2]);
       }
-      builder.endPolygon();
+      for(int j=0;j<curslice.size()-2;j++) {
+        builder.beginPolygon(curslice.size());	  
+        builder.addVertex(curslice[0]);	    
+        builder.addVertex(curslice[j+1]);	    
+        builder.addVertex(curslice[j+2]);	    
+        builder.endPolygon();
+      }
+// TODO color alpha
       curslice.clear();
       xcur=xnext;
       curslice.push_back(back_pt);	    
       curslice.push_back(forw_pt);	    
     } while(end == 0);
-    continue;
   }
-  return builder.build();
+  auto ps1 = builder.build();
+  return ps1;
 }
 
 Response GeometryEvaluator::visit(State& state, const PullNode& node)
@@ -3155,7 +3169,8 @@ Response GeometryEvaluator::visit(State& state, const PullNode& node)
   std::shared_ptr<const Geometry> newgeom;
   std::shared_ptr<const Geometry> geom = applyToChildren3D(node, OpenSCADOperator::UNION).constptr();
   if (geom) {
-    if(std::shared_ptr<const PolySet> ps = std::dynamic_pointer_cast<const PolySet>(geom)) {
+    std::shared_ptr<const PolySet> ps=PolySetUtils::getGeometryAsPolySet(geom);
+    if(ps != nullptr) {
       std::unique_ptr<Geometry> ps_pulled =  pullObject(node,ps.get());
       newgeom = std::move(ps_pulled);
       addToParent(state, node, newgeom);
@@ -3215,7 +3230,11 @@ Response GeometryEvaluator::visit(State& state, const WrapNode& node)
   std::shared_ptr<const Geometry> newgeom;
   std::shared_ptr<const Geometry> geom = applyToChildren3D(node, OpenSCADOperator::UNION).constptr();
   if (geom) {
-    if(std::shared_ptr<const PolySet> ps = std::dynamic_pointer_cast<const PolySet>(geom)) {
+    std::shared_ptr<const PolySet> ps = std::dynamic_pointer_cast<const PolySet>(geom);
+    if(ps != nullptr) {
+       ps = PolySetUtils::tessellate_faces(*ps);
+    } else ps= PolySetUtils::getGeometryAsPolySet(geom);
+    if(ps != nullptr) { 
       std::unique_ptr<Geometry> ps_wrapped =  wrapObject(node,ps.get());
       newgeom = std::move(ps_wrapped);
       addToParent(state, node, newgeom);
@@ -3240,7 +3259,7 @@ std::shared_ptr<const Geometry> GeometryEvaluator::projectionCut(const Projectio
   std::shared_ptr<const Geometry> newgeom = applyToChildren3D(node, OpenSCADOperator::UNION).constptr();
   if (newgeom) {
 #ifdef ENABLE_MANIFOLD
-    if (Feature::ExperimentalManifold.is_enabled()) {
+    if (RenderSettings::inst()->backend3D == RenderBackend3D::ManifoldBackend) {
       auto manifold = ManifoldUtils::createManifoldFromGeometry(newgeom);
       auto poly2d = manifold->slice();
       return std::shared_ptr<const Polygon2d>(ClipperUtils::sanitize(poly2d));
@@ -3263,7 +3282,7 @@ std::shared_ptr<const Geometry> GeometryEvaluator::projectionCut(const Projectio
 std::shared_ptr<const Geometry> GeometryEvaluator::projectionNoCut(const ProjectionNode& node)
 {
 #ifdef ENABLE_MANIFOLD
-  if (Feature::ExperimentalManifold.is_enabled()) {
+  if (RenderSettings::inst()->backend3D == RenderBackend3D::ManifoldBackend) {
     std::shared_ptr<const Geometry> newgeom = applyToChildren3D(node, OpenSCADOperator::UNION).constptr();
     if (newgeom) {
         auto manifold = ManifoldUtils::createManifoldFromGeometry(newgeom);

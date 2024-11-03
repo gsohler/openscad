@@ -7,6 +7,10 @@
 #include "printutils.h"
 #include "exceptions.h"
 
+#ifdef ENABLE_PYTHON
+#include "python/python_public.h"
+#endif
+
 CSGWorker::CSGWorker(MainWindow *main)
 {
   this->main = main;
@@ -26,6 +30,9 @@ int CSGWorker::start(void)
 {
   if(started) return 0;	
   started=1;
+#ifdef ENABLE_PYTHON
+  python_unlock();
+#endif
   this->thread->start();
   return 1;
 }
@@ -33,6 +40,9 @@ int CSGWorker::start(void)
 void CSGWorker::work()
 {
   // this is a worker thread: we don't want any exceptions escaping and crashing the app.
+#ifdef ENABLE_PYTHON
+  python_lock();
+#endif
   try {
     main->compileCSGThread();
   } catch (const ProgressCancelException& e) {
@@ -44,6 +54,9 @@ void CSGWorker::work()
   } catch (...) {
     LOG(message_group::Error, "Compilation cancelled by unknown exception.");
   }
+ #ifdef ENABLE_PYTHON
+   python_unlock();
+ #endif
 
   emit done();
   this->started=0;

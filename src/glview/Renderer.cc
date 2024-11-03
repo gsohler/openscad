@@ -1,14 +1,17 @@
-#include "Renderer.h"
-#include "PolySet.h"
-#include "Polygon2d.h"
-#include "ColorMap.h"
-#include "printutils.h"
-#include "PlatformUtils.h"
-#include "system-gl.h"
-#include "TextureNode.h"
+#include "glview/Renderer.h"
+#include "geometry/PolySet.h"
+#include "geometry/Polygon2d.h"
+#include "glview/ColorMap.h"
+#include "utils/printutils.h"
+#include "platform/PlatformUtils.h"
+#include "glview/system-gl.h"
+#include "core/TextureNode.h"
 
+#include <sstream>
 #include <Eigen/LU>
 #include <fstream>
+#include <string>
+#include <vector>
 
 #ifndef NULLGL
 

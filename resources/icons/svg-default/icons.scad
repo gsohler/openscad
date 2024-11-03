@@ -27,6 +27,7 @@ icons = [
     ["export-csg"],
     ["export-pdf"],
     ["export-png"],
+    ["export-pov"],
     ["preview"],
     ["render"],
     ["send"],
@@ -70,6 +71,7 @@ icons = [
     ["measure-dist"],
     ["measure-ang"],
     ["find-handle"]
+    ["edit-copy"],
 ];
 
 icon(selected_icon) {
@@ -84,6 +86,7 @@ icon(selected_icon) {
     export("CSG");
     export("PDF");
     export("PNG");
+    export("POV");
     preview();
     render_();
     send();
@@ -127,6 +130,7 @@ icon(selected_icon) {
     measure_dist();
     measure_ang();
     find_handle();
+	edit_copy();
 }
 
 if (list_icons) {
@@ -220,6 +224,14 @@ module export_paper() {
         translate([-1, height - corner_size + 1]) square([corner_size, corner_size]);
     }
     export_paper_corner();
+}
+
+module text_paper() {
+	export_paper();
+	x = [30, 40, 40, 10, 50, 40];
+	for (y = [0:5])
+	  translate([15, 11 * y + 17])
+		square([x[y], 3]);
 }
 
 module export_paper_corner() {
@@ -780,3 +792,11 @@ module find_handle() {
         
     }
 }
+module edit_copy() {
+union() {
+	difference() {
+		translate([10, 30]) scale(0.7) text_paper();
+		translate([26, 5]) scale(0.7) paper();
+	}
+	translate([32, -1]) scale(0.7) text_paper();
+}}

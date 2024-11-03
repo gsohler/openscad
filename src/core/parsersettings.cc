@@ -1,9 +1,16 @@
-#include "parsersettings.h"
-#include <boost/filesystem.hpp>
-#include <boost/algorithm/string.hpp>
-#include "PlatformUtils.h"
+#include "core/parsersettings.h"
 
-namespace fs = boost::filesystem;
+#include <algorithm>
+#include <iterator>
+#include <cassert>
+#include <string>
+#include <vector>
+
+#include <filesystem>
+#include <boost/algorithm/string.hpp>
+#include "platform/PlatformUtils.h"
+
+namespace fs = std::filesystem;
 
 std::vector<std::string> librarypath;
 

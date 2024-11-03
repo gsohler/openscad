@@ -1,14 +1,14 @@
-#include "LegacyRendererUtils.h"
-#include "PolySet.h"
-#include "Polygon2d.h"
-#include "ColorMap.h"
-#include "printutils.h"
-#include "PlatformUtils.h"
-#include "system-gl.h"
-#include "TextureNode.h"
+#include "glview/LegacyRendererUtils.h"
+#include "geometry/PolySet.h"
+#include "geometry/Polygon2d.h"
+#include "glview/ColorMap.h"
+#include "utils/printutils.h"
+#include "platform/PlatformUtils.h"
+#include "glview/system-gl.h"
+#include "core/TextureNode.h"
 
 #include <Eigen/LU>
-#include <fstream>
+#include <cstddef>
 
 
 #ifdef ENABLE_OPENCSG

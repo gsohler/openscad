@@ -43,7 +43,7 @@
 using namespace boost::assign; // bring 'operator+=()' into scope
 
 #include <boost/filesystem.hpp>
-namespace fs = boost::filesystem;
+//namespace fs = boost::filesystem;
 
 /*
  * Historic path_extrude argument parsing is quirky. To remain bug-compatible,
@@ -190,5 +190,5 @@ std::string PathExtrudeNode::toString() const
 
 void register_builtin_path_extrude()
 {
-  Builtins::init("path_extrude", new BuiltinModule(builtin_path_extrude,&Feature::ExperimentalPathExtrude), { "path_extrude(profile,path)", });
+  Builtins::init("path_extrude", new BuiltinModule(builtin_path_extrude));
 }

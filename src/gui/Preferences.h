@@ -1,12 +1,25 @@
 #pragma once
 
+#include <QAction>
+#include <QActionGroup>
+#include <QCloseEvent>
+#include <QComboBox>
+#include <QFont>
+#include <QFontComboBox>
+#include <QHash>
+#include <QKeyEvent>
+#include <QShowEvent>
+#include <QString>
+#include <QStringList>
+#include <QVariant>
+#include <QWidget>
 #include <QMainWindow>
 #include <QSettings>
 
-#include "qtgettext.h" // IWYU pragma: keep
+#include "gui/qtgettext.h" // IWYU pragma: keep
 #include "ui_Preferences.h"
-#include "Settings.h"
-#include "InitConfigurator.h"
+#include "gui/Settings.h"
+#include "gui/InitConfigurator.h"
 
 class Preferences : public QMainWindow, public Ui::Preferences, public InitConfigurator
 {
@@ -53,6 +66,7 @@ public slots:
   void on_enableParameterCheckBox_toggled(bool);
   void on_enableRangeCheckBox_toggled(bool);
   void on_useAsciiSTLCheckBox_toggled(bool);
+  void on_comboBoxRenderBackend3D_activated(int);
   void on_comboBoxToolbarExport3D_activated(int);
   void on_comboBoxToolbarExport2D_activated(int);
   void on_checkBoxSummaryCamera_toggled(bool);
@@ -101,6 +115,7 @@ public slots:
   void on_checkBoxEnableLineNumbers_toggled(bool);
 
   // Print
+  void on_comboBoxDefaultPrintService_activated(int);
   void on_pushButtonOctoPrintCheckConnection_clicked();
   void on_pushButtonOctoPrintSlicingEngine_clicked();
   void on_comboBoxOctoPrintSlicingEngine_activated(int);
@@ -108,9 +123,13 @@ public slots:
   void on_comboBoxOctoPrintSlicingProfile_activated(int);
   void on_comboBoxOctoPrintAction_activated(int);
   void on_comboBoxOctoPrintFileFormat_activated(int);
+  void on_comboBoxLocalSlicerFileFormat_activated(int);
   void on_lineEditOctoPrintURL_editingFinished();
   void on_lineEditOctoPrintApiKey_editingFinished();
   void on_pushButtonOctoPrintApiKey_clicked();
+  void on_pushButtonSelectLocalSlicerPath_clicked();
+  void on_lineEditLocalSlicer_editingFinished();
+  void on_textEditPythonImportList_textChanged();
 
 signals:
   void requestRedraw() const;

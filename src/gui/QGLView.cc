@@ -24,15 +24,20 @@
  *
  */
 
-#include "qtgettext.h"
-#include "QGLView.h"
-#include "Preferences.h"
-#include "Renderer.h"
-#include "degree_trig.h"
+#include "gui/QGLView.h"
+
+#include "gui/qtgettext.h"
+#include "gui/Preferences.h"
+#include "glview/Renderer.h"
+#include "utils/degree_trig.h"
 #if defined(USE_GLEW) || defined(OPENCSG_GLEW)
-#include "glew-utils.h"
+#include "glview/glew-utils.h"
 #endif
 
+#include <QImage>
+#include <QOpenGLWidget>
+#include <QWidget>
+#include <iostream>
 #include <QApplication>
 #include <QWheelEvent>
 #include <QCheckBox>
@@ -47,7 +52,7 @@
 #ifdef USE_GLAD
 #include <QOpenGLContext>
 #endif
-#include "OpenCSGWarningDialog.h"
+#include "gui/OpenCSGWarningDialog.h"
 #ifdef ENABLE_PYTHON
 #include <python_public.h>
 #endif
@@ -55,13 +60,15 @@
 
 #include <cstdio>
 #include <sstream>
+#include <string>
+#include <vector>
 
 #ifdef ENABLE_OPENCSG
 #  include <opencsg.h>
 #endif
 
-#include "qt-obsolete.h"
-#include "Measurement.h"
+#include "gui/qt-obsolete.h"
+#include "gui/Measurement.h"
 
 QGLView::QGLView(QWidget *parent) : QOpenGLWidget(parent)
 {
@@ -182,16 +189,19 @@ void QGLView::paintGL()
     if(this->shown_obj != nullptr) {
       switch(this->shown_obj->type) {
         case SelectionType::SELECTION_POINT:
+          if(shown_obj->pt.size() < 1) break;		
           status = QString("Point (%1/%2/%3)").arg(shown_obj->pt[0][0]).arg(shown_obj->pt[0][1]).arg(shown_obj->pt[0][2]);
           statusLabel->setText(status);
 	  break;
         case SelectionType::SELECTION_SEGMENT:
+          if(shown_obj->pt.size() < 2) break;		
           status = QString("Segment (%1/%2/%3) - (%4/%5/%6)")
 		  .arg(shown_obj->pt[0][0]).arg(shown_obj->pt[0][1]).arg(shown_obj->pt[0][2])
 		  .arg(shown_obj->pt[1][0]).arg(shown_obj->pt[1][1]).arg(shown_obj->pt[1][2]);
           statusLabel->setText(status);
 	  break;
         case SelectionType::SELECTION_FACE:
+          if(shown_obj->pt.size() < 3) break;		
 	  status=QString("Face selected\n");
           statusLabel->setText(status);
 	  break;
@@ -378,11 +388,11 @@ void QGLView::mouseReleaseEvent(QMouseEvent *event)
     if(event->button() == button_right) {
       QPoint point = event->pos();
       emit doRightClick(point);
-    }  
+    }
     if(event->button() == button_left) {
       QPoint point = event->pos();
       emit doLeftClick(point);
-    }  
+    }
   }
   mouse_drag_moved = false;
 }
@@ -572,6 +582,7 @@ std::shared_ptr<SelectedObject> QGLView::findObject(int mouse_x, int mouse_y)
 #ifdef ENABLE_PYTHON  
   if(handle_mode) {
     SelectedObject result;
+    result.type = SelectionType::SELECTION_HANDLE;
     double dist_near;
     double dist_nearest=NAN;
     std::string dist_name;
@@ -609,5 +620,5 @@ void QGLView::selectPoint(int mouse_x, int mouse_y)
   if(obj != nullptr) {
     this->selected_obj.push_back(*obj);
     update();
-  }	  
+  }
 }

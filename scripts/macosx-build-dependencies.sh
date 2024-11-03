@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # This script builds all library dependencies of OpenSCAD for Mac OS X.
 # The libraries will be build in 64-bit mode and backwards compatible
@@ -30,7 +30,7 @@ BASEDIR=$PWD/../libraries
 OPENSCADDIR=$PWD
 SRCDIR=$BASEDIR/src
 DEPLOYDIR=$BASEDIR/install
-MAC_OSX_VERSION_MIN=10.13
+MAC_OSX_VERSION_MIN=10.15
 OPTION_DEPLOY=false
 OPTION_FORCE=0
 OPTION_ARM64=false
@@ -58,7 +58,7 @@ PACKAGES=(
     "glib2 2.81.0"
     "pixman 0.42.2"
     "cairo 1.18.0"
-    "cgal 5.6.1"
+    "cgal 6.0"
     "qt5 5.15.13"
     "opencsg 1.6.0"
     "qscintilla 2.13.3"

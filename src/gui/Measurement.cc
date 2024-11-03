@@ -24,7 +24,12 @@
  *
  */
 
-#include "Measurement.h"
+#include "gui/Measurement.h"
+
+#include <QPoint>
+#include <QString>
+#include <cmath>
+#include <sstream>
 
 Measurement::Measurement()
 {

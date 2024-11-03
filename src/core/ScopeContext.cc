@@ -1,10 +1,14 @@
-#include "ScopeContext.h"
-#include "Expression.h"
-#include "Parameters.h"
-#include "printutils.h"
-#include "SourceFileCache.h"
-#include "UserModule.h"
+#include "core/ScopeContext.h"
+#include "core/Expression.h"
+#include "core/Parameters.h"
+#include "utils/printutils.h"
+#include "core/SourceFileCache.h"
+#include "core/UserModule.h"
+
+#include <utility>
+#include <memory>
 #include <cmath>
+#include <vector>
 
 // Experimental code. See issue #399
 #if 0
@@ -95,6 +99,11 @@ boost::optional<InstantiableModule> ScopeContext::lookup_local_module(const std:
   return Context::lookup_local_module(name, loc);
 }
 
+std::vector<std::string> ScopeContext::list_local_modules(void) const 
+{
+  return {};
+}
+
 UserModuleContext::UserModuleContext(const std::shared_ptr<const Context>& parent, const UserModule *module, const Location& loc, Arguments arguments, Children children) :
   ScopeContext(parent, &module->body),
   children(std::move(children))
@@ -153,4 +162,18 @@ boost::optional<InstantiableModule> FileContext::lookup_local_module(const std::
     }
   }
   return boost::none;
+}
+
+std::vector<std::string> FileContext::list_local_modules(void) const 
+{
+  std::vector<std::string> modules;
+  for (const auto& m : source_file->usedlibs) {
+    auto usedmod = SourceFileCache::instance()->lookup(m);
+    if(usedmod == nullptr) continue;
+    for(auto &kv:usedmod->scope.modules)
+    {
+      modules.push_back(kv.first);	    
+    }
+  }
+  return modules;
 }

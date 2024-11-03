@@ -24,24 +24,30 @@
  *
  */
 
-#include "primitives.h"
-#include "Builtins.h"
-#include "Children.h"
-#include "ModuleInstantiation.h"
-#include "Parameters.h"
-#include "PolySet.h"
-#include "Polygon2d.h"
-#include "calc.h"
+#include "core/primitives.h"
+#include "core/Builtins.h"
+#include "core/Children.h"
+#include "core/ModuleInstantiation.h"
+#include "core/Parameters.h"
+#include "geometry/PolySet.h"
+#include "geometry/Polygon2d.h"
+#include "utils/calc.h"
 #include "core/node.h"
-#include "degree_trig.h"
-#include "module.h"
-#include "printutils.h"
+#include "utils/degree_trig.h"
+#include "core/module.h"
+#include "utils/printutils.h"
+#include <algorithm>
+#include <utility>
 #include <boost/assign/std/vector.hpp>
 #include <cassert>
+#include <cstddef>
 #include <cmath>
 #include <iterator>
 #include <memory>
 #include <sstream>
+#include <string>
+#include <vector>
+
 using namespace boost::assign; // bring 'operator+=()' into scope
 
 #define F_MINIMUM 0.01
@@ -120,25 +126,29 @@ std::unique_ptr<const Geometry> CubeNode::createGeometry() const
     return PolySet::createEmpty();
   }
 
-  double x1, x2, y1, y2, z1, z2;
-  if (this->center) {
-    x1 = -this->x / 2;
-    x2 = +this->x / 2;
-    y1 = -this->y / 2;
-    y2 = +this->y / 2;
-    z1 = -this->z / 2;
-    z2 = +this->z / 2;
-  } else {
-    x1 = y1 = z1 = 0;
-    x2 = this->x;
-    y2 = this->y;
-    z2 = this->z;
+  double coord1[3], coord2[3], size;
+  for(int i=0;i<3;i++) {
+    switch(i) {
+      case 0: size=this->x; break;
+      case 1: size=this->y; break;
+      case 2: size=this->z; break;
+    }	    
+    if (this->center[i] > 0) {
+     coord1[i] = 0;
+     coord2[i] = size;
+    } else if (this->center[i] < 0) {
+     coord1[i] = -size;
+     coord2[i] = 0;
+    } else {
+     coord1[i] = -size/2;
+     coord2[i] = size/2;
+    }
   }
   int dimension = 3;
   auto ps = std::make_unique<PolySet>(3, /*convex*/true);
   for (int i = 0; i < 8; i++) {
-    ps->vertices.emplace_back(i & 1 ? x2 : x1, i & 2 ? y2 : y1,
-                              i & 4 ? z2 : z1);
+    ps->vertices.emplace_back(i & 1 ? coord2[0] : coord1[0], i & 2 ? coord2[1] : coord1[1],
+                              i & 4 ? coord2[2] : coord1[2]);
   }
   ps->indices = {
       {4, 5, 7, 6}, // top
@@ -181,7 +191,8 @@ static std::shared_ptr<AbstractNode> builtin_cube(const ModuleInstantiation *ins
     }
   }
   if (parameters["center"].type() == Value::Type::BOOL) {
-    node->center = parameters["center"].toBool();
+     bool cent = parameters["center"].toBool();
+     for(int i=0;i<3;i++) node->center[i]=cent?0:1;
   }
 
   return node;
@@ -292,7 +303,7 @@ std::unique_ptr<const Geometry> CylinderNode::createGeometry() const
 
   bool cone = (r2 == 0.0);
   bool inverted_cone = (r1 == 0.0);
-  
+
   auto polyset = std::make_unique<PolySet>(3, /*convex*/true);
   polyset->vertices.reserve((cone || inverted_cone) ? num_fragments + 1 : 2 * num_fragments);
 
@@ -528,12 +539,9 @@ static std::shared_ptr<AbstractNode> builtin_polyhedron(const ModuleInstantiatio
 
 std::unique_ptr<const Geometry> SquareNode::createGeometry() const
 {
-  auto p = std::make_unique<Polygon2d>();
-  if (
-    this->x <= 0 || !std::isfinite(this->x)
-    || this->y <= 0 || !std::isfinite(this->y)
-    ) {
-    return p;
+  if (this->x <= 0 || !std::isfinite(this->x) ||
+      this->y <= 0 || !std::isfinite(this->y)) {
+    return std::make_unique<Polygon2d>();
   }
 
   Vector2d v1(0, 0);
@@ -545,9 +553,7 @@ std::unique_ptr<const Geometry> SquareNode::createGeometry() const
 
   Outline2d o;
   o.vertices = {v1, {v2[0], v1[1]}, v2, {v1[0], v2[1]}};
-  p->addOutline(o);
-  p->setSanitized(true);
-  return p;
+  return std::make_unique<Polygon2d>(o);
 }
 
 static std::shared_ptr<AbstractNode> builtin_square(const ModuleInstantiation *inst, Arguments arguments, const Children& children)
