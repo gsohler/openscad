@@ -737,6 +737,24 @@ std::string SplineNode::toString() const
 
 int linsystem( Vector3d v1,Vector3d v2,Vector3d v3,Vector3d pt,Vector3d &res,double *detptr=NULL);
 
+std::vector<Vector2d> SplineNode::draw_arc(int fn, const Vector2d &tang1, double l1, const Vector2d &tang2, double l2, const Vector2d &cornerpt) const {
+  std::vector<Vector2d> result;	
+  if(fn == 1) result.push_back(cornerpt);
+  else {
+    // estimate ellipsis circumfence
+    double l=(l1-l2)/(l1+l2);
+    double circ = (l1+l2)*M_PI*(1+(3*l*l)/(10+sqrt(4-3*l*l)));
+    Vector2d vx = -tang1*(l1-circ/(8*fn));
+    Vector2d vy =  tang2*(l2-circ/(8*fn));
+//        printf("i=%d vx %g/%g vy %g/%g\n",i,vx[0], vx[1], vy[0], vy[1]);						       
+    for(int j=0;j<=fn-1;j++) {
+      double ang=M_PI/2.0*j/(fn-1);	      
+      Vector2d pt=cornerpt + vx*(1-sin(ang))+ vy *(1-cos(ang));
+      result.push_back(pt);
+    }  
+  }
+  return result;
+}
 std::unique_ptr<const Geometry> SplineNode::createGeometry() const
 {
   auto p = std::make_unique<Polygon2d>();
@@ -757,27 +775,43 @@ std::unique_ptr<const Geometry> SplineNode::createGeometry() const
     if(this->fa > 0 && 90.0/this->fa > fn)
       fn=90.0/this->fa;
         
-//    result.vertices.push_back(this->points[i]);
 
+    bool convex=true;
     Vector2d diff=this->points[(i+1)%n]-this->points[i];
-    if(linsystem( tangent[i], tangent[(i+1)%n],dirz,Vector3d(diff[0], diff[1], 0),res)) {
-	    printf("Error x\n");
-    }
-    Vector2d cornerpt=this->points[i] + res[0]*tangent[i].head<2>();
-    printf("Cornerpt %g/%g\n",cornerpt[0], cornerpt[1]);
-    if(fn == 1) result.vertices.push_back(cornerpt);
-    else {
-      // estimate ellipsis circumfence	    
-      double l=(res[0]-res[1])/(res[0]+res[1]);
-      double circ = (res[0]+res[1])*M_PI*(1+(3*l*l)/(10+sqrt(4-3*l*l)));
-      Vector2d vx = -tangent[i].head<2>()*(res[0]-circ/(8*fn));
-      Vector2d vy = tangent[(i+1)%n].head<2>()*(res[1]-circ/(8*fn));
-      printf("i=%d vx %g/%g vy %g/%g\n",i,vx[0], vx[1], vy[0], vy[1]);						       
-      for(int j=0;j<=fn-1;j++) {
-        double ang=M_PI/2.0*j/(fn-1);	      
-	Vector2d pt=cornerpt + vx*(1-sin(ang))+ vy *(1-cos(ang));
-	result.vertices.push_back(pt);
-      }
+    if(linsystem( tangent[i], tangent[(i+1)%n],dirz,Vector3d(diff[0], diff[1], 0),res)) convex=false;
+    if(res[0] < -1e-6 || res[1] < -1e-6) convex=false;
+    if(convex) {
+      Vector2d cornerpt=this->points[i] + res[0]*tangent[i].head<2>();
+      auto pts =draw_arc(fn, tangent[i].head<2>(), res[0], tangent[(i+1)%n].head<2>(), res[1],cornerpt);	    
+      for(const Vector2d &pt: pts) result.vertices.push_back(pt);	      
+
+    } else {
+      // create midpoint		    
+      Vector2d midpt = (this->points[i] + this->points[(i+1)%n])/2.0;
+      Vector2d dir = (this->points[(i+1)%n] - this->points[i]).normalized();
+      
+      // Mid tangent
+      Vector2d midtang = (tangent[i] + tangent[(i+1)%n]).normalized().head<2>().normalized();
+
+      // flip mid tangent
+      double l=midtang.dot(dir);
+      midtang = 2*dir*l-midtang;
+
+      Vector2d diff=midpt - this->points[i];
+
+      // 1st arc
+      if(linsystem( tangent[i], Vector3d(midtang[0], midtang[1], 0),dirz,Vector3d(diff[0], diff[1], 0),res)) printf("prog errr\n");
+      Vector2d cornerpt1=this->points[i] + res[0]*tangent[i].head<2>();
+      auto pts =draw_arc(fn, tangent[i].head<2>(), res[0], midtang, res[1],cornerpt1);	    
+      for(const Vector2d &pt: pts) result.vertices.push_back(pt);	      
+      
+      // 2nd arc
+      if(linsystem( Vector3d(midtang[0], midtang[1], 0),tangent[(i+1)%n],dirz,Vector3d(diff[0], diff[1], 0),res)) printf("prog errr\n");
+      Vector2d cornerpt2=this->points[(i+1)%n] - res[1]*tangent[(i+1)%n].head<2>();
+      auto pts2 =draw_arc(fn, midtang, res[0], tangent[(i+1)%n].head<2>(), res[1], cornerpt2);	    
+      for(const Vector2d &pt: pts2) result.vertices.push_back(pt);	      
+
+//      result.vertices.push_back(this->points[i]); // Debug pt
     }
   }
   p->addOutline(result);
