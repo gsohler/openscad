@@ -717,6 +717,73 @@ std::unique_ptr<const Geometry> PolygonNode::createGeometry() const
   return p;
 }
 
+
+std::string SplineNode::toString() const
+{
+  std::ostringstream stream;
+  stream << "polygon(points = [";
+  bool firstPoint = true;
+  for (const auto& point : this->points) {
+    if (firstPoint) {
+      firstPoint = false;
+    } else {
+      stream << ", ";
+    }
+    stream << "[" << point[0] << ", " << point[1] << "]";
+  }
+  stream << "], fn = " << this->fn << "fa = " << this -> fa << ", fs = " << this->fs << ")";
+  return stream.str();
+}
+
+int linsystem( Vector3d v1,Vector3d v2,Vector3d v3,Vector3d pt,Vector3d &res,double *detptr=NULL);
+
+std::unique_ptr<const Geometry> SplineNode::createGeometry() const
+{
+  auto p = std::make_unique<Polygon2d>();
+  Outline2d result;
+  Vector3d dirz(0,0,1);
+  Vector3d res;
+
+  std::vector<Vector3d> tangent;
+  int n=this->points.size();
+  for(int i=0;i<n;i++) {
+    Vector2d dir=(this->points[(i+1)%n] - this->points[(i+n-1)%n]).normalized();
+    tangent.push_back(Vector3d(dir[0], dir[1], 0));    
+  }
+  for(int i=0;i<n;i++) {
+    // point at corner	  
+    int fn=1;
+    if(this->fn > 0 && this->fn > fn) fn=this->fn;
+    if(this->fa > 0 && 90.0/this->fa > fn)
+      fn=90.0/this->fa;
+        
+//    result.vertices.push_back(this->points[i]);
+
+    Vector2d diff=this->points[(i+1)%n]-this->points[i];
+    if(linsystem( tangent[i], tangent[(i+1)%n],dirz,Vector3d(diff[0], diff[1], 0),res)) {
+	    printf("Error x\n");
+    }
+    Vector2d cornerpt=this->points[i] + res[0]*tangent[i].head<2>();
+    printf("Cornerpt %g/%g\n",cornerpt[0], cornerpt[1]);
+    if(fn == 1) result.vertices.push_back(cornerpt);
+    else {
+      // estimate ellipsis circumfence	    
+      double l=(res[0]-res[1])/(res[0]+res[1]);
+      double circ = (res[0]+res[1])*M_PI*(1+(3*l*l)/(10+sqrt(4-3*l*l)));
+      Vector2d vx = -tangent[i].head<2>()*(res[0]-circ/(8*fn));
+      Vector2d vy = tangent[(i+1)%n].head<2>()*(res[1]-circ/(8*fn));
+      printf("i=%d vx %g/%g vy %g/%g\n",i,vx[0], vx[1], vy[0], vy[1]);						       
+      for(int j=0;j<=fn-1;j++) {
+        double ang=M_PI/2.0*j/(fn-1);	      
+	Vector2d pt=cornerpt + vx*(1-sin(ang))+ vy *(1-cos(ang));
+	result.vertices.push_back(pt);
+      }
+    }
+  }
+  p->addOutline(result);
+  return p;
+}
+
 static std::shared_ptr<AbstractNode> builtin_polygon(const ModuleInstantiation *inst, Arguments arguments, const Children& children)
 {
   auto node = std::make_shared<PolygonNode>(inst);

@@ -199,3 +199,15 @@ public:
   std::vector<std::vector<size_t>> paths;
   int convexity = 1;
 };
+
+class SplineNode : public LeafNode
+{
+public:
+  SplineNode (const ModuleInstantiation *mi) : LeafNode(mi) {}
+  std::string toString() const override;
+  std::string name() const override { return "spline"; }
+  std::unique_ptr<const Geometry> createGeometry() const override;
+
+  std::vector<Vector2d> points;
+  double fn, fa, fs;
+};
