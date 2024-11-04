@@ -855,6 +855,56 @@ PyObject *python_polygon(PyObject *self, PyObject *args, PyObject *kwargs)
   return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
 }
 
+PyObject *python_spline(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+  DECLARE_INSTANCE
+  unsigned int i, j, pointIndex;
+  auto node = std::make_shared<SplineNode>(instance);
+
+  char *kwlist[] = {"points", "fn", "fa", "fs", NULL};
+  PyObject *points = NULL;
+  double fn=0, fa=0, fs=0;
+  int convexity = 2;
+
+  PyObject *element;
+  Vector2d point;
+
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O!|ddd", kwlist,
+                                   &PyList_Type, &points, &fn, &fa, &fs
+                                   )) {
+    PyErr_SetString(PyExc_TypeError, "Error during parsing spline(points)");
+    return NULL;
+  }
+
+  if (points != NULL && PyList_Check(points) ) {
+    if(PyList_Size(points) == 0) {
+      PyErr_SetString(PyExc_TypeError, "There must at least be one point in the polygon");
+      return NULL;
+    }
+    for (i = 0; i < PyList_Size(points); i++) {
+      element = PyList_GetItem(points, i);
+      if (PyList_Check(element) && PyList_Size(element) == 2) {
+        point[0] = PyFloat_AsDouble(PyList_GetItem(element, 0));
+        point[1] = PyFloat_AsDouble(PyList_GetItem(element, 1));
+        node->points.push_back(point);
+      } else {
+        PyErr_SetString(PyExc_TypeError, "Coordinate must exactly contain 2 numbers");
+        return NULL;
+      }
+
+    }
+  } else {
+    PyErr_SetString(PyExc_TypeError, "Polygon points must be a list of coordinates");
+    return NULL;
+  }
+  node->fn=fn;
+  node->fa=fa;
+  node->fs=fs;
+
+  python_retrieve_pyname(node);
+  return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
+}
+
 int python_tomatrix(PyObject *pyt, Matrix4d &mat)
 {
   if(pyt == nullptr) return 1;
@@ -3937,6 +3987,7 @@ PyMethodDef PyOpenSCADFunctions[] = {
   {"square", (PyCFunction) python_square, METH_VARARGS | METH_KEYWORDS, "Create Square."},
   {"circle", (PyCFunction) python_circle, METH_VARARGS | METH_KEYWORDS, "Create Circle."},
   {"polygon", (PyCFunction) python_polygon, METH_VARARGS | METH_KEYWORDS, "Create Polygon."},
+  {"spline", (PyCFunction) python_spline, METH_VARARGS | METH_KEYWORDS, "Create Spline."},
   {"text", (PyCFunction) python_text, METH_VARARGS | METH_KEYWORDS, "Create Text."},
   {"textmetrics", (PyCFunction) python_textmetrics, METH_VARARGS | METH_KEYWORDS, "Get textmetrics."},
 
