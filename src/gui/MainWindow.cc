@@ -1527,6 +1527,8 @@ void MainWindow::compileCSG()
     exceptionCleanup();
   }
   csgworker->start();
+  //compileCSGThread();
+  //compileCSGDone();
 }
 
 void MainWindow::compileCSGThread(void)

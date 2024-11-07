@@ -102,18 +102,19 @@ PyObject *PyOpenSCADObjectFromNode(PyTypeObject *type, const std::shared_ptr<Abs
   return nullptr;
 }
 
-PyGILState_STATE gstate=PyGILState_LOCKED;
+//PyGILState_STATE gstate=PyGILState_LOCKED;
+PyThreadState *tstate=nullptr;
 
 void python_lock(void){
-#ifndef _WIN32	
-//  gstate = PyGILState_Ensure();	
-#endif  
+//#ifndef _WIN32	
+  if(tstate != nullptr) PyEval_RestoreThread(tstate);
+//#endif  
 }
 
 void python_unlock(void) {
-#ifndef _WIN32	
-//  PyGILState_Release(gstate);	
-#endif  
+//#ifndef _WIN32	
+  tstate = PyEval_SaveThread();
+//#endif  
 }
 
 /*
@@ -598,6 +599,7 @@ void initPython(double time)
     PyPreConfig preconfig;
     PyPreConfig_InitPythonConfig(&preconfig);
     Py_PreInitialize(&preconfig);
+    PyEval_InitThreads(); // https://stackoverflow.com/questions/47167251/pygilstate-ensure-causing-deadlock
 
 #ifdef HAVE_PYTHON_YIELD
     set_object_callback(openscad_object_callback);
