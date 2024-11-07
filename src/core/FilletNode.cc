@@ -218,6 +218,8 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
   for(auto &e: edge_db) {
     if(corner_selected[e.first.ind1] && corner_selected[e.first.ind2])
     {
+      assert(e.second.facea >= 0);
+      assert(e.second.faceb >= 0);
       auto &facea =merged[e.second.facea];
       auto &faceb =merged[e.second.faceb];
       Vector3d fan=calcTriangleNormal(ps->vertices, facea).head<3>();

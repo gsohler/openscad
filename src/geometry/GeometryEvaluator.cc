@@ -127,6 +127,7 @@ void triangleDump(const char *msg, const IndexedFace &face, const std::vector<Ve
 Vector4d calcTriangleNormal(const std::vector<Vector3d> &vertices,const IndexedFace &pol)
 {
 	int n=pol.size();
+	assert(pol.size() >= 3);
 	Vector3d norm(0,0,0);
 	for(int j=0;j<n-2;j++) {
 		// need to calculate all normals, as 1st 2 could be in a concave corner
@@ -230,6 +231,23 @@ std::unordered_map<EdgeKey, EdgeVal, boost::hash<EdgeKey> > createEdgeDb(const s
 	edge_db[edge].posb=j;
       }
     }    
+  }
+  int error=0;
+  for(auto &e: edge_db) {
+    if(e.second.facea == -1 || e.second.faceb == -1) {
+      printf("Mismatched EdgeDB ind1=%d idn2=%d facea=%d faceb=%d\n",e.first.ind1, e.first.ind2, e.second.facea, e.second.faceb);
+      error=1;
+    }
+  }
+  if(error) {
+    for(unsigned int i=0;i<indices.size();i++)
+    {
+      auto &face=indices[i];
+      printf("%d :",i);
+      for(unsigned int j=0;j<face.size();j++) printf("%d ",face[j]);
+      printf("\n");
+    } // tri 5-9-11 missing
+    assert(0);	      
   }
   return edge_db;
 }
@@ -460,7 +478,8 @@ static indexedFaceList mergeTrianglesSub(const std::vector<IndexedFace> &triangl
 			Vector3d p0=vert[last];
 			Vector3d p1=vert[cur];
 			Vector3d p2=vert[next];
-			if((p2-p1).cross(p1-p0).norm() > 0.00001) {
+			if(1) { // (p2-p1).cross(p1-p0).norm() > 0.00001) {
+			// TODO enable again, need partner also to remove
 				poly_new.push_back(cur);
 				last=cur;
 				cur=next;
