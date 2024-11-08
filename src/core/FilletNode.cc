@@ -225,11 +225,14 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
       Vector3d fan=calcTriangleNormal(ps->vertices, facea).head<3>();
       Vector3d fbn=calcTriangleNormal(ps->vertices, faceb).head<3>();
       double d=fan.dot(fbn);
-      if(d < cos_minang) {
-        e.second.sel=1;
-        corner_rounds[e.first.ind1].push_back(e.first.ind2);
-        corner_rounds[e.first.ind2].push_back(e.first.ind1);
-      }	else e.second.sel=0;
+      e.second.sel=0;
+      if(d >= cos_minang) continue; // dont create facets when the angle conner is too small
+      if(polinds[e.first.ind1].size() != 3) continue; // start must be 3edge corner
+      if(polinds[e.first.ind2].size() != 3) continue; // start must be 3edge corner
+
+      e.second.sel=1;
+      corner_rounds[e.first.ind1].push_back(e.first.ind2);
+      corner_rounds[e.first.ind2].push_back(e.first.ind1);
     }		      
   }
 
