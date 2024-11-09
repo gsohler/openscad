@@ -310,6 +310,48 @@ int python_vectorval(PyObject *vec, int minval, int maxval, double *x, double *y
   return 1;
 }
 
+std::vector<Vector3d> python_vectors(PyObject *vec, int mindim, int maxdim) 
+{
+  std::vector<Vector3d> results;	
+  Vector3d result;	
+  if (PyList_Check(vec)) {
+    // check if its a valid vec<Vector3d>
+    int valid=1;
+    for(int i=0;valid && i<PyList_Size(vec);i++) {
+      PyObject *item = PyList_GetItem(vec,i);
+      if(!PyList_Check(item)) valid=0;
+    }	    
+    if(valid) {
+      for(int j=0;valid && j<PyList_Size(vec);j++) {
+        PyObject *item = PyList_GetItem(vec,j);
+        if(PyList_Size(item) >= mindim && PyList_Size(item) <= maxdim) {	  
+          for(int i=0;i<PyList_Size(item);i++) {
+            if (PyList_Size(item) > i) {
+              if (python_numberval(PyList_GetItem(item, i), &result[i])) return results; // Error
+            }
+          }	
+        }  
+	results.push_back(result);
+      }	
+      return results;
+    }
+    if(PyList_Size(vec) >= mindim && PyList_Size(vec) <= maxdim) {	  
+      for(int i=0;i<PyList_Size(vec);i++) {
+        if (PyList_Size(vec) > i) {
+          if (python_numberval(PyList_GetItem(vec, i), &result[i])) return results; // Error
+        }
+      }	
+    }  
+    results.push_back(result);
+  }
+  if (!python_numberval(vec, &result[0])) {
+    result[1] = result[0];
+    result[2] = result[1];
+    results.push_back(result);
+  }
+  return results; // Error
+}
+
 /*
  * Helper function to extract actual values for fn, fa and fs
  */
@@ -599,7 +641,7 @@ void initPython(double time)
     PyPreConfig preconfig;
     PyPreConfig_InitPythonConfig(&preconfig);
     Py_PreInitialize(&preconfig);
-    PyEval_InitThreads(); // https://stackoverflow.com/questions/47167251/pygilstate-ensure-causing-deadlock
+//    PyEval_InitThreads(); // https://stackoverflow.com/questions/47167251/pygilstate-ensure-causing-deadlock
 
 #ifdef HAVE_PYTHON_YIELD
     set_object_callback(openscad_object_callback);

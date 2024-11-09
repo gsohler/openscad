@@ -1288,15 +1288,11 @@ PyObject *python_translate_sub(PyObject *obj, Vector3d translatevec)
   return pyresult;
 }
 
+PyObject *python_nb_sub_vec3(PyObject *arg1, PyObject *arg2, int mode);
 PyObject *python_translate_core(PyObject *obj, PyObject *v) 
 {
   if(v == nullptr) return obj;
-  double x = 0, y = 0, z = 0;
-  if (python_vectorval(v, 1, 3, &x, &y, &z)) {
-    PyErr_SetString(PyExc_TypeError, "Invalid vector specifiaction in trans");
-    return NULL;
-  }
-  return python_translate_sub(obj, Vector3d(x, y, z));
+  return  python_nb_sub_vec3(obj, v, 0);
 }	
 
 PyObject *python_translate(PyObject *self, PyObject *args, PyObject *kwargs)
@@ -2885,25 +2881,37 @@ PyObject *python_nb_sub_vec3(PyObject *arg1, PyObject *arg2, int mode) // 0: tra
   std::shared_ptr<AbstractNode> child;
   PyObject *dummydict;	  
 
-  double x=0, y=0, z=0 ;
-  if (!python_vectorval(arg2, 2, 3, &x, &y, &z)) {
-    child = PyOpenSCADObjectToNodeMulti(arg1, &dummydict);
+  child = PyOpenSCADObjectToNodeMulti(arg1, &dummydict);
+  std::vector<Vector3d> vecs = python_vectors(arg2,2,3);
+  if (vecs.size() > 0) {
     if (child == NULL) {
       PyErr_SetString(PyExc_TypeError, "invalid argument left to operator");
       return NULL;
     }
     if(mode == 0 || mode == 2) {
-	    auto node = std::make_shared<TransformNode>(instance, "translate");
-	    Vector3d transvec(x, y, z);
-	    if(mode == 2) transvec = -transvec;
-	    node->matrix.translate(transvec);
-	    node->children.push_back(child);
-	    return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
+	    std::vector<std::shared_ptr<TransformNode>> nodes;
+	    for(int j=0;j<vecs.size();j++) {
+	      auto node = std::make_shared<TransformNode>(instance, "translate");
+	      if(mode == 0) node->matrix.translate(vecs[j]);
+	      if(mode == 2) node->matrix.translate(-vecs[j]);
+	      node->children.push_back(child);
+	      nodes.push_back(node);
+	    }  
+	    if(nodes.size() == 1) return PyOpenSCADObjectFromNode(&PyOpenSCADType, nodes[0]);
+	    else {
+              auto node = std::make_shared<CsgOpNode>(instance, OpenSCADOperator::UNION);
+              DECLARE_INSTANCE
+	      for(auto x : nodes) node->children.push_back(x);
+	      return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
+	    }  
     }
     if(mode == 1) {
 	    auto node = std::make_shared<TransformNode>(instance, "scale"); 
-	    Vector3d scalevec(x, y, z);
-	    node->matrix.scale(scalevec);
+	    if(vecs.size() != 1){
+              PyErr_SetString(PyExc_TypeError, "Several vectors not useful for scale");
+              return NULL;
+            }
+	    node->matrix.scale(vecs[0]);
 	    node->children.push_back(child);
 	    return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
     }
@@ -2919,7 +2927,8 @@ PyObject *python_nb_subtract(PyObject *arg1, PyObject *arg2)
 {
   double dmy;	
   if(PyList_Check(arg2) && PyList_Size(arg2) > 0) {
-    if (!python_numberval(PyList_GetItem(arg2, 0), &dmy)){
+    PyObject *sub = PyList_GetItem(arg2, 0);	  
+    if (!python_numberval(sub, &dmy) || PyList_Check(sub)){
       return python_nb_sub_vec3(arg1, arg2, 2); 
     }
   }	  
