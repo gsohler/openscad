@@ -2875,52 +2875,72 @@ PyObject *python_nb_sub(PyObject *arg1, PyObject *arg2, OpenSCADOperator mode)
   return pyresult;
 }
 
-PyObject *python_nb_sub_vec3(PyObject *arg1, PyObject *arg2, int mode) // 0: translate, 1: scale, 2: translateneg
+PyObject *python_nb_sub_vec3(PyObject *arg1, PyObject *arg2, int mode) // 0: translate, 1: scale, 2: translateneg, 3=translate-exp
 {
   DECLARE_INSTANCE
   std::shared_ptr<AbstractNode> child;
   PyObject *dummydict;	  
 
   child = PyOpenSCADObjectToNodeMulti(arg1, &dummydict);
-  std::vector<Vector3d> vecs = python_vectors(arg2,2,3);
+  std::vector<Vector3d> vecs;
+  if(mode == 3) {
+    if(!PyList_Check(arg2)) {
+      PyErr_SetString(PyExc_TypeError, "explode arg must be a list");
+      return NULL;
+    }
+    int n=PyList_Size(arg2);
+    double dmy;
+    std::vector<float> vals[3];
+    for(int i=0;i<3;i++) vals[i].push_back(0.0);
+    for(int i=0;i<n;i++) {
+      vals[i].clear();	    
+      auto *item =PyList_GetItem(arg2,i);	    
+      if (!python_numberval(item, &dmy)) vals[i].push_back(dmy);
+      else if(PyList_Check(item)) {
+        int m = PyList_Size(item);	      
+	for(int j=0;j<m;j++) {
+          auto *item1 =PyList_GetItem(item,j);	    
+          if (!python_numberval(item1, &dmy)) vals[i].push_back(dmy);
+	}  
+      } else {
+        PyErr_SetString(PyExc_TypeError, "Unknown explode spec");
+        return NULL;
+      }
+
+    }
+    for(auto z : vals[2])
+      for(auto y : vals[1])
+        for(auto x : vals[0])
+          vecs.push_back(Vector3d(x,y,z));		
+  } else vecs = python_vectors(arg2,2,3);
   if (vecs.size() > 0) {
     if (child == NULL) {
       PyErr_SetString(PyExc_TypeError, "invalid argument left to operator");
       return NULL;
     }
-    if(mode == 0 || mode == 2) {
-	    std::vector<std::shared_ptr<TransformNode>> nodes;
-	    for(int j=0;j<vecs.size();j++) {
-	      auto node = std::make_shared<TransformNode>(instance, "translate");
-	      if(mode == 0) node->matrix.translate(vecs[j]);
-	      if(mode == 2) node->matrix.translate(-vecs[j]);
-	      node->children.push_back(child);
-	      nodes.push_back(node);
-	    }  
-	    if(nodes.size() == 1) return PyOpenSCADObjectFromNode(&PyOpenSCADType, nodes[0]);
-	    else {
-              auto node = std::make_shared<CsgOpNode>(instance, OpenSCADOperator::UNION);
-              DECLARE_INSTANCE
-	      for(auto x : nodes) node->children.push_back(x);
-	      return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
-	    }  
-    }
-    if(mode == 1) {
-	    auto node = std::make_shared<TransformNode>(instance, "scale"); 
-	    if(vecs.size() != 1){
-              PyErr_SetString(PyExc_TypeError, "Several vectors not useful for scale");
-              return NULL;
-            }
-	    node->matrix.scale(vecs[0]);
-	    node->children.push_back(child);
-	    return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
-    }
+    std::vector<std::shared_ptr<TransformNode>> nodes;
+    for(int j=0;j<vecs.size();j++) {
+      auto node = std::make_shared<TransformNode>(instance, "transform");
+      if(mode == 0 || mode == 3) node->matrix.translate(vecs[j]);
+      if(mode == 1) node->matrix.scale(vecs[j]);
+      if(mode == 2) node->matrix.translate(-vecs[j]);
+      node->children.push_back(child);
+      nodes.push_back(node);
+    }  
+    if(nodes.size() == 1) return PyOpenSCADObjectFromNode(&PyOpenSCADType, nodes[0]);
+    else {
+      auto node = std::make_shared<CsgOpNode>(instance, OpenSCADOperator::UNION);
+      DECLARE_INSTANCE
+      for(auto x : nodes) node->children.push_back(x);
+      return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
+    }  
   }
   PyErr_SetString(PyExc_TypeError, "invalid argument right to operator");
   return NULL;
 }
 
 PyObject *python_nb_add(PyObject *arg1, PyObject *arg2) { return python_nb_sub_vec3(arg1, arg2, 0); }  // translate
+PyObject *python_nb_xor(PyObject *arg1, PyObject *arg2) { return python_nb_sub_vec3(arg1, arg2, 3); }
 PyObject *python_nb_mul(PyObject *arg1, PyObject *arg2) { return python_nb_sub_vec3(arg1, arg2, 1); } // scale
 PyObject *python_nb_or(PyObject *arg1, PyObject *arg2) { return python_nb_sub(arg1, arg2,  OpenSCADOperator::UNION); }
 PyObject *python_nb_subtract(PyObject *arg1, PyObject *arg2)
@@ -4151,7 +4171,7 @@ PyNumberMethods PyOpenSCADNumbers =
      0,			//binaryfunc nb_lshift
      0,			//binaryfunc nb_rshift
      python_nb_and,	//binaryfunc nb_and 
-     0,			//binaryfunc nb_xor
+     python_nb_xor,      //binaryfunc nb_xor
      python_nb_or,	//binaryfunc nb_or 
      0,			//unaryfunc nb_int
      0,			//void *nb_reserved
