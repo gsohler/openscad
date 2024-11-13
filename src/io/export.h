@@ -102,6 +102,7 @@ struct ExportInfo {
   FileFormat format;
   std::string sourceFilePath; // Full path to the OpenSCAD source file
   ExportPdfOptions *options;
+  const Camera *camera;
 };
 
 class Export3mfInfo{

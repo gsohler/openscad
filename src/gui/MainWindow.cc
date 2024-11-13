@@ -2415,7 +2415,7 @@ void MainWindow::sendToOctoPrint()
     userFileName = fileInfo.baseName() + "." + fileFormat.toLower();
   }
 
-  ExportInfo exportInfo = {.format = exportFileFormat, .sourceFilePath = activeEditor->filepath.toStdString()};
+  ExportInfo exportInfo = {.format = exportFileFormat, .sourceFilePath = activeEditor->filepath.toStdString(), .camera = &qglview->cam};
   exportFileByName(this->root_geom, exportFileName.toStdString(), exportInfo);
 
   try {
@@ -2470,7 +2470,7 @@ void MainWindow::sendToLocalSlicer()
     userFileName = fileInfo.baseName() + fileFormat;
   }
 
-  ExportInfo exportInfo = {.format = exportFileFormat, .sourceFilePath = activeEditor->filepath.toStdString()};
+  ExportInfo exportInfo = {.format = exportFileFormat, .sourceFilePath = activeEditor->filepath.toStdString(), .camera = &qglview->cam};
   exportFileByName(this->root_geom, exportFileName.toStdString(), exportInfo);
 
   QProcess process(this);
@@ -2505,7 +2505,7 @@ void MainWindow::sendToPrintService()
   const QString exportFilename = exportFile.fileName();
 
   //Render the stl to a temporary file:
-  ExportInfo exportInfo = {.format = FileFormat::BINARY_STL, .sourceFilePath = activeEditor->filepath.toStdString()};
+  ExportInfo exportInfo = {.format = FileFormat::BINARY_STL, .sourceFilePath = activeEditor->filepath.toStdString(), .camera = &qglview->cam};
   exportFileByName(this->root_geom, exportFilename.toStdString(), exportInfo);
 
   //Create a name that the order process will use to refer to the file. Base it off of the project name
@@ -3346,7 +3346,7 @@ void MainWindow::actionExport(FileFormat format, const char *type_name, const ch
   }
   this->export_paths[suffix] = exportFilename;
 
-  ExportInfo exportInfo = {.format = format, .sourceFilePath = activeEditor->filepath.toStdString()};
+  ExportInfo exportInfo = {.format = format, .sourceFilePath = activeEditor->filepath.toStdString(), .camera = &qglview->cam};
   // Add options
   exportInfo.options = options;
 

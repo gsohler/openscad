@@ -108,7 +108,7 @@ get_debian_deps()
   imagemagick libfreetype6-dev libdouble-conversion-dev \
   gtk-doc-tools libglib2.0-dev gettext xvfb pkg-config ragel libtbb-dev \
   libgl1-mesa-dev libxi-dev libfontconfig-dev libzip-dev libglm-dev nettle-dev get_qt5_deps_debian \
-  libjpeg-dev
+  libjpeg-dev get_qt5_deps_debian
 }
 
 get_qt5_deps_debian()
