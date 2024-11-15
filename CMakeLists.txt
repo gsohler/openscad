@@ -216,29 +216,6 @@ find_package(PkgConfig)
 
 add_subdirectory(submodules)
 
-#set(STEP_LIB "${CMAKE_SOURCE_DIR}/submoules/stepcode/build/bin/exppp")
-#add_custom_command(
-#  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/submodules/stepcode
-#  COMMAND mkdir -p build && cd build && cmake .. && make -j3
-#  OUTPUT ${STEP_LIB}
-#)
-#add_custom_target(target_step DEPENDS ${STEP_LIB})
-#add_dependencies(OpenSCAD target_step)
-include(ExternalProject)
-ExternalProject_Add(stepcode
-  SOURCE_DIR "${CMAKE_SOURCE_DIR}/submodules/stepcode"
-  CMAKE_ARGS -DSC_PYTHON_GENERATOR=OFF 
-  INSTALL_COMMAND cmake -E echo "Skipping install step."
-)  
-add_dependencies(OpenSCAD stepcode)
-
-target_link_directories(OpenSCAD PRIVATE "${CMAKE_SOURCE_DIR}/submodules/stepcode/build/lib/")
-target_link_libraries(OpenSCAD PRIVATE "stepcore")
-target_link_libraries(OpenSCAD PRIVATE "stepeditor")
-target_link_libraries(OpenSCAD PRIVATE "stepdai")
-target_link_libraries(OpenSCAD PRIVATE "steputils")
-target_link_libraries(OpenSCAD PRIVATE "sdai_ap203e2")
-
 # The submodules will set up mimalloc if needed, and we need to defer any
 # target_link_libraries() calls until after that.
 
@@ -542,11 +519,6 @@ target_include_directories(OpenSCAD PRIVATE
   "src/ext"
   "src/ext/lexertl/include"
   "src/ext/libtess2/Include"
-  "submodules/stepcode/include"
-  "submodules/stepcode/build/include"
-  "submodules/stepcode/include/clstepcore"
-  "submodules/stepcode/include/cleditor"
-  "submodules/stepcode/include/clutils"
 
   # All the following should go away, not needed anymore after
   # PR #5312. Left here for now in case there are on-going PRs that
@@ -870,6 +842,7 @@ set(CORE_SOURCES
   src/io/import_off.cc
   src/io/import_stl.cc
   src/io/import_step.cc
+  src/io/StepKernel.cpp
   src/io/import_svg.cc
   src/libsvg/circle.cc
   src/libsvg/data.cc

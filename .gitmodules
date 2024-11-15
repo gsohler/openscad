@@ -13,6 +13,3 @@
 [submodule "OpenCSG"]
 	path = submodules/OpenCSG
 	url = https://github.com/openscad/OpenCSG.git
-[submodule "submodules/stepcode"]
-	path = submodules/stepcode
-	url = https://github.com/stepcode/stepcode
