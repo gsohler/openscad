@@ -3696,7 +3696,8 @@ PyObject *do_import_python(PyObject *self, PyObject *args, PyObject *kwargs, Imp
     return NULL;
   }
 
-  filename = lookup_file(v == NULL ? "" : v, instance->location().filePath().parent_path().string(), "");
+  std::string cur_dir = get_current_dir_name();
+  filename = lookup_file(v == NULL ? "" : v, cur_dir, instance->location().filePath().parent_path().string());
   if (!filename.empty()) handle_dep(filename);
   ImportType actualtype = type;
   if (actualtype == ImportType::UNKNOWN) {
@@ -3709,6 +3710,8 @@ PyObject *do_import_python(PyObject *self, PyObject *args, PyObject *kwargs, Imp
     else if (ext == ".3mf") actualtype = ImportType::_3MF;
     else if (ext == ".amf") actualtype = ImportType::AMF;
     else if (ext == ".svg") actualtype = ImportType::SVG;
+    else if (ext == ".stp") actualtype = ImportType::STEP;
+    else if (ext == ".step") actualtype = ImportType::STEP;
   }
 
   auto node = std::make_shared<ImportNode>(instance, actualtype);
