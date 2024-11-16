@@ -107,13 +107,13 @@ PyThreadState *tstate=nullptr;
 
 void python_lock(void){
 //#ifndef _WIN32	
-  if(tstate != nullptr) PyEval_RestoreThread(tstate);
+  if(tstate != nullptr && pythonInitDict != nullptr) PyEval_RestoreThread(tstate);
 //#endif  
 }
 
 void python_unlock(void) {
 //#ifndef _WIN32	
-  tstate = PyEval_SaveThread();
+  if(pythonInitDict != nullptr)	tstate = PyEval_SaveThread();
 //#endif  
 }
 
