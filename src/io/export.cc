@@ -96,6 +96,7 @@ bool initialize() {
   add_item({FileFormat::PDF, "pdf", "pdf", "PDF"});
   add_item({FileFormat::PS, "ps", "ps", "PS"});
   add_item({FileFormat::POV, "pov", "pov", "POV"});
+  add_item({FileFormat::STEP, "stp", "stp", "STP"});
 
   // Alias
   identifierToInfo()["stl"] = identifierToInfo()["asciistl"];
@@ -143,6 +144,7 @@ return format == FileFormat::ASCII_STL ||
   format == FileFormat::PDF ||
   format == FileFormat::PS ||
   format == FileFormat::NEF3 ||
+  format == FileFormat::STEP ||
   format == FileFormat::POV;
 }
 
@@ -194,6 +196,9 @@ void exportFile(const std::shared_ptr<const Geometry>& root_geom, std::ostream& 
     break;
   case FileFormat::POV:
     export_pov(root_geom, output, exportInfo);
+    break;
+  case FileFormat::STEP:
+    export_step(root_geom, output, exportInfo);
     break;
 #ifdef ENABLE_CGAL
   case FileFormat::NEFDBG:

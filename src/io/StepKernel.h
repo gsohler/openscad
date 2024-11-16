@@ -32,6 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 #include <algorithm>
 #include <sstream>
 #include <math.h>
+#include "GeometryUtils.h"
 
 class StepKernel
 {
@@ -797,17 +798,16 @@ public:
 
 	StepKernel::EdgeCurve* create_edge_curve(StepKernel::Vertex * vert1, StepKernel::Vertex * vert2, bool dir);
 
-	void build_tri_body(std::vector<double> tris, double tol, int &merged_edge_cnt);
+	void build_tri_body(std::vector<Vector3d> tris, std::vector<IndexedFace> faces, double tol);
 	void get_edge_from_map(
-		double  p0[3],
-		double  p1[3],
+		Vector3d p0,
+		Vector3d p1,
 		std::map<std::tuple<double, double, double, double, double, double>, StepKernel::EdgeCurve *> &edge_map,
 		StepKernel::Vertex * vert1,
 		StepKernel::Vertex * vert2,
 		EdgeCurve *& edge_curve,
 		bool &edge_dir,
 		int &merge_cnt);
-	void write_step(std::string file_name);
 	std::string read_line(std::ifstream &stp_file, bool skip_all_space);
 	void read_step(std::string file_name);
 	std::vector<Entity*> entities;

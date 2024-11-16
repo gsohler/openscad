@@ -61,89 +61,49 @@ StepKernel::EdgeCurve* StepKernel::create_edge_curve(StepKernel::Vertex * vert1,
 	return new EdgeCurve(entities, vert1, vert2, surf_curve1, dir);
 }
 
-void StepKernel::build_tri_body(std::vector<double> tris,double tol, int &merged_edge_cnt)
+void StepKernel::build_tri_body(std::vector<Vector3d> vertices, std::vector<IndexedFace> faces, double tol)
 {
 	auto point = new Point(entities, 0.0, 0.0, 0.0);
 	auto dir_1 = new Direction(entities, 0.0, 0.0, 1.0);
 	auto dir_2 = new Direction(entities, 1.0, 0.0, 0.0);
 
 	auto base_csys = new Csys3D(entities, dir_1, dir_2, point);
-	std::vector<Face*> faces;
+	std::vector<Face*> sfaces;
 	std::map<std::tuple<double, double, double, double, double, double>, EdgeCurve*> edge_map;
-	for (std::size_t i = 0; i < tris.size() / 9; i++)
+	for (std::size_t i = 0; i < faces.size() ; i++)
 	{
-		double p0[3] = { tris[i * 9 + 0],tris[i * 9 + 1] ,tris[i * 9 + 2] };
-		double p1[3] = { tris[i * 9 + 3],tris[i * 9 + 4] ,tris[i * 9 + 5] };
-		double p2[3] = { tris[i * 9 + 6],tris[i * 9 + 7] ,tris[i * 9 + 8] };
+		Vector3d p0 = vertices[faces[i][0]];
+		Vector3d p1 = vertices[faces[i][1]];
+		Vector3d p2 = vertices[faces[i][2]];
 
-		double d0[3] = { 1,0,0 };
-		d0[0] = p1[0] - p0[0];
-		d0[1] = p1[1] - p0[1];
-		d0[2] = p1[2] - p0[2];
-		double dist0 = sqrt(d0[0] * d0[0] + d0[1] * d0[1] + d0[2] * d0[2]);
-		if (dist0 < tol)
-			continue;
-		d0[0] = d0[0] / dist0;
-		d0[1] = d0[1] / dist0;
-		d0[2] = d0[2] / dist0;
-
-		double d1[3] = { 1,0,0 };
-		d1[0] = p2[0] - p0[0];
-		d1[1] = p2[1] - p0[1];
-		d1[2] = p2[2] - p0[2];
-		double dist1 = sqrt(d1[0] * d1[0] + d1[1] * d1[1] + d1[2] * d1[2]);
-		if (dist1 < tol)
-			continue;
-		d1[0] = d1[0] / dist1;
-		d1[1] = d1[1] / dist1;
-		d1[2] = d1[2] / dist1;
-
-		// now cross
-		// cross to get the thrid direction for the beam csys
-		double d2[3] = { d0[1] * d1[2] - d0[2] * d1[1], d0[2] * d1[0] - d0[0] * d1[2], d0[0] * d1[1] - d0[1] * d1[0] };
+		Vector3d d0=(p1-p0).normalized();
+		Vector3d d1=(p2-p0).normalized();
+		Vector3d d2=d0.cross(d1).normalized();
 		double dist2 = sqrt(d2[0] * d2[0] + d2[1] * d2[1] + d2[2] * d2[2]);
-		if (dist2 < tol)
-			continue;
-		d2[0] = d2[0] / dist2;
-		d2[1] = d2[1] / dist2;
-		d2[2] = d2[2] / dist2;
+		Vector3d d1_cor=d0.cross(d2).normalized();
 
-		// correct the m direction
-		double d1_cor[3] = { d2[1] * d0[2] - d2[2] * d0[1], d2[2] * d0[0] - d2[0] * d0[2], d2[0] * d0[1] - d2[1] * d0[0] };
-		double d1_cor_len = sqrt(d1_cor[0] * d1_cor[0] + d1_cor[1] * d1_cor[1] + d1_cor[2] * d1_cor[2]);
-		d1[0] = d1_cor[0] / d1_cor_len;
-		d1[1] = d1_cor[1] / d1_cor_len;
-		d1[2] = d1_cor[2] / d1_cor_len;
-
-
+		int merged_edge_cnt;
 		// build the face
-		// the 3 vertex locations
-		auto point1 = new Point(entities, p0[0], p0[1], p0[2]);
-		auto vert1 = new Vertex(entities, point1);
-
-		auto point2 = new Point(entities, p1[0], p1[1], p1[2]);
-		auto vert2 = new Vertex(entities, point2);
-
-		auto point3 = new Point(entities, p2[0], p2[1], p2[2]);
-		auto vert3 = new Vertex(entities, point3);
-
-
-		EdgeCurve* edge_curve1 = 0;
-		bool edge1_dir = true;
-		get_edge_from_map(p0, p1, edge_map, vert1, vert2, edge_curve1, edge1_dir, merged_edge_cnt);
-
-		EdgeCurve* edge_curve2 = 0;
-		bool edge2_dir = true;
-		get_edge_from_map(p1, p2, edge_map, vert2, vert3, edge_curve2, edge2_dir, merged_edge_cnt);
-
-		EdgeCurve* edge_curve3 = 0;
-		bool edge3_dir = true;
-		get_edge_from_map(p2, p0, edge_map, vert3, vert1, edge_curve3, edge3_dir, merged_edge_cnt);
+		int n=faces[i].size();
+		std::vector<StepKernel::Vertex *> vert;
+		for(int j=0;j<n;j++){
+			int ind=faces[i][j];
+			auto point = new Point(entities, vertices[ind][0], vertices[ind][1], vertices[ind][2]);
+			auto v = new Vertex(entities, point);
+			vert.push_back(v);
+		}
 
 		std::vector<OrientedEdge*> oriented_edges;
-		oriented_edges.push_back(new OrientedEdge(entities, edge_curve1, edge1_dir));
-		oriented_edges.push_back(new OrientedEdge(entities, edge_curve2, edge2_dir));
-		oriented_edges.push_back(new OrientedEdge(entities, edge_curve3, edge3_dir));
+		for(int j=0;j<n;j++)
+		{
+			int ind=faces[i][j];
+			int indn=faces[i][(j+1)%n];
+			EdgeCurve* edge_curve;
+			bool edge_dir = true; // TODO mist
+			get_edge_from_map(vertices[ind], vertices[indn], edge_map, vert[j], vert[(j+1)%n], edge_curve, edge_dir, merged_edge_cnt);
+			oriented_edges.push_back(new OrientedEdge(entities, edge_curve, edge_dir));
+		}
+
 
 		// create the plane
 		auto plane_point = new Point(entities, p0[0], p0[1], p0[2]);
@@ -157,11 +117,11 @@ void StepKernel::build_tri_body(std::vector<double> tris,double tol, int &merged
 		auto edge_loop = new EdgeLoop(entities, oriented_edges);
 		std::vector<FaceBound*> face_bounds;
 		face_bounds.push_back(new FaceBound(entities, edge_loop, true));
-		faces.push_back(new Face(entities, face_bounds, plane, true));
+		sfaces.push_back(new Face(entities, face_bounds, plane, true));
 	}
 
 	// build the model
-	auto open_shell = new Shell(entities, faces);
+	auto open_shell = new Shell(entities, sfaces);
 	std::vector<Shell*> shells;
 	shells.push_back(open_shell);
 	auto shell_model = new ShellModel(entities, shells);
@@ -169,8 +129,8 @@ void StepKernel::build_tri_body(std::vector<double> tris,double tol, int &merged
 }
 
 void StepKernel::get_edge_from_map(
-	double  p0[3],
-	double  p1[3],
+	Vector3d p0,
+	Vector3d p1,
 	std::map<std::tuple<double, double, double, double, double, double>, StepKernel::EdgeCurve *> &edge_map,
 	StepKernel::Vertex * vert1,
 	StepKernel::Vertex * vert2,
@@ -199,38 +159,6 @@ void StepKernel::get_edge_from_map(
 		edge_curve = create_edge_curve(vert1, vert2, true);
 		edge_map[edge_tuple1_f] = edge_curve;
 	}
-}
-
-void StepKernel::write_step(std::string file_name)
-{
-	std::time_t tt = std ::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-	struct std::tm * ptm = std::localtime(&tt);
-	std::stringstream iso_time;
-	iso_time << std::put_time(ptm, "%FT%T");
-
-	std::ofstream stp_file;
-	stp_file.open(file_name);
-	if (!stp_file)
-		return;
-	std::string author = "slugdev";
-	std::string org = "org";
-		// header info
-	stp_file << "ISO-10303-21;\n";
-	stp_file << "HEADER;\n";
-	stp_file << "FILE_DESCRIPTION(('STP203'),'2;1');\n";
-	stp_file << "FILE_NAME('" << file_name << "','" << iso_time.str() << "',('" << author << "'),('" << org << "'),' ','stltostp',' ');\n";
-	stp_file << "FILE_SCHEMA(('CONFIG_CONTROL_DESIGN'));\n";
-	stp_file << "ENDSEC; \n";
-
-	// data section
-	stp_file << "DATA;\n";
-
-	for (auto e:entities )
-		e->serialize(stp_file);
-	// create the base csys
-	stp_file << "ENDSEC;\n";
-	stp_file << "END-ISO-10303-21;\n";
-	stp_file.close();
 }
 
 std::string StepKernel::read_line(std::ifstream &stp_file, bool skip_all_space)

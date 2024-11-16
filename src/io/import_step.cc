@@ -9,7 +9,7 @@ extern void SchemaInit( class Registry & );
 
 // https://github.com/slugdev/stltostp/blob/master/StepKernel.cpp
 //
-typedef std::vector<int> intList;
+Vector4d calcTriangleNormal(const std::vector<Vector3d> &vertices,const IndexedFace &pol);
 std::unique_ptr<PolySet> import_step(const std::string& filename, const Location& loc) {
   PolySetBuilder builder;
   printf("Importing %s\n",filename.c_str());
@@ -23,9 +23,20 @@ std::unique_ptr<PolySet> import_step(const std::string& filename, const Location
     for(int i=0;i<shell->faces.size();i++) {
       StepKernel::Face *face = shell->faces[i];
       if(face == nullptr) continue;
+      StepKernel::Plane *plane = face->plane;
+      if(plane == nullptr) continue;
+      StepKernel::Csys3D *sys = plane->csys;
+      if(sys == nullptr) continue;
+      StepKernel::Direction *dir1=sys->dir1;
+      StepKernel::Direction *dir2=sys->dir2;
+      if(dir1 == nullptr || dir2 == nullptr) continue;
+      Vector3d d1(dir1->x, dir1->y, dir2->z);
+      Vector3d d2(dir2->x, dir2->y, dir2->z);
+      Vector3d dn=d1.cross(d2).normalized();
+
       for(int j=0;j<face->faceBounds.size();j++) {
         StepKernel::FaceBound *bound = face->faceBounds[j];
-	std::vector<intList> stubs;
+	std::vector<IndexedFace> stubs;
 	if(bound == nullptr) continue;
 	StepKernel::EdgeLoop *loop = bound->edgeLoop;
 	for(int k=0;k<loop->faces.size();k++) {
@@ -34,7 +45,7 @@ std::unique_ptr<PolySet> import_step(const std::string& filename, const Location
 	  StepKernel::EdgeCurve *edgecurv = edge->edge;
 	  StepKernel::Point *pt1 = edgecurv->vert1->point;
 	  StepKernel::Point *pt2 = edgecurv->vert2->point;
-	  intList stub;
+	  IndexedFace stub;
 	  Vector3d p1(pt1->x, pt1->y, pt1->z);
 	  stub.push_back(builder.vertexIndex(p1));
 	  Vector3d p2(pt2->x, pt2->y, pt2->z);
@@ -44,7 +55,7 @@ std::unique_ptr<PolySet> import_step(const std::string& filename, const Location
 	}
 	// now combine the stub
 	if(stubs.size() == 0) continue;
-	intList combined = stubs[0];
+	IndexedFace combined = stubs[0];
 	stubs.erase(stubs.begin());
 	while(stubs.size() > 0) {
          int done=0;		
@@ -72,8 +83,15 @@ std::unique_ptr<PolySet> import_step(const std::string& filename, const Location
 	 }
 	}
 	combined.erase(combined.begin());
+
+	std::vector<Vector3d> vertices;
+	builder.copyVertices(vertices);
+	Vector4d tn=calcTriangleNormal(vertices,combined);
+	if(tn.head<3>().dot(dn) < 0)
+	  std::reverse(combined.begin(), combined.end());
+
 	builder.beginPolygon(combined.size());
-	// TODO thrown, debugging weg
+	// TODO thrown
 	// TODO export, TODO Vector3d
         for(int i=0;i<combined.size();i++) builder.addVertex(combined[i]);			
        	
