@@ -481,29 +481,19 @@ public:
 			auto st = args.find_first_of('(');
 			auto en = args.find_last_of(')');
 			auto arg_str = args.substr(st + 1, en - st - 1);
-//			std::replace(arg_str.begin(), arg_str.end(), ',', ' ');
+			std::replace(arg_str.begin(), arg_str.end(), ',', ' ');
 			std::replace(arg_str.begin(), arg_str.end(), '#', ' ');
-			printf("mani parse_args %s\n",arg_str.c_str());
-			auto toks = tokenize(arg_str);
-			printf("t %d\n",toks.size());
-			int p1_id=-1, p2_id=-1;
-			if(toks.size() >= 1) {
-	  			std::stringstream ss(toks[0]);
-				ss >> p1_id;
-			}
-			if(toks.size() >= 2) {
-	  			std::stringstream ss(toks[1]);
-				ss >> p2_id;
-			}
+			std::stringstream ss(arg_str);
+			int p1_id, p2_id;
+			ss >> p1_id >> p2_id;
 
-			printf("a %d %d\n",p1_id, p2_id);
 			csys = dynamic_cast<Csys3D*>(ent_map[p1_id]);
 			shellModel = dynamic_cast<ShellModel*>(ent_map[p2_id]);
 
-			if (!csys) csys = dynamic_cast<Csys3D*>(ent_map[p1_id]);
-			if (!shellModel) {
-				shellModel = dynamic_cast<ShellModel*>(ent_map[p2_id]);
-				printf("t %p\n", ent_map[p2_id]);
+			if (!csys && !shellModel)
+			{
+				csys = dynamic_cast<Csys3D*>(ent_map[p2_id]);
+				shellModel = dynamic_cast<ShellModel*>(ent_map[p1_id]);
 			}
 		}
 
@@ -538,9 +528,7 @@ public:
 			auto arg_str = args.substr(st + 1, en - st - 1);
 //			std::replace(arg_str.begin(), arg_str.end(), ',', ' ');
 			std::replace(arg_str.begin(), arg_str.end(), '#', ' ');
-			printf("mani parse_args %s\n",arg_str.c_str());
 			auto toks = tokenize(arg_str);
-			printf("t %d\n",toks.size());
 			int p1_id=-1, p2_id=-1;
 			if(toks.size() >= 1) {
 	  			std::stringstream ss(toks[0]);
@@ -551,7 +539,6 @@ public:
 				ss >> p2_id;
 			}
 
-			printf("a %d %d\n",p1_id, p2_id);
 			csys = dynamic_cast<Csys3D*>(ent_map[p1_id]);
 			shell = dynamic_cast<Shell*>(ent_map[p2_id]);
 

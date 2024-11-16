@@ -330,8 +330,7 @@ void StepKernel::read_step(std::string file_name)
 				ent = new ManifoldShape(entities);
 			else if (func_name == "MANIFOLD_SOLID_BREP"){
 				ent = new ManifoldSolid(entities);
-			}
-			else if (func_name == "VERTEX_POINT")
+			}else if (func_name == "VERTEX_POINT")
 				ent = new Vertex(entities);
 			else if (func_name == "SURFACE_CURVE")
 				ent = new SurfaceCurve(entities);
@@ -357,10 +356,9 @@ void StepKernel::read_step(std::string file_name)
 				args.push_back(arg_str);
 			}
 		}
-		std::cout << cur_str << "\n";
+//		std::cout << cur_str << "\n";
 	}
 	// processes all the arguments
-	printf("r %d %d\n",ents.size(),args.size());
 	for (int i = 0; i < ents.size(); i++)
 	{
 		ents[i]->parse_args(ent_map,args[i]);
