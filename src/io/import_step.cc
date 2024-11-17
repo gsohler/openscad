@@ -23,8 +23,8 @@ void import_shell(PolySetBuilder &builder, StepKernel &sk, StepKernel::Shell *sh
     StepKernel::Direction *dir1=sys->dir1;
     StepKernel::Direction *dir2=sys->dir2;
     if(dir1 == nullptr || dir2 == nullptr) return;
-    Vector3d d1(dir1->x, dir1->y, dir2->z);
-    Vector3d d2(dir2->x, dir2->y, dir2->z);
+    Vector3d d1=dir1->pt;
+    Vector3d d2=dir2->pt;
     Vector3d dn=d1.cross(d2).normalized();
 
     for(int j=0;j<face->faceBounds.size();j++) {
@@ -39,10 +39,10 @@ void import_shell(PolySetBuilder &builder, StepKernel &sk, StepKernel::Shell *sh
         StepKernel::Point *pt1 = edgecurv->vert1->point;
         StepKernel::Point *pt2 = edgecurv->vert2->point;
         IndexedFace stub;
-        Vector3d p1(pt1->x, pt1->y, pt1->z);
-        stub.push_back(builder.vertexIndex(p1));
-        Vector3d p2(pt2->x, pt2->y, pt2->z);
-        stub.push_back(builder.vertexIndex(p2));
+        Vector3d p1=pt1->pt;
+        stub.push_back(builder.vertexIndex(pt1->pt));
+        Vector3d p2=pt2->pt;
+        stub.push_back(builder.vertexIndex(pt2->pt));
         stubs.push_back(stub);
 
       }

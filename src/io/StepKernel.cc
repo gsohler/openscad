@@ -45,16 +45,10 @@ StepKernel::~StepKernel()
 StepKernel::EdgeCurve* StepKernel::create_edge_curve(StepKernel::Vertex * vert1, StepKernel::Vertex * vert2,bool dir)
 {
 	// curve 1
-	auto line_point1 = new Point(entities, vert1->point->x, vert1->point->y, vert1->point->z);
-	double vx = vert2->point->x - vert1->point->x;
-	double vy = vert2->point->y - vert1->point->y;
-	double vz = vert2->point->z - vert1->point->z;
-	double dist = sqrt(vx * vx + vy * vy + vz * vz);
-	vx = vx / dist;
-	vy = vy / dist;
-	vz = vz / dist;
+	auto line_point1 = new Point(entities, vert1->point->pt);
+	Vector3d v = (vert2->point->pt - vert1->point->pt).normalized();
 
-	auto line_dir1 = new Direction(entities, vx, vy, vz);
+	auto line_dir1 = new Direction(entities, v);
 	auto line_vector1 = new Vector(entities, line_dir1, 1.0);
 	auto line1 = new Line(entities, line_point1, line_vector1);
 	auto surf_curve1 = new SurfaceCurve(entities, line1);
@@ -63,9 +57,9 @@ StepKernel::EdgeCurve* StepKernel::create_edge_curve(StepKernel::Vertex * vert1,
 
 void StepKernel::build_tri_body(std::vector<Vector3d> vertices, std::vector<IndexedFace> faces, double tol)
 {
-	auto point = new Point(entities, 0.0, 0.0, 0.0);
-	auto dir_1 = new Direction(entities, 0.0, 0.0, 1.0);
-	auto dir_2 = new Direction(entities, 1.0, 0.0, 0.0);
+	auto point = new Point(entities, Vector3d(0.0, 0.0, 0.0));
+	auto dir_1 = new Direction(entities, Vector3d(0.0, 0.0, 1.0));
+	auto dir_2 = new Direction(entities, Vector3d(1.0, 0.0, 0.0));
 
 	auto base_csys = new Csys3D(entities, dir_1, dir_2, point);
 	std::vector<Face*> sfaces;
@@ -88,7 +82,7 @@ void StepKernel::build_tri_body(std::vector<Vector3d> vertices, std::vector<Inde
 		std::vector<StepKernel::Vertex *> vert;
 		for(int j=0;j<n;j++){
 			int ind=faces[i][j];
-			auto point = new Point(entities, vertices[ind][0], vertices[ind][1], vertices[ind][2]);
+			auto point = new Point(entities, vertices[ind]);
 			auto v = new Vertex(entities, point);
 			vert.push_back(v);
 		}
@@ -106,9 +100,9 @@ void StepKernel::build_tri_body(std::vector<Vector3d> vertices, std::vector<Inde
 
 
 		// create the plane
-		auto plane_point = new Point(entities, p0[0], p0[1], p0[2]);
-		auto plane_dir_1 = new Direction(entities, d2[0], d2[1], d2[2]);
-		auto plane_dir_2 = new Direction(entities, d0[0], d0[1], d0[2]);
+		auto plane_point = new Point(entities, p0);
+		auto plane_dir_1 = new Direction(entities, d2);
+		auto plane_dir_2 = new Direction(entities, d0);
 		auto plane_csys = new Csys3D(entities, plane_dir_1, plane_dir_2, plane_point);
 		auto plane = new Plane(entities, plane_csys);
 

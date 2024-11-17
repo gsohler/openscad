@@ -82,15 +82,13 @@ public:
 	public:
 		Direction(std::vector<Entity*> &ent_list) : Entity(ent_list)
 		{
-			x = 0;
-			y = 0;
-			z = 0;
+			pt[0] = 0;
+			pt[1] = 0;
+			pt[2] = 0;
 		}
-		Direction(std::vector<Entity*> &ent_list, double x_in, double y_in, double z_in): Entity(ent_list)
+		Direction(std::vector<Entity*> &ent_list, Vector3d pt_in): Entity(ent_list)
 		{
-			x = x_in;
-			y = y_in;
-			z = z_in;
+			pt = pt_in;
 		}
 
 		virtual ~Direction()
@@ -98,7 +96,7 @@ public:
 
 		virtual void serialize(std::ostream& stream_in)
 		{
-			stream_in << "#" << id << " = DIRECTION('"<< label<<"', (" << x << ", " << y << ", " << z << "));\n";
+			stream_in << "#" << id << " = DIRECTION('"<< label<<"', (" << pt[0] << ", " << pt[1] << ", " << pt[2] << "));\n";
 		}
 
 		virtual void parse_args(std::map<int,Entity*> &ent_map, std::string args)
@@ -108,10 +106,9 @@ public:
 			auto arg_str = args.substr(st+1, en - st - 1);
 			std::replace(arg_str.begin(), arg_str.end(), ',', ' ');
 			std::stringstream ss(arg_str);
-			ss >> x >> y >> z;
+			ss >> pt[0] >> pt[1] >> pt[2];
 		}
-
-		double x, y, z;
+		Vector3d pt;
 	};
 
 	class Point : public Entity
@@ -119,15 +116,13 @@ public:
 	public:
 		Point(std::vector<Entity*> &ent_list) : Entity(ent_list)
 		{
-			x = 0;
-			y = 0;
-			z = 0;
+			pt[0] = 0;
+			pt[1] = 0;
+			pt[2] = 0;
 		}
-		Point(std::vector<Entity*> &ent_list, double x_in, double y_in, double z_in) : Entity(ent_list)
+		Point(std::vector<Entity*> &ent_list, Vector3d pt_in) : Entity(ent_list)
 		{
-			x = x_in;
-			y = y_in;
-			z = z_in;
+			pt=pt_in;
 		}
 
 		virtual ~Point()
@@ -135,7 +130,7 @@ public:
 
 		virtual void serialize(std::ostream& stream_in)
 		{
-			stream_in << "#" << id << " = CARTESIAN_POINT('" << label << "', (" << x << "," << y << "," << z << "));\n";
+			stream_in << "#" << id << " = CARTESIAN_POINT('" << label << "', (" << pt[0] << "," << pt[1] << "," << pt[2] << "));\n";
 		}
 		virtual void parse_args(std::map<int, Entity*> &ent_map, std::string args)
 		{
@@ -144,9 +139,9 @@ public:
 			auto arg_str = args.substr(st + 1, en - st - 1);
 			std::replace(arg_str.begin(), arg_str.end(), ',', ' ');
 			std::stringstream ss(arg_str);
-			ss >> x >> y >> z;
+			ss >> pt[0] >> pt[1] >> pt[2];
 		}
-		double x, y, z;
+		Vector3d pt;
 	};
 
 	class Csys3D : public Entity
