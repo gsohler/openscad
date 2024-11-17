@@ -35,14 +35,17 @@ void import_shell(PolySetBuilder &builder, StepKernel &sk, StepKernel::Shell *sh
       for(int k=0;k<loop->faces.size();k++) {
         StepKernel::OrientedEdge *edge=loop->faces[k];
         if(edge == nullptr) return;
-        StepKernel::EdgeCurve *edgecurv = edge->edge;
+        StepKernel::EdgeCurve *edgecurv = edge->edge; 
         StepKernel::Point *pt1 = edgecurv->vert1->point;
         StepKernel::Point *pt2 = edgecurv->vert2->point;
         IndexedFace stub;
-        Vector3d p1=pt1->pt;
-        stub.push_back(builder.vertexIndex(pt1->pt));
-        Vector3d p2=pt2->pt;
-        stub.push_back(builder.vertexIndex(pt2->pt));
+	if(edge->dir) {
+          stub.push_back(builder.vertexIndex(pt1->pt));
+          stub.push_back(builder.vertexIndex(pt2->pt));
+	} else {
+          stub.push_back(builder.vertexIndex(pt2->pt));
+          stub.push_back(builder.vertexIndex(pt1->pt));
+	}
         stubs.push_back(stub);
 
       }
@@ -85,7 +88,6 @@ void import_shell(PolySetBuilder &builder, StepKernel &sk, StepKernel::Shell *sh
 
       builder.beginPolygon(combined.size());
       // TODO thrown
-      // TODO export_dir, TODO Vector3d
       for(int i=0;i<combined.size();i++) builder.addVertex(combined[i]);			
      	
     }

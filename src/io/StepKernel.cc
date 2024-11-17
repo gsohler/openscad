@@ -93,12 +93,12 @@ void StepKernel::build_tri_body(std::vector<Vector3d> vertices, std::vector<Inde
 			int ind=faces[i][j];
 			int indn=faces[i][(j+1)%n];
 			EdgeCurve* edge_curve;
-			bool edge_dir = true; // TODO mist
+			bool edge_dir = true; 
 			get_edge_from_map(vertices[ind], vertices[indn], edge_map, vert[j], vert[(j+1)%n], edge_curve, edge_dir, merged_edge_cnt);
 			oriented_edges.push_back(new OrientedEdge(entities, edge_curve, edge_dir));
 		}
 
-
+//https://www.kleinanzeigen.de/s-anzeige/schlittschuhe-kinder-groesse-25-29/2925176078-230-6425
 		// create the plane
 		auto plane_point = new Point(entities, p0);
 		auto plane_dir_1 = new Direction(entities, d2);
@@ -264,6 +264,36 @@ void StepKernel::read_step(std::string file_name)
 				 ent = new Vector(entities);
 			else if (func_name == "LINE")
 				 ent = new Line(entities);
+			else if (func_name == "PCURVE")
+				 ent = new Line(entities); // TODO fix
+			else if (func_name == "DEFINITIONAL_REPRESENTATION")
+				 ent = new Line(entities); // TODO fix
+			else if (func_name == "UNCERTAINTY_MEASURE_WITH_UNIT")
+				 ent = new Line(entities); // TODO fix
+			else if (func_name == "PRODUCT_TYPE")
+				 ent = new Line(entities); // TODO fix
+			else if (func_name == "APPLICATION_PROTOCOL_DEFINITION")
+				 ent = new Line(entities); // TODO fix
+			else if (func_name == "APPLICATION_CONTEXT")
+				 ent = new Line(entities); // TODO fix
+			else if (func_name == "SHAPE_DEFINITION_REPRESENTATION")
+				 ent = new Line(entities); // TODO fix
+			else if (func_name == "PRODUCT")
+				 ent = new Line(entities); // TODO fix
+			else if (func_name == "PRODUCT_DEFINITION_SHAPE")
+				 ent = new Line(entities); // TODO fix
+			else if (func_name == "PRODUCT_DEFINITION")
+				 ent = new Line(entities); // TODO fix
+			else if (func_name == "PRODUCT_DEFINITION_FORMATION")
+				 ent = new Line(entities); // TODO fix
+			else if (func_name == "MECHANICAL_CONTEXT")
+				 ent = new Line(entities); // TODO fix
+			else if (func_name == "PRODUCT_DEFINITION_CONTEXT")
+				 ent = new Line(entities); // TODO fix
+			else if (func_name == "ADVANCED_BREP_SHAPE_REPRESENTATION")
+				 ent = new Line(entities); // TODO fix
+			else if (func_name == "(")
+				 ent = new Line(entities); // TODO fix
 
 			if(!ent) {
 				printf("Unknown Type %s\n",func_name.c_str());
