@@ -256,9 +256,9 @@ void StepKernel::read_step(std::string file_name)
 				ent = new ShellModel(entities);
 			else if (func_name == "MANIFOLD_SURFACE_SHAPE_REPRESENTATION")
 				ent = new ManifoldShape(entities);
-			else if (func_name == "MANIFOLD_SOLID_BREP"){
+			else if (func_name == "MANIFOLD_SOLID_BREP")
 				ent = new ManifoldSolid(entities);
-			}else if (func_name == "VERTEX_POINT")
+			else if (func_name == "VERTEX_POINT")
 				ent = new Vertex(entities);
 			else if (func_name == "SURFACE_CURVE")
 				ent = new SurfaceCurve(entities);
