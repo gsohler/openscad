@@ -224,6 +224,82 @@ public:
 		Csys3D* csys;
 	};
 
+	class Circle : public Entity
+	{
+	public:
+		Circle(std::vector<Entity*> &ent_list) : Entity(ent_list)
+		{
+			csys = 0;
+			r=0;
+		}
+
+		Circle(std::vector<Entity*> &ent_list, std::string name, Csys3D* csys_in, double r) : Entity(ent_list)
+		{
+			csys = csys_in;
+		}
+		virtual ~Circle()
+		{}
+
+		virtual void serialize(std::ostream& stream_in)
+		{
+			stream_in << "#" << id << " = CIRCLE('" << label << "',#" << csys->id <<");\n";
+			stream_in << "#" << id << " = CIRCLE('" << label << "',#" << csys->id << "," << r << ");\n";
+		}
+		virtual void parse_args(std::map<int, Entity*> &ent_map, std::string args)
+		{
+			auto st = args.find_first_of(',');
+			auto arg_str = args.substr(st + 1);
+			std::replace(arg_str.begin(), arg_str.end(), ',', ' ');
+			std::replace(arg_str.begin(), arg_str.end(), '#', ' ');
+			std::stringstream ss(arg_str);
+			int p_id;
+			ss >> p_id >> r;
+			csys = dynamic_cast<Csys3D*>(ent_map[p_id]);
+		}
+		std::string name;
+		double r;
+		Csys3D* csys;
+
+	};
+
+	class CylindricalSurface : public Entity
+	{
+	public:
+		CylindricalSurface(std::vector<Entity*> &ent_list) : Entity(ent_list)
+		{
+			csys = 0;
+			r=0;
+		}
+
+		CylindricalSurface(std::vector<Entity*> &ent_list, std::string name, Csys3D* csys_in, double r) : Entity(ent_list)
+		{
+			csys = csys_in;
+		}
+		virtual ~CylindricalSurface()
+		{}
+
+		virtual void serialize(std::ostream& stream_in)
+		{
+			stream_in << "#" << id << " = CYLINDRICAL_SURFACE('" << label << "',#" << csys->id <<");\n";
+			stream_in << "#" << id << " = CYLINDRICAL_SURFACE('" << label << "',#" << csys->id << "," << r << ");\n";
+		}
+		virtual void parse_args(std::map<int, Entity*> &ent_map, std::string args)
+		{
+			auto st = args.find_first_of(',');
+			auto arg_str = args.substr(st + 1);
+			std::replace(arg_str.begin(), arg_str.end(), ',', ' ');
+			std::replace(arg_str.begin(), arg_str.end(), '#', ' ');
+			std::stringstream ss(arg_str);
+			int p_id;
+			ss >> p_id >> r;
+			csys = dynamic_cast<Csys3D*>(ent_map[p_id]);
+		}
+		std::string name;
+		double r;
+		Csys3D* csys;
+
+	};
+
 	class OrientedEdge;
 
 	class EdgeLoop : public Entity
@@ -355,12 +431,14 @@ public:
 			ss >> p_id >> tf;
 
 			plane = dynamic_cast<Plane*>(ent_map[p_id]);
+			cylindrical = dynamic_cast<CylindricalSurface*>(ent_map[p_id]);
 			dir = (tf == ".T.");
 		}
 
 		std::vector<FaceBound*> faceBounds;
 		bool dir;
 		Plane* plane;
+		CylindricalSurface *cylindrical;
 	};
 
 	class Shell : public Entity
@@ -658,8 +736,8 @@ public:
 			vert1 = dynamic_cast<Vertex*>(ent_map[p1_id]);
 			vert2 = dynamic_cast<Vertex*>(ent_map[p2_id]);
 			surfCurve = dynamic_cast<SurfaceCurve*>(ent_map[p3_id]);
-			if(!surfCurve)
-				line = dynamic_cast<Line*>(ent_map[p3_id]);
+			line = dynamic_cast<Line*>(ent_map[p3_id]);
+			circle = dynamic_cast<Circle*>(ent_map[p3_id]);
 			dir = (tf == ".T.");
 		}
 
@@ -667,6 +745,7 @@ public:
 		Vertex* vert2;
 		SurfaceCurve* surfCurve;
 		Line* line;
+		Circle *circle;
 		bool dir;
 	};
 

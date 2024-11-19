@@ -219,10 +219,12 @@ void StepKernel::read_step(std::string file_name)
 			auto func_start = cur_str.find_first_not_of("\t ", equal_pos+1);
 			auto func_end = cur_str.find_first_of("\t (", func_start + 1);
 			auto func_name = cur_str.substr(func_start, func_end - func_start);
+			bool unimplemented = false;
 
 			// now parse the args
 			auto arg_end = cur_str.find_last_of(')');
-			auto arg_str = cur_str.substr(func_end + 1, arg_end - func_end - 1);
+			auto arg_start = cur_str.find_first_not_of("\t (",func_end+1);
+			auto arg_str = cur_str.substr(arg_start, arg_end - arg_start);
 			Entity* ent = 0;
 			if (func_name == "CARTESIAN_POINT")
 				ent = new Point(entities);
@@ -264,40 +266,83 @@ void StepKernel::read_step(std::string file_name)
 				 ent = new Vector(entities);
 			else if (func_name == "LINE")
 				 ent = new Line(entities);
-			else if (func_name == "PCURVE")
-				 ent = new Line(entities); // TODO fix
-			else if (func_name == "DEFINITIONAL_REPRESENTATION")
-				 ent = new Line(entities); // TODO fix
-			else if (func_name == "UNCERTAINTY_MEASURE_WITH_UNIT")
-				 ent = new Line(entities); // TODO fix
-			else if (func_name == "PRODUCT_TYPE")
-				 ent = new Line(entities); // TODO fix
-			else if (func_name == "APPLICATION_PROTOCOL_DEFINITION")
-				 ent = new Line(entities); // TODO fix
-			else if (func_name == "APPLICATION_CONTEXT")
-				 ent = new Line(entities); // TODO fix
-			else if (func_name == "SHAPE_DEFINITION_REPRESENTATION")
-				 ent = new Line(entities); // TODO fix
-			else if (func_name == "PRODUCT")
-				 ent = new Line(entities); // TODO fix
-			else if (func_name == "PRODUCT_DEFINITION_SHAPE")
-				 ent = new Line(entities); // TODO fix
-			else if (func_name == "PRODUCT_DEFINITION")
-				 ent = new Line(entities); // TODO fix
-			else if (func_name == "PRODUCT_DEFINITION_FORMATION")
-				 ent = new Line(entities); // TODO fix
-			else if (func_name == "MECHANICAL_CONTEXT")
-				 ent = new Line(entities); // TODO fix
-			else if (func_name == "PRODUCT_DEFINITION_CONTEXT")
-				 ent = new Line(entities); // TODO fix
-			else if (func_name == "ADVANCED_BREP_SHAPE_REPRESENTATION")
-				 ent = new Line(entities); // TODO fix
-			else if (func_name == "(")
-				 ent = new Line(entities); // TODO fix
+			else if (func_name == "CIRCLE")
+				 ent = new Circle(entities);
+			else if (func_name == "CYLINDRICAL_SURFACE")
+				 ent = new CylindricalSurface(entities);
+			else if (func_name == "PCURVE") unimplemented=true;
+			else if (func_name == "DEFINITIONAL_REPRESENTATION") unimplemented=true;
+			else if (func_name == "UNCERTAINTY_MEASURE_WITH_UNIT") unimplemented=true;
+			else if (func_name == "PRODUCT_TYPE") unimplemented=true;
+			else if (func_name == "APPLICATION_PROTOCOL_DEFINITION") unimplemented=true;
+			else if (func_name == "APPLICATION_CONTEXT") unimplemented=true;
+			else if (func_name == "SHAPE_DEFINITION_REPRESENTATION") unimplemented=true;
+			else if (func_name == "PRODUCT") unimplemented=true;
+			else if (func_name == "PRODUCT_DEFINITION_SHAPE") unimplemented=true;
+			else if (func_name == "PRODUCT_DEFINITION") unimplemented=true;
+			else if (func_name == "PRODUCT_DEFINITION_FORMATION") unimplemented=true;
+			else if (func_name == "MECHANICAL_CONTEXT") unimplemented=true;
+			else if (func_name == "PRODUCT_DEFINITION_CONTEXT") unimplemented=true;
+			else if (func_name == "ADVANCED_BREP_SHAPE_REPRESENTATION") unimplemented=true;
+			else if (func_name == "PERSON") unimplemented=true;
+			else if (func_name == "DATE_TIME_ROLE") unimplemented=true;
+			else if (func_name == "LOCAL_TIME") unimplemented=true;
+			else if (func_name == "APPROVAL_ROLE") unimplemented=true;
+			else if (func_name == "APPROVAL") unimplemented=true;
+			else if (func_name == "COORDINATED_UNIVERSAL_TIME_OFFSET") unimplemented=true;
+			else if (func_name == "CC_DESIGN_PERSON_AND_ORGANIZATION_ASSIGNMENT") unimplemented=true;
+			else if (func_name == "DATE_AND_TIME") unimplemented=true;
+			else if (func_name == "APPROVAL_DATE_TIME") unimplemented=true;
+			else if (func_name == "SECURITY_CLASSIFICATION_LEVEL") unimplemented=true;
+			else if (func_name == "APPROVAL_STATUS") unimplemented=true;
+			else if (func_name == "CC_DESIGN_APPROVAL") unimplemented=true;
+			else if (func_name == "ORGANIZATION") unimplemented=true;
+			else if (func_name == "PERSON_AND_ORGANIZATION") unimplemented=true;
+			else if (func_name == "CALENDAR_DATE") unimplemented=true;
+			else if (func_name == "PRODUCT_DEFINITION_FORMATION_WITH_SPECIFIED_SOURCE") unimplemented=true;
+			else if (func_name == "PERSON_AND_ORGANIZATION_ROLE") unimplemented=true;
+			else if (func_name == "PRODUCT_RELATED_PRODUCT_CATEGORY") unimplemented=true;
+			else if (func_name == "CC_DESIGN_DATE_AND_TIME_ASSIGNMENT") unimplemented=true;
+			else if (func_name == "SECURITY_CLASSIFICATION") unimplemented=true;
+			else if (func_name == "APPROVAL_PERSON_ORGANIZATION") unimplemented=true;
+			else if (func_name == "DESIGN_CONTEXT") unimplemented=true;
+			else if (func_name == "CC_DESIGN_SECURITY_CLASSIFICATION") unimplemented=true;
+			else if (func_name == "(") unimplemented=true;
+/*
+ * * 
+#149 = CLOSED_SHELL ( 'NONE', ( #155, #141, #100, #147 ) ) ;
+ #147 = ADVANCED_FACE ( 'NONE', ( #143 ), #43, .F. ) ;
+  #143 = FACE_OUTER_BOUND ( 'NONE', #55, .T. ) ;
+   #55 = EDGE_LOOP ( 'NONE', ( #156, #13 ) ) ;
+    #13 = ORIENTED_EDGE ( 'NONE', *, *, #31, .F. ) ;
+    #14 = ORIENTED_EDGE ( 'NONE', *, *, #31, .T. ) ;
+     #31 = EDGE_CURVE ( 'NONE', #71, #129, #28, .T. ) ;
+      #71 = VERTEX_POINT ( 'NONE', #82 ) ;
+       #82 = CARTESIAN_POINT ( 'NONE',  ( 6.123233995736766085E-15, 0.000000000000000000, 50.00000000000000000 ) ) ;
+      #129 = VERTEX_POINT ( 'NONE', #101 ) ;
+        CARTESIAN_POINT ( 'NONE',  ( 0.000000000000000000, 0.000000000000000000, -50.00000000000000000 ) ) ;
+     
+      #28 = CIRCLE ( 'NONE', #113, 50.00000000000000000 ) ;
+       #113 = AXIS2_PLACEMENT_3D ( 'NONE', #107, #167, #96 ) ;
+        #107 = CARTESIAN_POINT ( 'NONE',  ( 0.000000000000000000, 0.000000000000000000, 0.000000000000000000 ) ) ;
+        #167 = DIRECTION ( 'NONE',  ( 0.000000000000000000, 1.000000000000000000, 0.000000000000000000 ) ) ;
+        #96 = DIRECTION ( 'NONE',  ( 0.000000000000000000, 0.000000000000000000, 1.000000000000000000 ) ) ;
+    
+
+
+#148 = CYLINDRICAL_SURFACE ( 'NONE', #18, 50.00000000000000000 ) ;	
+ #18 = AXIS2_PLACEMENT_3D ( 'NONE', #49, #19, #163 ) ;
+* 
+ */
+
 
 			if(!ent) {
-				printf("Unknown Type %s\n",func_name.c_str());
-				ent = new Line(entities);
+				if(unimplemented) {
+				  ent = new Line(entities); // TODO fix
+				} else {
+				  printf("Unknown Type %s\n",func_name.c_str());
+				  ent = new Line(entities);
+				}  
 			}
 
 			if (ent)

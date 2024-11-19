@@ -10,47 +10,65 @@ extern void SchemaInit( class Registry & );
 // https://github.com/slugdev/stltostp/blob/master/StepKernel.cpp
 //
 Vector4d calcTriangleNormal(const std::vector<Vector3d> &vertices,const IndexedFace &pol);
+int linsystem( Vector3d v1,Vector3d v2,Vector3d v3,Vector3d pt,Vector3d &res,double *detptr=NULL);
 void import_shell(PolySetBuilder &builder, StepKernel &sk, StepKernel::Shell *shell)
 {
-  if(shell == nullptr) return;
+  if(shell == nullptr) return; // Shell , CLOSED_SHELL
   for(int i=0;i<shell->faces.size();i++) {
-    StepKernel::Face *face = shell->faces[i];
-    if(face == nullptr) return;
+    StepKernel::Face *face = shell->faces[i]; // Face, ADVANCED_FACE
+    if(face == nullptr) continue;
     StepKernel::Plane *plane = face->plane;
-    if(plane == nullptr) return;
-    StepKernel::Csys3D *sys = plane->csys;
-    if(sys == nullptr) return;
-    StepKernel::Direction *dir1=sys->dir1;
-    StepKernel::Direction *dir2=sys->dir2;
-    if(dir1 == nullptr || dir2 == nullptr) return;
-    Vector3d d1=dir1->pt;
-    Vector3d d2=dir2->pt;
-    Vector3d dn=d1.cross(d2).normalized();
+    StepKernel::Csys3D *sys = nullptr;
+    if(plane != nullptr) sys = plane->csys;
 
     for(int j=0;j<face->faceBounds.size();j++) {
-      StepKernel::FaceBound *bound = face->faceBounds[j];
+      StepKernel::FaceBound *bound = face->faceBounds[j]; //FaceBound, FACE_OUTER_BOUND
       std::vector<IndexedFace> stubs;
-      if(bound == nullptr) return;
-      StepKernel::EdgeLoop *loop = bound->edgeLoop;
+      if(bound == nullptr) continue;
+      StepKernel::EdgeLoop *loop = bound->edgeLoop; 
       for(int k=0;k<loop->faces.size();k++) {
         StepKernel::OrientedEdge *edge=loop->faces[k];
-        if(edge == nullptr) return;
+        if(edge == nullptr) continue;
         StepKernel::EdgeCurve *edgecurv = edge->edge; 
         StepKernel::Point *pt1 = edgecurv->vert1->point;
         StepKernel::Point *pt2 = edgecurv->vert2->point;
         IndexedFace stub;
-	if(edge->dir) {
+	if(edgecurv->circle != nullptr) {
+	  int fn=20;
+	  auto csys = edgecurv->circle->csys;
+	  Vector3d xdir=csys->dir2->pt;
+	  Vector3d zdir=csys->dir1->pt;
+	  Vector3d ydir=xdir.cross(zdir).normalized();
+	  // calc start angle
+	  Vector3d res;
+	  if(linsystem( xdir, ydir, zdir, pt1->pt - csys->point->pt,res)) continue;
+	  double startang=atan2(res[1], res[0]);
+
+	  if(linsystem( xdir, ydir, zdir, pt2->pt - csys->point->pt,res)) continue;
+	  double endang=atan2(res[1], res[0]);
+
+	  if(endang < startang) endang += 2*M_PI;
+	  //
+	  double r=edgecurv->circle->r;
+	  Vector3d cent=edgecurv->circle->csys->point->pt;
           stub.push_back(builder.vertexIndex(pt1->pt));
+	  for(int i=1;i<fn-1;i++) {
+            double ang=startang + (endang-startang)*i/(double) fn;		 
+	    Vector3d pt=cent+xdir*r*cos(ang)+ydir*r*sin(ang);
+            stub.push_back(builder.vertexIndex(pt));
+	  }
           stub.push_back(builder.vertexIndex(pt2->pt));
-	} else {
-          stub.push_back(builder.vertexIndex(pt2->pt));
-          stub.push_back(builder.vertexIndex(pt1->pt));
 	}
+	else {
+          stub.push_back(builder.vertexIndex(pt1->pt));
+          stub.push_back(builder.vertexIndex(pt2->pt));
+	}  
         stubs.push_back(stub);
 
       }
       // now combine the stub
-      if(stubs.size() == 0) return;
+      std::vector<Vector3d> vertices;
+      if(stubs.size() == 0) continue;
       IndexedFace combined = stubs[0];
       stubs.erase(stubs.begin());
       while(stubs.size() > 0) {
@@ -80,11 +98,14 @@ void import_shell(PolySetBuilder &builder, StepKernel &sk, StepKernel::Shell *sh
       }
       combined.erase(combined.begin());
 
-      std::vector<Vector3d> vertices;
       builder.copyVertices(vertices);
       Vector4d tn=calcTriangleNormal(vertices,combined);
-      if(tn.head<3>().dot(dn) < 0)
-        std::reverse(combined.begin(), combined.end());
+      if(sys != nullptr) {
+        Vector3d dn =sys->dir1->pt;
+        if(!face->dir) dn=-dn;
+        if(tn.head<3>().dot(dn) < 0)
+          std::reverse(combined.begin(), combined.end());
+      }	
 
       builder.beginPolygon(combined.size());
       // TODO thrown
