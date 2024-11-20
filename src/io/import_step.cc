@@ -21,6 +21,7 @@ void import_shell(PolySetBuilder &builder, StepKernel &sk, StepKernel::Shell *sh
     StepKernel::Axis2Placement *sys = nullptr;
     if(plane != nullptr) sys = plane->axis;
 
+    std::vector<IndexedFace> faceLoopInd;
     for(int j=0;j<face->faceBounds.size();j++) {
       StepKernel::FaceBound *bound = face->faceBounds[j]; //FaceBound, FACE_OUTER_BOUND
       std::vector<IndexedFace> stubs;
@@ -30,6 +31,7 @@ void import_shell(PolySetBuilder &builder, StepKernel &sk, StepKernel::Shell *sh
         StepKernel::OrientedEdge *edge=loop->faces[k];
         if(edge == nullptr) continue;
         StepKernel::EdgeCurve *edgecurv = edge->edge; 
+        printf("%d %d %d %d\n",face->dir,bound->dir,edge->dir,edgecurv->dir);
         StepKernel::Point *pt1 = edgecurv->vert1->point;
         StepKernel::Point *pt2 = edgecurv->vert2->point;
         IndexedFace stub;
@@ -42,7 +44,7 @@ void import_shell(PolySetBuilder &builder, StepKernel &sk, StepKernel::Shell *sh
 	  auto axis = circ->axis;
 	  Vector3d xdir=axis->dir2->pt;
 	  Vector3d zdir=axis->dir1->pt;
-	  Vector3d ydir=xdir.cross(zdir).normalized();
+	  Vector3d ydir=zdir.cross(xdir).normalized();
 	  // calc start angle
 	  Vector3d res;
 	  if(linsystem( xdir, ydir, zdir, pt1->pt - axis->point->pt,res)) continue;
@@ -51,7 +53,8 @@ void import_shell(PolySetBuilder &builder, StepKernel &sk, StepKernel::Shell *sh
 	  if(linsystem( xdir, ydir, zdir, pt2->pt - axis->point->pt,res)) continue;
 	  double endang=atan2(res[1], res[0]);
 
-	  if(endang < startang) endang += 2*M_PI;
+	  if(endang <= startang) endang += 2*M_PI;
+	  printf("startang=%g endang=%g\n",startang, endang);
 	  //
 	  double r=circ->r;
 	  Vector3d cent=circ->axis->point->pt;
@@ -71,6 +74,10 @@ void import_shell(PolySetBuilder &builder, StepKernel &sk, StepKernel::Shell *sh
           stub.push_back(builder.vertexIndex(pt2->pt));
 	} else {
           printf("Unimplemented csurfacecurve for id %d\n",edgecurv->id);
+	}
+        int totaldir = (edge->dir+edgecurv->dir)&1;
+	if(totaldir) {
+          std::reverse(stub.begin(), stub.end());
 	}
 
         stubs.push_back(stub);
@@ -96,31 +103,27 @@ void import_shell(PolySetBuilder &builder, StepKernel &sk, StepKernel::Shell *sh
            done=1;
            break; 
          }		   
-         if(stubs[i][stubs[i].size()-1] == conn) {
-           for(int j=stubs[i].size()-2;j>=0;j--) {
-             combined.push_back(stubs[i][j]);		     
-           }		   
-           stubs.erase(stubs.begin()+i);
-           done=1;
-           break; 
-         }		   
        }
       }
       combined.erase(combined.begin());
-
       builder.copyVertices(vertices);
       Vector4d tn=calcTriangleNormal(vertices,combined);
       if(sys != nullptr) {
         Vector3d dn =sys->dir1->pt;
         if(!face->dir) dn=-dn;
-        if(tn.head<3>().dot(dn) < 0)
+        int totaldir = (bound->dir)&1;
+        if(!totaldir)
           std::reverse(combined.begin(), combined.end());
       }	
 
+      faceLoopInd.push_back(combined);
+    }
+    // TODO connect polys with holes
+    // print output result
+    printf("Faceboudn len is %d\n",faceLoopInd.size());
+    for(auto combined: faceLoopInd) {
       builder.beginPolygon(combined.size());
-      // TODO thrown
       for(int i=0;i<combined.size();i++) builder.addVertex(combined[i]);			
-     	
     }
   }
 };

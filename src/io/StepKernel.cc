@@ -307,35 +307,19 @@ void StepKernel::read_step(std::string file_name)
 			else if (func_name == "APPROVAL_PERSON_ORGANIZATION") unimplemented=true;
 			else if (func_name == "DESIGN_CONTEXT") unimplemented=true;
 			else if (func_name == "CC_DESIGN_SECURITY_CLASSIFICATION") unimplemented=true;
+			else if (func_name == "PRODUCT_CONTEXT") unimplemented=true;
+			else if (func_name == "MECHANICAL_DESIGN_GEOMETRIC_PRESENTATION_REPRESENTATION") unimplemented=true;
+			else if (func_name == "STYLED_ITEM") unimplemented=true;
+			else if (func_name == "PRESENTATION_STYLE_ASSIGNMENT") unimplemented=true;
+			else if (func_name == "COLOUR_RGB") unimplemented=true;
+			else if (func_name == "FILL_AREA_STYLE") unimplemented=true;
+			else if (func_name == "SURFACE_STYLE_USAGE") unimplemented=true;
+			else if (func_name == "SURFACE_SIDE_STYLE") unimplemented=true;
+			else if (func_name == "SURFACE_STYLE_FILL_AREA") unimplemented=true;
+			else if (func_name == "FILL_AREA_STYLE_COLOUR") unimplemented=true;
+			else if (func_name == "CURVE_STYLE") unimplemented=true;
+			else if (func_name == "DRAUGHTING_PRE_DEFINED_CURVE_FONT") unimplemented=true;
 			else if (func_name == "(") unimplemented=true;
-/*
- * * 
-#149 = CLOSED_SHELL ( 'NONE', ( #155, #141, #100, #147 ) ) ;
- #147 = ADVANCED_FACE ( 'NONE', ( #143 ), #43, .F. ) ;
-  #143 = FACE_OUTER_BOUND ( 'NONE', #55, .T. ) ;
-   #55 = EDGE_LOOP ( 'NONE', ( #156, #13 ) ) ;
-    #13 = ORIENTED_EDGE ( 'NONE', *, *, #31, .F. ) ;
-    #14 = ORIENTED_EDGE ( 'NONE', *, *, #31, .T. ) ;
-     #31 = EDGE_CURVE ( 'NONE', #71, #129, #28, .T. ) ;
-      #71 = VERTEX_POINT ( 'NONE', #82 ) ;
-       #82 = CARTESIAN_POINT ( 'NONE',  ( 6.123233995736766085E-15, 0.000000000000000000, 50.00000000000000000 ) ) ;
-      #129 = VERTEX_POINT ( 'NONE', #101 ) ;
-        CARTESIAN_POINT ( 'NONE',  ( 0.000000000000000000, 0.000000000000000000, -50.00000000000000000 ) ) ;
-     
-      #28 = CIRCLE ( 'NONE', #113, 50.00000000000000000 ) ;
-       #113 = AXIS2_PLACEMENT_3D ( 'NONE', #107, #167, #96 ) ;
-        #107 = CARTESIAN_POINT ( 'NONE',  ( 0.000000000000000000, 0.000000000000000000, 0.000000000000000000 ) ) ;
-        #167 = DIRECTION ( 'NONE',  ( 0.000000000000000000, 1.000000000000000000, 0.000000000000000000 ) ) ;
-        #96 = DIRECTION ( 'NONE',  ( 0.000000000000000000, 0.000000000000000000, 1.000000000000000000 ) ) ;
-    
-
-
-#148 = CYLINDRICAL_SURFACE ( 'NONE', #18, 50.00000000000000000 ) ;	
- #18 = AXIS2_PLACEMENT_3D ( 'NONE', #49, #19, #163 ) ;
-* 
- */
-
-
 			if(!ent) {
 				if(unimplemented) {
 				  ent = new Line(entities); // TODO fix
