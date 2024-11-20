@@ -34,6 +34,8 @@ void import_shell(PolySetBuilder &builder, StepKernel &sk, StepKernel::Shell *sh
         StepKernel::Point *pt2 = edgecurv->vert2->point;
         IndexedFace stub;
 	StepKernel::Circle *circ = dynamic_cast<StepKernel::Circle *>(edgecurv->round);
+	StepKernel::SurfaceCurve *scurve = dynamic_cast<StepKernel::SurfaceCurve *>(edgecurv->round);
+	StepKernel::Line *line = dynamic_cast<StepKernel::Line *>(edgecurv->round);
 
 	if(circ != nullptr) {
 	  int fn=20;
@@ -61,10 +63,16 @@ void import_shell(PolySetBuilder &builder, StepKernel &sk, StepKernel::Shell *sh
 	  }
           stub.push_back(builder.vertexIndex(pt2->pt));
 	}
-	else {
+	else if(scurve != nullptr) {
           stub.push_back(builder.vertexIndex(pt1->pt));
           stub.push_back(builder.vertexIndex(pt2->pt));
+        } else if(line != nullptr) {
+          stub.push_back(builder.vertexIndex(pt1->pt));
+          stub.push_back(builder.vertexIndex(pt2->pt));
+	} else {
+          printf("Unimplemented csurfacecurve for id %d\n",edgecurv->id);
 	}
+
         stubs.push_back(stub);
 
       }
