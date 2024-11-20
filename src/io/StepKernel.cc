@@ -61,7 +61,7 @@ void StepKernel::build_tri_body(std::vector<Vector3d> vertices, std::vector<Inde
 	auto dir_1 = new Direction(entities, Vector3d(0.0, 0.0, 1.0));
 	auto dir_2 = new Direction(entities, Vector3d(1.0, 0.0, 0.0));
 
-	auto base_csys = new Csys3D(entities, dir_1, dir_2, point);
+	auto base_axis = new Axis2Placement(entities, dir_1, dir_2, point);
 	std::vector<Face*> sfaces;
 	std::map<std::tuple<double, double, double, double, double, double>, EdgeCurve*> edge_map;
 	for (std::size_t i = 0; i < faces.size() ; i++)
@@ -103,8 +103,8 @@ void StepKernel::build_tri_body(std::vector<Vector3d> vertices, std::vector<Inde
 		auto plane_point = new Point(entities, p0);
 		auto plane_dir_1 = new Direction(entities, d2);
 		auto plane_dir_2 = new Direction(entities, d0);
-		auto plane_csys = new Csys3D(entities, plane_dir_1, plane_dir_2, plane_point);
-		auto plane = new Plane(entities, plane_csys);
+		auto plane_axis = new Axis2Placement(entities, plane_dir_1, plane_dir_2, plane_point);
+		auto plane = new Plane(entities, plane_axis);
 
 		// build the faces
 
@@ -119,7 +119,7 @@ void StepKernel::build_tri_body(std::vector<Vector3d> vertices, std::vector<Inde
 	std::vector<Shell*> shells;
 	shells.push_back(open_shell);
 	auto shell_model = new ShellModel(entities, shells);
-	auto manifold_shape = new ManifoldShape(entities, base_csys, shell_model);
+	auto manifold_shape = new ManifoldShape(entities, base_axis, shell_model);
 }
 
 void StepKernel::get_edge_from_map(
@@ -231,7 +231,7 @@ void StepKernel::read_step(std::string file_name)
 			else if (func_name == "DIRECTION")
 				ent = new Direction(entities);
 			else if (func_name == "AXIS2_PLACEMENT_3D")
-				ent = new Csys3D(entities);
+				ent = new Axis2Placement(entities);
 			else if (func_name == "PLANE")
 				ent = new Plane(entities);
 			else if (func_name == "EDGE_LOOP")

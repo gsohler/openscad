@@ -17,9 +17,9 @@ void import_shell(PolySetBuilder &builder, StepKernel &sk, StepKernel::Shell *sh
   for(int i=0;i<shell->faces.size();i++) {
     StepKernel::Face *face = shell->faces[i]; // Face, ADVANCED_FACE
     if(face == nullptr) continue;
-    StepKernel::Plane *plane = face->plane;
-    StepKernel::Csys3D *sys = nullptr;
-    if(plane != nullptr) sys = plane->csys;
+    StepKernel::Plane *plane = dynamic_cast<StepKernel::Plane *>(face->surface);
+    StepKernel::Axis2Placement *sys = nullptr;
+    if(plane != nullptr) sys = plane->axis;
 
     for(int j=0;j<face->faceBounds.size();j++) {
       StepKernel::FaceBound *bound = face->faceBounds[j]; //FaceBound, FACE_OUTER_BOUND
@@ -33,24 +33,26 @@ void import_shell(PolySetBuilder &builder, StepKernel &sk, StepKernel::Shell *sh
         StepKernel::Point *pt1 = edgecurv->vert1->point;
         StepKernel::Point *pt2 = edgecurv->vert2->point;
         IndexedFace stub;
-	if(edgecurv->circle != nullptr) {
+	StepKernel::Circle *circ = dynamic_cast<StepKernel::Circle *>(edgecurv->round);
+
+	if(circ != nullptr) {
 	  int fn=20;
-	  auto csys = edgecurv->circle->csys;
-	  Vector3d xdir=csys->dir2->pt;
-	  Vector3d zdir=csys->dir1->pt;
+	  auto axis = circ->axis;
+	  Vector3d xdir=axis->dir2->pt;
+	  Vector3d zdir=axis->dir1->pt;
 	  Vector3d ydir=xdir.cross(zdir).normalized();
 	  // calc start angle
 	  Vector3d res;
-	  if(linsystem( xdir, ydir, zdir, pt1->pt - csys->point->pt,res)) continue;
+	  if(linsystem( xdir, ydir, zdir, pt1->pt - axis->point->pt,res)) continue;
 	  double startang=atan2(res[1], res[0]);
 
-	  if(linsystem( xdir, ydir, zdir, pt2->pt - csys->point->pt,res)) continue;
+	  if(linsystem( xdir, ydir, zdir, pt2->pt - axis->point->pt,res)) continue;
 	  double endang=atan2(res[1], res[0]);
 
 	  if(endang < startang) endang += 2*M_PI;
 	  //
-	  double r=edgecurv->circle->r;
-	  Vector3d cent=edgecurv->circle->csys->point->pt;
+	  double r=circ->r;
+	  Vector3d cent=circ->axis->point->pt;
           stub.push_back(builder.vertexIndex(pt1->pt));
 	  for(int i=1;i<fn-1;i++) {
             double ang=startang + (endang-startang)*i/(double) fn;		 
@@ -62,7 +64,7 @@ void import_shell(PolySetBuilder &builder, StepKernel &sk, StepKernel::Shell *sh
 	else {
           stub.push_back(builder.vertexIndex(pt1->pt));
           stub.push_back(builder.vertexIndex(pt2->pt));
-	}  
+	}
         stubs.push_back(stub);
 
       }
