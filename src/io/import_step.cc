@@ -11,6 +11,10 @@ extern void SchemaInit( class Registry & );
 //
 Vector4d calcTriangleNormal(const std::vector<Vector3d> &vertices,const IndexedFace &pol);
 int linsystem( Vector3d v1,Vector3d v2,Vector3d v3,Vector3d pt,Vector3d &res,double *detptr=NULL);
+bool GeometryUtils::tessellatePolygonWithHoles(const std::vector<Vector3f>& vertices,
+                                               const std::vector<IndexedFace>& faces,
+                                               std::vector<IndexedTriangle>& triangles,
+                                               const Vector3f *normal);
 void import_shell(PolySetBuilder &builder, StepKernel &sk, StepKernel::Shell *shell)
 {
   if(shell == nullptr) return; // Shell , CLOSED_SHELL
@@ -22,6 +26,7 @@ void import_shell(PolySetBuilder &builder, StepKernel &sk, StepKernel::Shell *sh
     if(plane != nullptr) sys = plane->axis;
 
     std::vector<IndexedFace> faceLoopInd;
+    std::vector<Vector3d> vertices;
     for(int j=0;j<face->faceBounds.size();j++) {
       StepKernel::FaceBound *bound = face->faceBounds[j]; //FaceBound, FACE_OUTER_BOUND
       std::vector<IndexedFace> stubs;
@@ -31,7 +36,7 @@ void import_shell(PolySetBuilder &builder, StepKernel &sk, StepKernel::Shell *sh
         StepKernel::OrientedEdge *edge=loop->faces[k];
         if(edge == nullptr) continue;
         StepKernel::EdgeCurve *edgecurv = edge->edge; 
-        printf("%d %d %d %d\n",face->dir,bound->dir,edge->dir,edgecurv->dir);
+//        printf("%d %d %d %d\n",face->dir,bound->dir,edge->dir,edgecurv->dir);
         StepKernel::Point *pt1 = edgecurv->vert1->point;
         StepKernel::Point *pt2 = edgecurv->vert2->point;
         IndexedFace stub;
@@ -52,14 +57,15 @@ void import_shell(PolySetBuilder &builder, StepKernel &sk, StepKernel::Shell *sh
 
 	  if(linsystem( xdir, ydir, zdir, pt2->pt - axis->point->pt,res)) continue;
 	  double endang=atan2(res[1], res[0]);
+	  int closed = (startang == endang)?1:0;
 
 	  if(endang <= startang) endang += 2*M_PI;
-	  printf("startang=%g endang=%g\n",startang, endang);
+//	  printf("startang=%g endang=%g\n",startang, endang);
 	  //
 	  double r=circ->r;
 	  Vector3d cent=circ->axis->point->pt;
           stub.push_back(builder.vertexIndex(pt1->pt));
-	  for(int i=1;i<fn-1;i++) {
+	  for(int i=1;i<fn;i++) {
             double ang=startang + (endang-startang)*i/(double) fn;		 
 	    Vector3d pt=cent+xdir*r*cos(ang)+ydir*r*sin(ang);
             stub.push_back(builder.vertexIndex(pt));
@@ -84,14 +90,11 @@ void import_shell(PolySetBuilder &builder, StepKernel &sk, StepKernel::Shell *sh
 
       }
       // now combine the stub
-      std::vector<Vector3d> vertices;
       if(stubs.size() == 0) continue;
       IndexedFace combined = stubs[0];
       stubs.erase(stubs.begin());
+      int conn = combined[combined.size()-1];
       while(stubs.size() > 0) {
-       int done=0;		
-       int conn = combined[combined.size()-1];
-       if(conn == combined[0]) { printf("complete break\n"); break; }
 
        for(int i=0;i<stubs.size();i++)
        {
@@ -100,10 +103,11 @@ void import_shell(PolySetBuilder &builder, StepKernel &sk, StepKernel::Shell *sh
              combined.push_back(stubs[i][j]);		     
            }		   
            stubs.erase(stubs.begin()+i);
-           done=1;
            break; 
          }		   
        }
+       conn = combined[combined.size()-1];
+       if(conn == combined[0]) break;
       }
       combined.erase(combined.begin());
       builder.copyVertices(vertices);
@@ -118,15 +122,27 @@ void import_shell(PolySetBuilder &builder, StepKernel &sk, StepKernel::Shell *sh
 
       faceLoopInd.push_back(combined);
     }
-    // TODO connect polys with holes
-    // print output result
-    printf("Faceboudn len is %d\n",faceLoopInd.size());
-    for(auto combined: faceLoopInd) {
-      builder.beginPolygon(combined.size());
-      for(int i=0;i<combined.size();i++) builder.addVertex(combined[i]);			
-    }
+    int n=face->faceBounds.size();
+    if(n == 1) {
+      builder.beginPolygon(faceLoopInd[0].size());
+      for(int i=0;i<faceLoopInd[0].size();i++) builder.addVertex(faceLoopInd[0][i]);			
+    } else {
+      std::vector<IndexedTriangle> triangles;
+      if(sys == nullptr) continue;
+      Vector3d dn =sys->dir1->pt;
+      Vector3f df(dn[0], dn[1], dn[2]);
+      std::vector<Vector3f> verticesf;
+      for(auto v : vertices)
+	verticesf.push_back(Vector3f(v[0], v[1], v[2]));	      // TODO better
+
+      GeometryUtils::tessellatePolygonWithHoles(verticesf,faceLoopInd, triangles,&df);
+      for(auto tri: triangles) {
+        builder.beginPolygon(3);
+        for(int i=0;i<3;i++) builder.addVertex(tri[i]);			
+      }
+    }  
   }
-};
+}
 std::unique_ptr<PolySet> import_step(const std::string& filename, const Location& loc) {
   printf("Importing %s\n",filename.c_str());
   PolySetBuilder builder;
