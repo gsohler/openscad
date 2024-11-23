@@ -489,7 +489,7 @@ if(ENABLE_PYTHON)
     target_include_directories(OpenSCADPy SYSTEM PRIVATE ${HARFBUZZ_INCLUDE_DIRS})
     target_include_directories(OpenSCADPy SYSTEM PRIVATE ${FREETYPE_INCLUDE_DIRS})
   else() #MXE
-    if("$PYTHON_VERSION}" STREQUAL "")
+    if("${PYTHON_VERSION}" STREQUAL "")
 	    SET(Python_Eff_LIBRARIES ${Python_LIBRARIES} )
 	    SET(Python_Eff_INCLUDE_DIRS ${Python_INCLUDE_DIRS} )
     else()
