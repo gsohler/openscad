@@ -94,8 +94,9 @@ void import_shell(PolySetBuilder &builder, StepKernel &sk, StepKernel::Shell *sh
       IndexedFace combined = stubs[0];
       stubs.erase(stubs.begin());
       int conn = combined[combined.size()-1];
-      while(stubs.size() > 0) {
-
+      bool done=true;
+      while(stubs.size() > 0 && done) {
+       done=false;
        for(int i=0;i<stubs.size();i++)
        {
          if(stubs[i][0] == conn) {
@@ -103,26 +104,34 @@ void import_shell(PolySetBuilder &builder, StepKernel &sk, StepKernel::Shell *sh
              combined.push_back(stubs[i][j]);		     
            }		   
            stubs.erase(stubs.begin()+i);
+	   done=true;
            break; 
          }		   
        }
        conn = combined[combined.size()-1];
-       if(conn == combined[0]) break;
+      }
+
+      if(stubs.size() != 0) {
+      	printf("Warning: Cannot detect full loop for facebound %d\n",bound->id);
       }
       combined.erase(combined.begin());
       builder.copyVertices(vertices);
       Vector4d tn=calcTriangleNormal(vertices,combined);
-      if(sys != nullptr) {
-        Vector3d dn =sys->dir1->pt;
-        if(!face->dir) dn=-dn;
-        int totaldir = (bound->dir)&1;
-        if(!totaldir)
-          std::reverse(combined.begin(), combined.end());
-      }	
+      int totaldir = (bound->dir)&1;
+      if(!totaldir)
+      {
+        std::reverse(combined.begin(), combined.end());
+      }
 
       faceLoopInd.push_back(combined);
     }
     int n=face->faceBounds.size();
+
+    StepKernel::CylindricalSurface *cyl_surf = dynamic_cast<StepKernel::CylindricalSurface *>(face->surface);
+    // TODO help cylindrical surfaces to tessellate correctly, maybe by using cylindrical surface ?
+    //if(cyl_surf != nullptr) continue;
+    if(face->id == 211) continue; 
+
     if(n == 1) {
       builder.beginPolygon(faceLoopInd[0].size());
       for(int i=0;i<faceLoopInd[0].size();i++) builder.addVertex(faceLoopInd[0][i]);			
