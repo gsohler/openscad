@@ -32,6 +32,7 @@ void import_shell(PolySetBuilder &builder, StepKernel &sk, StepKernel::Shell *sh
       std::vector<IndexedFace> stubs;
       if(bound == nullptr) continue;
       StepKernel::EdgeLoop *loop = bound->edgeLoop; 
+      std::vector<int> arc_starts;
       for(int k=0;k<loop->faces.size();k++) {
         StepKernel::OrientedEdge *edge=loop->faces[k];
         if(edge == nullptr) continue;
@@ -64,7 +65,10 @@ void import_shell(PolySetBuilder &builder, StepKernel &sk, StepKernel::Shell *sh
 	  //
 	  double r=circ->r;
 	  Vector3d cent=circ->axis->point->pt;
-          stub.push_back(builder.vertexIndex(pt1->pt));
+	  int ind=builder.vertexIndex(pt1->pt);
+          stub.push_back(ind);
+	  arc_starts.push_back(ind);
+
 	  for(int i=1;i<fn;i++) {
             double ang=startang + (endang-startang)*i/(double) fn;		 
 	    Vector3d pt=cent+xdir*r*cos(ang)+ydir*r*sin(ang);
@@ -90,6 +94,7 @@ void import_shell(PolySetBuilder &builder, StepKernel &sk, StepKernel::Shell *sh
 
       }
       // now combine the stub
+      int stubs_size = stubs.size();
       if(stubs.size() == 0) continue;
       IndexedFace combined = stubs[0];
       stubs.erase(stubs.begin());
@@ -118,19 +123,49 @@ void import_shell(PolySetBuilder &builder, StepKernel &sk, StepKernel::Shell *sh
       builder.copyVertices(vertices);
       Vector4d tn=calcTriangleNormal(vertices,combined);
       int totaldir = (bound->dir)&1;
-      if(!totaldir)
-      {
-        std::reverse(combined.begin(), combined.end());
-      }
+      if(!totaldir) std::reverse(combined.begin(), combined.end());
+
+
+      StepKernel::CylindricalSurface *cyl_surf = dynamic_cast<StepKernel::CylindricalSurface *>(face->surface);
+      do{
+        if(cyl_surf == nullptr) break;
+	if(stubs_size != 4) break;
+	if(arc_starts.size() != 2) break;
+
+	std::vector<int> a0pos, a1pos;
+	for(int i=0;i<combined.size();i++) {
+          if(combined[i] == arc_starts[0]) a0pos.push_back(i); 
+          if(combined[i] == arc_starts[1]) a1pos.push_back(i);
+	}
+	if(a0pos.size() != 2) break;
+	if(a1pos.size() != 2) break;
+	printf("manipulate cylinder\n");
+	int amid[2];
+	amid[0]=(a0pos[0]+a0pos[1])/2;
+	amid[1]=(a1pos[0]+a1pos[1])/2;
+
+	IndexedFace  combined1, combined2;
+	// a0pos[0]-amid[0] . amid[1]-a1pos[1]
+	for(int i=a0pos[0];i<=amid[0] ;i++) combined1.push_back(combined[i]);
+	for(int i= amid[1];i<=a1pos[1];i++) combined1.push_back(combined[i]);
+
+	// a1pos[0]-amid[1],  amid[0]-a0pos[1]
+	for(int i=a1pos[0];i<=amid[1] ;i++) combined2.push_back(combined[i]);
+	for(int i= amid[0];i<=a0pos[1];i++) combined2.push_back(combined[i]);
+
+	combined=combined1;
+
+        builder.beginPolygon(combined2.size());
+        for(int i=0;i<combined2.size();i++) builder.addVertex(combined2[i]);			
+
+
+      } while(0);
+
 
       faceLoopInd.push_back(combined);
     }
     int n=face->faceBounds.size();
 
-    StepKernel::CylindricalSurface *cyl_surf = dynamic_cast<StepKernel::CylindricalSurface *>(face->surface);
-    // TODO help cylindrical surfaces to tessellate correctly, maybe by using cylindrical surface ?
-    //if(cyl_surf != nullptr) continue;
-    if(face->id == 211) continue; 
 
     if(n == 1) {
       builder.beginPolygon(faceLoopInd[0].size());
