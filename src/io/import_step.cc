@@ -49,8 +49,19 @@ void import_shell(PolySetBuilder &builder, StepKernel &sk, StepKernel::Shell *sh
 	if(circ != nullptr) {
 	  int fn=20;
 	  auto axis = circ->axis;
-	  Vector3d xdir=axis->dir2->pt;
-	  Vector3d zdir=axis->dir1->pt;
+	  if(axis == nullptr) {
+            printf("Axis is null!\n");
+	    continue;
+	  }
+	  Vector3d xdir, zdir;
+	  if(axis->dir1 == nullptr) {
+            printf("dir1 not defined!\n");
+	    continue;	    
+	  }
+	  zdir=axis->dir1->pt;
+
+	  if(axis->dir2 != nullptr) xdir=axis->dir2->pt; else xdir=Vector3d(zdir[1], zdir[2],-zdir[0]);
+
 	  Vector3d ydir=zdir.cross(xdir).normalized();
 	  // calc start angle
 	  Vector3d res;
@@ -121,6 +132,14 @@ void import_shell(PolySetBuilder &builder, StepKernel &sk, StepKernel::Shell *sh
 	   done=true;
            break; 
          }		   
+         if(stubs[i][stubs[i].size()-1] == conn) {
+           for(int j=stubs[i].size()-2;j>= 0; j--) {
+             combined.push_back(stubs[i][j]);		     
+           }		   
+           stubs.erase(stubs.begin()+i);
+	   done=true;
+           break; 
+         }		   
        }
        conn = combined[combined.size()-1];
       }
@@ -136,7 +155,8 @@ void import_shell(PolySetBuilder &builder, StepKernel &sk, StepKernel::Shell *sh
       if(remove_begin) combined.erase(combined.begin());
 	else combined.erase(combined.end()-1);
       builder.copyVertices(vertices);
-      Vector4d tn=calcTriangleNormal(vertices,combined);
+      Vector4d tn(1,0,0,0);
+      if(combined.size() >= 3) tn =calcTriangleNormal(vertices,combined);
       int totaldir = (bound->dir)&1;
       if(!totaldir) std::reverse(combined.begin(), combined.end());
 

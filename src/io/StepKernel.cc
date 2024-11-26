@@ -159,11 +159,30 @@ std::string StepKernel::read_line(std::ifstream &stp_file, bool skip_all_space)
 {
 	std::string line_str;
 	bool leading_space = true;
+	bool in_squote=false;
+	bool in_dquote=false;
+	bool in_comment=false;
+	char old_char;
 	while (stp_file)
 	{
 		char get_char = ' ';
 		stp_file.get(get_char);
-		if (get_char == ';')
+		if(old_char == '/' && get_char == '*' && !in_comment){
+			in_comment=true;
+			line_str = line_str.substr(0,line_str.size()-1);
+
+		}
+		if(old_char == '*' && get_char == '/' && in_comment) {
+			in_comment=false;
+			continue;
+		}
+
+		old_char = get_char;
+		if(in_comment) continue;
+
+		if (get_char == '\'' && !in_dquote) in_squote=!in_squote;
+		if (get_char == '\"' && !in_squote) in_dquote=!in_dquote;
+		if (get_char == ';' && !in_squote && !in_dquote)
 			break;
 
 		if (get_char == '\n' || get_char == '\r' || get_char == '\t')
@@ -319,6 +338,15 @@ void StepKernel::read_step(std::string file_name)
 			else if (func_name == "FILL_AREA_STYLE_COLOUR") unimplemented=true;
 			else if (func_name == "CURVE_STYLE") unimplemented=true;
 			else if (func_name == "DRAUGHTING_PRE_DEFINED_CURVE_FONT") unimplemented=true;
+			else if (func_name == "SHAPE_REPRESENTATION") unimplemented=true;
+			else if (func_name == "SHAPE_REPRESENTATION_RELATIONSHIP") unimplemented=true;
+			else if (func_name == "PERSONAL_ADDRESS") unimplemented=true;
+			else if (func_name == "PLANE_ANGLE_MEASURE_WITH_UNIT") unimplemented=true;
+			else if (func_name == "PRODUCT_CATEGORY") unimplemented=true;
+			else if (func_name == "PRODUCT_CATEGORY_RELATIONSHIP") unimplemented=true;
+			else if (func_name == "(LENGTH_UNIT") unimplemented=true;
+			else if (func_name == "(NAMED_UNIT") unimplemented=true;
+			else if (func_name == "(GEOMETRIC_REPRESENTATION_CONTEXT") unimplemented=true;
 			else if (func_name == "(") unimplemented=true;
 			if(!ent) {
 				if(unimplemented) {
