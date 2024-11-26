@@ -32,7 +32,7 @@ void import_shell(PolySetBuilder &builder, StepKernel &sk, StepKernel::Shell *sh
       std::vector<IndexedFace> stubs;
       if(bound == nullptr) continue;
       StepKernel::EdgeLoop *loop = bound->edgeLoop; 
-      std::vector<int> arc_starts;
+      std::vector<int> arc_ends;
       for(int k=0;k<loop->faces.size();k++) {
         StepKernel::OrientedEdge *edge=loop->faces[k];
         if(edge == nullptr) continue;
@@ -65,16 +65,20 @@ void import_shell(PolySetBuilder &builder, StepKernel &sk, StepKernel::Shell *sh
 	  //
 	  double r=circ->r;
 	  Vector3d cent=circ->axis->point->pt;
+
 	  int ind=builder.vertexIndex(pt1->pt);
           stub.push_back(ind);
-	  arc_starts.push_back(ind);
+	  arc_ends.push_back(ind);
 
 	  for(int i=1;i<fn;i++) {
             double ang=startang + (endang-startang)*i/(double) fn;		 
 	    Vector3d pt=cent+xdir*r*cos(ang)+ydir*r*sin(ang);
             stub.push_back(builder.vertexIndex(pt));
 	  }
-          stub.push_back(builder.vertexIndex(pt2->pt));
+	  ind = builder.vertexIndex(pt2->pt);
+          stub.push_back(ind);
+	  arc_ends.push_back(ind);
+
 	}
 	else if(scurve != nullptr) {
           stub.push_back(builder.vertexIndex(pt1->pt));
@@ -130,38 +134,32 @@ void import_shell(PolySetBuilder &builder, StepKernel &sk, StepKernel::Shell *sh
       do{
         if(cyl_surf == nullptr) break;
 	if(stubs_size != 4) break;
-	if(arc_starts.size() != 2) break;
+	if(arc_ends.size() != 4) break;
 
-	std::vector<int> a0pos, a1pos;
+	std::vector<int> pos;
 	for(int i=0;i<combined.size();i++) {
-          if(combined[i] == arc_starts[0]) a0pos.push_back(i); 
-          if(combined[i] == arc_starts[1]) a1pos.push_back(i);
+		if(combined[i] == arc_ends[0]) pos.push_back(i);
+		else if(combined[i] == arc_ends[1]) pos.push_back(i);
+		else if(combined[i] == arc_ends[2]) pos.push_back(i);
+		else if(combined[i] == arc_ends[3]) pos.push_back(i);
 	}
-	if(a0pos.size() != 2) break;
-	if(a1pos.size() != 2) break;
-	printf("manipulate cylinder\n");
-	int amid[2];
-	amid[0]=(a0pos[0]+a0pos[1])/2;
-	amid[1]=(a1pos[0]+a1pos[1])/2;
+	int bstart=pos[0];
+	int bend=pos[3];
+	while(bstart+1 < bend-1) {
+          builder.beginPolygon(4);
+          builder.addVertex(combined[bstart]);			
+          builder.addVertex(combined[bstart+1]);			
+          builder.addVertex(combined[bend-1]);			
+          builder.addVertex(combined[bend]);			
+	  bstart++;
+	  bend--;
+	  if(bstart > pos[1] || bend < pos[2]) break;
+	}  
 
-	IndexedFace  combined1, combined2;
-	// a0pos[0]-amid[0] . amid[1]-a1pos[1]
-	for(int i=a0pos[0];i<=amid[0] ;i++) combined1.push_back(combined[i]);
-	for(int i= amid[1];i<=a1pos[1];i++) combined1.push_back(combined[i]);
-
-	// a1pos[0]-amid[1],  amid[0]-a0pos[1]
-	for(int i=a1pos[0];i<=amid[1] ;i++) combined2.push_back(combined[i]);
-	for(int i= amid[0];i<=a0pos[1];i++) combined2.push_back(combined[i]);
-
-	combined=combined1;
-
-        builder.beginPolygon(combined2.size());
-        for(int i=0;i<combined2.size();i++) builder.addVertex(combined2[i]);			
-
-
+	combined.clear();
       } while(0);
 
-
+      	
       faceLoopInd.push_back(combined);
     }
     int n=face->faceBounds.size();
