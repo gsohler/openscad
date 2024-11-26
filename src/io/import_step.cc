@@ -33,6 +33,7 @@ void import_shell(PolySetBuilder &builder, StepKernel &sk, StepKernel::Shell *sh
       if(bound == nullptr) continue;
       StepKernel::EdgeLoop *loop = bound->edgeLoop; 
       std::vector<int> arc_ends;
+      std::vector<int> line_ends;
       for(int k=0;k<loop->faces.size();k++) {
         StepKernel::OrientedEdge *edge=loop->faces[k];
         if(edge == nullptr) continue;
@@ -83,9 +84,13 @@ void import_shell(PolySetBuilder &builder, StepKernel &sk, StepKernel::Shell *sh
 	else if(scurve != nullptr) {
           stub.push_back(builder.vertexIndex(pt1->pt));
           stub.push_back(builder.vertexIndex(pt2->pt));
+	  line_ends.push_back(stub[0]);
+	  line_ends.push_back(stub[1]);
         } else if(line != nullptr) {
           stub.push_back(builder.vertexIndex(pt1->pt));
           stub.push_back(builder.vertexIndex(pt2->pt));
+	  line_ends.push_back(stub[0]);
+	  line_ends.push_back(stub[1]);
 	} else {
           printf("Unimplemented csurfacecurve for id %d\n",edgecurv->id);
 	}
@@ -123,7 +128,13 @@ void import_shell(PolySetBuilder &builder, StepKernel &sk, StepKernel::Shell *sh
       if(stubs.size() != 0) {
       	printf("Warning: Cannot detect full loop for facebound %d\n",bound->id);
       }
-      combined.erase(combined.begin());
+      int remove_begin=0;
+      for(int i=0;i+1<line_ends.size();i+=2){
+	     if(combined[0] == line_ends[i] && combined[1] == line_ends[i+1]) remove_begin=1;
+	     if(combined[1] == line_ends[i] && combined[0] == line_ends[i+1]) remove_begin=1;
+      }
+      if(remove_begin) combined.erase(combined.begin());
+	else combined.erase(combined.end()-1);
       builder.copyVertices(vertices);
       Vector4d tn=calcTriangleNormal(vertices,combined);
       int totaldir = (bound->dir)&1;
