@@ -98,7 +98,6 @@ void StepKernel::build_tri_body(std::vector<Vector3d> vertices, std::vector<Inde
 			oriented_edges.push_back(new OrientedEdge(entities, edge_curve, edge_dir));
 		}
 
-//https://www.kleinanzeigen.de/s-anzeige/schlittschuhe-kinder-groesse-25-29/2925176078-230-6425
 		// create the plane
 		auto plane_point = new Point(entities, p0);
 		auto plane_dir_1 = new Direction(entities, d2);
@@ -201,9 +200,10 @@ void StepKernel::read_step(std::string file_name)
 {
 	std::ifstream stp_file;
 	stp_file.open(file_name);
-	if (!stp_file)
+	if (!stp_file){
+		printf("Cannot open %s\n",file_name.c_str());
 		return;
-
+	}
 	// read the first line to get the iso stuff
 	std::string iso_line = read_line(stp_file, true);
 
