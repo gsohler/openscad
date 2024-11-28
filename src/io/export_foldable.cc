@@ -306,11 +306,11 @@ std::vector<sheetS> sheets_combine(std::vector<sheetS> sheets, const plotSetting
 //  if(debugstr != NULL) {
 //	  sscanf(debugstr,"%d",&debug);
 //  }
-  printf("sheets_combine src sheets is %ld\n",sheets.size());
+//  printf("sheets_combine src sheets is %ld\n",sheets.size());
   std::vector<sheetS> combined;
   std::vector<doubleList> combined_extent;	
   for(unsigned int i=0;i<sheets.size();i++) {
-    printf(".\n");	  
+//    printf(".\n");	  
     bool success=false;
     // try to combine new with all existing sheets
     for(unsigned int j=0;!success && j<combined.size();j++) {
@@ -350,13 +350,13 @@ std::vector<sheetS> sheets_combine(std::vector<sheetS> sheets, const plotSetting
 	success=true;
         combined[j]=Union;	
 	combined_extent[j]=create_radExtent(Union);	    
-	printf("%d fits next to %d with angle %d\n",i,j,k*30);
+//	printf("%d fits next to %d with angle %d\n",i,j,k*30);
       }	      
     }
     if(!success) {
       combined.push_back(sheets[i]);	  
       combined_extent.push_back(sheet_extent[i]);
-      printf("new page %ld for %d\n",combined.size(),i);
+//      printf("new page %ld for %d\n",combined.size(),i);
     }
   }
   return combined;	
@@ -369,7 +369,7 @@ void debug_conn(std::vector<connS> &con,std::vector<IndexedFace> &faces, const s
     auto &a = con[i];
     int n=faces[a.p1].size();		  
     double da= (vertices[faces[a.p1][a.f1]] - vertices[faces[a.p1][(a.f1+1)%n]]).norm();
-    printf("Con %d:done=%d length=%g  %d:%d ->%d:%d \n",i,con[i].done, da, con[i].p1, con[i].f1, con[i].p2, con[i].f2);
+//    printf("Con %d:done=%d length=%g  %d:%d ->%d:%d \n",i,con[i].done, da, con[i].p1, con[i].f1, con[i].p2, con[i].f2);
   }
 }
 std::vector<sheetS> fold_3d(std::shared_ptr<const PolySet> ps, const plotSettingsS &plot_s)

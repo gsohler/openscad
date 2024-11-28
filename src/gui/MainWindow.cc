@@ -312,6 +312,8 @@ QAction *getExport3DAction(const MainWindow *mainWindow) {
     return mainWindow->fileActionExport3MF;
   } else if (format == "PS") {
     return mainWindow->fileActionExportFoldable;
+  } else if (format == "STP") {
+    return mainWindow->fileActionExportSTP;
   } else {
     return nullptr;
   }
@@ -327,6 +329,8 @@ QAction *getExport2DAction(const MainWindow *mainWindow) {
     return mainWindow->fileActionExportPDF;
   } else if (format == "PS") {
     return mainWindow->fileActionExportFoldable;
+  } else if (format == "STP") {
+    return mainWindow->fileActionExportSTP;
   } else {
     return nullptr;
   }
@@ -672,6 +676,7 @@ MainWindow::MainWindow(const QStringList& filenames)
   connect(this->fileActionExportOFF, SIGNAL(triggered()), this, SLOT(actionExportOFF()));
   connect(this->fileActionExportWRL, SIGNAL(triggered()), this, SLOT(actionExportWRL()));
   connect(this->fileActionExportFoldable, SIGNAL(triggered()), this, SLOT(actionExportFoldable()));
+  connect(this->fileActionExportSTP, SIGNAL(triggered()), this, SLOT(actionExportSTP()));
   connect(this->fileActionExportPOV, SIGNAL(triggered()), this, SLOT(actionExportPOV()));
   connect(this->fileActionExportAMF, SIGNAL(triggered()), this, SLOT(actionExportAMF()));
   connect(this->fileActionExportDXF, SIGNAL(triggered()), this, SLOT(actionExportDXF()));
@@ -3271,6 +3276,11 @@ void MainWindow::actionExportWRL()
 void MainWindow::actionExportFoldable()
 {
   actionExport(FileFormat::PS, "PS", ".ps", 3);
+}
+
+void MainWindow::actionExportSTP()
+{
+  actionExport(FileFormat::STEP, "STP", ".stp", 3);
 }
 
 void MainWindow::actionExportPOV()

@@ -234,6 +234,7 @@
      <addaction name="fileActionExportOFF"/>
      <addaction name="fileActionExportWRL"/>
      <addaction name="fileActionExportFoldable"/>
+     <addaction name="fileActionExportSTP"/>
      <addaction name="fileActionExportAMF"/>
      <addaction name="fileActionExport3MF"/>
      <addaction name="fileActionExportDXF"/>
@@ -1087,6 +1088,11 @@
   <action name="fileActionExportFoldable">
    <property name="text">
     <string>Export as &amp;Foldable PS...</string>
+   </property>
+  </action>
+  <action name="fileActionExportSTP">
+   <property name="text">
+    <string>Export as &amp;Step...</string>
    </property>
   </action>
   <action name="viewActionPreview">
