@@ -194,16 +194,20 @@ void PolySetBuilder::copyVertices(std::vector<Vector3d> &vertices) {
   vertices_.copy(std::back_inserter(vertices));
 }
 
-void PolySetBuilder::addCurve(std::shared_ptr<Curve> curve){
-  if(curve->start > curve->end) curve->reverse();
-//  auto arc_curve = std::dynamic_pointer_cast<ArcCurve *>(curve);
-//  if(arc_curve != nullptr) {
-//    for(auto &c:curves)
-//	  if(c == arc_curve) return; // duplicate
-//  }
-  for(auto &c:curves)
-	  if(c == curve) return; // duplicate
-  curves.push_back(curve);
+void PolySetBuilder::addCurve(std::shared_ptr<Curve> new_curve){
+  if(new_curve->start > new_curve->end) new_curve->reverse();
+  auto arc_new_curve = std::dynamic_pointer_cast<ArcCurve>(new_curve);
+  if(arc_new_curve != nullptr) {
+    for(auto &curve:curves) {
+      auto arc_curve = std::dynamic_pointer_cast<ArcCurve>(curve);
+      if(arc_curve != nullptr) {
+        if(*arc_curve == *arc_new_curve) return; // duplicate
+      }					   
+    }					 
+  }
+  for(auto &curve:curves)
+	  if(*curve == *new_curve) return; // duplicate
+  curves.push_back(new_curve);
 }
 std::unique_ptr<PolySet> PolySetBuilder::build()
 {

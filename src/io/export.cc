@@ -79,6 +79,8 @@ Containers &containers() {
     add_item(*containers, {FileFormat::CSG, "csg", "csg", "CSG"});
     add_item(*containers, {FileFormat::PARAM, "param", "param", "param"});
     add_item(*containers, {FileFormat::AST, "ast", "ast", "AST"});
+    add_item(*containers, {FileFormat::STEP, "step", "stp", "STEP"});
+    add_item(*containers, {FileFormat::STEP, "step", "step", "STEP"});
     add_item(*containers, {FileFormat::TERM, "term", "term", "term"});
     add_item(*containers, {FileFormat::ECHO, "echo", "echo", "echo"});
     add_item(*containers, {FileFormat::PNG, "png", "png", "PNG"});

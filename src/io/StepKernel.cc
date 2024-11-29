@@ -42,7 +42,7 @@ StepKernel::~StepKernel()
 {
 }
 
-StepKernel::EdgeCurve* StepKernel::create_edge_curve(StepKernel::Vertex * vert1, StepKernel::Vertex * vert2,bool dir)
+StepKernel::EdgeCurve* StepKernel::create_line_edge_curve(StepKernel::Vertex * vert1, StepKernel::Vertex * vert2,bool dir)
 {
 	// curve 1
 	auto line_point1 = new Point(entities, vert1->point->pt);
@@ -55,7 +55,7 @@ StepKernel::EdgeCurve* StepKernel::create_edge_curve(StepKernel::Vertex * vert1,
 	return new EdgeCurve(entities, vert1, vert2, surf_curve1, dir);
 }
 
-void StepKernel::build_tri_body(std::vector<Vector3d> vertices, std::vector<IndexedFace> faces, double tol)
+void StepKernel::build_tri_body(std::vector<Vector3d> vertices, std::vector<IndexedFace> faces, std::vector<std::shared_ptr<Curve>> curves, double tol)
 {
 	auto point = new Point(entities, Vector3d(0.0, 0.0, 0.0));
 	auto dir_1 = new Direction(entities, Vector3d(0.0, 0.0, 1.0));
@@ -82,6 +82,11 @@ void StepKernel::build_tri_body(std::vector<Vector3d> vertices, std::vector<Inde
 		std::vector<StepKernel::Vertex *> vert;
 		for(int j=0;j<n;j++){
 			int ind=faces[i][j];
+			for(int k=0;k<curves.size();k++) {
+                          if(curves[k]->start == ind || curves[k]->end == ind) {
+			    printf("curve\n");
+			  }				  
+			}
 			auto point = new Point(entities, vertices[ind]);
 			auto v = new Vertex(entities, point);
 			vert.push_back(v);
@@ -149,7 +154,7 @@ void StepKernel::get_edge_from_map(
 	}
 	if (!edge_curve)
 	{
-		edge_curve = create_edge_curve(vert1, vert2, true);
+		edge_curve = create_line_edge_curve(vert1, vert2, true);
 		edge_map[edge_tuple1_f] = edge_curve;
 	}
 }

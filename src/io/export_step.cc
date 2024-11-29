@@ -39,6 +39,7 @@ void export_step(const std::shared_ptr<const Geometry>& geom, std::ostream& outp
 	auto ps = PolySetUtils::getGeometryAsPolySet(geom);
 	if(ps == nullptr) return;
 
+	printf("export curves: %d\n",ps->curves.size());
 	std::vector<int> faceParents;
 	std::vector<Vector4d> normals, newNormals;
 
@@ -48,7 +49,7 @@ void export_step(const std::shared_ptr<const Geometry>& geom, std::ostream& outp
 
 	StepKernel sk;
 
-	sk.build_tri_body(ps->vertices, indicesNew,1e-5);
+	sk.build_tri_body(ps->vertices, indicesNew,ps->curves, 1e-5);
 	std::time_t tt = std ::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
 	struct std::tm * ptm = std::localtime(&tt);
 	std::stringstream iso_time;

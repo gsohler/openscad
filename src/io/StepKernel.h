@@ -33,6 +33,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 #include <sstream>
 #include <math.h>
 #include "GeometryUtils.h"
+#include <Curve.h>
 
 class StepKernel
 {
@@ -876,9 +877,10 @@ public:
 	StepKernel();
 	virtual ~StepKernel();
 
-	StepKernel::EdgeCurve* create_edge_curve(StepKernel::Vertex * vert1, StepKernel::Vertex * vert2, bool dir);
+	StepKernel::EdgeCurve* create_line_edge_curve(StepKernel::Vertex * vert1, StepKernel::Vertex * vert2, bool dir);
+	StepKernel::EdgeCurve* create_arc_edge_curve(StepKernel::Vertex * vert1, StepKernel::Vertex * vert2, bool dir);
 
-	void build_tri_body(std::vector<Vector3d> tris, std::vector<IndexedFace> faces, double tol);
+	void build_tri_body(std::vector<Vector3d> tris, std::vector<IndexedFace> faces, std::vector<std::shared_ptr<Curve>> curves, double tol);
 	void get_edge_from_map(
 		Vector3d p0,
 		Vector3d p1,

@@ -67,6 +67,7 @@ std::unique_ptr<PolySet> tessellate_faces(const PolySet& polyset)
   auto result = std::make_unique<PolySet>(3, polyset.convexValue());
   result->setConvexity(polyset.getConvexity());
   result->setTriangular(true);
+  result->curves = polyset.curves;
   // ideally this should not require a copy...
   if (polyset.isTriangular()) {
     result->vertices = polyset.vertices;
@@ -199,6 +200,7 @@ std::shared_ptr<const PolySet> getGeometryAsPolySet(const std::shared_ptr<const 
   }
 #endif
 #ifdef ENABLE_MANIFOLD
+	  printf("e\n");
   if (auto mani = std::dynamic_pointer_cast<const ManifoldGeometry>(geom)) {
     return mani->toPolySet();
   }
