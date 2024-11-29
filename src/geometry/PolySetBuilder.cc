@@ -194,6 +194,17 @@ void PolySetBuilder::copyVertices(std::vector<Vector3d> &vertices) {
   vertices_.copy(std::back_inserter(vertices));
 }
 
+void PolySetBuilder::addCurve(std::shared_ptr<Curve> curve){
+  if(curve->start > curve->end) curve->reverse();
+//  auto arc_curve = std::dynamic_pointer_cast<ArcCurve *>(curve);
+//  if(arc_curve != nullptr) {
+//    for(auto &c:curves)
+//	  if(c == arc_curve) return; // duplicate
+//  }
+  for(auto &c:curves)
+	  if(c == curve) return; // duplicate
+  curves.push_back(curve);
+}
 std::unique_ptr<PolySet> PolySetBuilder::build()
 {
   endPolygon();
@@ -203,6 +214,7 @@ std::unique_ptr<PolySet> PolySetBuilder::build()
   polyset->indices = std::move(indices_);
   polyset->color_indices = std::move(color_indices_);
   polyset->colors = std::move(colors_);
+  polyset->curves = std::move(curves);
   polyset->setConvexity(convexity_);
   bool is_triangular = true;
   for (const auto& face : polyset->indices) {

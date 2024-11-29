@@ -78,9 +78,12 @@ void import_shell(PolySetBuilder &builder, StepKernel &sk, StepKernel::Shell *sh
 	  double r=circ->r;
 	  Vector3d cent=circ->axis->point->pt;
 
+	  auto curve = std::make_shared<ArcCurve>(cent, zdir, r);
+
 	  int ind=builder.vertexIndex(pt1->pt);
           stub.push_back(ind);
 	  arc_ends.push_back(ind);
+	  curve->start=ind;
 
 	  for(int i=1;i<fn;i++) {
             double ang=startang + (endang-startang)*i/(double) fn;		 
@@ -90,6 +93,10 @@ void import_shell(PolySetBuilder &builder, StepKernel &sk, StepKernel::Shell *sh
 	  ind = builder.vertexIndex(pt2->pt);
           stub.push_back(ind);
 	  arc_ends.push_back(ind);
+	  curve->end=ind;
+
+	  builder.addCurve(curve);
+
 
 	}
 	else if(scurve != nullptr) {
@@ -103,7 +110,7 @@ void import_shell(PolySetBuilder &builder, StepKernel &sk, StepKernel::Shell *sh
 	  line_ends.push_back(stub[0]);
 	  line_ends.push_back(stub[1]);
 	} else {
-          printf("Unimplemented csurfacecurve for id %d\n",edgecurv->id);
+          printf("Unimplemented surfacecurve for id %d\n",edgecurv->id);
 	}
         int totaldir = (edge->dir+edgecurv->dir)&1;
 	if(totaldir) {
@@ -246,9 +253,11 @@ std::unique_ptr<PolySet> import_step(const std::string& filename, const Location
       continue;
     }  
   }
-  // https://github.com/FreeCAD/FreeCAD/blob/main/src/Mod/Part/App/ImportStep.cpp
-/*
 
-*/
-  return builder.build();
+  auto res = builder.build();
+  printf("res has %d curves\n", res->curves.size());
+  for(int i=0;i<res->curves.size();i++) {
+    res->curves[i]->display(res->vertices);
+  }
+  return res;
 } 
