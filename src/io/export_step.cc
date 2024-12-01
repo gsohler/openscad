@@ -40,6 +40,9 @@ void export_step(const std::shared_ptr<const Geometry>& geom, std::ostream& outp
 	if(ps == nullptr) return;
 
 	printf("export curves: %d\n",ps->curves.size());
+	for(auto curve : ps->curves) {
+		curve->display(ps->vertices);
+	}
 	std::vector<int> faceParents;
 	std::vector<Vector4d> normals, newNormals;
 

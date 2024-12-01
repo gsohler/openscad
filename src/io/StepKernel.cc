@@ -64,6 +64,23 @@ void StepKernel::build_tri_body(std::vector<Vector3d> vertices, std::vector<Inde
 	auto base_axis = new Axis2Placement(entities, dir_1, dir_2, point);
 	std::vector<Face*> sfaces;
 	std::map<std::tuple<double, double, double, double, double, double>, EdgeCurve*> edge_map;
+
+		// check for all points it they sit on an arc// TODO move place to be mor efficient
+	std::vector<int> vert2curve;
+	for(int i=0;i<vertices.size();i++){
+		Vector3d pt=vertices[i];
+	        printf("%d (%g/%g/%g)",i, pt[0], pt[1], pt[2]);		  
+		int found=-1;
+		for(int j=0;j<curves.size();j++) {
+                	if(curves[j]->pointMember(vertices, pt)) {
+				printf("(%d)",j);
+				found=j;
+			}
+		}
+		printf("\n");
+		vert2curve.push_back(found);
+	}
+
 	for (std::size_t i = 0; i < faces.size() ; i++)
 	{
 		Vector3d p0 = vertices[faces[i][0]];
@@ -77,29 +94,33 @@ void StepKernel::build_tri_body(std::vector<Vector3d> vertices, std::vector<Inde
 		Vector3d d1_cor=d0.cross(d2).normalized();
 
 		int merged_edge_cnt;
+
+		IndexedFace perimeter_points = faces[i]; // TODO fix
+			
+
 		// build the face
-		int n=faces[i].size();
+		int n=perimeter_points.size();
 		std::vector<StepKernel::Vertex *> vert;
+
+		
+		// eckpfeiler
 		for(int j=0;j<n;j++){
-			int ind=faces[i][j];
-			for(int k=0;k<curves.size();k++) {
-                          if(curves[k]->start == ind || curves[k]->end == ind) {
-			    printf("curve\n");
-			  }				  
-			}
+			int ind=perimeter_points[j];
 			auto point = new Point(entities, vertices[ind]);
 			auto v = new Vertex(entities, point);
 			vert.push_back(v);
 		}
 
 		std::vector<OrientedEdge*> oriented_edges;
+		// latten
 		for(int j=0;j<n;j++)
 		{
-			int ind=faces[i][j];
-			int indn=faces[i][(j+1)%n];
+			int ind=perimeter_points[j];
+			int indn=perimeter_points[(j+1)%n];
 			EdgeCurve* edge_curve;
 			bool edge_dir = true; 
-			get_edge_from_map(vertices[ind], vertices[indn], edge_map, vert[j], vert[(j+1)%n], edge_curve, edge_dir, merged_edge_cnt);
+			// hier wird line eingesetzt
+			edge_curve = get_line_from_map(vertices[ind], vertices[indn], edge_map, vert[j], vert[(j+1)%n], edge_dir, merged_edge_cnt);
 			oriented_edges.push_back(new OrientedEdge(entities, edge_curve, edge_dir));
 		}
 
@@ -126,17 +147,16 @@ void StepKernel::build_tri_body(std::vector<Vector3d> vertices, std::vector<Inde
 	auto manifold_shape = new ManifoldShape(entities, base_axis, shell_model);
 }
 
-void StepKernel::get_edge_from_map(
+StepKernel::EdgeCurve *StepKernel::get_line_from_map(
 	Vector3d p0,
 	Vector3d p1,
 	std::map<std::tuple<double, double, double, double, double, double>, StepKernel::EdgeCurve *> &edge_map,
 	StepKernel::Vertex * vert1,
 	StepKernel::Vertex * vert2,
-	EdgeCurve *& edge_curve,
 	bool &edge_dir,
 	int &merge_cnt)
 {
-	edge_curve = 0;
+	StepKernel::EdgeCurve *edge_curve = 0;
 	edge_dir = true;
 	auto edge_tuple1_f = std::make_tuple(p0[0], p0[1], p0[2], p1[0], p1[1], p1[2]);
 	auto edge_tuple1_r = std::make_tuple(p1[0], p1[1], p1[2], p0[0], p0[1], p0[2]);
@@ -157,6 +177,7 @@ void StepKernel::get_edge_from_map(
 		edge_curve = create_line_edge_curve(vert1, vert2, true);
 		edge_map[edge_tuple1_f] = edge_curve;
 	}
+	return edge_curve;
 }
 
 std::string StepKernel::read_line(std::ifstream &stp_file, bool skip_all_space)

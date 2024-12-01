@@ -881,15 +881,10 @@ public:
 	StepKernel::EdgeCurve* create_arc_edge_curve(StepKernel::Vertex * vert1, StepKernel::Vertex * vert2, bool dir);
 
 	void build_tri_body(std::vector<Vector3d> tris, std::vector<IndexedFace> faces, std::vector<std::shared_ptr<Curve>> curves, double tol);
-	void get_edge_from_map(
-		Vector3d p0,
-		Vector3d p1,
-		std::map<std::tuple<double, double, double, double, double, double>, StepKernel::EdgeCurve *> &edge_map,
-		StepKernel::Vertex * vert1,
-		StepKernel::Vertex * vert2,
-		EdgeCurve *& edge_curve,
-		bool &edge_dir,
-		int &merge_cnt);
+	EdgeCurve * get_line_from_map( Vector3d p0, Vector3d p1, std::map<std::tuple<double, double, double, double, double, double>, StepKernel::EdgeCurve *> &edge_map, StepKernel::Vertex * vert1,
+		StepKernel::Vertex * vert2, bool &edge_dir, int &merge_cnt);
+	EdgeCurve * get_arc_from_map( Vector3d p0, Vector3d p1, std::map<std::tuple<double, double, double, double, double, double>, StepKernel::EdgeCurve *> &edge_map, StepKernel::Vertex * vert1,
+		StepKernel::Vertex * vert2, bool &edge_dir, int &merge_cnt);
 	std::string read_line(std::ifstream &stp_file, bool skip_all_space);
 	void read_step(std::string file_name);
 	std::vector<Entity*> entities;

@@ -558,6 +558,7 @@ std::shared_ptr<AbstractNode> python_modulefunc(const ModuleInstantiation *op_mo
 
 Value python_convertresult(PyObject *arg)
 {
+	printf("convert result\n");
   if(arg == nullptr) return Value::undefined.clone();
   if(PyList_Check(arg)) {
     VectorType vec(nullptr);
@@ -576,7 +577,9 @@ Value python_convertresult(PyObject *arg)
     auto str = std::string(chars);
     Py_XDECREF(strobj);
     return { str } ;
+  } else if(arg == Py_None) { return Value::undefined.clone(); 
   } else {
+	  printf("tt\n");
     PyErr_SetString(PyExc_TypeError, "Unsupported function result\n");
     return Value::undefined.clone();
   }

@@ -47,7 +47,7 @@ void import_shell(PolySetBuilder &builder, StepKernel &sk, StepKernel::Shell *sh
 	StepKernel::Line *line = dynamic_cast<StepKernel::Line *>(edgecurv->round);
 
 	if(circ != nullptr) {
-	  int fn=20;
+	  int fn=10;
 	  auto axis = circ->axis;
 	  if(axis == nullptr) {
             printf("Axis is null!\n");
