@@ -507,7 +507,7 @@ std::vector<IndexedFace> mergeTriangles(const std::vector<IndexedFace> polygons,
 		int norm_ind=-1;
 		for(unsigned int j=0;norm_ind == -1 && j<norm_list.size();j++) {
 			const auto &cur = norm_list[j];
-			if(cur.head<3>().dot(norm.head<3>()) > 0.999 && fabs(cur[3] - norm[3]) < 0.001) {
+			if(cur.head<3>().dot(norm.head<3>()) > 0.99999 && fabs(cur[3] - norm[3]) < 0.001) {
 				norm_ind=j;
 			}
 			if(cur.norm() < 1e-6 && norm.norm() < 1e-6) norm_ind=j; // zero vector matches zero vector
@@ -1411,7 +1411,7 @@ std::vector<Vector3d> offset3D_offset(std::vector<Vector3d> vertices, std::vecto
 	// -------------------------------
 	// now calc length of all edges
 	// -------------------------------
-	std::vector<double> edge_len, edge_len_factor;
+	std::vector<double> edge_len;
 	double edge_len_min=0;
 	for(unsigned int i=0;i<indices.size();i++)
 	{
@@ -1631,7 +1631,7 @@ std::vector<Vector3d> offset3D_offset(std::vector<Vector3d> vertices, std::vecto
 				} else 	verticesNew[i]=verticesNew[mainfiller[0]];
 				continue;
 			}
-		} else if(faceInds.size() == 3) {
+		} else if(faceInds.size() >= 3) {
 			Vector3d dir0=faceNormal[faceInds[0]].head<3>();
 			Vector3d dir1=faceNormal[faceInds[1]].head<3>();
 			Vector3d dir2=faceNormal[faceInds[2]].head<3>();
@@ -1699,11 +1699,9 @@ std::vector<Vector3d> offset3D_offset(std::vector<Vector3d> vertices, std::vecto
 			if(b > a) {
 				double dist=(verticesNew[b]-verticesNew[a]).norm();
 				double fact = (dist-edge_len[cnt])/off_act;
-				if(fabs(fact) > 0.0001) {
-					// find maximal downsize value
-					double t_off_max=-edge_len[cnt]/fact;
-					if(off_max < t_off_max && t_off_max < 0) off_max=t_off_max;
-					edge_len_factor.push_back(fact);
+				if(fabs(edge_len[cnt]-dist) > 1e-5) {
+					double off_max_sub = off_act/(edge_len[cnt]-dist);
+					if(off_max_sub > off_max && off_max_sub < 0) off_max = off_max_sub;
 				}
 				cnt++;
 			}
