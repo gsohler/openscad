@@ -100,7 +100,7 @@ mkdir -p ${DEPLOYDIR}
 case $OS in
     MACOSX)
         . ./scripts/setenv-macos.sh
-        CMAKE_CONFIG="$CMAKE_CONFIG -DCMAKE_OSX_ARCHITECTURES=x86_64;arm64"
+        CMAKE_CONFIG="$CMAKE_CONFIG -DUSE_QT6=ON -DCMAKE_OSX_ARCHITECTURES=x86_64;arm64"
     ;;
     LINUX)
         TARGET=

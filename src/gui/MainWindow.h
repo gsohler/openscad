@@ -325,6 +325,7 @@ public:
   QList<double> getTranslation() const;
   QList<double> getRotation() const;
   QSignalMapper *addmenu_mapper;
+  std::unordered_map<FileFormat, QAction*>  export_map;
 
 public slots:
   void actionReloadRenderPreview();
