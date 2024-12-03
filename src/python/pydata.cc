@@ -318,14 +318,15 @@ PyObject *python_lv_negate(PyObject *arg) { return  Py_None; }
 #endif
 
 extern PyTypeObject PyOpenSCADType;
-Value python_convertresult(PyObject *arg);
+Value python_convertresult(PyObject *arg, int &error);
 
 PyObject *PyDataObject_call(PyObject *self, PyObject *args, PyObject *kwargs)
 {
 //  printf("Call %d\n",PyTuple_Size(args));
   AssignmentList pargs;
+  int error;
   for(int i=0;i<PyTuple_Size(args);i++) {
-    Value val = python_convertresult(PyTuple_GetItem(args,i));	  
+    Value val = python_convertresult(PyTuple_GetItem(args,i),error);	  
     std::shared_ptr<Literal> lit = std::make_shared<Literal>(std::move(val), Location::NONE);
     std::shared_ptr<Assignment> ass  = std::make_shared<Assignment>(std::string(""),lit);
     pargs.push_back(ass);

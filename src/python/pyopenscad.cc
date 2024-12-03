@@ -556,15 +556,17 @@ std::shared_ptr<AbstractNode> python_modulefunc(const ModuleInstantiation *op_mo
  * Converting a python result to an openscad result. extra function required as it might call itself hierarchically
  */
 
-Value python_convertresult(PyObject *arg)
+Value python_convertresult(PyObject *arg, int &error)
 {
-	printf("convert result\n");
+  error=0;	
   if(arg == nullptr) return Value::undefined.clone();
   if(PyList_Check(arg)) {
     VectorType vec(nullptr);
     for(int i=0;i<PyList_Size(arg);i++) {
       PyObject *item=PyList_GetItem(arg,i);
-      vec.emplace_back(python_convertresult(item));
+      int suberror;
+      vec.emplace_back(python_convertresult(item,suberror));
+      error |= suberror;
     }
     return std::move(vec);
   } else if(PyFloat_Check(arg)) { return { PyFloat_AsDouble(arg) }; }
@@ -579,8 +581,8 @@ Value python_convertresult(PyObject *arg)
     return { str } ;
   } else if(arg == Py_None) { return Value::undefined.clone(); 
   } else {
-	  printf("tt\n");
     PyErr_SetString(PyExc_TypeError, "Unsupported function result\n");
+    error=1;
     return Value::undefined.clone();
   }
 }
@@ -589,7 +591,7 @@ Value python_convertresult(PyObject *arg)
  * Actually trying use python to evaluate a OpenSCAD Function
  */
 
-Value python_functionfunc(const FunctionCall *call,const std::shared_ptr<const Context> &cxt  )
+Value python_functionfunc(const FunctionCall *call,const std::shared_ptr<const Context> &cxt, int &error  )
 {
   const char *errorstr = nullptr;
   PyObject *funcresult = python_callfunction(cxt,call->name, call->arguments, errorstr);
@@ -600,7 +602,7 @@ Value python_functionfunc(const FunctionCall *call,const std::shared_ptr<const C
   }
   if(funcresult == nullptr) return Value::undefined.clone();
 
-  Value res = python_convertresult(funcresult);
+  Value res = python_convertresult(funcresult, error);
   Py_XDECREF(funcresult);
   return res;
 }

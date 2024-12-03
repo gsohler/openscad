@@ -23,7 +23,7 @@ python_modulefunc(const ModuleInstantiation *module,
                   std::string &error);
 
 Value python_functionfunc(const FunctionCall *call,
-                          const std::shared_ptr<const Context> &context);
+                          const std::shared_ptr<const Context> &context, int &error);
 double python_doublefunc(void *cbfunc, double arg);
 Outline2d python_getprofile(void *cbfunc, int fn, double arg);
 

@@ -39,7 +39,7 @@ double python_doublefunc(void *cbfunc, double arg);
 std::shared_ptr<AbstractNode> python_modulefunc(const ModuleInstantiation *module,const std::shared_ptr<const Context> &context, std::string &error);
 std::vector<int> python_intlistval(PyObject *list);
 
-Value python_functionfunc(const FunctionCall *call,const std::shared_ptr<const Context> &context);
+Value python_functionfunc(const FunctionCall *call,const std::shared_ptr<const Context> &context, int &error);
 int python_vectorval(PyObject *vec, int minarg, int maxarg, double *x, double *y, double *z, double *w=NULL);
 std::vector<Vector3d> python_vectors(PyObject *vec, int mindim, int maxdim);
 int python_numberval(PyObject *number, double *result);
