@@ -452,22 +452,38 @@ PyObject *python_callfunction(const std::shared_ptr<const Context> &cxt , const 
   if(!pythonMainModule){
     return nullptr;
   }
-  PyObject *maindict = PyModule_GetDict(pythonMainModule);
 
-  // search the function in all modules
-  PyObject *key, *value;
-  Py_ssize_t pos = 0;
-
-  while (PyDict_Next(maindict, &pos, &key, &value)) {
-    PyObject *module = PyObject_GetAttrString(pythonMainModule, PyUnicode_AsUTF8(key));
-    if(module != nullptr){
-      PyObject *moduledict = PyModule_GetDict(module);
-      Py_DECREF(module);
-      if(moduledict != nullptr) {
-        pFunc = PyDict_GetItemString(moduledict, name.c_str());
-        if(pFunc != nullptr) break;
+  int dotpos=name.find(".");
+  if(dotpos >= 0) {
+    std::string varname = name.substr(1,dotpos-1); // assume its always in paranthesis
+    std::string methodname = name.substr(dotpos+1,name.size()-dotpos-2);
+    Value var = cxt->lookup_variable(varname, Location::NONE).clone();
+    if(var.type() == Value::Type::PYTHONCLASS) {
+      const PythonClassType &python_class = var.toPythonClass();
+      PyObject* methodobj = PyUnicode_FromString(methodname.c_str());
+      pFunc = PyObject_GenericGetAttr((PyObject *) python_class.ptr,methodobj);
+      if(pFunc != nullptr) {
       }
     }
+  }
+  if(!pFunc) {
+    PyObject *maindict = PyModule_GetDict(pythonMainModule);
+
+    // search the function in all modules
+    PyObject *key, *value;
+    Py_ssize_t pos = 0;
+
+    while (PyDict_Next(maindict, &pos, &key, &value)) {
+      PyObject *module = PyObject_GetAttrString(pythonMainModule, PyUnicode_AsUTF8(key));
+      if(module != nullptr){
+        PyObject *moduledict = PyModule_GetDict(module);
+        Py_DECREF(module);
+        if(moduledict != nullptr) {
+          pFunc = PyDict_GetItemString(moduledict, name.c_str());
+         if(pFunc != nullptr) break;
+        } 
+      }
+    }  
   }
   if (!pFunc) {
     return nullptr;
@@ -502,7 +518,9 @@ PyObject *python_callfunction(const std::shared_ptr<const Context> &cxt , const 
     }
 
   }
+  printf("callig func with %d args\n",PyTuple_Size(args));
   PyObject* funcresult = PyObject_CallObject(pFunc, args);
+  printf("call ended\n");
   Py_XDECREF(args);
 
   if(funcresult == nullptr) {
@@ -580,11 +598,15 @@ Value python_convertresult(PyObject *arg, int &error)
     Py_XDECREF(strobj);
     return { str } ;
   } else if(arg == Py_None) { return Value::undefined.clone(); 
+  } else if(arg->ob_type->tp_base == &PyBaseObject_Type) {
+	  Py_INCREF(arg);
+	  return PythonClassType(arg);
   } else {
+    printf("unsupported type %s\n",arg->ob_type->tp_base->tp_name);	  
     PyErr_SetString(PyExc_TypeError, "Unsupported function result\n");
     error=1;
-    return Value::undefined.clone();
   }
+  return Value::undefined.clone();
 }
 
 /*
