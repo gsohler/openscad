@@ -81,7 +81,7 @@ std::shared_ptr<AbstractNode> ModuleInstantiation::evaluate(const std::shared_pt
       return nullptr;
     }
 #endif
-    if(result == nullptr) LOG(message_group::Warning, loc, context->documentRoot(), "Ignoring unknown module '%1$s'", this->name());
+//    if(result == nullptr) LOG(message_group::Warning, loc, context->documentRoot(), "Ignoring unknown module '%1$s'", this->name());
     return result;
   }
 

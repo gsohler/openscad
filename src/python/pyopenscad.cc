@@ -518,9 +518,7 @@ PyObject *python_callfunction(const std::shared_ptr<const Context> &cxt , const 
     }
 
   }
-  printf("callig func with %d args\n",PyTuple_Size(args));
   PyObject* funcresult = PyObject_CallObject(pFunc, args);
-  printf("call ended\n");
   Py_XDECREF(args);
 
   if(funcresult == nullptr) {

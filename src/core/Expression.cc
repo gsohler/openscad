@@ -473,9 +473,11 @@ boost::optional<CallableFunction> FunctionCall::evaluate_function_expression(con
   if (isLookup) {
     return context->lookup_function(name, location());
   } else {
+    auto member_expr = std::dynamic_pointer_cast<MemberLookup>(expr);
     auto v = expr->evaluate(context);
     if (v.type() == Value::Type::FUNCTION) {
       return CallableFunction{std::move(v)};
+    } else if(member_expr != nullptr){
     } else {
       LOG(message_group::Warning, loc, context->documentRoot(), "Can't call function on %1$s", v.typeName());
       return boost::none;
