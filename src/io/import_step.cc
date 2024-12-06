@@ -181,6 +181,8 @@ void import_shell(PolySetBuilder &builder, StepKernel &sk, StepKernel::Shell *sh
 		else if(combined[i] == arc_ends[2]) pos.push_back(i);
 		else if(combined[i] == arc_ends[3]) pos.push_back(i);
 	}
+	auto cyl = std::make_shared<CylinderSurface>(cyl_surf->axis->point->pt, cyl_surf->axis->dir1->pt, cyl_surf->r);
+	 builder.addSurface(cyl);
 	int bstart=pos[0];
 	int bend=pos[3];
 	while(bstart+1 < bend-1) {
@@ -255,9 +257,9 @@ std::unique_ptr<PolySet> import_step(const std::string& filename, const Location
   }
 
   auto res = builder.build();
-  printf("res has %d curves\n", res->curves.size());
-  for(int i=0;i<res->curves.size();i++) {
-    res->curves[i]->display(res->vertices);
-  }
+//  printf("res has %d curves\n", res->curves.size());
+//  for(int i=0;i<res->curves.size();i++) {
+//    res->curves[i]->display(res->vertices);
+//  }
   return res;
 } 

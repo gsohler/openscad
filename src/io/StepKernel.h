@@ -34,6 +34,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 #include <math.h>
 #include "GeometryUtils.h"
 #include <Curve.h>
+#include <Surface.h>
 
 class StepKernel
 {

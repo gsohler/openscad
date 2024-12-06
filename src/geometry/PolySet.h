@@ -5,6 +5,7 @@
 #include "geometry/GeometryUtils.h"
 #include "geometry/Polygon2d.h"
 #include "geometry/Curve.h"
+#include "geometry/Surface.h"
 #include "utils/boost-utils.h"
 
 #include <cstdint>
@@ -26,6 +27,7 @@ public:
   std::vector<int32_t> color_indices; 
   std::vector<Color4f> colors;
   std::vector<std::shared_ptr<Curve>> curves; // defines vertex connections(edges) which are not straight lines
+  std::vector<std::shared_ptr<Surface>> surfaces; // defines vertex connections(edges) which are not straight lines
 
   PolySet(unsigned int dim, boost::tribool convex = unknown);
 
