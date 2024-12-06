@@ -50,7 +50,7 @@ int CylinderSurface::pointMember(std::vector<Vector3d> &vertices, Vector3d pt) {
 	// check if on plane
 	double dist = (pt - refpt).dot(normdir);
 
-	if(fabs((pt+dist*normdir -refpt).norm() -r) > 1e-5) return 0;
+	if(fabs((pt-dist*normdir -refpt).norm() -r) > 1e-5) return 0;
 
 	return 1; 
 }

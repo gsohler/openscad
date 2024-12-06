@@ -55,7 +55,7 @@ StepKernel::EdgeCurve* StepKernel::create_line_edge_curve(StepKernel::Vertex * v
 	return new EdgeCurve(entities, vert1, vert2, surf_curve1, dir);
 }
 
-void StepKernel::build_tri_body(std::vector<Vector3d> vertices, std::vector<IndexedFace> faces, std::vector<std::shared_ptr<Curve>> curves, double tol)
+void StepKernel::build_tri_body(std::vector<Vector3d> vertices, std::vector<IndexedFace> faces,const  std::vector<std::shared_ptr<Curve>> &curves, const std::vector<std::shared_ptr<Surface>> surfaces,  double tol)
 {
 	auto point = new Point(entities, Vector3d(0.0, 0.0, 0.0));
 	auto dir_1 = new Direction(entities, Vector3d(0.0, 0.0, 1.0));
@@ -65,7 +65,7 @@ void StepKernel::build_tri_body(std::vector<Vector3d> vertices, std::vector<Inde
 	std::vector<Face*> sfaces;
 	std::map<std::tuple<double, double, double, double, double, double>, EdgeCurve*> edge_map;
 
-		// check for all points it they sit on an arc// TODO move place to be mor efficient
+	// check for all points it they sit on an arc// TODO move place to be mor efficient
 	std::vector<int> vert2curve;
 	for(int i=0;i<vertices.size();i++){
 		Vector3d pt=vertices[i];
@@ -80,6 +80,23 @@ void StepKernel::build_tri_body(std::vector<Vector3d> vertices, std::vector<Inde
 		printf("\n");
 		vert2curve.push_back(found);
 	}
+
+	// check all faces, if they are part of a special surface curve
+	for(int i=0;i<faces.size();i++) {
+          auto &face = faces[i];		
+          printf("Face %d ",i);		
+          for(int j=0;j< surfaces.size();j++) {
+           int valid=1;		  
+	   for(int k=0;valid && k<face.size();k++) {
+             if(!surfaces[j]->pointMember(vertices, vertices[face[k]])) valid=0;
+	   }
+	   if(valid) printf("(%d) ",j);
+	  }
+
+	  printf("\n");
+	}
+
+
 
 	for (std::size_t i = 0; i < faces.size() ; i++)
 	{
