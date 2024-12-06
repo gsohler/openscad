@@ -58,6 +58,30 @@ void LocalScope::print(std::ostream& stream, const std::string& indent, const bo
   }
 }
 
+void LocalScope::print_python(std::ostream& stream, const std::string& indent, const bool inlined, const bool skip_brackets) const
+{
+  for (const auto& f : this->astFunctions) {
+    f.second->print_python(stream, indent);
+  }
+  for (const auto& m : this->astModules) {
+    m.second->print_python(stream, indent);
+  }
+  for (const auto& assignment : this->assignments) {
+    assignment->print_python(stream, indent);
+  }
+  if(this->moduleInstantiations.size() == 1) {
+    this->moduleInstantiations[0]->print_python(stream, indent, inlined, skip_brackets);
+  } else {
+    if(!skip_brackets) stream << "[\n";	  
+    for (int i=0; i<this->moduleInstantiations.size();i++) {
+      if(i > 0) stream << ",\n";	    
+      this->moduleInstantiations[i]->print_python(stream, indent+"  ", inlined, skip_brackets);
+    }
+    stream << "\n";
+    if(!skip_brackets)  stream << "]";	  
+  }    
+}
+
 std::shared_ptr<AbstractNode> LocalScope::instantiateModules(const std::shared_ptr<const Context>& context, const std::shared_ptr<AbstractNode> &target) const
 {
   for (const auto& modinst : this->moduleInstantiations) {

@@ -99,6 +99,12 @@ void UnaryOp::print(std::ostream& stream, const std::string&) const
   stream << opString() << *this->expr;
 }
 
+
+void UnaryOp::print_python(std::ostream& stream, const std::string&) const
+{
+  stream << opString() << *this->expr;
+}
+
 BinaryOp::BinaryOp(Expression *left, BinaryOp::Op op, Expression *right, const Location& loc) :
   Expression(loc), op(op), left(left), right(right)
 {
@@ -169,6 +175,12 @@ void BinaryOp::print(std::ostream& stream, const std::string&) const
   stream << "(" << *this->left << " " << opString() << " " << *this->right << ")";
 }
 
+
+void BinaryOp::print_python(std::ostream& stream, const std::string&) const
+{
+  stream << "(" << *this->left << " " << opString() << " " << *this->right << ")";
+}
+
 TernaryOp::TernaryOp(Expression *cond, Expression *ifexpr, Expression *elseexpr, const Location& loc)
   : Expression(loc), cond(cond), ifexpr(ifexpr), elseexpr(elseexpr)
 {
@@ -189,6 +201,11 @@ void TernaryOp::print(std::ostream& stream, const std::string&) const
   stream << "(" << *this->cond << " ? " << *this->ifexpr << " : " << *this->elseexpr << ")";
 }
 
+void TernaryOp::print_python(std::ostream& stream, const std::string&) const
+{
+  stream << "(" << *this->cond << " ? " << *this->ifexpr << " : " << *this->elseexpr << ")";
+}
+
 ArrayLookup::ArrayLookup(Expression *array, Expression *index, const Location& loc)
   : Expression(loc), array(array), index(index)
 {
@@ -203,12 +220,22 @@ void ArrayLookup::print(std::ostream& stream, const std::string&) const
   stream << *array << "[" << *index << "]";
 }
 
+void ArrayLookup::print_python(std::ostream& stream, const std::string&) const
+{
+  stream << *array << "[" << *index << "]";
+}
+
 Value Literal::evaluate(const std::shared_ptr<const Context>&) const
 {
   return value.clone();
 }
 
 void Literal::print(std::ostream& stream, const std::string&) const
+{
+  stream << value;
+}
+
+void Literal::print_python(std::ostream& stream, const std::string&) const
 {
   stream << value;
 }
@@ -280,6 +307,14 @@ void Range::print(std::ostream& stream, const std::string&) const
   stream << "]";
 }
 
+void Range::print_python(std::ostream& stream, const std::string&) const
+{
+  stream << "[" << *this->begin;
+  if (this->step) stream << " : " << *this->step;
+  stream << " : " << *this->end;
+  stream << "]";
+}
+
 bool Range::isLiteral() const {
   return this->step ?
          begin->isLiteral() && end->isLiteral() && step->isLiteral() :
@@ -340,6 +375,16 @@ void Vector::print(std::ostream& stream, const std::string&) const
   stream << "]";
 }
 
+void Vector::print_python(std::ostream& stream, const std::string&) const
+{
+  stream << "[";
+  for (size_t i = 0; i < this->children.size(); ++i) {
+    if (i > 0) stream << ", ";
+    stream << *this->children[i];
+  }
+  stream << "]";
+}
+
 Lookup::Lookup(std::string name, const Location& loc) : Expression(loc), name(std::move(name))
 {
 }
@@ -350,6 +395,11 @@ Value Lookup::evaluate(const std::shared_ptr<const Context>& context) const
 }
 
 void Lookup::print(std::ostream& stream, const std::string&) const
+{
+  stream << this->name;
+}
+
+void Lookup::print_python(std::ostream& stream, const std::string&) const
 {
   stream << this->name;
 }
@@ -405,6 +455,11 @@ void MemberLookup::print(std::ostream& stream, const std::string&) const
   stream << *this->expr << "." << this->member;
 }
 
+void MemberLookup::print_python(std::ostream& stream, const std::string&) const
+{
+  stream << *this->expr << "." << this->member;
+}
+
 FunctionDefinition::FunctionDefinition(Expression *expr, AssignmentList parameters, const Location& loc)
   : Expression(loc), context(nullptr), parameters(std::move(parameters)), expr(expr)
 {
@@ -418,6 +473,20 @@ Value FunctionDefinition::evaluate(const std::shared_ptr<const Context>& context
 void FunctionDefinition::print(std::ostream& stream, const std::string& indent) const
 {
   stream << indent << "function(";
+  bool first = true;
+  for (const auto& parameter : parameters) {
+    stream << (first ? "" : ", ") << parameter->getName();
+    if (parameter->getExpr()) {
+      stream << " = " << *parameter->getExpr();
+    }
+    first = false;
+  }
+  stream << ") " << *this->expr;
+}
+
+void FunctionDefinition::print_python(std::ostream& stream, const std::string& indent) const
+{
+  stream << indent << "def(";
   bool first = true;
   for (const auto& parameter : parameters) {
     stream << (first ? "" : ", ") << parameter->getName();
@@ -483,6 +552,7 @@ boost::optional<CallableFunction> FunctionCall::evaluate_function_expression(con
       return boost::none;
     }
   }
+      return boost::none;
 }
 
 struct SimplifiedExpression {
@@ -620,6 +690,11 @@ void FunctionCall::print(std::ostream& stream, const std::string&) const
   stream << this->get_name() << "(" << this->arguments << ")";
 }
 
+void FunctionCall::print_python(std::ostream& stream, const std::string&) const
+{
+  stream << this->get_name() << "(" << this->arguments << ")";
+}
+
 Expression *FunctionCall::create(const std::string& funcname, const AssignmentList& arglist, Expression *expr, const Location& loc)
 {
   if (funcname == "assert") {
@@ -679,6 +754,12 @@ void Assert::print(std::ostream& stream, const std::string&) const
   if (this->expr) stream << " " << *this->expr;
 }
 
+void Assert::print_python(std::ostream& stream, const std::string&) const
+{
+  stream << "assert(" << this->arguments << ")";
+  if (this->expr) stream << " " << *this->expr;
+}
+
 Echo::Echo(AssignmentList args, Expression *expr, const Location& loc)
   : Expression(loc), arguments(std::move(args)), expr(expr)
 {
@@ -704,6 +785,12 @@ void Echo::print(std::ostream& stream, const std::string&) const
   if (this->expr) stream << " " << *this->expr;
 }
 
+void Echo::print_python(std::ostream& stream, const std::string&) const
+{
+  stream << "print(" << this->arguments << ")";
+  if (this->expr) stream << " " << *this->expr;
+}
+
 
 const Expression *Texture::evaluateStep(const std::shared_ptr<const Context>& context) const
 {
@@ -725,6 +812,12 @@ Value Texture::evaluate(const std::shared_ptr<const Context>& context) const
 }
 
 void Texture::print(std::ostream& stream, const std::string&) const
+{
+  stream << "tex2(" << this->arguments << ")";
+  if (this->expr) stream << " " << *this->expr;
+}
+
+void Texture::print_python(std::ostream& stream, const std::string&) const
 {
   stream << "tex2(" << this->arguments << ")";
   if (this->expr) stream << " " << *this->expr;
@@ -775,6 +868,11 @@ void Let::print(std::ostream& stream, const std::string&) const
   stream << "let(" << this->arguments << ") " << *expr;
 }
 
+void Let::print_python(std::ostream& stream, const std::string&) const
+{
+  stream << "let(" << this->arguments << ") " << *expr;
+}
+
 ListComprehension::ListComprehension(const Location& loc) : Expression(loc)
 {
 }
@@ -795,6 +893,14 @@ Value LcIf::evaluate(const std::shared_ptr<const Context>& context) const
 }
 
 void LcIf::print(std::ostream& stream, const std::string&) const
+{
+  stream << "if(" << *this->cond << ") (" << *this->ifexpr << ")";
+  if (this->elseexpr) {
+    stream << " else (" << *this->elseexpr << ")";
+  }
+}
+
+void LcIf::print_python(std::ostream& stream, const std::string&) const
 {
   stream << "if(" << *this->cond << ") (" << *this->ifexpr << ")";
   if (this->elseexpr) {
@@ -850,6 +956,11 @@ Value LcEach::evaluate(const std::shared_ptr<const Context>& context) const
 }
 
 void LcEach::print(std::ostream& stream, const std::string&) const
+{
+  stream << "each (" << *this->expr << ")";
+}
+
+void LcEach::print_python(std::ostream& stream, const std::string&) const
 {
   stream << "each (" << *this->expr << ")";
 }
@@ -958,6 +1069,11 @@ void LcFor::print(std::ostream& stream, const std::string&) const
   stream << "for(" << this->arguments << ") (" << *this->expr << ")";
 }
 
+void LcFor::print_python(std::ostream& stream, const std::string&) const
+{
+  stream << "for(" << this->arguments << ") (" << *this->expr << ")";
+}
+
 LcForC::LcForC(AssignmentList args, AssignmentList incrargs, Expression *cond, Expression *expr, const Location& loc)
   : ListComprehension(loc), arguments(std::move(args)), incr_arguments(std::move(incrargs)), cond(cond), expr(expr)
 {
@@ -1006,6 +1122,15 @@ void LcForC::print(std::ostream& stream, const std::string&) const
     << ") " << *this->expr;
 }
 
+void LcForC::print_python(std::ostream& stream, const std::string&) const
+{
+  stream
+    << "for(" << this->arguments
+    << ";" << *this->cond
+    << ";" << this->incr_arguments
+    << ") " << *this->expr;
+}
+
 LcLet::LcLet(AssignmentList args, Expression *expr, const Location& loc)
   : ListComprehension(loc), arguments(std::move(args)), expr(expr)
 {
@@ -1017,6 +1142,11 @@ Value LcLet::evaluate(const std::shared_ptr<const Context>& context) const
 }
 
 void LcLet::print(std::ostream& stream, const std::string&) const
+{
+  stream << "let(" << this->arguments << ") (" << *this->expr << ")";
+}
+
+void LcLet::print_python(std::ostream& stream, const std::string&) const
 {
   stream << "let(" << this->arguments << ") (" << *this->expr << ")";
 }

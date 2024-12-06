@@ -17,7 +17,9 @@ public:
     : ASTNode(loc), arguments(std::move(args)), modname(std::move(name)) { }
 
   virtual void print(std::ostream& stream, const std::string& indent, const bool inlined) const;
+  virtual void print_python(std::ostream& stream, const std::string& indent, const bool inlined, const bool skip_brackets) const;
   void print(std::ostream& stream, const std::string& indent) const override { print(stream, indent, false); }
+  void print_python(std::ostream& stream, const std::string& indent) const override { print_python(stream, indent, false, false); }
   std::shared_ptr<AbstractNode> evaluate(const std::shared_ptr<const Context>& context) const;
 
   const std::string& name() const { return this->modname; }
@@ -44,6 +46,7 @@ public:
   LocalScope *makeElseScope();
   LocalScope *getElseScope() const { return this->else_scope.get(); }
   void print(std::ostream& stream, const std::string& indent, const bool inlined) const final;
+  void print_python(std::ostream& stream, const std::string& indent, const bool inlined, const bool skip_brackets) const final;
 private:
   std::unique_ptr<LocalScope> else_scope;
 };

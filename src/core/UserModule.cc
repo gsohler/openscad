@@ -131,3 +131,23 @@ void UserModule::print(std::ostream& stream, const std::string& indent) const
     stream << indent << "}\n";
   }
 }
+
+void UserModule::print_python(std::ostream& stream, const std::string& indent) const
+{
+  std::string tab;
+  if (!this->name.empty()) {
+    stream << indent << "def " << this->name << "(";
+    for (size_t i = 0; i < this->parameters.size(); ++i) {
+      const auto& parameter = this->parameters[i];
+      if (i > 0) stream << ", ";
+      stream << parameter->getName();
+      if (parameter->getExpr()) stream << " = " << *parameter->getExpr();
+    }
+    stream << "):\n";
+    tab = "\t";
+  }
+  body.print_python(stream, indent + tab);
+//  if (!this->name.empty()) {
+//    stream << indent << "}\n";
+//  }
+}

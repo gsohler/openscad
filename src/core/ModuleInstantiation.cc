@@ -36,6 +36,41 @@ void ModuleInstantiation::print(std::ostream& stream, const std::string& indent,
   }
 }
 
+
+void ModuleInstantiation::print_python(std::ostream& stream, const std::string& indent, const bool inlined, const bool skip_brackets) const
+{
+  if (!inlined) stream << indent;
+  stream <<  modname << "(" ;
+  int n=0;
+  if(scope.numElements() > 1) {
+    scope.print_python(stream, indent + "\t", false, true);
+    n++;
+  }
+  else if(scope.numElements() == 1) {
+    scope.print_python(stream, indent + "\t", true, true);
+    n++;
+  }
+
+  for (size_t i = 0; i < this->arguments.size(); ++i) {
+    const auto& arg = this->arguments[i];
+    if (n > 0) stream << ", ";
+    if (!arg->getName().empty()) stream << arg->getName() << " = ";
+    stream << *arg->getExpr();
+    n++;
+  }
+  stream << ")" ;
+//  if (scope.numElements() == 0) {
+//    stream << ");\n";
+//  } else if (scope.numElements() == 1) {
+//    stream << ") ";
+//    scope.print_python(stream, indent, true);
+//  } else {
+//    stream << ") {\n";
+//    scope.print_python(stream, indent + "\t", false);
+//    stream << indent << "}\n";
+//  }
+}
+
 void IfElseModuleInstantiation::print(std::ostream& stream, const std::string& indent, const bool inlined) const
 {
   ModuleInstantiation::print(stream, indent, inlined);
@@ -50,6 +85,26 @@ void IfElseModuleInstantiation::print(std::ostream& stream, const std::string& i
       } else {
         stream << "{\n";
         else_scope->print(stream, indent + "\t", false);
+        stream << indent << "}\n";
+      }
+    }
+  }
+}
+
+void IfElseModuleInstantiation::print_python(std::ostream& stream, const std::string& indent, const bool inlined, const bool skip_brackets) const
+{
+  ModuleInstantiation::print(stream, indent, inlined);
+  if (else_scope) {
+    auto num_elements = else_scope->numElements();
+    if (num_elements == 0) {
+      stream << indent << "else;";
+    } else {
+      stream << indent << "else ";
+      if (num_elements == 1) {
+        else_scope->print_python(stream, indent, true);
+      } else {
+        stream << "{\n";
+        else_scope->print_python(stream, indent + "\t", false);
         stream << indent << "}\n";
       }
     }

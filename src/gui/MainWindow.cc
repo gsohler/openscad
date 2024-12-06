@@ -2845,7 +2845,7 @@ void MainWindow::actionDisplayAST()
   e->setWindowTitle("AST Dump");
   e->setReadOnly(true);
   if (root_file) {
-    e->setPlainText(QString::fromStdString(root_file->dump("")));
+    e->setPlainText(QString::fromStdString(root_file->dump_python("")));
   } else {
     e->setPlainText("No AST to dump. Please try compiling first...");
   }
