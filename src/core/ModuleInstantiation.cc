@@ -36,18 +36,17 @@ void ModuleInstantiation::print(std::ostream& stream, const std::string& indent,
   }
 }
 
-
-void ModuleInstantiation::print_python(std::ostream& stream, const std::string& indent, const bool inlined, const bool skip_brackets) const
+void ModuleInstantiation::print_python(std::ostream& stream, std::ostream& stream_def, const std::string& indent, const bool inlined, const bool skip_brackets) const
 {
   if (!inlined) stream << indent;
   stream <<  modname << "(" ;
   int n=0;
   if(scope.numElements() > 1) {
-    scope.print_python(stream, indent + "\t", false, true);
+    scope.print_python(stream, stream_def, indent + "\t", false, true);
     n++;
   }
   else if(scope.numElements() == 1) {
-    scope.print_python(stream, indent + "\t", true, true);
+    scope.print_python(stream, stream_def, indent + "\t", true, true);
     n++;
   }
 
@@ -91,7 +90,7 @@ void IfElseModuleInstantiation::print(std::ostream& stream, const std::string& i
   }
 }
 
-void IfElseModuleInstantiation::print_python(std::ostream& stream, const std::string& indent, const bool inlined, const bool skip_brackets) const
+void IfElseModuleInstantiation::print_python(std::ostream& stream, std::ostream& stream_def,  const std::string& indent, const bool inlined, const bool skip_brackets) const
 {
   ModuleInstantiation::print(stream, indent, inlined);
   if (else_scope) {
@@ -101,10 +100,10 @@ void IfElseModuleInstantiation::print_python(std::ostream& stream, const std::st
     } else {
       stream << indent << "else ";
       if (num_elements == 1) {
-        else_scope->print_python(stream, indent, true);
+        else_scope->print_python(stream, stream_def, indent, true);
       } else {
         stream << "{\n";
-        else_scope->print_python(stream, indent + "\t", false);
+        else_scope->print_python(stream, stream_def, indent + "\t", false);
         stream << indent << "}\n";
       }
     }

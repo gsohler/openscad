@@ -48,7 +48,7 @@ public:
   virtual ~ASTNode() = default;
 
   virtual void print(std::ostream& stream, const std::string& indent) const = 0;
-  virtual void print_python(std::ostream& stream, const std::string& indent) const = 0;
+  virtual void print_python(std::ostream& stream, std::ostream& stream_def, const std::string& indent) const = 0;
 
   [[nodiscard]] std::string dump(const std::string& indent) const;
   [[nodiscard]] std::string dump_python(const std::string& indent) const;

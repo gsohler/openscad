@@ -62,7 +62,7 @@ void Assignment::print(std::ostream& stream, const std::string& indent) const
   stream << indent << this->name << " = " << *this->expr << ";\n";
 }
 
-void Assignment::print_python(std::ostream& stream, const std::string& indent) const
+void Assignment::print_python(std::ostream& stream, std::ostream& stream_def, const std::string& indent) const
 {
   if (this->hasAnnotations()) {
     const Annotation *group = this->annotation("Group");

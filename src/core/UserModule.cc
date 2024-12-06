@@ -132,7 +132,7 @@ void UserModule::print(std::ostream& stream, const std::string& indent) const
   }
 }
 
-void UserModule::print_python(std::ostream& stream, const std::string& indent) const
+void UserModule::print_python(std::ostream& stream, std::ostream& stream_def, const std::string& indent) const
 {
   std::string tab;
   if (!this->name.empty()) {
@@ -146,7 +146,9 @@ void UserModule::print_python(std::ostream& stream, const std::string& indent) c
     stream << "):\n";
     tab = "\t";
   }
-  body.print_python(stream, indent + tab);
+  stream << "\treturn ";
+  body.print_python(stream, stream_def, indent + tab);
+  stream << "\n";
 //  if (!this->name.empty()) {
 //    stream << indent << "}\n";
 //  }

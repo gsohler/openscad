@@ -100,7 +100,7 @@ void UnaryOp::print(std::ostream& stream, const std::string&) const
 }
 
 
-void UnaryOp::print_python(std::ostream& stream, const std::string&) const
+void UnaryOp::print_python(std::ostream& stream, std::ostream& stream_def, const std::string&) const
 {
   stream << opString() << *this->expr;
 }
@@ -176,7 +176,7 @@ void BinaryOp::print(std::ostream& stream, const std::string&) const
 }
 
 
-void BinaryOp::print_python(std::ostream& stream, const std::string&) const
+void BinaryOp::print_python(std::ostream& stream, std::ostream& stream_def, const std::string&) const
 {
   stream << "(" << *this->left << " " << opString() << " " << *this->right << ")";
 }
@@ -201,7 +201,7 @@ void TernaryOp::print(std::ostream& stream, const std::string&) const
   stream << "(" << *this->cond << " ? " << *this->ifexpr << " : " << *this->elseexpr << ")";
 }
 
-void TernaryOp::print_python(std::ostream& stream, const std::string&) const
+void TernaryOp::print_python(std::ostream& stream, std::ostream& stream_def, const std::string&) const
 {
   stream << "(" << *this->cond << " ? " << *this->ifexpr << " : " << *this->elseexpr << ")";
 }
@@ -220,7 +220,7 @@ void ArrayLookup::print(std::ostream& stream, const std::string&) const
   stream << *array << "[" << *index << "]";
 }
 
-void ArrayLookup::print_python(std::ostream& stream, const std::string&) const
+void ArrayLookup::print_python(std::ostream& stream, std::ostream& stream_def, const std::string&) const
 {
   stream << *array << "[" << *index << "]";
 }
@@ -235,7 +235,7 @@ void Literal::print(std::ostream& stream, const std::string&) const
   stream << value;
 }
 
-void Literal::print_python(std::ostream& stream, const std::string&) const
+void Literal::print_python(std::ostream& stream, std::ostream& stream_def, const std::string&) const
 {
   stream << value;
 }
@@ -307,7 +307,7 @@ void Range::print(std::ostream& stream, const std::string&) const
   stream << "]";
 }
 
-void Range::print_python(std::ostream& stream, const std::string&) const
+void Range::print_python(std::ostream& stream, std::ostream& stream_def, const std::string&) const
 {
   stream << "[" << *this->begin;
   if (this->step) stream << " : " << *this->step;
@@ -375,7 +375,7 @@ void Vector::print(std::ostream& stream, const std::string&) const
   stream << "]";
 }
 
-void Vector::print_python(std::ostream& stream, const std::string&) const
+void Vector::print_python(std::ostream& stream, std::ostream& stream_def, const std::string&) const
 {
   stream << "[";
   for (size_t i = 0; i < this->children.size(); ++i) {
@@ -399,7 +399,7 @@ void Lookup::print(std::ostream& stream, const std::string&) const
   stream << this->name;
 }
 
-void Lookup::print_python(std::ostream& stream, const std::string&) const
+void Lookup::print_python(std::ostream& stream, std::ostream& stream_def, const std::string&) const
 {
   stream << this->name;
 }
@@ -455,7 +455,7 @@ void MemberLookup::print(std::ostream& stream, const std::string&) const
   stream << *this->expr << "." << this->member;
 }
 
-void MemberLookup::print_python(std::ostream& stream, const std::string&) const
+void MemberLookup::print_python(std::ostream& stream, std::ostream& stream_def, const std::string&) const
 {
   stream << *this->expr << "." << this->member;
 }
@@ -484,7 +484,7 @@ void FunctionDefinition::print(std::ostream& stream, const std::string& indent) 
   stream << ") " << *this->expr;
 }
 
-void FunctionDefinition::print_python(std::ostream& stream, const std::string& indent) const
+void FunctionDefinition::print_python(std::ostream& stream, std::ostream& stream_def, const std::string& indent) const
 {
   stream << indent << "def(";
   bool first = true;
@@ -690,7 +690,7 @@ void FunctionCall::print(std::ostream& stream, const std::string&) const
   stream << this->get_name() << "(" << this->arguments << ")";
 }
 
-void FunctionCall::print_python(std::ostream& stream, const std::string&) const
+void FunctionCall::print_python(std::ostream& stream, std::ostream& stream_def, const std::string&) const
 {
   stream << this->get_name() << "(" << this->arguments << ")";
 }
@@ -754,7 +754,7 @@ void Assert::print(std::ostream& stream, const std::string&) const
   if (this->expr) stream << " " << *this->expr;
 }
 
-void Assert::print_python(std::ostream& stream, const std::string&) const
+void Assert::print_python(std::ostream& stream, std::ostream& stream_def, const std::string&) const
 {
   stream << "assert(" << this->arguments << ")";
   if (this->expr) stream << " " << *this->expr;
@@ -785,7 +785,7 @@ void Echo::print(std::ostream& stream, const std::string&) const
   if (this->expr) stream << " " << *this->expr;
 }
 
-void Echo::print_python(std::ostream& stream, const std::string&) const
+void Echo::print_python(std::ostream& stream, std::ostream& stream_def, const std::string&) const
 {
   stream << "print(" << this->arguments << ")";
   if (this->expr) stream << " " << *this->expr;
@@ -817,7 +817,7 @@ void Texture::print(std::ostream& stream, const std::string&) const
   if (this->expr) stream << " " << *this->expr;
 }
 
-void Texture::print_python(std::ostream& stream, const std::string&) const
+void Texture::print_python(std::ostream& stream, std::ostream& stream_def,  const std::string&) const
 {
   stream << "tex2(" << this->arguments << ")";
   if (this->expr) stream << " " << *this->expr;
@@ -868,7 +868,7 @@ void Let::print(std::ostream& stream, const std::string&) const
   stream << "let(" << this->arguments << ") " << *expr;
 }
 
-void Let::print_python(std::ostream& stream, const std::string&) const
+void Let::print_python(std::ostream& stream, std::ostream& stream_def, const std::string&) const
 {
   stream << "let(" << this->arguments << ") " << *expr;
 }
@@ -900,7 +900,7 @@ void LcIf::print(std::ostream& stream, const std::string&) const
   }
 }
 
-void LcIf::print_python(std::ostream& stream, const std::string&) const
+void LcIf::print_python(std::ostream& stream, std::ostream& stream_def, const std::string&) const
 {
   stream << "if(" << *this->cond << ") (" << *this->ifexpr << ")";
   if (this->elseexpr) {
@@ -960,7 +960,7 @@ void LcEach::print(std::ostream& stream, const std::string&) const
   stream << "each (" << *this->expr << ")";
 }
 
-void LcEach::print_python(std::ostream& stream, const std::string&) const
+void LcEach::print_python(std::ostream& stream, std::ostream& stream_def, const std::string&) const
 {
   stream << "each (" << *this->expr << ")";
 }
@@ -1069,7 +1069,7 @@ void LcFor::print(std::ostream& stream, const std::string&) const
   stream << "for(" << this->arguments << ") (" << *this->expr << ")";
 }
 
-void LcFor::print_python(std::ostream& stream, const std::string&) const
+void LcFor::print_python(std::ostream& stream, std::ostream& stream_def, const std::string&) const
 {
   stream << "for(" << this->arguments << ") (" << *this->expr << ")";
 }
@@ -1122,7 +1122,7 @@ void LcForC::print(std::ostream& stream, const std::string&) const
     << ") " << *this->expr;
 }
 
-void LcForC::print_python(std::ostream& stream, const std::string&) const
+void LcForC::print_python(std::ostream& stream, std::ostream& stream_def, const std::string&) const
 {
   stream
     << "for(" << this->arguments
@@ -1146,7 +1146,7 @@ void LcLet::print(std::ostream& stream, const std::string&) const
   stream << "let(" << this->arguments << ") (" << *this->expr << ")";
 }
 
-void LcLet::print_python(std::ostream& stream, const std::string&) const
+void LcLet::print_python(std::ostream& stream, std::ostream& stream_def,const std::string&) const
 {
   stream << "let(" << this->arguments << ") (" << *this->expr << ")";
 }

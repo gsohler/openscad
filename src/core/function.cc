@@ -64,7 +64,7 @@ void UserFunction::print(std::ostream& stream, const std::string& indent) const
   stream << ") = " << *expr << ";\n";
 }
 
-void UserFunction::print_python(std::ostream& stream, const std::string& indent) const
+void UserFunction::print_python(std::ostream& stream, std::ostream& stream_def, const std::string& indent) const
 {
   stream << indent << "function " << name << "(";
   for (size_t i = 0; i < parameters.size(); ++i) {

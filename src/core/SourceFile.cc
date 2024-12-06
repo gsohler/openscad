@@ -62,9 +62,9 @@ void SourceFile::print(std::ostream& stream, const std::string& indent) const
   scope.print(stream, indent);
 }
 
-void SourceFile::print_python(std::ostream& stream, const std::string& indent) const
+void SourceFile::print_python(std::ostream& stream, std::ostream& stream_def, const std::string& indent) const
 {
-  scope.print_python(stream, indent);
+  scope.print_python(stream, stream_def, indent);
 }
 
 void SourceFile::registerUse(const std::string& path, const Location& loc)

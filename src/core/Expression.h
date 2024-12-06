@@ -34,7 +34,7 @@ public:
   UnaryOp(Op op, Expression *expr, const Location& loc);
   [[nodiscard]] Value evaluate(const std::shared_ptr<const Context>& context) const override;
   void print(std::ostream& stream, const std::string& indent) const override;
-  void print_python(std::ostream& stream, const std::string& indent) const override;
+  void print_python(std::ostream& stream, std::ostream& stream_def, const std::string& indent) const override;
 
 private:
   [[nodiscard]] const char *opString() const;
@@ -66,7 +66,7 @@ public:
   BinaryOp(Expression *left, Op op, Expression *right, const Location& loc);
   [[nodiscard]] Value evaluate(const std::shared_ptr<const Context>& context) const override;
   void print(std::ostream& stream, const std::string& indent) const override;
-  void print_python(std::ostream& stream, const std::string& indent) const override;
+  void print_python(std::ostream& stream, std::ostream& stream_def, const std::string& indent) const override;
 
 private:
   [[nodiscard]] const char *opString() const;
@@ -83,7 +83,7 @@ public:
   [[nodiscard]] const Expression *evaluateStep(const std::shared_ptr<const Context>& context) const;
   [[nodiscard]] Value evaluate(const std::shared_ptr<const Context>& context) const override;
   void print(std::ostream& stream, const std::string& indent) const override;
-  void print_python(std::ostream& stream, const std::string& indent) const override;
+  void print_python(std::ostream& stream, std::ostream& stream_def, const std::string& indent) const override;
 private:
   std::shared_ptr<Expression> cond;
   std::shared_ptr<Expression> ifexpr;
@@ -96,7 +96,7 @@ public:
   ArrayLookup(Expression *array, Expression *index, const Location& loc);
   [[nodiscard]] Value evaluate(const std::shared_ptr<const Context>& context) const override;
   void print(std::ostream& stream, const std::string& indent) const override;
-  void print_python(std::ostream& stream, const std::string& indent) const override;
+  void print_python(std::ostream& stream, std::ostream& stream_def, const std::string& indent) const override;
 private:
   std::shared_ptr<Expression> array;
   std::shared_ptr<Expression> index;
@@ -117,7 +117,7 @@ public:
 
   [[nodiscard]] Value evaluate(const std::shared_ptr<const Context>& context) const override;
   void print(std::ostream& stream, const std::string& indent) const override;
-  void print_python(std::ostream& stream, const std::string& indent) const override;
+  void print_python(std::ostream& stream, std::ostream& stream_def, const std::string& indent) const override;
   [[nodiscard]] bool isLiteral() const override { return true; }
 private:
   const Value value;
@@ -133,7 +133,7 @@ public:
   [[nodiscard]] const Expression *getEnd() const { return end.get(); }
   [[nodiscard]] Value evaluate(const std::shared_ptr<const Context>& context) const override;
   void print(std::ostream& stream, const std::string& indent) const override;
-  void print_python(std::ostream& stream, const std::string& indent) const override;
+  void print_python(std::ostream& stream, std::ostream& stream_def, const std::string& indent) const override;
   [[nodiscard]] bool isLiteral() const override;
 private:
   std::shared_ptr<Expression> begin;
@@ -148,7 +148,7 @@ public:
   const std::vector<std::shared_ptr<Expression>>& getChildren() const { return children; }
   Value evaluate(const std::shared_ptr<const Context>& context) const override;
   void print(std::ostream& stream, const std::string& indent) const override;
-  void print_python(std::ostream& stream, const std::string& indent) const override;
+  void print_python(std::ostream& stream, std::ostream& stream_def, const std::string& indent) const override;
   void emplace_back(Expression *expr);
   bool isLiteral() const override;
 private:
@@ -162,7 +162,7 @@ public:
   Lookup(std::string name, const Location& loc);
   [[nodiscard]] Value evaluate(const std::shared_ptr<const Context>& context) const override;
   void print(std::ostream& stream, const std::string& indent) const override;
-  void print_python(std::ostream& stream, const std::string& indent) const override;
+  void print_python(std::ostream& stream, std::ostream& stream_def, const std::string& indent) const override;
   [[nodiscard]] const std::string& get_name() const { return name; }
 private:
   std::string name;
@@ -174,7 +174,7 @@ public:
   MemberLookup(Expression *expr, std::string member, const Location& loc);
   [[nodiscard]] Value evaluate(const std::shared_ptr<const Context>& context) const override;
   void print(std::ostream& stream, const std::string& indent) const override;
-  void print_python(std::ostream& stream, const std::string& indent) const override;
+  void print_python(std::ostream& stream, std::ostream& stream_def, const std::string& indent) const override;
 private:
   std::shared_ptr<Expression> expr;
   std::string member;
@@ -187,7 +187,7 @@ public:
   [[nodiscard]] boost::optional<CallableFunction> evaluate_function_expression(const std::shared_ptr<const Context>& context) const;
   [[nodiscard]] Value evaluate(const std::shared_ptr<const Context>& context) const override;
   void print(std::ostream& stream, const std::string& indent) const override;
-  void print_python(std::ostream& stream, const std::string& indent) const override;
+  void print_python(std::ostream& stream, std::ostream& stream_def, const std::string& indent) const override;
   [[nodiscard]] const std::string& get_name() const { return name; }
   static Expression *create(const std::string& funcname, const AssignmentList& arglist, Expression *expr, const Location& loc);
 public:
@@ -203,7 +203,7 @@ public:
   FunctionDefinition(Expression *expr, AssignmentList parameters, const Location& loc);
   [[nodiscard]] Value evaluate(const std::shared_ptr<const Context>& context) const override;
   void print(std::ostream& stream, const std::string& indent) const override;
-  void print_python(std::ostream& stream, const std::string& indent) const override;
+  void print_python(std::ostream& stream, std::ostream& stream_def, const std::string& indent) const override;
 public:
   std::shared_ptr<const Context> context;
   AssignmentList parameters;
@@ -218,7 +218,7 @@ public:
   [[nodiscard]] const Expression *evaluateStep(const std::shared_ptr<const Context>& context) const;
   [[nodiscard]] Value evaluate(const std::shared_ptr<const Context>& context) const override;
   void print(std::ostream& stream, const std::string& indent) const override;
-  void print_python(std::ostream& stream, const std::string& indent) const override;
+  void print_python(std::ostream& stream, std::ostream& stream_def, const std::string& indent) const override;
 private:
   AssignmentList arguments;
   std::shared_ptr<Expression> expr;
@@ -231,7 +231,7 @@ public:
   [[nodiscard]] const Expression *evaluateStep(const std::shared_ptr<const Context>& context) const;
   [[nodiscard]] Value evaluate(const std::shared_ptr<const Context>& context) const override;
   void print(std::ostream& stream, const std::string& indent) const override;
-  void print_python(std::ostream& stream, const std::string& indent) const override;
+  void print_python(std::ostream& stream, std::ostream& stream_def, const std::string& indent) const override;
 private:
   AssignmentList arguments;
   std::shared_ptr<Expression> expr;
@@ -244,7 +244,7 @@ public:
   [[nodiscard]] const Expression *evaluateStep(const std::shared_ptr<const Context>& context) const;
   [[nodiscard]] Value evaluate(const std::shared_ptr<const Context>& context) const override;
   void print(std::ostream& stream, const std::string& indent) const override;
-  void print_python(std::ostream& stream, const std::string& indent) const override;
+  void print_python(std::ostream& stream, std::ostream& stream_def, const std::string& indent) const override;
 private:
   AssignmentList arguments;
   std::shared_ptr<Expression> expr;
@@ -258,7 +258,7 @@ public:
   const Expression *evaluateStep(ContextHandle<Context>& targetContext) const;
   [[nodiscard]] Value evaluate(const std::shared_ptr<const Context>& context) const override;
   void print(std::ostream& stream, const std::string& indent) const override;
-  void print_python(std::ostream& stream, const std::string& indent) const override;
+  void print_python(std::ostream& stream, std::ostream& stream_def, const std::string& indent) const override;
 private:
   AssignmentList arguments;
   std::shared_ptr<Expression> expr;
@@ -276,7 +276,7 @@ public:
   LcIf(Expression *cond, Expression *ifexpr, Expression *elseexpr, const Location& loc);
   [[nodiscard]] Value evaluate(const std::shared_ptr<const Context>& context) const override;
   void print(std::ostream& stream, const std::string& indent) const override;
-  void print_python(std::ostream& stream, const std::string& indent) const override;
+  void print_python(std::ostream& stream, std::ostream& stream_def, const std::string& indent) const override;
 private:
   std::shared_ptr<Expression> cond;
   std::shared_ptr<Expression> ifexpr;
@@ -290,7 +290,7 @@ public:
   static void forEach(const AssignmentList& assignments, const Location& loc, const std::shared_ptr<const Context>& context, const std::function<void(const std::shared_ptr<const Context>&)>& operation, const std::function<void(size_t)>* pReserve = nullptr);
   [[nodiscard]] Value evaluate(const std::shared_ptr<const Context>& context) const override;
   void print(std::ostream& stream, const std::string& indent) const override;
-  void print_python(std::ostream& stream, const std::string& indent) const override;
+  void print_python(std::ostream& stream, std::ostream& stream_def, const std::string& indent) const override;
 private:
   AssignmentList arguments;
   std::shared_ptr<Expression> expr;
@@ -302,7 +302,7 @@ public:
   LcForC(AssignmentList args, AssignmentList incrargs, Expression *cond, Expression *expr, const Location& loc);
   [[nodiscard]] Value evaluate(const std::shared_ptr<const Context>& context) const override;
   void print(std::ostream& stream, const std::string& indent) const override;
-  void print_python(std::ostream& stream, const std::string& indent) const override;
+  void print_python(std::ostream& stream, std::ostream& stream_def, const std::string& indent) const override;
 private:
   AssignmentList arguments;
   AssignmentList incr_arguments;
@@ -316,7 +316,7 @@ public:
   LcEach(Expression *expr, const Location& loc);
   [[nodiscard]] Value evaluate(const std::shared_ptr<const Context>& context) const override;
   void print(std::ostream& stream, const std::string& indent) const override;
-  void print_python(std::ostream& stream, const std::string& indent) const override;
+  void print_python(std::ostream& stream, std::ostream& stream_def, const std::string& indent) const override;
 private:
   Value evalRecur(Value&& v, const std::shared_ptr<const Context>& context) const;
   std::shared_ptr<Expression> expr;
@@ -328,7 +328,7 @@ public:
   LcLet(AssignmentList args, Expression *expr, const Location& loc);
   [[nodiscard]] Value evaluate(const std::shared_ptr<const Context>& context) const override;
   void print(std::ostream& stream, const std::string& indent) const override;
-  void print_python(std::ostream& stream, const std::string& indent) const override;
+  void print_python(std::ostream& stream, std::ostream& stream_def, const std::string& indent) const override;
 private:
   AssignmentList arguments;
   std::shared_ptr<Expression> expr;
