@@ -66,12 +66,12 @@ void UserFunction::print(std::ostream& stream, const std::string& indent) const
 
 void UserFunction::print_python(std::ostream& stream, std::ostream& stream_def, const std::string& indent) const
 {
-  stream << indent << "function " << name << "(";
+  stream << indent << "def " << name << "(";
   for (size_t i = 0; i < parameters.size(); ++i) {
     const auto& parameter = parameters[i];
     if (i > 0) stream << ", ";
     stream << parameter->getName();
     if (parameter->getExpr()) stream << " = " << *parameter->getExpr();
   }
-  stream << ") = " << *expr << ";\n";
+  stream << "):\n\treturn " << *expr << "\n\n";
 }

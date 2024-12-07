@@ -146,9 +146,9 @@ void UserModule::print_python(std::ostream& stream, std::ostream& stream_def, co
     stream << "):\n";
     tab = "\t";
   }
-  stream << "\treturn ";
-  body.print_python(stream, stream_def, indent + tab);
-  stream << "\n";
+//  stream << "\t";
+  body.print_python(stream, stream_def, indent + tab,false, 1);
+  stream << "\n\n";
 //  if (!this->name.empty()) {
 //    stream << indent << "}\n";
 //  }
