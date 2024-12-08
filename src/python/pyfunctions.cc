@@ -35,6 +35,8 @@
 #include "SourceFile.h"
 #include "BuiltinContext.h"
 #include <PolySetBuilder.h>
+#include <UserModule.h>
+
 extern bool parse(SourceFile *& file, const std::string& text, const std::string& filename, const std::string& mainFile, int debug);
 
 #include <src/python/pydata.h>
@@ -3804,15 +3806,15 @@ PyObject *python_nimport(PyObject *self, PyObject *args, PyObject *kwargs)
 }
 
 PyObject *python_str(PyObject *self) {
-	char str[40];
+  char str[40];
   PyObject *dummydict;	  
-	auto node=PyOpenSCADObjectToNode(self, &dummydict);
-	if(*str != '\0')
-		sprintf(str,"OpenSCAD (%d)",(int) node->index());
-	else
-		sprintf(str,"Invalid OpenSCAD Object");
+  std::shared_ptr<AbstractNode> node=PyOpenSCADObjectToNode(self, &dummydict);
+  if(node != nullptr)
+    sprintf(str,"OpenSCAD (%d)",(int) node->index());
+  else
+    sprintf(str,"Invalid OpenSCAD Object");
 
-	return PyUnicode_FromStringAndSize(str,strlen(str));
+  return PyUnicode_FromStringAndSize(str,strlen(str));
 }
 
 PyObject *python_add_parameter(PyObject *self, PyObject *args, PyObject *kwargs, ImportType type)
@@ -3877,6 +3879,7 @@ PyObject *python_add_parameter(PyObject *self, PyObject *args, PyObject *kwargs,
   return Py_None;
 }
 
+std::vector<std::shared_ptr<const Context>> global_save;
 PyObject *python_scad(PyObject *self, PyObject *args, PyObject *kwargs)
 {
   DECLARE_INSTANCE
@@ -3895,46 +3898,68 @@ PyObject *python_scad(PyObject *self, PyObject *args, PyObject *kwargs)
     return Py_None;
   }
 
-  EvaluationSession session{"python"};
-  ContextHandle<BuiltinContext> builtin_context{Context::create<BuiltinContext>(&session)};
+  EvaluationSession *session = new EvaluationSession("python");
+  ContextHandle<BuiltinContext> ch = Context::create<BuiltinContext>(session);
+  ContextHandle<BuiltinContext> builtin_context{std::move(ch)};
   std::shared_ptr<const FileContext> file_context;
   std::shared_ptr<AbstractNode> resultnode = parsed_file->instantiate(*builtin_context, &file_context);
-  delete parsed_file;
+//  delete parsed_file;
   return PyOpenSCADObjectFromNode(&PyOpenSCADType,resultnode);
 }
 
-PyObject *python_use(PyObject *self, PyObject *args, PyObject *kwargs)
+  std::shared_ptr<const FileContext> file_context=nullptr;
+
+PyObject *python_osinclude(PyObject *self, PyObject *args, PyObject *kwargs)
 {
   DECLARE_INSTANCE
+  auto empty = std::make_shared<CubeNode>(instance);
   char *kwlist[] = {"file", NULL};
   const char *file = NULL;
+  char code[40];
   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s", kwlist,
                                    &file
                                    )) {
-    PyErr_SetString(PyExc_TypeError, "Error during parsing osuse(path)");
+    PyErr_SetString(PyExc_TypeError, "Error during parsing osinclude(path)");
     return NULL;
   }
+  printf("file=%s\n",file);
   const std::string filename = lookup_file(file, ".",".");
-  SourceFile *source_file = new SourceFile(".","."); // filename, filename);
-  source_file->registerUse(std::string(filename), Location::NONE);
-  source_file->handleDependencies(true);
-  EvaluationSession session{"."};
+  printf("a\n");
+  sprintf(code,"include <%s>\n",filename.c_str());
 
-  ContextHandle<BuiltinContext> c_handle{Context::create<BuiltinContext>(&session)};
-  std::shared_ptr<const BuiltinContext> cxt = *c_handle;
+  SourceFile *parsed_file = NULL;
+  if(!parse(parsed_file, code, "python", "python", false)) {
+    PyErr_SetString(PyExc_TypeError, "Error in SCAD code");
+    return Py_None;
+  }
+//  parsed_file->registerInclude(std::string(filename), std::string(filename), Location::NONE);
+//  parsed_file->handleDependencies(true);
 
-  ContextHandle<FileContext> fc_handle{Context::create<FileContext>(cxt, source_file)};
-  std::shared_ptr<const FileContext> file_cxt = *fc_handle;
- 
-  auto namelist = file_cxt->list_local_modules();
+
+  EvaluationSession *session = new EvaluationSession("python");
+  ContextHandle<BuiltinContext> *builtin_context = new ContextHandle<BuiltinContext>(Context::create<BuiltinContext>(session));
+  std::shared_ptr<AbstractNode> resultnode = parsed_file->instantiate(**builtin_context, &file_context);
+  global_save.push_back(file_context->get_shared_ptr());
+  LocalScope scope = parsed_file->scope;
+  printf("modules are %d\n",scope.modules.size());
+  printf("functions are %d\n",scope.functions.size());
+  printf("assignments are %d\n",scope.assignments.size());
+
+
+//  auto namelist = file_cxt->list_local_modules();
   PyObject *dict;
   dict = PyDict_New();
-  std::shared_ptr<AbstractNode> empty;
   PyOpenSCADObject *result = (PyOpenSCADObject *) PyOpenSCADObjectFromNode(&PyOpenSCADType, empty); 
 
-  for(std::string name: namelist) {
-    boost::optional<InstantiableModule> mod = file_cxt->lookup_local_module(name, Location::NONE);
-    PyDict_SetItemString(result->dict, name.c_str(),PyDataObjectFromModule(&PyDataType, mod) );
+  for(auto mod : parsed_file->scope.modules) {
+    printf("%s\n",mod.first.c_str());
+    std::shared_ptr<UserModule> usmod = mod.second;
+    printf("mod is %p\n",usmod);
+    InstantiableModule m;
+    m.defining_context=file_context;
+    m.module=mod.second.get();
+    boost::optional<InstantiableModule> res(m);
+    PyDict_SetItemString(result->dict, mod.first.c_str(),PyDataObjectFromModule(&PyDataType, res ));
   }
   return (PyObject *) result;
 
@@ -4092,7 +4117,7 @@ PyMethodDef PyOpenSCADFunctions[] = {
   {"render", (PyCFunction) python_render, METH_VARARGS | METH_KEYWORDS, "Render Object."},
   {"osimport", (PyCFunction) python_import, METH_VARARGS | METH_KEYWORDS, "Import Object."},
   {"nimport", (PyCFunction) python_nimport, METH_VARARGS | METH_KEYWORDS, "Import Networked Object."},
-  {"osuse", (PyCFunction) python_use, METH_VARARGS | METH_KEYWORDS, "Import OpenSCAD Library."},
+  {"osinclude", (PyCFunction) python_osinclude, METH_VARARGS | METH_KEYWORDS, "Import OpenSCAD Library."},
   {"version", (PyCFunction) python_version, METH_VARARGS | METH_KEYWORDS, "Output openscad Version."},
   {"version_num", (PyCFunction) python_version_num, METH_VARARGS | METH_KEYWORDS, "Output openscad Version."},
   {"add_parameter", (PyCFunction) python_add_parameter, METH_VARARGS | METH_KEYWORDS, "Add Parameter for Customizer."},

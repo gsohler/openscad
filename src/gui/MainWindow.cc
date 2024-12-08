@@ -199,7 +199,7 @@ int curl_download(std::string url, std::string path)
           std::filesystem::rename(path+"_", path);	      
 	}catch(const std::exception& ex)
         {
-	  std::cerr << ex.what() << endl;
+	  std::cerr << ex.what() << std::endl;
           LOG(message_group::Error, "Exception during installing file!");
         }  
       } else {

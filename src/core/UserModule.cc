@@ -82,6 +82,7 @@ std::shared_ptr<AbstractNode> UserModule::instantiate(const std::shared_ptr<cons
 {
   if (StackCheck::inst().check()) {
     print_err(inst->name(), loc, context);
+    printf("throw2a\n");
     throw RecursionException::create("module", inst->name(), loc);
     return nullptr;
   }
@@ -103,6 +104,7 @@ std::shared_ptr<AbstractNode> UserModule::instantiate(const std::shared_ptr<cons
   try{
     ret = this->body.instantiateModules(*module_context, std::make_shared<GroupNode>(inst, std::string("module ") + this->name));
   } catch (EvaluationException& e) {
+    printf("throw2\n");
     if (OpenSCAD::traceUsermoduleParameters && e.traceDepth > 0) {
       print_trace(this, *module_context, this->parameters);
       e.traceDepth--;

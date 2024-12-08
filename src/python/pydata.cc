@@ -320,6 +320,12 @@ PyObject *python_lv_negate(PyObject *arg) { return  Py_None; }
 extern PyTypeObject PyOpenSCADType;
 Value python_convertresult(PyObject *arg, int &error);
 
+#include <UserModule.h>
+#include <ScopeContext.h>
+
+extern std::shared_ptr<const Context> global_save;
+extern std::shared_ptr<const FileContext> file_context;
+
 PyObject *PyDataObject_call(PyObject *self, PyObject *args, PyObject *kwargs)
 {
 //  printf("Call %d\n",PyTuple_Size(args));
@@ -333,15 +339,32 @@ PyObject *PyDataObject_call(PyObject *self, PyObject *args, PyObject *kwargs)
   }
 
   boost::optional<InstantiableModule> mod =PyDataObjectToModule(self);
-  std::string instance_name; 
-  ModuleInstantiation *instance = new ModuleInstantiation(instance_name,pargs, Location::NONE);
+  std::string instance_name;
+  const UserModule *usermod = dynamic_cast<const UserModule*>(mod->module);
+  if(usermod != nullptr) {
+	instance_name=usermod->name;
+  }
+  ModuleInstantiation *modinst = new ModuleInstantiation(instance_name,pargs, Location::NONE);
 
   EvaluationSession session{"."};
-  ContextHandle<BuiltinContext> c_handle{Context::create<BuiltinContext>(&session)};
-  std::shared_ptr<const BuiltinContext> cxt = *c_handle;
+  ContextHandle<BuiltinContext> cxt{Context::create<BuiltinContext>(&session)};
 
-  auto resultnode = mod->module->instantiate(cxt, instance, cxt);
+  if(file_context != nullptr) {
+   const Value &val = file_context->lookup_variable(std::string("h"), Location::NONE);
+   if(val.isUndefined()) printf("UNDEF\n"); else printf("DEF\n");
+  }
+
+//  ContextHandle<FileContext> file_context{Context::create<FileContext>(cxt, source_file)};
+//    *resulting_file_context = *file_context;
+
+
+//  mod->defining_context 
+//  auto resultnode = mod->module->instantiate(file_context, modinst, *cxt);
+   auto resultnode=modinst->evaluate(file_context);
+   printf("resultnode is %p\n",resultnode);
   return PyOpenSCADObjectFromNode(&PyOpenSCADType, resultnode);
+//  
+//  return nullptr;
 }
 
 PyNumberMethods PyDataNumbers =
