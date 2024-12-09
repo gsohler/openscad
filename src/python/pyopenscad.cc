@@ -448,13 +448,18 @@ double python_doublefunc(void *v_cbfunc, double arg)
  */
 PyObject *python_fromopenscad(Value val)
 {	
+    printf("FromOpenscad\n");	
     switch(val.type())
     {
+      case Value::Type::UNDEFINED:
+	return Py_None;
+      case Value::Type::BOOL:
+	return val.toBool()?Py_True:Py_False;
       case Value::Type::NUMBER:
 	return  PyFloat_FromDouble(val.toDouble());
       case Value::Type::STRING:
 	return PyUnicode_FromString(val.toString().c_str());
-//TODO  more types RANGE, VECTOR, OBEJCT, FUNCTION
+//TODO  more types RANGE, VECTOR, OBJECT, FUNCTION
       default:
 	return Py_None;
     }
