@@ -53,6 +53,7 @@ bool pythonRuntimeInitialized = false;
 std::vector<std::string> mapping_name;
 std::vector<std::string> mapping_code;
 std::vector<int> mapping_level;
+std::shared_ptr<const FileContext> osinclude_context = nullptr;
 
 
 void PyOpenSCADObject_dealloc(PyOpenSCADObject *self)

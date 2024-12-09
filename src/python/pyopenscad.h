@@ -4,6 +4,8 @@
 #include "node.h"
 #include <geometry/Polygon2d.h>
 #include "src/core/function.h"
+#include "src/core/ScopeContext.h"
+#include "src/core/UserModule.h"
 
 #pragma GCC diagnostic ignored "-Wwrite-strings"
 
@@ -50,6 +52,7 @@ void python_build_hashmap(const std::shared_ptr<AbstractNode> &node);
 extern std::vector<std::string> mapping_name;
 extern std::vector<std::string> mapping_code;
 extern std::vector<int> mapping_level;
+extern std::shared_ptr<const FileContext> osinclude_context; // for osinclude and calling lib functions
 
 PyObject *python_str(PyObject *self);
 

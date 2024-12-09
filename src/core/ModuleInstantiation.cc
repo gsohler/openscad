@@ -85,11 +85,11 @@ std::shared_ptr<AbstractNode> ModuleInstantiation::evaluate(const std::shared_pt
     return result;
   }
 
-  printf("throw1\n");
   try{
     auto node = module->module->instantiate(module->defining_context, this, context);
     return node;
   } catch (EvaluationException& e) {
+  printf("throw1\n");
     if (e.traceDepth > 0) {
       print_trace(this, context);
       e.traceDepth--;

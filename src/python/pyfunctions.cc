@@ -35,8 +35,6 @@
 #include "SourceFile.h"
 #include "BuiltinContext.h"
 #include <PolySetBuilder.h>
-#include <UserModule.h>
-
 extern bool parse(SourceFile *& file, const std::string& text, const std::string& filename, const std::string& mainFile, int debug);
 
 #include <src/python/pydata.h>
@@ -3879,7 +3877,6 @@ PyObject *python_add_parameter(PyObject *self, PyObject *args, PyObject *kwargs,
   return Py_None;
 }
 
-std::vector<std::shared_ptr<const Context>> global_save;
 PyObject *python_scad(PyObject *self, PyObject *args, PyObject *kwargs)
 {
   DECLARE_INSTANCE
@@ -3898,16 +3895,13 @@ PyObject *python_scad(PyObject *self, PyObject *args, PyObject *kwargs)
     return Py_None;
   }
 
-  EvaluationSession *session = new EvaluationSession("python");
-  ContextHandle<BuiltinContext> ch = Context::create<BuiltinContext>(session);
-  ContextHandle<BuiltinContext> builtin_context{std::move(ch)};
+  EvaluationSession session{"python"};
+  ContextHandle<BuiltinContext> builtin_context{Context::create<BuiltinContext>(&session)};
   std::shared_ptr<const FileContext> file_context;
   std::shared_ptr<AbstractNode> resultnode = parsed_file->instantiate(*builtin_context, &file_context);
-//  delete parsed_file;
+  delete parsed_file;
   return PyOpenSCADObjectFromNode(&PyOpenSCADType,resultnode);
 }
-
-  std::shared_ptr<const FileContext> file_context=nullptr;
 
 PyObject *python_osinclude(PyObject *self, PyObject *args, PyObject *kwargs)
 {
@@ -3922,9 +3916,7 @@ PyObject *python_osinclude(PyObject *self, PyObject *args, PyObject *kwargs)
     PyErr_SetString(PyExc_TypeError, "Error during parsing osinclude(path)");
     return NULL;
   }
-  printf("file=%s\n",file);
   const std::string filename = lookup_file(file, ".",".");
-  printf("a\n");
   sprintf(code,"include <%s>\n",filename.c_str());
 
   SourceFile *parsed_file = NULL;
@@ -3935,28 +3927,21 @@ PyObject *python_osinclude(PyObject *self, PyObject *args, PyObject *kwargs)
 //  parsed_file->registerInclude(std::string(filename), std::string(filename), Location::NONE);
 //  parsed_file->handleDependencies(true);
 
-
   EvaluationSession *session = new EvaluationSession("python");
-  ContextHandle<BuiltinContext> *builtin_context = new ContextHandle<BuiltinContext>(Context::create<BuiltinContext>(session));
-  std::shared_ptr<AbstractNode> resultnode = parsed_file->instantiate(**builtin_context, &file_context);
-  global_save.push_back(file_context->get_shared_ptr());
+  ContextHandle<BuiltinContext> builtin_context{Context::create<BuiltinContext>(session)};
+
+  std::shared_ptr<AbstractNode> resultnode = parsed_file->instantiate(*builtin_context, &osinclude_context);
   LocalScope scope = parsed_file->scope;
-  printf("modules are %d\n",scope.modules.size());
-  printf("functions are %d\n",scope.functions.size());
-  printf("assignments are %d\n",scope.assignments.size());
-
-
-//  auto namelist = file_cxt->list_local_modules();
   PyObject *dict;
   dict = PyDict_New();
   PyOpenSCADObject *result = (PyOpenSCADObject *) PyOpenSCADObjectFromNode(&PyOpenSCADType, empty); 
 
   for(auto mod : parsed_file->scope.modules) {
-    printf("%s\n",mod.first.c_str());
+//    printf("%s\n",mod.first.c_str());
     std::shared_ptr<UserModule> usmod = mod.second;
-    printf("mod is %p\n",usmod);
+//    printf("mod is %p\n",usmod);
     InstantiableModule m;
-    m.defining_context=file_context;
+    m.defining_context=osinclude_context;
     m.module=mod.second.get();
     boost::optional<InstantiableModule> res(m);
     PyDict_SetItemString(result->dict, mod.first.c_str(),PyDataObjectFromModule(&PyDataType, res ));
