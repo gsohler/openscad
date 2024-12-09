@@ -3936,16 +3936,35 @@ PyObject *python_osinclude(PyObject *self, PyObject *args, PyObject *kwargs)
   dict = PyDict_New();
   PyOpenSCADObject *result = (PyOpenSCADObject *) PyOpenSCADObjectFromNode(&PyOpenSCADType, empty); 
 
-  for(auto mod : parsed_file->scope.modules) {
-//    printf("%s\n",mod.first.c_str());
+  for(auto mod : parsed_file->scope.modules) { // copy modules
     std::shared_ptr<UserModule> usmod = mod.second;
-//    printf("mod is %p\n",usmod);
     InstantiableModule m;
     m.defining_context=osinclude_context;
     m.module=mod.second.get();
     boost::optional<InstantiableModule> res(m);
     PyDict_SetItemString(result->dict, mod.first.c_str(),PyDataObjectFromModule(&PyDataType, res ));
   }
+
+ for(auto fun : parsed_file->scope.functions) { // copy functions
+    std::shared_ptr<UserFunction> usfunc = fun.second; // install lambda functions ?
+//    printf("%s\n",fun.first.c_str());
+//    InstantiableModule m;
+//    m.defining_context=osinclude_context;
+//    m.module=mod.second.get();
+//    boost::optional<InstantiableModule> res(m);
+//    PyDict_SetItemString(result->dict, mod.first.c_str(),PyDataObjectFromModule(&PyDataType, res ));
+  }
+
+  for(auto ass : parsed_file->scope.assignments) { // copy assignments
+    const std::shared_ptr<Expression> expr = ass->getExpr();
+    Value val = expr->evaluate(osinclude_context);
+    if(val.isDefined()) {
+      PyObject *res= python_fromopenscad(std::move(val));
+      PyDict_SetItemString(result->dict, ass->getName().c_str(),res);
+    }
+  }
+
+
   return (PyObject *) result;
 
 }

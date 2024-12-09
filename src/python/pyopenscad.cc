@@ -446,6 +446,20 @@ double python_doublefunc(void *v_cbfunc, double arg)
 /*
  * Try to call a python function by name using OpenSCAD module childs and OpenSCAD function arguments: argument order is childs, arguments
  */
+PyObject *python_fromopenscad(Value val)
+{	
+    switch(val.type())
+    {
+      case Value::Type::NUMBER:
+	return  PyFloat_FromDouble(val.toDouble());
+      case Value::Type::STRING:
+	return PyUnicode_FromString(val.toString().c_str());
+//TODO  more types RANGE, VECTOR, OBEJCT, FUNCTION
+      default:
+	return Py_None;
+    }
+    return Py_None;
+}
 
 PyObject *python_callfunction(const std::shared_ptr<const Context> &cxt , const std::string &name, const std::vector<std::shared_ptr<Assignment> > &op_args, const char *&errorstr)
 {
@@ -499,21 +513,7 @@ PyObject *python_callfunction(const std::shared_ptr<const Context> &cxt , const 
     Assignment *op_arg=op_args[i].get();
 
     std::shared_ptr<Expression> expr=op_arg->getExpr();
-    Value val = expr.get()->evaluate(cxt);
-    PyObject *value=nullptr;
-    switch(val.type())
-    {
-      case Value::Type::NUMBER:
-	value =  PyFloat_FromDouble(val.toDouble());
-        break;
-      case Value::Type::STRING:
-	value = PyUnicode_FromString(val.toString().c_str());
-        break;
-//TODO  more types RANGE, VECTOR, OBEJCT, FUNCTION
-      default:
-	value= PyLong_FromLong(-1);
-        break;
-    }
+    PyObject *value= python_fromopenscad( expr.get()->evaluate(cxt));
     if(value != nullptr) {
       PyTuple_SetItem(args, i, value);
     }
