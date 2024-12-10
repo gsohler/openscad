@@ -448,7 +448,6 @@ double python_doublefunc(void *v_cbfunc, double arg)
  */
 PyObject *python_fromopenscad(Value val)
 {	
-    printf("FromOpenscad\n");	
     switch(val.type())
     {
       case Value::Type::UNDEFINED:

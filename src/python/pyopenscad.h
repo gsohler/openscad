@@ -54,7 +54,7 @@ PyObject *python_fromopenscad(Value val);
 extern std::vector<std::string> mapping_name;
 extern std::vector<std::string> mapping_code;
 extern std::vector<int> mapping_level;
-extern std::shared_ptr<const FileContext> osinclude_context; // for osinclude and calling lib functions
+extern SourceFile *osinclude_source;
 
 PyObject *python_str(PyObject *self);
 

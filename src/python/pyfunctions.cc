@@ -3903,6 +3903,7 @@ PyObject *python_scad(PyObject *self, PyObject *args, PyObject *kwargs)
   return PyOpenSCADObjectFromNode(&PyOpenSCADType,resultnode);
 }
 
+SourceFile *osinclude_source;
 PyObject *python_osinclude(PyObject *self, PyObject *args, PyObject *kwargs)
 {
   DECLARE_INSTANCE
@@ -3919,33 +3920,32 @@ PyObject *python_osinclude(PyObject *self, PyObject *args, PyObject *kwargs)
   const std::string filename = lookup_file(file, ".",".");
   sprintf(code,"include <%s>\n",filename.c_str());
 
-  SourceFile *parsed_file = NULL;
-  if(!parse(parsed_file, code, "python", "python", false)) {
+  if(!parse(osinclude_source, code, "python", "python", false)) {
     PyErr_SetString(PyExc_TypeError, "Error in SCAD code");
     return Py_None;
   }
-//  parsed_file->registerInclude(std::string(filename), std::string(filename), Location::NONE);
-//  parsed_file->handleDependencies(true);
 
   EvaluationSession *session = new EvaluationSession("python");
   ContextHandle<BuiltinContext> builtin_context{Context::create<BuiltinContext>(session)};
 
-  std::shared_ptr<AbstractNode> resultnode = parsed_file->instantiate(*builtin_context, &osinclude_context);
-  LocalScope scope = parsed_file->scope;
+  std::shared_ptr<const FileContext> osinclude_context;
+  std::shared_ptr<AbstractNode> resultnode = osinclude_source->instantiate(*builtin_context, &osinclude_context); // TODO keine globakle var, kollision!
+
+  LocalScope scope = osinclude_source->scope;
   PyObject *dict;
   dict = PyDict_New();
   PyOpenSCADObject *result = (PyOpenSCADObject *) PyOpenSCADObjectFromNode(&PyOpenSCADType, empty); 
 
-  for(auto mod : parsed_file->scope.modules) { // copy modules
+  for(auto mod : osinclude_source->scope.modules) { // copy modules
     std::shared_ptr<UserModule> usmod = mod.second;
     InstantiableModule m;
-    m.defining_context=osinclude_context;
+//    m.defining_context=osinclude_context;
     m.module=mod.second.get();
     boost::optional<InstantiableModule> res(m);
     PyDict_SetItemString(result->dict, mod.first.c_str(),PyDataObjectFromModule(&PyDataType, res ));
   }
 
- for(auto fun : parsed_file->scope.functions) { // copy functions
+ for(auto fun : osinclude_source->scope.functions) { // copy functions
     std::shared_ptr<UserFunction> usfunc = fun.second; // install lambda functions ?
 //    printf("%s\n",fun.first.c_str());
 //    InstantiableModule m;
@@ -3955,7 +3955,8 @@ PyObject *python_osinclude(PyObject *self, PyObject *args, PyObject *kwargs)
 //    PyDict_SetItemString(result->dict, mod.first.c_str(),PyDataObjectFromModule(&PyDataType, res ));
   }
 
-  for(auto ass : parsed_file->scope.assignments) { // copy assignments
+  for(auto ass : osinclude_source->scope.assignments) { // copy assignments
+//    printf("Var %s\n",ass->getName().c_str());						   
     const std::shared_ptr<Expression> expr = ass->getExpr();
     Value val = expr->evaluate(osinclude_context);
     if(val.isDefined()) {

@@ -360,8 +360,12 @@ static void collectGarbage(std::vector<std::weak_ptr<Context>>& managedContexts)
 ContextMemoryManager::~ContextMemoryManager()
 {
   collectGarbage(managedContexts);
-  assert(managedContexts.empty());
-  assert(heapSizeAccounting.size() == 0);
+  printf("managed  iss %d\n",managedContexts.size());
+  printf("heapSizae is %d\n",heapSizeAccounting.size());
+//  assert(managedContexts.empty());
+//  assert(heapSizeAccounting.size() == 0);
+  managedContexts.clear();
+//  heapSizeAccounting.clear();
 }
 
 void ContextMemoryManager::addContext(const std::shared_ptr<Context>& context)

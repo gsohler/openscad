@@ -317,7 +317,6 @@ PyObject *python_lv_divide(PyObject *arg1, PyObject *arg2) { return  Py_None; }
 PyObject *python_lv_negate(PyObject *arg) { return  Py_None; }
 #endif
 
-extern PyTypeObject PyOpenSCADType;
 Value python_convertresult(PyObject *arg, int &error);
 
 PyObject *PyDataObject_call(PyObject *self, PyObject *args, PyObject *kwargs)
@@ -336,11 +335,16 @@ PyObject *PyDataObject_call(PyObject *self, PyObject *args, PyObject *kwargs)
   std::string instance_name;
   const UserModule *usermod = dynamic_cast<const UserModule*>(mod->module);
   if(usermod != nullptr) instance_name=usermod->name;
+  std::shared_ptr<ModuleInstantiation> modinst = std::make_shared<ModuleInstantiation>(instance_name,pargs, Location::NONE);
 
-  ModuleInstantiation *modinst = new ModuleInstantiation(instance_name,pargs, Location::NONE);
-
-  if(osinclude_context == nullptr) return nullptr; 
-  auto resultnode = modinst->evaluate(osinclude_context); // TODO warum geht nicht dedining_context
+  if(osinclude_source == nullptr) return nullptr;
+  std::shared_ptr<const FileContext> dummy_context;
+  EvaluationSession session{"python"};
+  ContextHandle<BuiltinContext> builtin_context{Context::create<BuiltinContext>(&session)};
+  osinclude_source->scope.moduleInstantiations.clear();
+  osinclude_source->scope.moduleInstantiations.push_back(modinst);
+  std::shared_ptr<AbstractNode> resultnode = osinclude_source->instantiate(*builtin_context, &dummy_context);  // <- hier macht das problem
+  delete osinclude_source;
   return PyOpenSCADObjectFromNode(&PyOpenSCADType, resultnode);
 }
 
