@@ -358,6 +358,7 @@ PyObject *PyDataObject_call(PyObject *self, PyObject *args, PyObject *kwargs)
     PyErr_SetString(PyExc_TypeError, "Error in SCAD code");
     return Py_None;
   }
+  source->handleDependencies(true);
 
   EvaluationSession session{"python"};
   ContextHandle<BuiltinContext> builtin_context{Context::create<BuiltinContext>(&session)};
@@ -366,7 +367,7 @@ PyObject *PyDataObject_call(PyObject *self, PyObject *args, PyObject *kwargs)
   source->scope.moduleInstantiations.push_back(modinst);
   std::shared_ptr<AbstractNode> resultnode = source->instantiate(*builtin_context, &dummy_context);  // <- hier macht das problem
 
-  delete osinclude_source;
+  delete source;
   auto result = PyOpenSCADObjectFromNode(&PyOpenSCADType, resultnode);
   return result;
 }
