@@ -33,32 +33,36 @@ static PyObject *PyDataObject_new(PyTypeObject *type, PyObject *args,  PyObject 
   return (PyObject *)self;
 }
 
-PyObject *PyDataObjectFromModule(PyTypeObject *type, boost::optional<InstantiableModule> mod)
+PyObject *PyDataObjectFromModule(PyTypeObject *type, std::string modulepath, std::string modulename)
 {
+  std::string result = modulepath+"|"+modulename;	
   PyDataObject *res;
   res = (PyDataObject *)  type->tp_alloc(type, 0);
   if (res != NULL) {
     res->data_type = DATA_TYPE_SCADMODULE;
-    res->data = (void *) mod->module;
+    res->data = (void *) strdup(result.c_str()); // TODO memory leak!
     Py_XINCREF(res);
     return (PyObject *)res;
   }
   return Py_None;
 }
 
-boost::optional<InstantiableModule> PyDataObjectToModule(PyObject *obj)
+void PyDataObjectToModule(PyObject *obj, std::string &modulepath, std::string &modulename)
 {
   if(obj != NULL && obj->ob_type == &PyDataType) {
     PyDataObject * dataobj = (PyDataObject *) obj;
     if(dataobj->data_type == DATA_TYPE_SCADMODULE) {
-     InstantiableModule m;
-     m.module=(AbstractModule *)  dataobj->data;
-     boost::optional<InstantiableModule> res(m);
-     return res;
+
+    	   
+     std::string result((char *)dataobj->data);
+     int sep=result.find("|");
+     if(sep >= 0) {
+       modulepath=result.substr(0,sep);
+       modulename=result.substr(sep+1);       
+     }
+
     }
   }
-  boost::optional<InstantiableModule> res;
-  return res;
 }
 
 
@@ -319,33 +323,52 @@ PyObject *python_lv_negate(PyObject *arg) { return  Py_None; }
 
 Value python_convertresult(PyObject *arg, int &error);
 
+extern bool parse(SourceFile *& file, const std::string& text, const std::string& filename, const std::string& mainFile, int debug);
 PyObject *PyDataObject_call(PyObject *self, PyObject *args, PyObject *kwargs)
 {
-//  printf("Call %d\n",PyTuple_Size(args));
   AssignmentList pargs;
+  std::vector<std::shared_ptr<AbstractNode>> children;
   int error;
   for(int i=0;i<PyTuple_Size(args);i++) {
-    Value val = python_convertresult(PyTuple_GetItem(args,i),error);	  
-    std::shared_ptr<Literal> lit = std::make_shared<Literal>(std::move(val), Location::NONE);
-    std::shared_ptr<Assignment> ass  = std::make_shared<Assignment>(std::string(""),lit);
-    pargs.push_back(ass);
+    PyObject *arg = 	PyTuple_GetItem(args,i);  
+    if(Py_TYPE(arg) == &PyOpenSCADType) {
+	std::shared_ptr<AbstractNode> child = ((PyOpenSCADObject *) arg)->node;
+	children.push_back(child);
+    } else {
+      Value val = python_convertresult(arg,error);	  
+      std::shared_ptr<Literal> lit = std::make_shared<Literal>(std::move(val), Location::NONE);
+      std::shared_ptr<Assignment> ass  = std::make_shared<Assignment>(std::string(""),lit);
+      pargs.push_back(ass);
+    }  
   }
 
-  boost::optional<InstantiableModule> mod =PyDataObjectToModule(self);
-  std::string instance_name;
-  const UserModule *usermod = dynamic_cast<const UserModule*>(mod->module);
-  if(usermod != nullptr) instance_name=usermod->name;
-  std::shared_ptr<ModuleInstantiation> modinst = std::make_shared<ModuleInstantiation>(instance_name,pargs, Location::NONE);
+  std::string modulepath, modulename;
+  PyDataObjectToModule(self,modulepath, modulename);
 
-  if(osinclude_source == nullptr) return nullptr;
-  std::shared_ptr<const FileContext> dummy_context;
+  std::shared_ptr<ModuleInstantiation> modinst = std::make_shared<ModuleInstantiation>(modulename,pargs, Location::NONE);
+  for(auto child : children) {
+    std::shared_ptr<ModuleInstantiation> childmod = std::make_shared<ModuleInstantiation>(*child->modinst);	  
+    modinst->scope.moduleInstantiations.push_back(childmod);	  
+  }
+  char code[100];
+  sprintf(code,"include <%s>\n",modulepath.c_str());
+
+  SourceFile *source;
+  if(!parse(source, code, "python", "python", false)) {
+    PyErr_SetString(PyExc_TypeError, "Error in SCAD code");
+    return Py_None;
+  }
+
   EvaluationSession session{"python"};
   ContextHandle<BuiltinContext> builtin_context{Context::create<BuiltinContext>(&session)};
-  osinclude_source->scope.moduleInstantiations.clear();
-  osinclude_source->scope.moduleInstantiations.push_back(modinst);
-  std::shared_ptr<AbstractNode> resultnode = osinclude_source->instantiate(*builtin_context, &dummy_context);  // <- hier macht das problem
+  std::shared_ptr<const FileContext> dummy_context;
+  source->scope.moduleInstantiations.clear();
+  source->scope.moduleInstantiations.push_back(modinst);
+  std::shared_ptr<AbstractNode> resultnode = source->instantiate(*builtin_context, &dummy_context);  // <- hier macht das problem
+
   delete osinclude_source;
-  return PyOpenSCADObjectFromNode(&PyOpenSCADType, resultnode);
+  auto result = PyOpenSCADObjectFromNode(&PyOpenSCADType, resultnode);
+  return result;
 }
 
 PyNumberMethods PyDataNumbers =

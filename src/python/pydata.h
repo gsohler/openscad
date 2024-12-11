@@ -29,7 +29,7 @@ PyObject *PyDataObjectFromTree(PyTypeObject *type, const std::vector<libfive::Tr
 std::vector<libfive::Tree *> PyDataObjectToTree(PyObject *object);
 #endif
 
-PyObject *PyDataObjectFromModule(PyTypeObject *type, boost::optional<InstantiableModule> mod);
-boost::optional<InstantiableModule> PyDataObjectToModule(PyObject *obj);
+PyObject *PyDataObjectFromModule(PyTypeObject *type, std::string modulepath, std::string modulename);
+void PyDataObjectToModule(PyObject *obj, std::string &modulepath, std::string &modulename);
 
 

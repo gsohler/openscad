@@ -3940,9 +3940,9 @@ PyObject *python_osinclude(PyObject *self, PyObject *args, PyObject *kwargs)
     std::shared_ptr<UserModule> usmod = mod.second;
     InstantiableModule m;
 //    m.defining_context=osinclude_context;
-    m.module=mod.second.get();
-    boost::optional<InstantiableModule> res(m);
-    PyDict_SetItemString(result->dict, mod.first.c_str(),PyDataObjectFromModule(&PyDataType, res ));
+//    m.module=mod.second.get();
+//    boost::optional<InstantiableModule> res(m);
+    PyDict_SetItemString(result->dict, mod.first.c_str(),PyDataObjectFromModule(&PyDataType, filename, mod.first ));
   }
 
  for(auto fun : osinclude_source->scope.functions) { // copy functions
