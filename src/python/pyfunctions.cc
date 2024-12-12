@@ -1603,6 +1603,7 @@ PyObject *python_output_core(PyObject *obj)
     PyErr_SetString(PyExc_TypeError, "Invalid type for Object in output");
     return NULL;
   }
+  // TODO fix or clean tag_highlight here
   PyObject *key, *value;
   Py_ssize_t pos = 0;
   python_result_node = child;
@@ -1610,7 +1611,7 @@ PyObject *python_output_core(PyObject *obj)
   mapping_name.clear();
   mapping_code.clear();
   mapping_level.clear();
-  python_build_hashmap(child);
+  python_build_hashmap(child,0);
   python_result_handle.clear();
   Matrix4d raw;
   SelectedObject sel;

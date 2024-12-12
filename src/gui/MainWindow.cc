@@ -2175,7 +2175,7 @@ void MainWindow::parseTopLevelDocument()
     this->activeEditor->resetHighlighting();
     if (this->root_file != nullptr) {
       //add parameters as annotation in AST
-      auto error = evaluatePython(fulltext_py);
+      auto error = evaluatePython(fulltext_py,true); // run dummy
       this->root_file->scope.assignments=customizer_parameters;
       CommentParser::collectParameters(fulltext_py, this->root_file, '#');  // add annotations
       this->activeEditor->parameterWidget->setParameters(this->root_file, "\n"); // set widgets values

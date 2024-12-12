@@ -326,6 +326,7 @@ Value python_convertresult(PyObject *arg, int &error);
 extern bool parse(SourceFile *& file, const std::string& text, const std::string& filename, const std::string& mainFile, int debug);
 PyObject *PyDataObject_call(PyObject *self, PyObject *args, PyObject *kwargs)
 {
+  if(pythonDryRun) return Py_None;	
   AssignmentList pargs;
   std::vector<std::shared_ptr<AbstractNode>> children;
   int error;

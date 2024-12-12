@@ -42,6 +42,7 @@ PyObject *pythonMainModule = nullptr ;
 std::list<std::string> pythonInventory;
 AssignmentList customizer_parameters;
 AssignmentList customizer_parameters_finished;
+bool pythonDryRun=false;
 std::shared_ptr<AbstractNode> python_result_node = nullptr; /* global result veriable containing the python created result */
 std::vector<SelectedObject> python_result_handle;
 bool python_active;  /* if python is actually used during evaluation */
@@ -188,26 +189,27 @@ std::shared_ptr<AbstractNode> PyOpenSCADObjectToNodeMulti(PyObject *objs,PyObjec
   return result;
 }
 
-std::string python_hierdump(const std::shared_ptr<AbstractNode> &node)
+void  python_hierdump(std::ostringstream &stream, const std::shared_ptr<AbstractNode> &node)
 {
-  std::string dump = node->toString();	
+  stream <<  node->toString();	
   auto children = node->getChildren();
-  if(children.size() < 1) dump += ";";
-  else if(children.size() < 2) dump += python_hierdump(children[0]);
+  if(children.size() < 1) stream << ";";
+  else if(children.size() < 2)  python_hierdump(stream, children[0]);
   else {
-   dump += "{ ";	  
-   for(unsigned int i=0;i<children.size();i++) dump += python_hierdump(children[i]);
-   dump += " }";	  
+   stream <<  "{ ";	  
+   for(unsigned int i=0;i<children.size();i++) python_hierdump(stream, children[i]);
+   stream << " }";	  
   }
-
-  return dump;
 }
-void python_build_hashmap(const std::shared_ptr<AbstractNode> &node)
+void python_build_hashmap(const std::shared_ptr<AbstractNode> &node, int level)
 {
+	
   PyObject *maindict = PyModule_GetDict(pythonMainModule);
   PyObject *key, *value;
   Py_ssize_t pos = 0;
-  std::string code=python_hierdump(node);
+  std::ostringstream stream;
+  python_hierdump(stream, node);
+  std::string code = stream.str();
   while (PyDict_Next(maindict, &pos, &key, &value)) {
     if(value->ob_type != &PyOpenSCADType) continue;
     std::shared_ptr<AbstractNode> testnode = ((PyOpenSCADObject *) value)->node;
@@ -219,17 +221,21 @@ void python_build_hashmap(const std::shared_ptr<AbstractNode> &node)
     mapping_name.push_back(key_str);
     mapping_code.push_back(code);
     mapping_level.push_back(pos);
-  }  
-  for(const auto &child:node->getChildren()) {
-    python_build_hashmap(child);	  
   }
+  if(level < 5) { // no  many level are unclear and error prone(overwrites memory)
+    for(const auto &child:node->getChildren()) {
+      python_build_hashmap(child,level+1);	  
+    }
+  }  
 }
 
 void python_retrieve_pyname(const std::shared_ptr<AbstractNode> &node)
 {
   std::string name;	
   int level=-1;
-  std::string my_code = python_hierdump(node);
+  std::ostringstream stream;
+  python_hierdump(stream, node);
+  std::string my_code = stream.str();
   for(unsigned int i=0;i<mapping_code.size();i++) {
     if(mapping_code[i] == my_code) {
       if(level == -1 || level > mapping_level[i]) {	    
@@ -743,7 +749,7 @@ void finishPython(void)
 #endif
 }
 
-std::string evaluatePython(const std::string & code)
+std::string evaluatePython(const std::string & code, bool dry_run)
 {
   std::string error;
   python_result_node = nullptr;
@@ -752,6 +758,7 @@ std::string evaluatePython(const std::string & code)
   PyObject *pyExcValue = nullptr;
   PyObject *pyExcTraceback = nullptr;
   /* special python code to catch errors from stdout and stderr and make them available in OpenSCAD console */
+  pythonDryRun=dry_run;
   if(!pythonMainModuleInitialized)
 	  return "Python not initialized";
   const char *python_init_code="\
