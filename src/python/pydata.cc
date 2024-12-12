@@ -342,6 +342,19 @@ PyObject *PyDataObject_call(PyObject *self, PyObject *args, PyObject *kwargs)
       pargs.push_back(ass);
     }  
   }
+  if(kwargs != nullptr) {
+    PyObject *key, *value;
+    Py_ssize_t pos = 0;
+    while (PyDict_Next(kwargs, &pos, &key, &value)) {
+      PyObject* value1 = PyUnicode_AsEncodedString(key, "utf-8", "~");
+      const char *value_str =  PyBytes_AS_STRING(value1);
+      Value val = python_convertresult(value,error);	  
+      std::shared_ptr<Literal> lit = std::make_shared<Literal>(std::move(val), Location::NONE);
+      std::shared_ptr<Assignment> ass  = std::make_shared<Assignment>(std::string(value_str),lit);
+      pargs.push_back(ass);
+    }       
+  }
+
 
   std::string modulepath, modulename;
   PyDataObjectToModule(self,modulepath, modulename);
