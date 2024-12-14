@@ -11,6 +11,10 @@
 #include "Expression.h"
 #include "pyopenscad.h"
 
+#include "../src/geometry/GeometryEvaluator.h"
+#include "core/Tree.h"
+#include <PolySet.h>
+#include <PolySetUtils.h>
 #ifdef ENABLE_LIBFIVE
 #include <libfive/tree/opcode.hpp>
 #endif
@@ -327,14 +331,51 @@ extern bool parse(SourceFile *& file, const std::string& text, const std::string
 PyObject *PyDataObject_call(PyObject *self, PyObject *args, PyObject *kwargs)
 {
   if(pythonDryRun) return Py_None;	
+  std::string modulepath, modulename;
+  PyDataObjectToModule(self,modulepath, modulename);
   AssignmentList pargs;
-  std::vector<std::shared_ptr<AbstractNode>> children;
+  std::vector<std::shared_ptr<ModuleInstantiation>> modinsts;
   int error;
   for(int i=0;i<PyTuple_Size(args);i++) {
     PyObject *arg = 	PyTuple_GetItem(args,i);  
     if(Py_TYPE(arg) == &PyOpenSCADType) {
 	std::shared_ptr<AbstractNode> child = ((PyOpenSCADObject *) arg)->node;
-	children.push_back(child);
+	Tree tree(child, "");
+	GeometryEvaluator geomevaluator(tree);
+	std::shared_ptr<const Geometry> geom = geomevaluator.evaluateGeometry(*tree.root(), true);
+	std::shared_ptr<const PolySet> ps = PolySetUtils::getGeometryAsPolySet(geom);
+	if(ps != nullptr) {
+
+          // prepare vertices		
+	  auto vecs3d = std::make_shared<Vector>(Location::NONE);
+          for(auto vertex: ps->vertices) {
+	    auto vec3d = new Vector(Location::NONE);
+            vec3d->emplace_back( new  Literal(vertex[0], Location::NONE));
+            vec3d->emplace_back( new  Literal(vertex[1], Location::NONE));
+            vec3d->emplace_back( new  Literal(vertex[2], Location::NONE));
+            
+	    vecs3d->emplace_back( vec3d);
+	  }
+          std::shared_ptr<Assignment>  ass_pts= std::make_shared<Assignment>(std::string("points"),vecs3d);
+
+          // prepare indices		
+	  auto inds3d = std::make_shared<Vector>(Location::NONE);
+          for(auto face: ps->indices) {
+	    auto ind3d = new Vector(Location::NONE);
+	    for (auto it = face.crbegin(); it != face.crend(); ++it) {
+              ind3d->emplace_back( new  Literal(*it, Location::NONE));
+            }
+	    inds3d->emplace_back( ind3d);
+	  }
+          std::shared_ptr<Assignment>  ass_faces=std::make_shared<Assignment>(std::string("faces"),inds3d);
+
+	  AssignmentList poly_asslist;
+          poly_asslist.push_back(ass_pts);
+          poly_asslist.push_back(ass_faces);
+
+          auto poly_modinst = std::make_shared<ModuleInstantiation>("polyhedron",poly_asslist, Location::NONE);
+          modinsts.push_back(poly_modinst);	  
+	}
     } else {
       Value val = python_convertresult(arg,error);	  
       std::shared_ptr<Literal> lit = std::make_shared<Literal>(std::move(val), Location::NONE);
@@ -355,15 +396,9 @@ PyObject *PyDataObject_call(PyObject *self, PyObject *args, PyObject *kwargs)
     }       
   }
 
+  std::shared_ptr<ModuleInstantiation> modinst = std::make_shared<ModuleInstantiation>(modulename ,pargs, Location::NONE);
+   modinst->scope.moduleInstantiations = modinsts;
 
-  std::string modulepath, modulename;
-  PyDataObjectToModule(self,modulepath, modulename);
-
-  std::shared_ptr<ModuleInstantiation> modinst = std::make_shared<ModuleInstantiation>(modulename,pargs, Location::NONE);
-  for(auto child : children) {
-    std::shared_ptr<ModuleInstantiation> childmod = std::make_shared<ModuleInstantiation>(*child->modinst);	  
-    modinst->scope.moduleInstantiations.push_back(childmod);	  
-  }
   char code[100];
   sprintf(code,"include <%s>\n",modulepath.c_str());
 

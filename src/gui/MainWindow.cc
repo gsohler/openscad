@@ -1477,7 +1477,7 @@ void MainWindow::instantiateRoot()
         this->root_node = this->absolute_root_node;
       }
       if (nextLocation) {
-        LOG(message_group::NONE, *nextLocation, builtin_context->documentRoot(), "More than one Root Modifier (!)");
+//        LOG(message_group::NONE, *nextLocation, builtin_context->documentRoot(), "More than one Root Modifier (!)"); TODO activate
       }
 
       // FIXME: Consider giving away ownership of root_node to the Tree, or use reference counted pointers
