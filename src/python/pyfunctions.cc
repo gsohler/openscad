@@ -3911,7 +3911,7 @@ PyObject *python_osinclude(PyObject *self, PyObject *args, PyObject *kwargs)
   auto empty = std::make_shared<CubeNode>(instance);
   char *kwlist[] = {"file", NULL};
   const char *file = NULL;
-  char code[40];
+  char code[200];
   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s", kwlist,
                                    &file
                                    )) {

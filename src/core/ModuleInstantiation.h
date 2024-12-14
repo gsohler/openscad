@@ -17,7 +17,7 @@ public:
     : ASTNode(loc), arguments(std::move(args)), modname(std::move(name)) { }
 
   ModuleInstantiation(const ModuleInstantiation &ref)
-    : ASTNode(ref.loc), arguments(ref.arguments), modname(ref.modname) { }
+    : ASTNode(ref.loc), arguments(std::move(ref.arguments)), modname(std::move(ref.modname)) { }
 
   virtual void print(std::ostream& stream, const std::string& indent, const bool inlined) const;
   void print(std::ostream& stream, const std::string& indent) const override { print(stream, indent, false); }

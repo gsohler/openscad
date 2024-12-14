@@ -419,7 +419,7 @@ PyObject *PyDataObject_call(PyObject *self, PyObject *args, PyObject *kwargs)
   source->scope.moduleInstantiations.push_back(modinst);
   std::shared_ptr<AbstractNode> resultnode = source->instantiate(*builtin_context, &dummy_context);  // <- hier macht das problem
 
-  delete source;
+//  delete source;
   auto result = PyOpenSCADObjectFromNode(&PyOpenSCADType, resultnode);
   return result;
 }
