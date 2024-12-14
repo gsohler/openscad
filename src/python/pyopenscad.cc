@@ -542,13 +542,7 @@ PyObject *python_callfunction(const std::shared_ptr<const Context> &cxt , const 
     if(pyExcTraceback != nullptr) Py_XDECREF(pyExcTraceback);
 
     if(pyExcValue != nullptr){
-      PyObject* str_exc_value = PyObject_Repr(pyExcValue);
-      PyObject* pyExcValueStr = PyUnicode_AsEncodedString(str_exc_value, "utf-8", "~");
-      Py_XDECREF(str_exc_value);
-      errorstr =  PyBytes_AS_STRING(pyExcValueStr);
-      PyErr_SetString(PyExc_TypeError, errorstr);
-      Py_XDECREF(pyExcValueStr);
-      Py_XDECREF(pyExcValue);
+      errorstr =  PyBytes_AS_STRING(pyExcValue);
     }
 
     return nullptr;
@@ -599,12 +593,7 @@ Value python_convertresult(PyObject *arg, int &error)
   } else if(PyFloat_Check(arg)) { return { PyFloat_AsDouble(arg) }; }
   else if(PyLong_Check(arg))  { return { (double) PyLong_AsLong(arg) }; }
   else if(PyUnicode_Check(arg)) {
-    PyObject* repr = PyObject_Repr(arg);
-    PyObject* strobj = PyUnicode_AsEncodedString(repr, "utf-8", "~");
-    Py_XDECREF(repr);
-    const char *chars =  PyBytes_AS_STRING(strobj);
-    auto str = std::string(chars);
-    Py_XDECREF(strobj);
+    auto str = std::string(PyUnicode_AsUTF8(arg));
     return { str } ;
   } else if(arg == Py_None) { return Value::undefined.clone(); 
   } else if(arg->ob_type->tp_base == &PyBaseObject_Type) {
@@ -815,12 +804,8 @@ sys.stderr = stderr_bak\n\
     PyErr_Fetch(&pyExcType, &pyExcValue, &pyExcTraceback); /* extract actual python stack trace in case of an expception and return the error string to the caller */
     if(pyExcType != nullptr) Py_XDECREF(pyExcType);
     if(pyExcValue != nullptr) {
-      PyObject* str_exc_value = PyObject_Repr(pyExcValue);
-      if(pyExcValue != nullptr) Py_XDECREF(pyExcValue);
-      PyObject* pyExcValueStr = PyUnicode_AsEncodedString(str_exc_value, "utf-8", "~");
-      const char *strExcValue =  PyBytes_AS_STRING(pyExcValueStr);
-      if(strExcValue != nullptr && strcmp(strExcValue,"<NULL>") != 0) error += strExcValue;
-      if(str_exc_value != nullptr) Py_XDECREF(str_exc_value);
+      auto strExcValue = std::string(PyUnicode_AsUTF8(pyExcValue));
+      error += strExcValue;
     }
     if(pyExcTraceback != nullptr) {
       auto *tb_o = (PyTracebackObject *)pyExcTraceback;
