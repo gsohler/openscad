@@ -388,10 +388,13 @@ PyObject *PyDataObject_call(PyObject *self, PyObject *args, PyObject *kwargs)
     Py_ssize_t pos = 0;
     while (PyDict_Next(kwargs, &pos, &key, &value)) {
       PyObject* value1 = PyUnicode_AsEncodedString(key, "utf-8", "~");
-      const char *value_str =  PyBytes_AS_STRING(value1);
+      std::string value_str =  PyBytes_AS_STRING(value1);
+      if(value_str == "fn") value_str="$fn";
+      if(value_str == "fa") value_str="$fa";
+      if(value_str == "fs") value_str="$fs";
       Value val = python_convertresult(value,error);	  
       std::shared_ptr<Literal> lit = std::make_shared<Literal>(std::move(val), Location::NONE);
-      std::shared_ptr<Assignment> ass  = std::make_shared<Assignment>(std::string(value_str),lit);
+      std::shared_ptr<Assignment> ass  = std::make_shared<Assignment>(value_str,lit);
       pargs.push_back(ass);
     }       
   }
