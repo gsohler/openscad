@@ -452,7 +452,7 @@ double python_doublefunc(void *v_cbfunc, double arg)
 /*
  * Try to call a python function by name using OpenSCAD module childs and OpenSCAD function arguments: argument order is childs, arguments
  */
-PyObject *python_fromopenscad(Value val)
+PyObject *python_fromopenscad(const Value &val)
 {	
     switch(val.type())
     {
@@ -464,7 +464,15 @@ PyObject *python_fromopenscad(Value val)
 	return  PyFloat_FromDouble(val.toDouble());
       case Value::Type::STRING:
 	return PyUnicode_FromString(val.toString().c_str());
-//TODO  more types RANGE, VECTOR, OBJECT, FUNCTION
+      case Value::Type::VECTOR:
+	{
+	  const VectorType& vec = val.toVector();
+  	  PyObject *result=PyList_New(vec.size());
+	  for(int j=0;j<vec.size();j++)
+		PyList_SetItem(result,j,python_fromopenscad(vec[j]));
+	  return result;
+	}
+//TODO  more types RANGE, OBJECT, FUNCTION
       default:
 	return Py_None;
     }
