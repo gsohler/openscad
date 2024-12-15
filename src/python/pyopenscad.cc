@@ -718,9 +718,9 @@ void initPython(double time)
     }
 
   }
-  char run_str[250];
-  sprintf(run_str,"fa=12.0\nfn=0.0\nfs=2.0\nt=%g\nphi=%g",time,2*G_PI*time);
-  PyRun_String(run_str, Py_file_input, pythonInitDict, pythonInitDict);
+  std::ostringstream stream;
+  stream << "fa=12.0\nfn=0.0\nfs=2.0\nt=" << time << "\nphi=" << 2*G_PI*time;
+  PyRun_String(stream.str().c_str(), Py_file_input, pythonInitDict, pythonInitDict);
   customizer_parameters_finished = customizer_parameters;
   customizer_parameters.clear();
 }

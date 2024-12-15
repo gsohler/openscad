@@ -3805,15 +3805,15 @@ PyObject *python_nimport(PyObject *self, PyObject *args, PyObject *kwargs)
 }
 
 PyObject *python_str(PyObject *self) {
-  char str[40];
+  std::ostringstream stream;
   PyObject *dummydict;	  
   std::shared_ptr<AbstractNode> node=PyOpenSCADObjectToNode(self, &dummydict);
   if(node != nullptr)
-    sprintf(str,"OpenSCAD (%d)",(int) node->index());
+    stream << "OpenSCAD (" << (int) node->index() << ")";
   else
-    sprintf(str,"Invalid OpenSCAD Object");
+    stream << "Invalid OpenSCAD Object";
 
-  return PyUnicode_FromStringAndSize(str,strlen(str));
+  return PyUnicode_FromStringAndSize(stream.str().c_str(),stream.str().size());
 }
 
 PyObject *python_add_parameter(PyObject *self, PyObject *args, PyObject *kwargs, ImportType type)
@@ -3911,7 +3911,7 @@ PyObject *python_osinclude(PyObject *self, PyObject *args, PyObject *kwargs)
   auto empty = std::make_shared<CubeNode>(instance);
   char *kwlist[] = {"file", NULL};
   const char *file = NULL;
-  char code[200];
+  std::ostringstream stream;
   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s", kwlist,
                                    &file
                                    )) {
@@ -3919,10 +3919,10 @@ PyObject *python_osinclude(PyObject *self, PyObject *args, PyObject *kwargs)
     return NULL;
   }
   const std::string filename = lookup_file(file, ".",".");
-  sprintf(code,"include <%s>\n",filename.c_str());
+  stream << "include <" << filename << ">\n";
 
   SourceFile *source;
-  if(!parse(source, code, "python", "python", false)) {
+  if(!parse(source, stream.str(), "python", "python", false)) {
     PyErr_SetString(PyExc_TypeError, "Error in SCAD code");
     return Py_None;
   }
