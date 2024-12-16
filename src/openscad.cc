@@ -977,10 +977,12 @@ int main(int argc, char **argv)
   }
 
   PRINTDB("Application location detected as %s", applicationPath);
+#ifdef ENABLE_PYTHON  
   if(python_runipython) {
     ipython();	  
     exit(0);
   }
+#endif  
 
   auto cmdlinemode = false;
   if (!output_files.empty()) { // cmd-line mode

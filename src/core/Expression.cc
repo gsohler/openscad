@@ -487,6 +487,7 @@ boost::optional<CallableFunction> FunctionCall::evaluate_function_expression(con
       return boost::none;
     }
   }
+  return boost::none;
 }
 
 struct SimplifiedExpression {
