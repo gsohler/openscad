@@ -786,6 +786,7 @@ int main(int argc, char **argv)
     ("x,x", po::value<std::string>(), "dxf_file deprecated, use -o")
 #ifdef ENABLE_PYTHON
   ("trust-python",  "Trust python")
+  ("ipython",  "Run ipython Interpreter")
 #endif
   ;
 
@@ -819,6 +820,10 @@ int main(int argc, char **argv)
   if (vm.count("trust-python")) {
     LOG("Python Code globally trusted", OpenSCAD::debug);
     python_trusted = true;
+  }
+  if (vm.count("ipython")) {
+    LOG("Running ipython interpreter", OpenSCAD::debug);
+    python_runipython = true;
   }
 #endif
   if (vm.count("quiet")) {
@@ -972,6 +977,10 @@ int main(int argc, char **argv)
   }
 
   PRINTDB("Application location detected as %s", applicationPath);
+  if(python_runipython) {
+    ipython();	  
+    exit(0);
+  }
 
   auto cmdlinemode = false;
   if (!output_files.empty()) { // cmd-line mode

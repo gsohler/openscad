@@ -6,6 +6,7 @@
 
 extern bool python_active;
 extern bool python_trusted;
+extern bool python_runipython;
 extern AssignmentList customizer_parameters;
 extern AssignmentList customizer_parameters_finished;
 
@@ -14,6 +15,7 @@ void initPython(double time);
 void finishPython();
 void python_lock(void);
 void python_unlock(void);
+void ipython(void);
 
 std::string evaluatePython(const std::string &code, bool dry_run=0);
 
