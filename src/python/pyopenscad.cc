@@ -480,7 +480,7 @@ PyObject *python_fromopenscad(const Value &val)
     return Py_None;
 }
 
-PyObject *python_callfunction(const std::shared_ptr<const Context> &cxt , const std::string &name, const std::vector<std::shared_ptr<Assignment> > &op_args, const char *&errorstr)
+PyObject *python_callfunction(const std::shared_ptr<const Context> &cxt , const std::string &name, const std::vector<std::shared_ptr<Assignment> > &op_args, std::string &errorstr)
 {
   PyObject *pFunc = nullptr;
   if(!pythonMainModule){
@@ -496,8 +496,6 @@ PyObject *python_callfunction(const std::shared_ptr<const Context> &cxt , const 
       const PythonClassType &python_class = var.toPythonClass();
       PyObject* methodobj = PyUnicode_FromString(methodname.c_str());
       pFunc = PyObject_GenericGetAttr((PyObject *) python_class.ptr,methodobj);
-      if(pFunc != nullptr) {
-      }
     }
   }
   if(!pFunc) {
@@ -520,9 +518,11 @@ PyObject *python_callfunction(const std::shared_ptr<const Context> &cxt , const 
     }  
   }
   if (!pFunc) {
+    errorstr="Function not found";    	  
     return nullptr;
   }
   if (!PyCallable_Check(pFunc)) {
+    errorstr="Function not callable";    	  
     return nullptr;
   }
 
@@ -551,7 +551,13 @@ PyObject *python_callfunction(const std::shared_ptr<const Context> &cxt , const 
     if(pyExcTraceback != nullptr) Py_XDECREF(pyExcTraceback);
 
     if(pyExcValue != nullptr){
-      errorstr =  PyBytes_AS_STRING(pyExcValue);
+      PyObject* str_exc_value = PyObject_Repr(pyExcValue);
+      PyObject* pyExcValueStr = PyUnicode_AsEncodedString(str_exc_value, "utf-8", "~");
+      Py_XDECREF(str_exc_value);
+      errorstr =  PyBytes_AS_STRING(pyExcValueStr);
+      PyErr_SetString(PyExc_TypeError, errorstr.c_str());
+      Py_XDECREF(pyExcValueStr);
+      Py_XDECREF(pyExcValue);
     }
 
     return nullptr;
@@ -563,21 +569,22 @@ PyObject *python_callfunction(const std::shared_ptr<const Context> &cxt , const 
  * Actually trying use python to evaluate a OpenSCAD Module
  */
 
-std::shared_ptr<AbstractNode> python_modulefunc(const ModuleInstantiation *op_module,const std::shared_ptr<const Context> &cxt, std::string &error)
+std::shared_ptr<AbstractNode> python_modulefunc(const ModuleInstantiation *op_module,const std::shared_ptr<const Context> &cxt, std::string &error) // null & error: error, else: None
 {
   PyObject *dummydict;   
   std::shared_ptr<AbstractNode> result=nullptr;
-  const char *errorstr = nullptr;
+  std::string errorstr = "";
   {
     PyObject *funcresult = python_callfunction(cxt,op_module->name(),op_module->arguments, errorstr);
-    if (errorstr != nullptr){
+    if (errorstr.size() > 0){
       error = errorstr;
       return nullptr;
     }
-    if(funcresult == nullptr) return nullptr;
+    if(funcresult == nullptr) {error="function not executed"; return nullptr; }
 
     if(funcresult->ob_type == &PyOpenSCADType) result=PyOpenSCADObjectToNode(funcresult, &dummydict);
     Py_XDECREF(funcresult);
+    errorstr="";
   }
   return result;
 }
@@ -622,11 +629,11 @@ Value python_convertresult(PyObject *arg, int &error)
 
 Value python_functionfunc(const FunctionCall *call,const std::shared_ptr<const Context> &cxt, int &error  )
 {
-  const char *errorstr = nullptr;
+  std::string errorstr = "";
   PyObject *funcresult = python_callfunction(cxt,call->name, call->arguments, errorstr);
-  if (errorstr != nullptr)
+  if (errorstr.size() > 0)
   {
-    PyErr_SetString(PyExc_TypeError, errorstr);
+    PyErr_SetString(PyExc_TypeError, errorstr.c_str());
     return Value::undefined.clone();
   }
   if(funcresult == nullptr) return Value::undefined.clone();
