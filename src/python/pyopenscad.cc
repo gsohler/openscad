@@ -704,13 +704,17 @@ void initPython(double time)
     PyConfig config;
     PyConfig_InitPythonConfig(&config);
     std::string libdir;
+    std::ostringstream stream;
 #ifdef _WIN32
-    libdir= PlatformUtils::applicationPath()+"\\..\\libraries\\python;"+PlatformUtils::userLibraryPath()+";.";
+    char sepchar = ';';
+    stream << PlatformUtils::applicationPath() << "\\..\\libraries\\python";
 #else
-    libdir= PlatformUtils::applicationPath()+"/../libraries/python:"+ PlatformUtils::userLibraryPath()+":.";
+    char sepchar = ':';
+    stream << PlatformUtils::applicationPath() << "/../libraries/python";
+    stream << sepchar + PlatformUtils::applicationPath() << "/../lib/python"  <<  PY_MAJOR_VERSION  <<  "."  <<  PY_MINOR_VERSION ; // find it where linuxdeply put it
 #endif   
-//    libdir=PlatformUtils::userLibraryPath();
-    PyConfig_SetBytesString(&config, &config.pythonpath_env, libdir.c_str());
+    stream << sepchar << PlatformUtils::userLibraryPath() << sepchar << ".";
+    PyConfig_SetBytesString(&config, &config.pythonpath_env, stream.str().c_str());
     PyStatus status = Py_InitializeFromConfig(&config);
     if (PyStatus_Exception(status)) {
       LOG( message_group::Error, "Python not found. Is it installed ?");
