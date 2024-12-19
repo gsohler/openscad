@@ -479,6 +479,32 @@ PyObject *python_fromopenscad(const Value &val)
     }
     return Py_None;
 }
+void python_catch_error(std::string &errorstr)
+{
+    PyObject *pyExcType;
+    PyObject *pyExcValue;
+    PyObject *pyExcTraceback;
+    PyErr_Fetch(&pyExcType, &pyExcValue, &pyExcTraceback);
+    PyErr_NormalizeException(&pyExcType, &pyExcValue, &pyExcTraceback);
+    if(pyExcType != nullptr) Py_XDECREF(pyExcType);
+
+    if(pyExcValue != nullptr){
+      PyObject* str_exc_value = PyObject_Repr(pyExcValue);
+      PyObject* pyExcValueStr = PyUnicode_AsEncodedString(str_exc_value, "utf-8", "~");
+      Py_XDECREF(str_exc_value);
+      char *suberror = PyBytes_AS_STRING(pyExcValueStr);
+      if(suberror != nullptr) errorstr +=  suberror;
+      Py_XDECREF(pyExcValueStr);
+      Py_XDECREF(pyExcValue);
+    }
+    if(pyExcTraceback != nullptr) {
+      auto *tb_o = (PyTracebackObject *)pyExcTraceback;
+      int line_num = tb_o->tb_lineno;
+      errorstr += " in line ";
+      errorstr += std::to_string(line_num);
+      Py_XDECREF(pyExcTraceback);
+    }
+}
 
 PyObject *python_callfunction(const std::shared_ptr<const Context> &cxt , const std::string &name, const std::vector<std::shared_ptr<Assignment> > &op_args, std::string &errorstr)
 {
@@ -541,24 +567,10 @@ PyObject *python_callfunction(const std::shared_ptr<const Context> &cxt , const 
   PyObject* funcresult = PyObject_CallObject(pFunc, args);
   Py_XDECREF(args);
 
+  errorstr="";
   if(funcresult == nullptr) {
-    PyObject *pyExcType;
-    PyObject *pyExcValue;
-    PyObject *pyExcTraceback;
-    PyErr_Fetch(&pyExcType, &pyExcValue, &pyExcTraceback);
-    PyErr_NormalizeException(&pyExcType, &pyExcValue, &pyExcTraceback);
-    if(pyExcType != nullptr) Py_XDECREF(pyExcType);
-    if(pyExcTraceback != nullptr) Py_XDECREF(pyExcTraceback);
-
-    if(pyExcValue != nullptr){
-      PyObject* str_exc_value = PyObject_Repr(pyExcValue);
-      PyObject* pyExcValueStr = PyUnicode_AsEncodedString(str_exc_value, "utf-8", "~");
-      Py_XDECREF(str_exc_value);
-      errorstr =  PyBytes_AS_STRING(pyExcValueStr);
-      PyErr_SetString(PyExc_TypeError, errorstr.c_str());
-      Py_XDECREF(pyExcValueStr);
-      Py_XDECREF(pyExcValue);
-    }
+    python_catch_error(errorstr);	  
+    PyErr_SetString(PyExc_TypeError, errorstr.c_str());
 
     return nullptr;
   }
@@ -817,20 +829,8 @@ sys.stderr = stderr_bak\n\
       Py_XDECREF(command_output_value);
     }
 
-    PyErr_Fetch(&pyExcType, &pyExcValue, &pyExcTraceback); /* extract actual python stack trace in case of an expception and return the error string to the caller */
-    if(pyExcType != nullptr) Py_XDECREF(pyExcType);
-    if(pyExcValue != nullptr) {
-      auto strExcValue = std::string(PyUnicode_AsUTF8(pyExcValue));
-      error += strExcValue;
-    }
-    if(pyExcTraceback != nullptr) {
-      auto *tb_o = (PyTracebackObject *)pyExcTraceback;
-      int line_num = tb_o->tb_lineno;
-      error += " in line ";
-      error += std::to_string(line_num);
-      Py_XDECREF(pyExcTraceback);
-    }
-
+    error="";
+    python_catch_error(error);
     return error;
 }
 /*
