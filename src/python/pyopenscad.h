@@ -4,6 +4,8 @@
 #include "node.h"
 #include <geometry/Polygon2d.h>
 #include "src/core/function.h"
+#include "src/core/ScopeContext.h"
+#include "src/core/UserModule.h"
 
 #pragma GCC diagnostic ignored "-Wwrite-strings"
 
@@ -39,16 +41,20 @@ double python_doublefunc(void *cbfunc, double arg);
 std::shared_ptr<AbstractNode> python_modulefunc(const ModuleInstantiation *module,const std::shared_ptr<const Context> &context, std::string &error);
 std::vector<int> python_intlistval(PyObject *list);
 
-Value python_functionfunc(const FunctionCall *call,const std::shared_ptr<const Context> &context);
+Value python_functionfunc(const FunctionCall *call,const std::shared_ptr<const Context> &context, int &error);
 int python_vectorval(PyObject *vec, int minarg, int maxarg, double *x, double *y, double *z, double *w=NULL);
+std::vector<Vector3d> python_vectors(PyObject *vec, int mindim, int maxdim);
 int python_numberval(PyObject *number, double *result);
 void get_fnas(double& fn, double& fa, double& fs);
 void python_retrieve_pyname(const std::shared_ptr<AbstractNode> &node);
-void python_build_hashmap(const std::shared_ptr<AbstractNode> &node);
+void python_build_hashmap(const std::shared_ptr<AbstractNode> &node, int level);
+PyObject *python_fromopenscad(const Value &val);
+
 
 extern std::vector<std::string> mapping_name;
 extern std::vector<std::string> mapping_code;
 extern std::vector<int> mapping_level;
+extern SourceFile *osinclude_source;
 
 PyObject *python_str(PyObject *self);
 

@@ -100,7 +100,7 @@ mkdir -p ${DEPLOYDIR}
 case $OS in
     MACOSX)
         . ./scripts/setenv-macos.sh
-        CMAKE_CONFIG="$CMAKE_CONFIG -DCMAKE_OSX_ARCHITECTURES=x86_64;arm64"
+        CMAKE_CONFIG="$CMAKE_CONFIG -DUSE_BUILTIN_CLIPPER2=OFF -DUSE_BUILTIN_MANIFOLD=OFF -DCMAKE_OSX_ARCHITECTURES=x86_64;arm64"
     ;;
     LINUX)
         TARGET=
@@ -333,9 +333,8 @@ case $OS in
     MACOSX)
         cd $DEPLOYDIR
         /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $VERSIONDATE" OpenSCAD.app/Contents/Info.plist
-        macdeployqt OpenSCAD.app -dmg -no-strip
-        mv OpenSCAD.dmg OpenSCAD-$VERSION.dmg
-        echo "Binary created: OpenSCAD-$VERSION.dmg"
+        macdeployqt OpenSCAD.app -no-strip
+        echo "Binary created: OpenSCAD.app"
         cd $OPENSCADDIR
     ;;
     WIN)

@@ -75,6 +75,7 @@ Value UnaryOp::evaluate(const std::shared_ptr<const Context>& context) const
   case (Op::Negate): return checkUndef(-this->expr->evaluate(context), context);
   default:
     assert(false && "Non-existent unary operator!");
+    printf("throw3\n");
     throw EvaluationException("Non-existent unary operator!");
   }
 }
@@ -86,6 +87,7 @@ const char *UnaryOp::opString() const
   case Op::Negate: return "-";
   default:
     assert(false && "Non-existent unary operator!");
+    printf("throw4\n");
     throw EvaluationException("Non-existent unary operator!");
   }
 }
@@ -137,6 +139,7 @@ Value BinaryOp::evaluate(const std::shared_ptr<const Context>& context) const
     return checkUndef(this->left->evaluate(context) != this->right->evaluate(context), context);
   default:
     assert(false && "Non-existent binary operator!");
+    printf("throw5\n");
     throw EvaluationException("Non-existent binary operator!");
   }
 }
@@ -159,6 +162,7 @@ const char *BinaryOp::opString() const
   case Op::Equal:        return "==";
   case Op::NotEqual:     return "!=";
   default:
+    printf("throw6\n");
     assert(false && "Non-existent binary operator!");
     throw EvaluationException("Non-existent binary operator!");
   }
@@ -473,14 +477,17 @@ boost::optional<CallableFunction> FunctionCall::evaluate_function_expression(con
   if (isLookup) {
     return context->lookup_function(name, location());
   } else {
+    auto member_expr = std::dynamic_pointer_cast<MemberLookup>(expr);
     auto v = expr->evaluate(context);
     if (v.type() == Value::Type::FUNCTION) {
       return CallableFunction{std::move(v)};
+    } else if(member_expr != nullptr){
     } else {
       LOG(message_group::Warning, loc, context->documentRoot(), "Can't call function on %1$s", v.typeName());
       return boost::none;
     }
   }
+  return boost::none;
 }
 
 struct SimplifiedExpression {
@@ -521,8 +528,9 @@ static SimplificationResult simplify_function_body(const Expression *expression,
 #ifdef ENABLE_PYTHON    
       if(f == boost::none)
       {
-        Value v = python_functionfunc(call,context);
-        if(!v.isUndefined()) return v;
+        int error;	      
+        Value v = python_functionfunc(call,context, error);
+        if(!error) return v;
       }
 #endif    
       if (!f) {
@@ -569,6 +577,7 @@ Value FunctionCall::evaluate(const std::shared_ptr<const Context>& context) cons
   const auto& name = get_name();
   if (StackCheck::inst().check()) {
     print_err(name.c_str(), loc, context);
+    printf("throw7\n");
     throw RecursionException::create("function", name, this->loc);
   }
 
@@ -599,6 +608,7 @@ Value FunctionCall::evaluate(const std::shared_ptr<const Context>& context) cons
         current_call = *simplified_expression->new_active_function_call;
         if (recursion_depth++ == 1000000) {
           LOG(message_group::Error, expression->location(), expression_context->documentRoot(), "Recursion detected calling function '%1$s'", current_call->name);
+    printf("throw8\n");
           throw RecursionException::create("function", current_call->name, current_call->location());
         }
       }
@@ -607,6 +617,7 @@ Value FunctionCall::evaluate(const std::shared_ptr<const Context>& context) cons
         print_trace(current_call, *expression_context);
         e.traceDepth--;
       }
+    printf("throw9\n");
       throw;
     }
   }
@@ -654,6 +665,7 @@ void Assert::performAssert(const AssignmentList& arguments, const Location& loca
     std::string conditionString = conditionExpression ? STR(" '", *conditionExpression, "'") : "";
     std::string messageString = parameters.contains("message") ? (": " + parameters["message"].toEchoStringNoThrow()) : "";
     LOG(message_group::Error, location, context->documentRoot(), "Assertion%1$s failed%2$s", conditionString, messageString);
+    printf("throw11 %s| %s\n",conditionString.c_str(), messageString.c_str());
     throw AssertionFailedException("Assertion Failed", location);
   }
 }
@@ -973,6 +985,7 @@ Value LcForC::evaluate(const std::shared_ptr<const Context>& context) const
 
     if (counter++ == 1000000) {
       LOG(message_group::Error, loc, context->documentRoot(), "For loop counter exceeded limit");
+    printf("throw12\n");
       throw LoopCntException::create("for", loc);
     }
 

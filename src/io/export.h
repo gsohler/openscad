@@ -36,17 +36,29 @@ enum class FileFormat {
   PDF,
   PS,
   POV,
+  STEP,
   PARAM
+};
+
+struct FileFormatInfo {
+  FileFormat format;
+  std::string identifier;
+  std::string suffix;
+  std::string description;
 };
 
 namespace fileformat {
 
-void setup();
-bool fromIdentifier(const std::string& suffix, FileFormat& format);
-const std::string& toSuffix(FileFormat& format);
-bool canPreview(const FileFormat format);
-bool is3D(const FileFormat format);
-bool is2D(const FileFormat format);
+std::vector<FileFormat> all();
+std::vector<FileFormat> all2D();
+std::vector<FileFormat> all3D();
+
+const FileFormatInfo& info(FileFormat fileFormat);
+bool fromIdentifier(const std::string& identifier, FileFormat& format);
+const std::string& toSuffix(FileFormat format);
+bool canPreview(FileFormat format);
+bool is3D(FileFormat format);
+bool is2D(FileFormat format);
 
 }  // namespace FileFormat
 
@@ -102,6 +114,7 @@ struct ExportInfo {
   FileFormat format;
   std::string sourceFilePath; // Full path to the OpenSCAD source file
   ExportPdfOptions *options;
+  const Camera *camera;
 };
 
 class Export3mfInfo{
@@ -135,6 +148,7 @@ void export_dxf(const std::shared_ptr<const Geometry>& geom, std::ostream& outpu
 void export_svg(const std::shared_ptr<const Geometry>& geom, std::ostream& output);
 void export_pov(const std::shared_ptr<const Geometry>& geom, std::ostream& output, const ExportInfo& exportInfo);
 void export_pdf(const std::shared_ptr<const Geometry>& geom, std::ostream& output, const ExportInfo& exportInfo);
+void export_step(const std::shared_ptr<const Geometry>& geom, std::ostream& output, const ExportInfo& exportInfo);
 void export_nefdbg(const std::shared_ptr<const Geometry>& geom, std::ostream& output);
 void export_nef3(const std::shared_ptr<const Geometry>& geom, std::ostream& output);
 

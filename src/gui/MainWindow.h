@@ -185,6 +185,7 @@ private:
 
   LibraryInfoDialog *library_info_dialog{nullptr};
   FontListDialog *font_list_dialog{nullptr};
+  QSignalMapper *exportformat_mapper;
 
 public slots:
   void updateExportActions();
@@ -276,9 +277,7 @@ private slots:
   void csgRender();
   void csgReloadRender();
   void action3DPrint();
-  void sendToOctoPrint();
-  void sendToLocalSlicer();
-  void sendToPrintService();
+  void sendToExternalTool(class ExternalToolInterface &externalToolService);
   void actionRender();
   void actionRenderDone(const std::shared_ptr<const Geometry>&);
   void cgalRender();
@@ -296,19 +295,7 @@ private slots:
   bool canExport(unsigned int dim);
   void actionExport(FileFormat format, const char *type_name, const char *suffix, unsigned int dim);
   void actionExport(FileFormat format, const char *type_name, const char *suffix, unsigned int dim, ExportPdfOptions *options);
-  void actionExportSTL();
-  void actionExport3MF();
-  void actionExportOBJ();
-  void actionExportOFF();
-  void actionExportWRL();
-  void actionExportFoldable();
-  void actionExportPOV();
-  void actionExportAMF();
-  void actionExportDXF();
-  void actionExportSVG();
-  void actionExportPDF();
-  void actionExportCSG();
-  void actionExportImage();
+  void actionExportFileFormat(int fmt);
   void actionCopyViewport();
   void actionFlushCaches();
 
@@ -338,6 +325,7 @@ public:
   QList<double> getTranslation() const;
   QList<double> getRotation() const;
   QSignalMapper *addmenu_mapper;
+  std::unordered_map<FileFormat, QAction*>  export_map;
 
 public slots:
   void actionReloadRenderPreview();

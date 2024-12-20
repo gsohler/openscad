@@ -1287,15 +1287,11 @@ PyObject *python_translate_sub(PyObject *obj, Vector3d translatevec)
   return pyresult;
 }
 
+PyObject *python_nb_sub_vec3(PyObject *arg1, PyObject *arg2, int mode);
 PyObject *python_translate_core(PyObject *obj, PyObject *v) 
 {
   if(v == nullptr) return obj;
-  double x = 0, y = 0, z = 0;
-  if (python_vectorval(v, 1, 3, &x, &y, &z)) {
-    PyErr_SetString(PyExc_TypeError, "Invalid vector specifiaction in trans");
-    return NULL;
-  }
-  return python_translate_sub(obj, Vector3d(x, y, z));
+  return  python_nb_sub_vec3(obj, v, 0);
 }	
 
 PyObject *python_translate(PyObject *self, PyObject *args, PyObject *kwargs)
@@ -1606,6 +1602,7 @@ PyObject *python_output_core(PyObject *obj)
     PyErr_SetString(PyExc_TypeError, "Invalid type for Object in output");
     return NULL;
   }
+  // TODO fix or clean tag_highlight here
   PyObject *key, *value;
   Py_ssize_t pos = 0;
   python_result_node = child;
@@ -1613,7 +1610,7 @@ PyObject *python_output_core(PyObject *obj)
   mapping_name.clear();
   mapping_code.clear();
   mapping_level.clear();
-  python_build_hashmap(child);
+  python_build_hashmap(child,0);
   python_result_handle.clear();
   Matrix4d raw;
   SelectedObject sel;
@@ -2878,47 +2875,80 @@ PyObject *python_nb_sub(PyObject *arg1, PyObject *arg2, OpenSCADOperator mode)
   return pyresult;
 }
 
-PyObject *python_nb_sub_vec3(PyObject *arg1, PyObject *arg2, int mode) // 0: translate, 1: scale, 2: translateneg
+PyObject *python_nb_sub_vec3(PyObject *arg1, PyObject *arg2, int mode) // 0: translate, 1: scale, 2: translateneg, 3=translate-exp
 {
   DECLARE_INSTANCE
   std::shared_ptr<AbstractNode> child;
   PyObject *dummydict;	  
 
-  double x=0, y=0, z=0 ;
-  if (!python_vectorval(arg2, 2, 3, &x, &y, &z)) {
-    child = PyOpenSCADObjectToNodeMulti(arg1, &dummydict);
+  child = PyOpenSCADObjectToNodeMulti(arg1, &dummydict);
+  std::vector<Vector3d> vecs;
+  if(mode == 3) {
+    if(!PyList_Check(arg2)) {
+      PyErr_SetString(PyExc_TypeError, "explode arg must be a list");
+      return NULL;
+    }
+    int n=PyList_Size(arg2);
+    double dmy;
+    std::vector<float> vals[3];
+    for(int i=0;i<3;i++) vals[i].push_back(0.0);
+    for(int i=0;i<n;i++) {
+      vals[i].clear();	    
+      auto *item =PyList_GetItem(arg2,i);	    
+      if (!python_numberval(item, &dmy)) vals[i].push_back(dmy);
+      else if(PyList_Check(item)) {
+        int m = PyList_Size(item);	      
+	for(int j=0;j<m;j++) {
+          auto *item1 =PyList_GetItem(item,j);	    
+          if (!python_numberval(item1, &dmy)) vals[i].push_back(dmy);
+	}  
+      } else {
+        PyErr_SetString(PyExc_TypeError, "Unknown explode spec");
+        return NULL;
+      }
+
+    }
+    for(auto z : vals[2])
+      for(auto y : vals[1])
+        for(auto x : vals[0])
+          vecs.push_back(Vector3d(x,y,z));		
+  } else vecs = python_vectors(arg2,2,3);
+  if (vecs.size() > 0) {
     if (child == NULL) {
       PyErr_SetString(PyExc_TypeError, "invalid argument left to operator");
       return NULL;
     }
-    if(mode == 0 || mode == 2) {
-	    auto node = std::make_shared<TransformNode>(instance, "translate");
-	    Vector3d transvec(x, y, z);
-	    if(mode == 2) transvec = -transvec;
-	    node->matrix.translate(transvec);
-	    node->children.push_back(child);
-	    return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
-    }
-    if(mode == 1) {
-	    auto node = std::make_shared<TransformNode>(instance, "scale"); 
-	    Vector3d scalevec(x, y, z);
-	    node->matrix.scale(scalevec);
-	    node->children.push_back(child);
-	    return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
-    }
+    std::vector<std::shared_ptr<TransformNode>> nodes;
+    for(int j=0;j<vecs.size();j++) {
+      auto node = std::make_shared<TransformNode>(instance, "transform");
+      if(mode == 0 || mode == 3) node->matrix.translate(vecs[j]);
+      if(mode == 1) node->matrix.scale(vecs[j]);
+      if(mode == 2) node->matrix.translate(-vecs[j]);
+      node->children.push_back(child);
+      nodes.push_back(node);
+    }  
+    if(nodes.size() == 1) return PyOpenSCADObjectFromNode(&PyOpenSCADType, nodes[0]);
+    else {
+      auto node = std::make_shared<CsgOpNode>(instance, OpenSCADOperator::UNION);
+      DECLARE_INSTANCE
+      for(auto x : nodes) node->children.push_back(x);
+      return PyOpenSCADObjectFromNode(&PyOpenSCADType, node);
+    }  
   }
   PyErr_SetString(PyExc_TypeError, "invalid argument right to operator");
   return NULL;
 }
 
 PyObject *python_nb_add(PyObject *arg1, PyObject *arg2) { return python_nb_sub_vec3(arg1, arg2, 0); }  // translate
+PyObject *python_nb_xor(PyObject *arg1, PyObject *arg2) { return python_nb_sub_vec3(arg1, arg2, 3); }
 PyObject *python_nb_mul(PyObject *arg1, PyObject *arg2) { return python_nb_sub_vec3(arg1, arg2, 1); } // scale
 PyObject *python_nb_or(PyObject *arg1, PyObject *arg2) { return python_nb_sub(arg1, arg2,  OpenSCADOperator::UNION); }
 PyObject *python_nb_subtract(PyObject *arg1, PyObject *arg2)
 {
   double dmy;	
   if(PyList_Check(arg2) && PyList_Size(arg2) > 0) {
-    if (!python_numberval(PyList_GetItem(arg2, 0), &dmy)){
+    PyObject *sub = PyList_GetItem(arg2, 0);	  
+    if (!python_numberval(sub, &dmy) || PyList_Check(sub)){
       return python_nb_sub_vec3(arg1, arg2, 2); 
     }
   }	  
@@ -3441,15 +3471,15 @@ PyObject *python_offset_core(PyObject *obj,double r, double delta, PyObject *cha
 
   node->delta = 1;
   node->chamfer = false;
-  node->join_type = ClipperLib::jtRound;
+  node->join_type = Clipper2Lib::JoinType::Round;
   if (!isnan(r)) {
     node->delta = r;
   } else if (!isnan(delta)) {
     node->delta = delta;
-    node->join_type = ClipperLib::jtMiter;
+    node->join_type = Clipper2Lib::JoinType::Miter;
     if (chamfer == Py_True) {
       node->chamfer = true;
-      node->join_type = ClipperLib::jtSquare;
+      node->join_type = Clipper2Lib::JoinType::Square;
     }
     else if (chamfer == Py_False || chamfer == NULL )  node->chamfer = 0;
     else {
@@ -3665,7 +3695,16 @@ PyObject *do_import_python(PyObject *self, PyObject *args, PyObject *kwargs, Imp
     return NULL;
   }
 
-  filename = lookup_file(v == NULL ? "" : v, instance->location().filePath().parent_path().string(), "");
+#ifdef _WIN32
+  std::string cur_dir = ".";
+#else 
+//  #ifdef Q_OS_MACOS
+    std::string cur_dir = ".";
+//  #else
+//    std::string cur_dir = get_current_dir_name();
+//  #endif
+#endif  
+  filename = lookup_file(v == NULL ? "" : v, cur_dir, instance->location().filePath().parent_path().string());
   if (!filename.empty()) handle_dep(filename);
   ImportType actualtype = type;
   if (actualtype == ImportType::UNKNOWN) {
@@ -3678,6 +3717,8 @@ PyObject *do_import_python(PyObject *self, PyObject *args, PyObject *kwargs, Imp
     else if (ext == ".3mf") actualtype = ImportType::_3MF;
     else if (ext == ".amf") actualtype = ImportType::AMF;
     else if (ext == ".svg") actualtype = ImportType::SVG;
+    else if (ext == ".stp") actualtype = ImportType::STEP;
+    else if (ext == ".step") actualtype = ImportType::STEP;
   }
 
   auto node = std::make_shared<ImportNode>(instance, actualtype);
@@ -3766,15 +3807,15 @@ PyObject *python_nimport(PyObject *self, PyObject *args, PyObject *kwargs)
 }
 
 PyObject *python_str(PyObject *self) {
-	char str[40];
+  std::ostringstream stream;
   PyObject *dummydict;	  
-	auto node=PyOpenSCADObjectToNode(self, &dummydict);
-	if(*str != '\0')
-		sprintf(str,"OpenSCAD (%d)",(int) node->index());
-	else
-		sprintf(str,"Invalid OpenSCAD Object");
+  std::shared_ptr<AbstractNode> node=PyOpenSCADObjectToNode(self, &dummydict);
+  if(node != nullptr)
+    stream << "OpenSCAD (" << (int) node->index() << ")";
+  else
+    stream << "Invalid OpenSCAD Object";
 
-	return PyUnicode_FromStringAndSize(str,strlen(str));
+  return PyUnicode_FromStringAndSize(stream.str().c_str(),stream.str().size());
 }
 
 PyObject *python_add_parameter(PyObject *self, PyObject *args, PyObject *kwargs, ImportType type)
@@ -3856,6 +3897,7 @@ PyObject *python_scad(PyObject *self, PyObject *args, PyObject *kwargs)
     PyErr_SetString(PyExc_TypeError, "Error in SCAD code");
     return Py_None;
   }
+  parsed_file->handleDependencies(true);
 
   EvaluationSession session{"python"};
   ContextHandle<BuiltinContext> builtin_context{Context::create<BuiltinContext>(&session)};
@@ -3865,39 +3907,70 @@ PyObject *python_scad(PyObject *self, PyObject *args, PyObject *kwargs)
   return PyOpenSCADObjectFromNode(&PyOpenSCADType,resultnode);
 }
 
-PyObject *python_use(PyObject *self, PyObject *args, PyObject *kwargs)
+PyObject *python_osinclude(PyObject *self, PyObject *args, PyObject *kwargs)
 {
   DECLARE_INSTANCE
+  auto empty = std::make_shared<CubeNode>(instance);
   char *kwlist[] = {"file", NULL};
   const char *file = NULL;
+  std::ostringstream stream;
   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s", kwlist,
                                    &file
                                    )) {
-    PyErr_SetString(PyExc_TypeError, "Error during parsing osuse(path)");
+    PyErr_SetString(PyExc_TypeError, "Error during parsing osinclude(path)");
     return NULL;
   }
   const std::string filename = lookup_file(file, ".",".");
-  SourceFile *source_file = new SourceFile(".","."); // filename, filename);
-  source_file->registerUse(std::string(filename), Location::NONE);
-  source_file->handleDependencies(true);
-  EvaluationSession session{"."};
+  stream << "include <" << filename << ">\n";
 
-  ContextHandle<BuiltinContext> c_handle{Context::create<BuiltinContext>(&session)};
-  std::shared_ptr<const BuiltinContext> cxt = *c_handle;
+  SourceFile *source;
+  if(!parse(source, stream.str(), "python", "python", false)) {
+    PyErr_SetString(PyExc_TypeError, "Error in SCAD code");
+    return Py_None;
+  }
+  source->handleDependencies(true);
 
-  ContextHandle<FileContext> fc_handle{Context::create<FileContext>(cxt, source_file)};
-  std::shared_ptr<const FileContext> file_cxt = *fc_handle;
- 
-  auto namelist = file_cxt->list_local_modules();
+  EvaluationSession *session = new EvaluationSession("python");
+  ContextHandle<BuiltinContext> builtin_context{Context::create<BuiltinContext>(session)};
+
+  std::shared_ptr<const FileContext> osinclude_context;
+  std::shared_ptr<AbstractNode> resultnode = source->instantiate(*builtin_context, &osinclude_context); // TODO keine globakle var, kollision!
+
+  LocalScope scope = source->scope;
   PyObject *dict;
   dict = PyDict_New();
-  std::shared_ptr<AbstractNode> empty;
   PyOpenSCADObject *result = (PyOpenSCADObject *) PyOpenSCADObjectFromNode(&PyOpenSCADType, empty); 
 
-  for(std::string name: namelist) {
-    boost::optional<InstantiableModule> mod = file_cxt->lookup_local_module(name, Location::NONE);
-    PyDict_SetItemString(result->dict, name.c_str(),PyDataObjectFromModule(&PyDataType, mod) );
+  for(auto mod : source->scope.modules) { // copy modules
+    std::shared_ptr<UserModule> usmod = mod.second;
+    InstantiableModule m;
+//    m.defining_context=osinclude_context;
+//    m.module=mod.second.get();
+//    boost::optional<InstantiableModule> res(m);
+    PyDict_SetItemString(result->dict, mod.first.c_str(),PyDataObjectFromModule(&PyDataType, filename, mod.first ));
   }
+
+ for(auto fun : source->scope.functions) { // copy functions
+    std::shared_ptr<UserFunction> usfunc = fun.second; // install lambda functions ?
+//    printf("%s\n",fun.first.c_str());
+//    InstantiableModule m;
+//    m.defining_context=osinclude_context;
+//    m.module=mod.second.get();
+//    boost::optional<InstantiableModule> res(m);
+//    PyDict_SetItemString(result->dict, mod.first.c_str(),PyDataObjectFromModule(&PyDataType, res ));
+  }
+
+  for(auto ass : source->scope.assignments) { // copy assignments
+//    printf("Var %s\n",ass->getName().c_str());						   
+    const std::shared_ptr<Expression> expr = ass->getExpr();
+    Value val = expr->evaluate(osinclude_context);
+    if(val.isDefined()) {
+      PyObject *res= python_fromopenscad(std::move(val));
+      PyDict_SetItemString(result->dict, ass->getName().c_str(),res);
+    }
+  }
+
+
   return (PyObject *) result;
 
 }
@@ -4054,7 +4127,7 @@ PyMethodDef PyOpenSCADFunctions[] = {
   {"render", (PyCFunction) python_render, METH_VARARGS | METH_KEYWORDS, "Render Object."},
   {"osimport", (PyCFunction) python_import, METH_VARARGS | METH_KEYWORDS, "Import Object."},
   {"nimport", (PyCFunction) python_nimport, METH_VARARGS | METH_KEYWORDS, "Import Networked Object."},
-  {"osuse", (PyCFunction) python_use, METH_VARARGS | METH_KEYWORDS, "Import OpenSCAD Library."},
+  {"osinclude", (PyCFunction) python_osinclude, METH_VARARGS | METH_KEYWORDS, "Import OpenSCAD Library."},
   {"version", (PyCFunction) python_version, METH_VARARGS | METH_KEYWORDS, "Output openscad Version."},
   {"version_num", (PyCFunction) python_version_num, METH_VARARGS | METH_KEYWORDS, "Output openscad Version."},
   {"add_parameter", (PyCFunction) python_add_parameter, METH_VARARGS | METH_KEYWORDS, "Add Parameter for Customizer."},
@@ -4140,7 +4213,7 @@ PyNumberMethods PyOpenSCADNumbers =
      0,			//binaryfunc nb_lshift
      0,			//binaryfunc nb_rshift
      python_nb_and,	//binaryfunc nb_and 
-     0,			//binaryfunc nb_xor
+     python_nb_xor,      //binaryfunc nb_xor
      python_nb_or,	//binaryfunc nb_or 
      0,			//unaryfunc nb_int
      0,			//void *nb_reserved

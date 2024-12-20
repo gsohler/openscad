@@ -9,8 +9,12 @@
 #include "ModuleInstantiation.h"
 #include "BuiltinContext.h"
 #include "Expression.h"
-PyObject *PyOpenSCADObjectFromNode(PyTypeObject *type, const std::shared_ptr<AbstractNode> &node);
+#include "pyopenscad.h"
 
+#include "../src/geometry/GeometryEvaluator.h"
+#include "core/Tree.h"
+#include <PolySet.h>
+#include <PolySetUtils.h>
 #ifdef ENABLE_LIBFIVE
 #include <libfive/tree/opcode.hpp>
 #endif
@@ -33,32 +37,36 @@ static PyObject *PyDataObject_new(PyTypeObject *type, PyObject *args,  PyObject 
   return (PyObject *)self;
 }
 
-PyObject *PyDataObjectFromModule(PyTypeObject *type, boost::optional<InstantiableModule> mod)
+PyObject *PyDataObjectFromModule(PyTypeObject *type, std::string modulepath, std::string modulename)
 {
+  std::string result = modulepath+"|"+modulename;	
   PyDataObject *res;
   res = (PyDataObject *)  type->tp_alloc(type, 0);
   if (res != NULL) {
     res->data_type = DATA_TYPE_SCADMODULE;
-    res->data = (void *) mod->module;
+    res->data = (void *) strdup(result.c_str()); // TODO memory leak!
     Py_XINCREF(res);
     return (PyObject *)res;
   }
   return Py_None;
 }
 
-boost::optional<InstantiableModule> PyDataObjectToModule(PyObject *obj)
+void PyDataObjectToModule(PyObject *obj, std::string &modulepath, std::string &modulename)
 {
   if(obj != NULL && obj->ob_type == &PyDataType) {
     PyDataObject * dataobj = (PyDataObject *) obj;
     if(dataobj->data_type == DATA_TYPE_SCADMODULE) {
-     InstantiableModule m;
-     m.module=(AbstractModule *)  dataobj->data;
-     boost::optional<InstantiableModule> res(m);
-     return res;
+
+    	   
+     std::string result((char *)dataobj->data);
+     int sep=result.find("|");
+     if(sep >= 0) {
+       modulepath=result.substr(0,sep);
+       modulename=result.substr(sep+1);       
+     }
+
     }
   }
-  boost::optional<InstantiableModule> res;
-  return res;
 }
 
 
@@ -317,30 +325,103 @@ PyObject *python_lv_divide(PyObject *arg1, PyObject *arg2) { return  Py_None; }
 PyObject *python_lv_negate(PyObject *arg) { return  Py_None; }
 #endif
 
-extern PyTypeObject PyOpenSCADType;
-Value python_convertresult(PyObject *arg);
+Value python_convertresult(PyObject *arg, int &error);
 
+extern bool parse(SourceFile *& file, const std::string& text, const std::string& filename, const std::string& mainFile, int debug);
 PyObject *PyDataObject_call(PyObject *self, PyObject *args, PyObject *kwargs)
 {
-//  printf("Call %d\n",PyTuple_Size(args));
+  if(pythonDryRun) return Py_None;	
+  std::string modulepath, modulename;
+  PyDataObjectToModule(self,modulepath, modulename);
   AssignmentList pargs;
+  std::vector<std::shared_ptr<ModuleInstantiation>> modinsts;
+  int error;
   for(int i=0;i<PyTuple_Size(args);i++) {
-    Value val = python_convertresult(PyTuple_GetItem(args,i));	  
-    std::shared_ptr<Literal> lit = std::make_shared<Literal>(std::move(val), Location::NONE);
-    std::shared_ptr<Assignment> ass  = std::make_shared<Assignment>(std::string(""),lit);
-    pargs.push_back(ass);
+    PyObject *arg = 	PyTuple_GetItem(args,i);  
+    if(Py_TYPE(arg) == &PyOpenSCADType) {
+	std::shared_ptr<AbstractNode> child = ((PyOpenSCADObject *) arg)->node;
+	Tree tree(child, "");
+	GeometryEvaluator geomevaluator(tree);
+	std::shared_ptr<const Geometry> geom = geomevaluator.evaluateGeometry(*tree.root(), true);
+	std::shared_ptr<const PolySet> ps = PolySetUtils::getGeometryAsPolySet(geom);
+	if(ps != nullptr) {
+
+          // prepare vertices		
+	  auto vecs3d = std::make_shared<Vector>(Location::NONE);
+          for(auto vertex: ps->vertices) {
+	    auto vec3d = new Vector(Location::NONE);
+            vec3d->emplace_back( new  Literal(vertex[0], Location::NONE));
+            vec3d->emplace_back( new  Literal(vertex[1], Location::NONE));
+            vec3d->emplace_back( new  Literal(vertex[2], Location::NONE));
+            
+	    vecs3d->emplace_back( vec3d);
+	  }
+          std::shared_ptr<Assignment>  ass_pts= std::make_shared<Assignment>(std::string("points"),vecs3d);
+
+          // prepare indices		
+	  auto inds3d = std::make_shared<Vector>(Location::NONE);
+          for(auto face: ps->indices) {
+	    auto ind3d = new Vector(Location::NONE);
+	    for (auto it = face.crbegin(); it != face.crend(); ++it) {
+              ind3d->emplace_back( new  Literal(*it, Location::NONE));
+            }
+	    inds3d->emplace_back( ind3d);
+	  }
+          std::shared_ptr<Assignment>  ass_faces=std::make_shared<Assignment>(std::string("faces"),inds3d);
+
+	  AssignmentList poly_asslist;
+          poly_asslist.push_back(ass_pts);
+          poly_asslist.push_back(ass_faces);
+
+          auto poly_modinst = std::make_shared<ModuleInstantiation>("polyhedron",poly_asslist, Location::NONE);
+          modinsts.push_back(poly_modinst);	  
+	}
+    } else {
+      Value val = python_convertresult(arg,error);	  
+      std::shared_ptr<Literal> lit = std::make_shared<Literal>(std::move(val), Location::NONE);
+      std::shared_ptr<Assignment> ass  = std::make_shared<Assignment>(std::string(""),lit);
+      pargs.push_back(ass);
+    }  
+  }
+  if(kwargs != nullptr) {
+    PyObject *key, *value;
+    Py_ssize_t pos = 0;
+    while (PyDict_Next(kwargs, &pos, &key, &value)) {
+      PyObject* value1 = PyUnicode_AsEncodedString(key, "utf-8", "~");
+      std::string value_str =  PyBytes_AS_STRING(value1);
+      if(value_str == "fn") value_str="$fn";
+      if(value_str == "fa") value_str="$fa";
+      if(value_str == "fs") value_str="$fs";
+      Value val = python_convertresult(value,error);	  
+      std::shared_ptr<Literal> lit = std::make_shared<Literal>(std::move(val), Location::NONE);
+      std::shared_ptr<Assignment> ass  = std::make_shared<Assignment>(value_str,lit);
+      pargs.push_back(ass);
+    }       
   }
 
-  boost::optional<InstantiableModule> mod =PyDataObjectToModule(self);
-  std::string instance_name; 
-  ModuleInstantiation *instance = new ModuleInstantiation(instance_name,pargs, Location::NONE);
+  std::shared_ptr<ModuleInstantiation> modinst = std::make_shared<ModuleInstantiation>(modulename ,pargs, Location::NONE);
+   modinst->scope.moduleInstantiations = modinsts;
 
-  EvaluationSession session{"."};
-  ContextHandle<BuiltinContext> c_handle{Context::create<BuiltinContext>(&session)};
-  std::shared_ptr<const BuiltinContext> cxt = *c_handle;
+  char code[100];
+  sprintf(code,"include <%s>\n",modulepath.c_str());
 
-  auto resultnode = mod->module->instantiate(cxt, instance, cxt);
-  return PyOpenSCADObjectFromNode(&PyOpenSCADType, resultnode);
+  SourceFile *source;
+  if(!parse(source, code, "python", "python", false)) {
+    PyErr_SetString(PyExc_TypeError, "Error in SCAD code");
+    return Py_None;
+  }
+  source->handleDependencies(true);
+
+  EvaluationSession session{"python"};
+  ContextHandle<BuiltinContext> builtin_context{Context::create<BuiltinContext>(&session)};
+  std::shared_ptr<const FileContext> dummy_context;
+  source->scope.moduleInstantiations.clear();
+  source->scope.moduleInstantiations.push_back(modinst);
+  std::shared_ptr<AbstractNode> resultnode = source->instantiate(*builtin_context, &dummy_context);  // <- hier macht das problem
+
+//  delete source;
+  auto result = PyOpenSCADObjectFromNode(&PyOpenSCADType, resultnode);
+  return result;
 }
 
 PyNumberMethods PyDataNumbers =

@@ -124,7 +124,8 @@ bool useGUI()
 #endif // OPENSCAD_NOGUI
 
 bool checkAndExport(const std::shared_ptr<const Geometry>& root_geom, unsigned dimensions,
-                    FileFormat format, const bool is_stdout, const std::string& filename, const std::string& input_filename)
+                    FileFormat format, const bool is_stdout, const std::string& filename,
+		    const Camera *const camera, const std::string& input_filename)
 {
   if (root_geom->getDimension() != dimensions) {
     LOG("Current top level object is not a %1$dD object.", dimensions);
@@ -134,7 +135,7 @@ bool checkAndExport(const std::shared_ptr<const Geometry>& root_geom, unsigned d
     LOG("Current top level object is empty.");
     return false;
   }
-  ExportInfo exportInfo = {.format = format, .sourceFilePath = input_filename};
+  ExportInfo exportInfo = {.format = format, .sourceFilePath = input_filename, .camera = camera};
   if (is_stdout) {
     exportFileStdOut(root_geom, exportInfo);
   }
@@ -237,6 +238,57 @@ void localization_init() {
   }
 }
 
+struct AnimateArgs {
+  unsigned frames = 0;
+  unsigned num_shards = 1;
+  unsigned shard = 1;
+};
+
+struct CommandLine
+{
+  const bool is_stdin;
+  const std::string& filename;
+  const bool is_stdout;
+  std::string output_file;
+  const fs::path& original_path;
+  const std::string& parameterFile;
+  const std::string& setName;
+  const ViewOptions& viewOptions;
+  const Camera& camera;
+  const boost::optional<FileFormat> export_format;
+  const AnimateArgs animate;
+  const std::vector<std::string> summaryOptions;
+  const std::string summaryFile;
+};
+
+AnimateArgs get_animate(const po::variables_map& vm) {
+  AnimateArgs animate;
+  if (vm.count("animate")) {
+    animate.frames = vm["animate"].as<unsigned>();
+  }
+  if (vm.count("animate_sharding")) {
+    std::vector<std::string> strs;
+    boost::split(strs, vm["animate_sharding"].as<std::string>(),
+                 boost::is_any_of("/"));
+    if (strs.size() != 2) {
+      LOG("--animate_sharding requires <shard>/<num_shards>");
+      exit(1);
+    }
+    try {
+      animate.shard = boost::lexical_cast<unsigned>(strs[0]);
+      animate.num_shards = boost::lexical_cast<unsigned>(strs[1]);
+    } catch (const boost::bad_lexical_cast&) {
+      LOG("--animate_sharding parameters need to be positive integers");
+      exit(1);
+    }
+    if (animate.shard > animate.num_shards || animate.shard == 0) {
+      LOG("--animate_sharding: shard needs to be in range <1..num_shards>");
+      exit(1);
+    }
+  }
+  return animate;
+}
+
 Camera get_camera(const po::variables_map& vm)
 {
   Camera camera;
@@ -306,27 +358,11 @@ Camera get_camera(const po::variables_map& vm)
   return camera;
 }
 
-struct CommandLine
-{
-  const bool is_stdin;
-  const std::string& filename;
-  const bool is_stdout;
-  std::string output_file;
-  const fs::path& original_path;
-  const std::string& parameterFile;
-  const std::string& setName;
-  const ViewOptions& viewOptions;
-  const Camera& camera;
-  const boost::optional<FileFormat> export_format;
-  unsigned animate_frames;
-  const std::vector<std::string> summaryOptions;
-  const std::string summaryFile;
-};
-
 int do_export(const CommandLine& cmd, const RenderVariables& render_variables, FileFormat export_format, SourceFile *root_file)
 {
   auto filename_str = fs::path(cmd.output_file).generic_string();
-  auto fpath = fs::absolute(fs::path(cmd.filename));
+  // Avoid possibility of fs::absolute throwing when passed an empty path
+  auto fpath = cmd.filename.empty() ? fs::current_path() : fs::absolute(fs::path(cmd.filename));
   auto fparent = fpath.parent_path();
 
   // set CWD relative to source file
@@ -441,7 +477,7 @@ int do_export(const CommandLine& cmd, const RenderVariables& render_variables, F
 
     const std::string input_filename = cmd.is_stdin ? "<stdin>" : cmd.filename;
     const int dim = fileformat::is3D(export_format) ? 3 : fileformat::is2D(export_format) ? 2 : 0;
-    if (dim > 0 && !checkAndExport(root_geom, dim, export_format, cmd.is_stdout, filename_str, input_filename)) {
+    if (dim > 0 && !checkAndExport(root_geom, dim, export_format, cmd.is_stdout, filename_str, &cmd.camera, input_filename)) {
       return 1;
     }
 
@@ -525,7 +561,7 @@ int cmdline(const CommandLine& cmd)
 
   std::string text_py=text;
   if(python_active) {
-    if(cmd.animate_frames == 0) {
+    if(cmd.animate.frames == 0) {
       initPython(0.0);
       auto error  = evaluatePython(text_py);
       finishPython();
@@ -571,13 +607,17 @@ int cmdline(const CommandLine& cmd)
     .camera = cmd.camera,
   };
 
-  if (cmd.animate_frames == 0) {
+  if (cmd.animate.frames == 0) {
     render_variables.time = 0;
     return do_export(cmd, render_variables, export_format, root_file);
   } else {
     // export the requested number of animated frames
-    for (unsigned frame = 0; frame < cmd.animate_frames; ++frame) {
-      render_variables.time = frame * (1.0 / cmd.animate_frames);
+    const unsigned start_frame = ((cmd.animate.shard - 1) * cmd.animate.frames)
+      / cmd.animate.num_shards;
+    const unsigned limit_frame = (cmd.animate.shard * cmd.animate.frames)
+      / cmd.animate.num_shards;
+    for (unsigned frame = start_frame; frame < limit_frame; ++frame) {
+      render_variables.time = frame * (1.0 / cmd.animate.frames);
 #ifdef ENABLE_PYTHON      
     if(python_active) {
       initPython(render_variables.time);
@@ -677,7 +717,11 @@ int main(int argc, char **argv)
   PlatformUtils::ensureStdIO();
 #endif
 
-  const auto applicationPath = weakly_canonical(boost::dll::program_location().parent_path()).generic_string();
+#ifdef __EMSCRIPTEN__
+  const auto applicationPath = boost::dll::fs::current_path();
+#else
+  const auto applicationPath = weakly_canonical(boost::dll::program_location()).parent_path().generic_string();
+#endif
   PlatformUtils::registerApplicationPath(applicationPath);
 
 #ifdef ENABLE_CGAL
@@ -721,6 +765,7 @@ int main(int argc, char **argv)
     ("render", po::value<std::string>()->implicit_value(""), "for full geometry evaluation when exporting png")
     ("preview", po::value<std::string>()->implicit_value(""), "[=throwntogether] -for ThrownTogether preview png")
     ("animate", po::value<unsigned>(), "export N animated frames")
+    ("animate_sharding", po::value<std::string>(), "Parameter <shard>/<num_shards> - Divide work into <num_shards> and only output frames for <shard>. E.g. 2/5 only outputs the second 1/5 of frames. Use to parallelize work on multiple cores or machines.")
     ("view", po::value<CommaSeparatedVector>(), ("=view options: " + boost::algorithm::join(viewOptions.names(), " | ")).c_str())
     ("projection", po::value<std::string>(), "=(o)rtho or (p)erspective when exporting png")
     ("csglimit", po::value<unsigned int>(), "=n -stop rendering at n CSG elements when exporting png")
@@ -745,6 +790,7 @@ int main(int argc, char **argv)
     ("x,x", po::value<std::string>(), "dxf_file deprecated, use -o")
 #ifdef ENABLE_PYTHON
   ("trust-python",  "Trust python")
+  ("ipython",  "Run ipython Interpreter")
 #endif
   ;
 
@@ -778,6 +824,10 @@ int main(int argc, char **argv)
   if (vm.count("trust-python")) {
     LOG("Python Code globally trusted", OpenSCAD::debug);
     python_trusted = true;
+  }
+  if (vm.count("ipython")) {
+    LOG("Running ipython interpreter", OpenSCAD::debug);
+    python_runipython = true;
   }
 #endif
   if (vm.count("quiet")) {
@@ -915,14 +965,10 @@ int main(int argc, char **argv)
     }
   }
 
-  unsigned animate_frames = 0;
-  if (vm.count("animate")) {
-    animate_frames = vm["animate"].as<unsigned>();
-  }
-
+  AnimateArgs animate = get_animate(vm);
   Camera camera = get_camera(vm);
 
-  if (animate_frames) {
+  if (animate.frames) {
     for (const auto& filename : output_files) {
       if (filename == "-") {
         LOG("Option --animate is not supported when exporting to stdout.");
@@ -935,6 +981,12 @@ int main(int argc, char **argv)
   }
 
   PRINTDB("Application location detected as %s", applicationPath);
+#ifdef ENABLE_PYTHON  
+  if(python_runipython) {
+    ipython();	  
+    exit(0);
+  }
+#endif  
 
   auto cmdlinemode = false;
   if (!output_files.empty()) { // cmd-line mode
@@ -966,7 +1018,7 @@ int main(int argc, char **argv)
             viewOptions,
             camera,
             export_format,
-            animate_frames,
+            animate,
             vm.count("summary") ? vm["summary"].as<std::vector<std::string>>() : std::vector<std::string>{},
             vm.count("summary-file") ? vm["summary-file"].as<std::string>() : ""
           };

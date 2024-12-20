@@ -31,12 +31,17 @@ include("cmake/Modules/openscad_version.cmake")
 option(INFO "Display build configuration info at end of cmake config" ON)
 option(ENABLE_TESTS "Run testsuite after building." ON)
 option(EXPERIMENTAL "Enable Experimental Features" OFF)
-option(USE_MANIFOLD_TRIANGULATOR "Use Manifold's triangulator instead of CGAL's" OFF)
+option(USE_MANIFOLD_TRIANGULATOR "Use Manifold's triangulator instead of CGAL's" ON)
 option(USE_BUILTIN_MANIFOLD "Use manifold from submodule" ON)
+option(USE_BUILTIN_CLIPPER2 "Use Clipper2 from submodule" ON)
 option(USE_LEGACY_RENDERERS "Use legacy (non-VBO) OpenGL renderers" OFF)
 option(SNAPSHOT "Create dev snapshot, uses nightly icons" OFF)
 option(HEADLESS "Build without GUI frontend" OFF)
+if(APPLE)
+  option(USE_QT6 "Build the GUI with Qt6" ON)
+else()
 option(USE_QT6 "Build the GUI with Qt6" OFF)
+endif()
 option(ENABLE_EGL "Enable EGL support if available" ON)
 option(ENABLE_GLX "Enable GLX support if available" ON)
 # For now, we'll default to whatever OpenCSG uses (>=1.6 -> GLAD, <1.6 -> GLEW)
@@ -53,7 +58,6 @@ option(USE_CCACHE "Use ccache to speed up compilation." ON)
 option(ENABLE_CAIRO "Enable support for cairo vector graphics library." ON)
 option(ENABLE_SPNAV "Enable support for libspnav input driver." ON)
 option(ENABLE_HIDAPI "Enable support for HIDAPI input driver." ON)
-option(ENABLE_TBB "Enable support for oneAPI Threading Building Blocks." ON)
 option(ENABLE_CGAL "Enable CGAL." ON)
 option(ENABLE_MANIFOLD "Enable Manifold." ON)
 option(ALLOW_BUNDLED_HIDAPI "Allow usage of bundled HIDAPI library (Windows only)." OFF)
@@ -65,9 +69,16 @@ include(CMakeDependentOption)
 cmake_dependent_option(APPLE_UNIX "Build OpenSCAD in Unix mode in MacOS X instead of an Apple Bundle" OFF "APPLE" OFF)
 cmake_dependent_option(ENABLE_QTDBUS "Enable DBus input driver for Qt." ON "NOT HEADLESS" OFF)
 cmake_dependent_option(ENABLE_GAMEPAD "Enable Qt5Gamepad input driver." ON "NOT HEADLESS;NOT USE_QT6" OFF)
+set(WASM_BUILD_TYPE "web" CACHE STRING 
+  "WebAssembly build type. Support web (builds an OpenSCAD module) or node (standalone .js executable)")
 
-# Minimum version required for std::filesystem
-set(DEPLOYMENT_TARGET "10.15")
+if (USE_QT6)
+  # Minimum version required for Qt-6.5
+  set(DEPLOYMENT_TARGET "11.0")
+else()
+  # Minimum version required for std::filesystem
+  set(DEPLOYMENT_TARGET "10.15")
+endif()
 
 # Note: CMAKE_OSX_DEPLOYMENT_TARGET must be set before the project() invocation
 set(CMAKE_OSX_DEPLOYMENT_TARGET ${DEPLOYMENT_TARGET} CACHE STRING "Minimum OS X deployment version")
@@ -136,25 +147,65 @@ if (CMAKE_SYSTEM_NAME STREQUAL Emscripten)
   set(Boost_USE_STATIC_LIBS ON CACHE BOOL "" FORCE)
   set(Boost_USE_STATIC_RUNTIME ON CACHE BOOL "" FORCE)
   set(ENABLE_CAIRO OFF CACHE BOOL "" FORCE)
-  set(ENABLE_TBB OFF CACHE BOOL "" FORCE)
+  set(MANIFOLD_PAR OFF CACHE BOOL "" FORCE)
   set(NULLGL ON CACHE BOOL "" FORCE)
   set(ENABLE_PYTHON OFF CACHE BOOL "" FORCE)
   set(USE_MIMALLOC OFF CACHE BOOL "" FORCE)
   set(ENV{PKG_CONFIG_PATH} "/emsdk/upstream/emscripten/cache/sysroot/lib/pkgconfig")
   target_compile_definitions(OpenSCAD PRIVATE CGAL_DISABLE_ROUNDING_MATH_CHECK)
   target_link_libraries(OpenSCAD PRIVATE /emsdk/upstream/emscripten/cache/sysroot/lib/libz.a)
+  
+  # https://emscripten.org/docs/tools_reference/emcc.html
+  # https://emscripten.org/docs/tools_reference/settings_reference.html
+  target_compile_options(OpenSCAD PRIVATE -fexceptions)
   target_link_options(OpenSCAD PUBLIC
+    -fexceptions
+    -sABORT_ON_WASM_EXCEPTIONS
     -sALLOW_MEMORY_GROWTH=1
-    -sENVIRONMENT=web,worker
-    -sEXIT_RUNTIME=1
-    -sEXPORT_ES6=1
-    -sEXPORT_NAME=OpenSCAD
-    -sEXPORTED_RUNTIME_METHODS=['FS','ENV','callMain','ERRNO_CODES']
-    -sFORCE_FILESYSTEM=1
-    -sMODULARIZE=1
-    -sNO_DISABLE_EXCEPTION_CATCHING
-    -sUSE_PTHREADS=0
+    -sDISABLE_EXCEPTION_CATCHING=0
+    -sEXPORTED_RUNTIME_METHODS=['ENV','ERRNO_CODES','FS','PATH','callMain']
+    -sMAXIMUM_MEMORY=4GB
+    
+    # -g produces DWARF debug info, which is quite large and may need debugger extensions.
+    # Alternatively, can pass -gsource-map -sLOAD_SOURCE_MAP but then variable debugging isn't possible
+    $<$<CONFIG:Debug>:-g -O0>
   )
+  if (WASM_BUILD_TYPE STREQUAL "web")
+    target_link_options(OpenSCAD PUBLIC
+      -sENVIRONMENT=web,worker
+      -sEXIT_RUNTIME=1
+      -sEXPORT_ES6=1
+      -sEXPORT_NAME=OpenSCAD
+      -sMODULARIZE=1
+    )
+  elseif (WASM_BUILD_TYPE STREQUAL "node")
+    target_link_options(OpenSCAD PUBLIC
+      -sENVIRONMENT=node,worker
+      -sNODEJS_CATCH_EXIT
+      -sNODERAWFS
+
+      # Single .js (more elegant for CLI release) is larger than separate .js & .wasm (preferred for web)
+      $<$<CONFIG:Release>:-sSINGLE_FILE> 
+      
+      # Alternatively to single-file mode, code caching could make repeated runs faster:
+      # -sNODE_CODE_CACHING -sWASM_ASYNC_COMPILATION=0
+    )
+
+    # Ensure the resulting .js file is executable on Unix:
+    file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/prepend_node_shebang.cmake "
+      file(READ \"\${FILE}\" CONTENT)
+      file(WRITE \"\${FILE}\" \"#!/usr/bin/env node\n\${CONTENT}\")
+      if(CMAKE_HOST_UNIX)
+        execute_process(COMMAND chmod +x \"\${FILE}\")
+      endif()
+    ")
+    add_custom_command(
+      POST_BUILD TARGET OpenSCAD
+      COMMAND ${CMAKE_COMMAND} "-DFILE=$<TARGET_FILE:OpenSCAD>" -P "${CMAKE_CURRENT_BINARY_DIR}/prepend_node_shebang.cmake"
+    )
+  else()
+    message(FATAL_ERROR "Invalid WASM_BUILD_TYPE: ${WASM_BUILD_TYPE} (allowed: node, web)")
+  endif()
 endif()
 
 if(NULLGL)
@@ -288,10 +339,11 @@ if (MSVC)
   message(STATUS "Eigen: ${Eigen3_VERSION}")
 
   set(Boost_USE_STATIC_LIBS TRUE)
-  find_package(Boost 1.56 REQUIRED COMPONENTS filesystem system regex program_options)
+  find_package(Boost 1.61 REQUIRED COMPONENTS system regex program_options)
   message(STATUS "Boost: ${Boost_VERSION}")
   target_include_directories(OpenSCAD SYSTEM PRIVATE ${Boost_INCLUDE_DIRS})
   target_link_libraries(OpenSCAD PRIVATE ${Boost_LIBRARIES})
+  target_compile_definitions(OpenSCAD PRIVATE BOOST_DLL_USE_STD_FS)
 
   find_package(harfbuzz CONFIG REQUIRED)
   find_path(HARFBUZZ_INCLUDE_DIRS harfbuzz)
@@ -335,10 +387,11 @@ else()
   target_compile_definitions(OpenSCAD PRIVATE EIGEN_DONT_ALIGN)
   message(STATUS "Eigen: ${Eigen3_VERSION}")
 
-  find_package(Boost 1.56 REQUIRED COMPONENTS filesystem system regex program_options)
+  find_package(Boost 1.61 REQUIRED COMPONENTS system regex program_options)
   message(STATUS "Boost: ${Boost_VERSION}")
   target_include_directories(OpenSCAD SYSTEM PRIVATE ${Boost_INCLUDE_DIRS})
   target_link_libraries(OpenSCAD PRIVATE ${Boost_LIBRARIES})
+  target_compile_definitions(OpenSCAD PRIVATE BOOST_DLL_USE_STD_FS)
 
   find_package(HarfBuzz 0.9.19 REQUIRED QUIET)
   message(STATUS "Harfbuzz: ${HARFBUZZ_VERSION}")
@@ -493,24 +546,20 @@ if(ENABLE_PYTHON)
     target_include_directories(OpenSCADPy SYSTEM PRIVATE ${FREETYPE_INCLUDE_DIRS})
   else() #MXE
     if("${PYTHON_VERSION}" STREQUAL "")
-      message(STATUS "AAA")
-      SET(PYTHON_LIBRARIES ${Python_LIBRARIES} )
-      SET(PYTHON_INCLUDE_DIRS ${Python_INCLUDE_DIRS} )
+	    SET(Python_Eff_LIBRARIES ${Python_LIBRARIES} )
+	    SET(Python_Eff_INCLUDE_DIRS ${Python_INCLUDE_DIRS} )
     else()
-      message(STATUS "BBB")
-      message(STATUS "${PYTHON_VERSION}")
-      if("${PYTHON_VERSION}" STREQUAL "OFF")
-        message(STATUS "CCC")
-        SET(PYTHON_LIBRARIES ${Python_LIBRARIES} )
-        SET(PYTHON_INCLUDE_DIRS ${Python_INCLUDE_DIRS} )
-      else()
-        message(STATUS "DDD")
-        string(REGEX REPLACE "python[0-9.]+" "python${PYTHON_VERSION}"  PYTHON_INCLUDE_DIRS "${Python_INCLUDE_DIRS}" )
-        string(REGEX REPLACE "python[0-9.]+.so" "python${PYTHON_VERSION}.so"  PYTHON_LIBRARIES "${Python_LIBRARIES}" )
-      endif()
+	    if("${PYTHON_VERSION}" STREQUAL "OFF")
+                    SET(Python_Eff_LIBRARIES ${Python_LIBRARIES} )
+		    SET(Python_Eff_INCLUDE_DIRS ${Python_INCLUDE_DIRS} )
+            else()		    
+	   	     string(REGEX REPLACE "python[0-9.]+" "python${PYTHON_VERSION}"  Python_Eff_INCLUDE_DIRS "${Python_INCLUDE_DIRS}" )
+	             string(REGEX REPLACE "python[0-9.]+.so" "python${PYTHON_VERSION}.so"  Python_Eff_LIBRARIES "${Python_LIBRARIES}" )
+            endif()		     
     endif()
-    target_link_libraries(OpenSCADPy PRIVATE ${PYTHON_LIBRARIES})
-    target_include_directories(OpenSCADPy PRIVATE ${PYTHON_INCLUDE_DIRS})
+    target_link_libraries(OpenSCADPy PRIVATE ${Python_Eff_LIBRARIES})
+    target_include_directories(OpenSCADPy PRIVATE ${Python_Eff_INCLUDE_DIRS})
+    target_include_directories(OpenSCADPy PRIVATE "submodules/Clipper2/CPP/Clipper2Lib/include")
     message(STATUS "Python enabled")
     target_include_directories(OpenSCADPy SYSTEM PRIVATE ${FREETYPE_INCLUDE_DIRS})
     target_link_libraries(OpenSCADPy PRIVATE ${Python_LIBRARIES})
@@ -580,6 +629,7 @@ if(MXECROSS)
   target_link_libraries(OpenSCAD PRIVATE "libcurl.a;libidn2.a;libssh2.a;libunistring.a")
 else()	
   target_link_directories(OpenSCAD PRIVATE "/usr/lib64")
+  target_include_directories(OpenSCAD PRIVATE "submodules/Clipper2/CPP/Clipper2Lib/include")
   target_link_libraries(OpenSCAD PRIVATE "libcurl.so")
 endif()
 
@@ -971,7 +1021,6 @@ set(CORE_SOURCES
   src/ext/libtess2/Source/sweep.c
   src/ext/libtess2/Source/tess.c
   src/ext/lodepng/lodepng.cpp
-  src/ext/polyclipping/clipper.cpp
   src/geometry/ClipperUtils.cc
   src/geometry/Geometry.cc
   src/geometry/GeometryCache.cc
@@ -979,6 +1028,8 @@ set(CORE_SOURCES
   src/geometry/GeometryUtils.cc
   src/geometry/PolySet.cc
   src/geometry/PolySetBuilder.cc
+  src/geometry/Curve.cc
+  src/geometry/Surface.cc
   src/geometry/PolySetUtils.cc
   src/geometry/rotextrude.cc
   src/geometry/Polygon2d.cc
@@ -1004,6 +1055,7 @@ set(CORE_SOURCES
   src/io/export_pdf.cc
   src/io/export_stl.cc
   src/io/export_svg.cc
+  src/io/export_step.cc
   src/io/export_pov.cc
   src/io/export_param.cc
   src/io/export_wrl.cc
@@ -1013,6 +1065,8 @@ set(CORE_SOURCES
   src/io/import_obj.cc
   src/io/import_off.cc
   src/io/import_stl.cc
+  src/io/import_step.cc
+  src/io/StepKernel.cc
   src/io/import_svg.cc
   src/libsvg/circle.cc
   src/libsvg/data.cc
@@ -1091,38 +1145,44 @@ set(MANIFOLD_CGAL_SOURCES
   src/geometry/manifold/manifold-applyops-minkowski.cc
 )
 
-if(EXPERIMENTAL AND ENABLE_TBB)
-  # Note: currently only Manifold-related code makes use of TBB parallelization
-  # ("exact" CGAL numerics are not thread-safe)
-  target_compile_options(OpenSCAD PRIVATE
-    -DENABLE_TBB
-  )
-  find_package(TBB QUIET)
-  if (NOT TBB_FOUND AND PKG_CONFIG_FOUND)
-    pkg_check_modules(TBB tbb REQUIRED)
-    add_library(TBB::tbb UNKNOWN IMPORTED)
-    set_target_properties(TBB::tbb
-      PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${TBB_INCLUDE_DIRS}")
-    set_target_properties(TBB::tbb
-      PROPERTIES INTERFACE_LINK_LIBRARIES "${TBB_LINK_LIBRARIES}")
-    list(GET TBB_LINK_LIBRARIES 0 TBB_IMPORTED_LOCATION)
-    set_target_properties(TBB::tbb
-      PROPERTIES IMPORTED_LOCATION "${TBB_IMPORTED_LOCATION}")
-  endif()
-  message(STATUS "TBB: ${TBB_VERSION}")
-  target_link_libraries(OpenSCAD PRIVATE TBB::tbb)
+if(USE_BUILTIN_CLIPPER2)
+  set(CLIPPER2_UTILS OFF)
+  set(CLIPPER2_EXAMPLES OFF)
+  set(CLIPPER2_TESTS OFF)
+  add_subdirectory("submodules/Clipper2/CPP" EXCLUDE_FROM_ALL)
+  set(Clipper2_FOUND "YES")
+  message(STATUS "Clipper2 submodule")
+else()
+  find_package(Clipper2 REQUIRED QUIET)
+  message(STATUS "Clipper2: ${Clipper2_VERSION}")
 endif()
+target_link_libraries(OpenSCAD PRIVATE Clipper2::Clipper2)
 
 if(ENABLE_MANIFOLD)
+  if(NOT DEFINED MANIFOLD_PAR)
+    # Note: currently only Manifold-related code makes use of TBB parallelization
+    # ("exact" CGAL numerics are not thread-safe)
+    target_compile_options(OpenSCAD PRIVATE
+      -DENABLE_TBB
+    )
+    find_package(TBB QUIET)
+    if (NOT TBB_FOUND AND PKG_CONFIG_FOUND)
+      pkg_check_modules(TBB tbb REQUIRED)
+      add_library(TBB::tbb UNKNOWN IMPORTED)
+      set_target_properties(TBB::tbb
+        PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${TBB_INCLUDE_DIRS}")
+      set_target_properties(TBB::tbb
+        PROPERTIES INTERFACE_LINK_LIBRARIES "${TBB_LINK_LIBRARIES}")
+      list(GET TBB_LINK_LIBRARIES 0 TBB_IMPORTED_LOCATION)
+      set_target_properties(TBB::tbb
+        PROPERTIES IMPORTED_LOCATION "${TBB_IMPORTED_LOCATION}")
+    endif()
+    message(STATUS "TBB: ${TBB_VERSION}")
+    target_link_libraries(OpenSCAD PRIVATE TBB::tbb)
 
-  # Hack to find our wanted version of Python before Manifold's included googletest finds Python2
-  find_package(Python3 3.4 COMPONENTS Interpreter REQUIRED)
-
-  if(NOT DEFINED MANIFOLD_PAR AND ENABLE_TBB)
-    set(MANIFOLD_PAR TBB CACHE STRING "Parallel backend, either \"TBB\" or \"OpenMP\" or \"NONE\"" FORCE)
+    set(MANIFOLD_PAR ON CACHE BOOL "Parallel backend" FORCE)
   endif()
 
-  set(PYBIND11_FINDPYTHON OFF)
   set(MANIFOLD_PYBIND OFF)
   set(MANIFOLD_TEST OFF)
   if(USE_BUILTIN_MANIFOLD)
@@ -1133,10 +1193,12 @@ if(ENABLE_MANIFOLD)
     else()
       add_subdirectory(submodules/manifold EXCLUDE_FROM_ALL)
     endif()
+    message(STATUS "mainfold submodule: ${manifold_VERSION}")
   else()
-    find_package(manifold REQUIRED)
+    find_package(manifold REQUIRED QUIET)
+    message(STATUS "mainfold: ${manifold_VERSION}")
   endif()
-  target_link_libraries(OpenSCAD PRIVATE manifold polygon cross_section)
+  target_link_libraries(OpenSCAD PRIVATE manifold::manifold)
   add_sanitizers(manifold)
 
   if (USE_MANIFOLD_TRIANGULATOR)
@@ -1229,6 +1291,7 @@ set(GUI_SOURCES
   src/gui/Preferences.cc
   src/gui/PrintInitDialog.cc
   src/gui/PrintService.cc
+  src/gui/ExternalToolInterface.cc
   src/gui/ProgressWidget.cc
   src/gui/QGLView.cc
   src/gui/QGLView2.cc
@@ -1358,11 +1421,6 @@ set(GUI_UIS
     src/gui/parameter/ParameterVector.ui
     src/gui/parameter/ParameterWidget.ui
 )
-
-if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-  # Ignore specific warning on external lib
-  set_source_files_properties("src/ext/polyclipping/clipper.cpp" PROPERTIES COMPILE_FLAGS "-Wno-class-memaccess")
-endif()
 
 if (ENABLE_MANIFOLD)
   target_compile_definitions(OpenSCAD PRIVATE ENABLE_MANIFOLD)

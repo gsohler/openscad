@@ -170,10 +170,14 @@ void bezier_patch(PolySetBuilder &builder, Vector3d center, Vector3d dir[3], int
   }
 }
 
-Vector3d createFilletLimit(Vector3d v, double r) {
+double createFilletLimit(Vector3d v, double r) {
   double l=v.norm()/2.0;
   if(l > r) l=r;
-  return v.normalized()*l;
+  return l;
+}
+
+void debug_pt(const char *msg, Vector3d pt) {
+  printf("%s %g/%g/%g\n",msg, pt[0], pt[1], pt[2]);	
 }
 
 std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> ps,  std::vector<bool> corner_selected, double r_, int bn, double minang)
@@ -214,16 +218,21 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
   for(auto &e: edge_db) {
     if(corner_selected[e.first.ind1] && corner_selected[e.first.ind2])
     {
+      assert(e.second.facea >= 0);
+      assert(e.second.faceb >= 0);
       auto &facea =merged[e.second.facea];
       auto &faceb =merged[e.second.faceb];
       Vector3d fan=calcTriangleNormal(ps->vertices, facea).head<3>();
       Vector3d fbn=calcTriangleNormal(ps->vertices, faceb).head<3>();
       double d=fan.dot(fbn);
-      if(d < cos_minang) {
-        e.second.sel=1;
-        corner_rounds[e.first.ind1].push_back(e.first.ind2);
-        corner_rounds[e.first.ind2].push_back(e.first.ind1);
-      }	else e.second.sel=0;
+      e.second.sel=0;
+      if(d >= cos_minang) continue; // dont create facets when the angle conner is too small
+      if(polinds[e.first.ind1].size() != 3) continue; // start must be 3edge corner
+      if(polinds[e.first.ind2].size() != 3) continue; // start must be 3edge corner
+
+      e.second.sel=1;
+      corner_rounds[e.first.ind1].push_back(e.first.ind2);
+      corner_rounds[e.first.ind2].push_back(e.first.ind1);
     }		      
   }
 
@@ -243,8 +252,8 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
       Vector3d p2=ps->vertices[e.first.ind2];
       Vector3d p1org=p1, p2org=p2;
       Vector3d dir=p2-p1;
-      if(corner_rounds[e.first.ind1].size() >=  3) p1 += createFilletLimit(dir,r_);
-      if(corner_rounds[e.first.ind2].size() >=  3) p2 -= createFilletLimit(dir,r_);
+      if(corner_rounds[e.first.ind1].size() >=  3) p1 += dir.normalized()*createFilletLimit(dir,r_);
+      if(corner_rounds[e.first.ind2].size() >=  3) p2 -= dir.normalized()*createFilletLimit(dir,r_);
       dir=dir.normalized(); // TODO
       auto &facea =merged[e.second.facea];								  
       auto &faceb =merged[e.second.faceb];								  
@@ -257,19 +266,21 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
       Vector3d fan=calcTriangleNormal(ps->vertices, facea).head<3>();
       Vector3d fbn=calcTriangleNormal(ps->vertices, faceb).head<3>();
 
+      // A 1st side of the edge
+      // B 2nd face of the edge
       int indposao, indposbo, indposai, indposbi;
       Vector3d unit;
 
-      indposao = facea[(e.second.posa+facean-1)%facean];
-      indposai = facea[(e.second.posa+1)%facean];
+      indposao = facea[(e.second.posa+facean-1)%facean]; // o away from edge
+      indposai = facea[(e.second.posa+1)%facean]; // i on edge
 
       indposbo = faceb[(e.second.posb+2)%facebn];
       indposbi = faceb[e.second.posb];
     
-      Vector3d e_fa1  = createFilletLimit((ps->vertices[indposao]-ps->vertices[facea[e.second.posa]]), r_)*fanf; // Facea neben ind1
+      Vector3d e_fa1  = (ps->vertices[indposao]-ps->vertices[facea[e.second.posa]]).normalized()*fanf; // Facea neben ind1
       Vector3d e_fa1p = (ps->vertices[indposai]-ps->vertices[facea[e.second.posa]])*fanf; // Face1 nahe  richtung
 															   //
-      Vector3d e_fb1 =  createFilletLimit((ps->vertices[indposbo]-ps->vertices[faceb[(e.second.posb+1)%facebn]]),r_)*fbnf; // Faceb neben ind1
+      Vector3d e_fb1 =  (ps->vertices[indposbo]-ps->vertices[faceb[(e.second.posb+1)%facebn]]).normalized()*fbnf; // Faceb neben ind1
       Vector3d e_fb1p = (ps->vertices[indposbi]-ps->vertices[faceb[(e.second.posb+1)%facebn]])*fbnf; 
 
       if(corner_rounds[e.first.ind1].size() == 2)
@@ -277,24 +288,36 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
         double a=(e_fb1.cross(e_fa1)).dot(dir);
 	double b=(fan.cross(fbn)).dot(e_fa1p)*fanf*fbnf;
         if(list_included(corner_rounds[e.first.ind1],indposao)){
-		e_fa1 += dir*r_*fanf; 
+		e_fa1 += dir*fanf; 
+		double ang=(dir*fanf).dot(e_fa1.normalized());
+		e_fa1.normalize();
+		e_fa1 /= sqrt(1-ang*ang);
 		if(a*b < 0) e_fa1 = -e_fa1*fanf;
 		else e_fa1 = e_fa1*fanf;
-	}
+	} 
+
         if(list_included(corner_rounds[e.first.ind1],indposbo)){
-		e_fb1 += dir*r_*fbnf;
+		e_fb1 += dir*fbnf;
+		double ang=(dir*fbnf).dot(e_fb1.normalized());
+		e_fb1.normalize();
+		e_fb1 /= sqrt(1-ang*ang);
 		if(a*b < 0) e_fb1 = -e_fb1;
+		else e_fb1 = e_fb1*fbnf;
 	}
+	e_fa1 *= createFilletLimit(p2org-p1org,r_);
+	e_fb1 *= createFilletLimit(p2org-p1org,r_);
       }
 
       if(corner_rounds[e.first.ind1].size() == 3)
       {
+        e_fa1 *= createFilletLimit(p2org-p1org,r_);
+        e_fb1 *= createFilletLimit(p2org-p1org,r_);
         if( (fbn.cross(fan)).dot(e_fa1p) < 0 || (fbn.cross(fan)).dot(e_fb1p) < 0) {
 	  if((e_fa1p.cross(e_fa1)).dot(fan)*fanf < 0) {
-	    e_fa1 = -e_fa1*fanf - 2*createFilletLimit(p2org-p1org, r_);
+	    e_fa1 = -e_fa1*fanf - 2*(p2org-p1org).normalized()*createFilletLimit(p2org-p1org, r_);
 	  }
 	  if((e_fb1p.cross(e_fb1)).dot(fbn)*fbnf > 0) {
-	    e_fb1 = -e_fb1*fbnf - 2*createFilletLimit(p2org-p1org, r_);
+	    e_fb1 = -e_fb1*fbnf - 2*(p2org-p1org).normalized()*createFilletLimit(p2org-p1org, r_);
 	  }
 	}
         if(  (fbn.cross(fan)).dot(e_fb1p) > 0 ) {
@@ -314,12 +337,11 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
       indposbo = faceb[(e.second.posb+facebn-1)%facebn];
       indposbi = faceb[(e.second.posb+1)%facebn];
 
-      Vector3d e_fa2 = createFilletLimit((ps->vertices[indposao]-ps->vertices[facea[(e.second.posa+1)%facean]]),r_)*fanf; // Face1 entfernte richtung
+      Vector3d e_fa2 = (ps->vertices[indposao]-ps->vertices[facea[(e.second.posa+1)%facean]]).normalized()*fanf; // Face1 entfernte richtung
       Vector3d e_fa2p = (ps->vertices[indposai]-ps->vertices[facea[(e.second.posa+1)%facean]])*fanf; // Face1 entfernte richtung
 													       //
-      Vector3d e_fb2 = createFilletLimit((ps->vertices[indposbo]-ps->vertices[faceb[(e.second.posb+0)%facebn]]),r_)*fbnf; // Face2 entfernte Rcithung
+      Vector3d e_fb2 = (ps->vertices[indposbo]-ps->vertices[faceb[(e.second.posb+0)%facebn]]).normalized()*fbnf; // Face2 entfernte Rcithung
       Vector3d e_fb2p = (ps->vertices[indposbi]-ps->vertices[faceb[(e.second.posb+0)%facebn]])*fbnf; // Face2 entfernte Rcithung
-        	
 
 													   //
       if(corner_rounds[e.first.ind2].size() == 2) 
@@ -327,18 +349,30 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
         double a=(e_fb2.cross(e_fa2)).dot(dir);
 	double b=(fan.cross(fbn)).dot(e_fa2p)*fanf*fbnf;
         if(list_included(corner_rounds[e.first.ind2],indposao)){
-		e_fa2 -= dir*r_*fanf;
+		e_fa2 -= dir*fanf;
+		double ang=(dir*fanf).dot(e_fa2.normalized());
+		e_fa2.normalize();
+		e_fa2 /= sqrt(1-ang*ang);
 		if(a*b > 0) e_fa2 = -e_fa2*fanf;
 		else e_fa2 = e_fa2*fanf;
 	}
+
         if(list_included(corner_rounds[e.first.ind2],indposbo)){
-		e_fb2 -= dir*r_*fbnf;
+		e_fb2 -= dir*fbnf;
+		double ang=(dir*fbnf).dot(e_fb2.normalized());
+		e_fb2.normalize();
+		e_fb2 /= sqrt(1-ang*ang);
 		if(a*b > 0)  e_fb2 = -e_fb2;
 	}
+	e_fa2 *= createFilletLimit(p2org-p1org, r_);
+        e_fb2 *= createFilletLimit(p2org-p1org, r_);	      
+
       }	
 
       if(corner_rounds[e.first.ind2].size() == 3)
       {
+        e_fa2 *= createFilletLimit(p2org-p1org, r_);
+        e_fb2 *= createFilletLimit(p2org-p1org, r_);
         if( -(fbn.cross(fan)).dot(e_fa2p) < 0 || -(fbn.cross(fan)).dot(e_fb2p) < 0 ) {
 	  if(-(e_fa2p.cross(e_fa2)).dot(fan)*fanf < 0){
             e_fa2 = -e_fa2*fanf + 2*dir*r_; 
@@ -514,19 +548,26 @@ std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> p
 
       std::vector<int> angle;
       std::vector<Vector3d> dir;
+      Vector3d x;
       if(faceend[0] == facebeg[1]) { // 0,1,2
-        dir.push_back(createFilletLimit(ps->vertices[faceend[1]]-ps->vertices[i],r_));
+        x = ps->vertices[faceend[1]]-ps->vertices[i];			    
+        dir.push_back(x.normalized()*createFilletLimit(x,r_));
 	angle.push_back((facenorm[1].cross(facenorm[2])).dot(ps->vertices[faceend[1]]-ps->vertices[i])>0?1:-1);
-        dir.push_back(createFilletLimit(ps->vertices[faceend[2]]-ps->vertices[i],r_));
+	x = ps->vertices[faceend[2]]-ps->vertices[i];
+        dir.push_back(x.normalized()*createFilletLimit(x,r_));
 	angle.push_back((facenorm[2].cross(facenorm[0])).dot(ps->vertices[faceend[2]]-ps->vertices[i])>0?1:-1);
-        dir.push_back(createFilletLimit(ps->vertices[faceend[0]]-ps->vertices[i],r_));
+	x = ps->vertices[faceend[0]]-ps->vertices[i];
+        dir.push_back(x.normalized() *createFilletLimit(x,r_));
 	angle.push_back((facenorm[0].cross(facenorm[1])).dot(ps->vertices[faceend[0]]-ps->vertices[i])>0?1:-1);
       } else if(faceend[0] == facebeg[2]) { 
-        dir.push_back(createFilletLimit(ps->vertices[faceend[2]]-ps->vertices[i],r_));
+        x = ps->vertices[faceend[2]]-ps->vertices[i];	      
+        dir.push_back(x.normalized() * createFilletLimit(x ,r_));
 	angle.push_back((facenorm[2].cross(facenorm[1])).dot(ps->vertices[faceend[2]]-ps->vertices[i])>0?1:-1);
-        dir.push_back(createFilletLimit(ps->vertices[faceend[0]]-ps->vertices[i],r_));
+	x = ps->vertices[faceend[0]]-ps->vertices[i];
+        dir.push_back(x.normalized() *createFilletLimit(x ,r_));
 	angle.push_back((facenorm[0].cross(facenorm[2])).dot(ps->vertices[faceend[0]]-ps->vertices[i])>0?1:-1);
-        dir.push_back(createFilletLimit(ps->vertices[faceend[1]]-ps->vertices[i],r_));
+	x = ps->vertices[faceend[1]]-ps->vertices[i];
+        dir.push_back(x.normalized() * createFilletLimit(x ,r_));
 	angle.push_back((facenorm[1].cross(facenorm[0])).dot(ps->vertices[faceend[1]]-ps->vertices[i])>0?1:-1);
       } else assert(0);
       int conc1=-1, conc2=-1, conc3=-1;		      

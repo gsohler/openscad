@@ -86,8 +86,8 @@ void SourceFile::registerUse(const std::string& path, const Location& loc)
       }	else trusted =  python_trusted;
 */      
       if(trusted) {
-        boost::filesystem::path boost_path(path); 
-        std::string cmd = "import sys\nsys.path.append('"+boost_path.parent_path().string()+"')\nimport "+boost_path.stem().string();
+        std::filesystem::path fs_path(path); 
+        std::string cmd = "import sys\nsys.path.append('"+fs_path.parent_path().string()+"')\nimport "+fs_path.stem().string();
         if(!pythonRuntimeInitialized) initPython(0.0);
         std::string error=evaluatePython(cmd); 
         if (error.size() > 0) LOG(message_group::Error, Location::NONE, "", error.c_str());

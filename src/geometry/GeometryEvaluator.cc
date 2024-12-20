@@ -127,6 +127,7 @@ void triangleDump(const char *msg, const IndexedFace &face, const std::vector<Ve
 Vector4d calcTriangleNormal(const std::vector<Vector3d> &vertices,const IndexedFace &pol)
 {
 	int n=pol.size();
+	assert(pol.size() >= 3);
 	Vector3d norm(0,0,0);
 	for(int j=0;j<n-2;j++) {
 		// need to calculate all normals, as 1st 2 could be in a concave corner
@@ -230,6 +231,23 @@ std::unordered_map<EdgeKey, EdgeVal, boost::hash<EdgeKey> > createEdgeDb(const s
 	edge_db[edge].posb=j;
       }
     }    
+  }
+  int error=0;
+  for(auto &e: edge_db) {
+    if(e.second.facea == -1 || e.second.faceb == -1) {
+      printf("Mismatched EdgeDB ind1=%d idn2=%d facea=%d faceb=%d\n",e.first.ind1, e.first.ind2, e.second.facea, e.second.faceb);
+      error=1;
+    }
+  }
+  if(error) {
+    for(unsigned int i=0;i<indices.size();i++)
+    {
+      auto &face=indices[i];
+      printf("%d :",i);
+      for(unsigned int j=0;j<face.size();j++) printf("%d ",face[j]);
+      printf("\n");
+    } // tri 5-9-11 missing
+    assert(0);	      
   }
   return edge_db;
 }
@@ -460,7 +478,8 @@ static indexedFaceList mergeTrianglesSub(const std::vector<IndexedFace> &triangl
 			Vector3d p0=vert[last];
 			Vector3d p1=vert[cur];
 			Vector3d p2=vert[next];
-			if((p2-p1).cross(p1-p0).norm() > 0.00001) {
+			if(1) { // (p2-p1).cross(p1-p0).norm() > 0.00001) {
+			// TODO enable again, need partner also to remove
 				poly_new.push_back(cur);
 				last=cur;
 				cur=next;
@@ -488,7 +507,7 @@ std::vector<IndexedFace> mergeTriangles(const std::vector<IndexedFace> polygons,
 		int norm_ind=-1;
 		for(unsigned int j=0;norm_ind == -1 && j<norm_list.size();j++) {
 			const auto &cur = norm_list[j];
-			if(cur.head<3>().dot(norm.head<3>()) > 0.999 && fabs(cur[3] - norm[3]) < 0.001) {
+			if(cur.head<3>().dot(norm.head<3>()) > 0.99999 && fabs(cur[3] - norm[3]) < 0.001) {
 				norm_ind=j;
 			}
 			if(cur.norm() < 1e-6 && norm.norm() < 1e-6) norm_ind=j; // zero vector matches zero vector
@@ -1392,7 +1411,7 @@ std::vector<Vector3d> offset3D_offset(std::vector<Vector3d> vertices, std::vecto
 	// -------------------------------
 	// now calc length of all edges
 	// -------------------------------
-	std::vector<double> edge_len, edge_len_factor;
+	std::vector<double> edge_len;
 	double edge_len_min=0;
 	for(unsigned int i=0;i<indices.size();i++)
 	{
@@ -1612,7 +1631,7 @@ std::vector<Vector3d> offset3D_offset(std::vector<Vector3d> vertices, std::vecto
 				} else 	verticesNew[i]=verticesNew[mainfiller[0]];
 				continue;
 			}
-		} else if(faceInds.size() == 3) {
+		} else if(faceInds.size() >= 3) {
 			Vector3d dir0=faceNormal[faceInds[0]].head<3>();
 			Vector3d dir1=faceNormal[faceInds[1]].head<3>();
 			Vector3d dir2=faceNormal[faceInds[2]].head<3>();
@@ -1680,11 +1699,9 @@ std::vector<Vector3d> offset3D_offset(std::vector<Vector3d> vertices, std::vecto
 			if(b > a) {
 				double dist=(verticesNew[b]-verticesNew[a]).norm();
 				double fact = (dist-edge_len[cnt])/off_act;
-				if(fabs(fact) > 0.0001) {
-					// find maximal downsize value
-					double t_off_max=-edge_len[cnt]/fact;
-					if(off_max < t_off_max && t_off_max < 0) off_max=t_off_max;
-					edge_len_factor.push_back(fact);
+				if(fabs(edge_len[cnt]-dist) > 1e-5) {
+					double off_max_sub = off_act/(edge_len[cnt]-dist);
+					if(off_max_sub > off_max && off_max_sub < 0) off_max = off_max_sub;
 				}
 				cnt++;
 			}
@@ -2078,7 +2095,8 @@ std::unique_ptr<Polygon2d> GeometryEvaluator::applyHull2D(const AbstractNode& no
 std::unique_ptr<Polygon2d> GeometryEvaluator::applyFill2D(const AbstractNode& node)
 {
   // Merge and sanitize input geometry
-  auto geometry_in = ClipperUtils::apply(collectChildren2D(node), ClipperLib::ctUnion);
+  auto geometry_in = ClipperUtils::apply(collectChildren2D(node), Clipper2Lib::ClipType::Union);
+  assert(geometry_in->isSanitized());
 
   std::vector<std::shared_ptr<const Polygon2d>> newchildren;
   // Keep only the 'positive' outlines, eg: the outside edges
@@ -2089,7 +2107,7 @@ std::unique_ptr<Polygon2d> GeometryEvaluator::applyFill2D(const AbstractNode& no
   }
 
   // Re-merge geometry in case of nested outlines
-  return ClipperUtils::apply(newchildren, ClipperLib::ctUnion);
+  return ClipperUtils::apply(newchildren, Clipper2Lib::ClipType::Union);
 }
 
 std::unique_ptr<Geometry> GeometryEvaluator::applyHull3D(const AbstractNode& node)
@@ -2183,6 +2201,7 @@ bool GeometryEvaluator::isSmartCached(const AbstractNode& node)
 std::shared_ptr<const Geometry> GeometryEvaluator::smartCacheGet(const AbstractNode& node, bool preferNef)
 {
   const std::string& key = this->tree.getIdString(node);
+  if(key.empty() ) return {};
   const bool hasgeom = GeometryCache::instance()->contains(key);
   const bool hascgal = CGALCache::instance()->contains(key);
   if (hascgal && (preferNef || !hasgeom)) return CGALCache::instance()->get(key);
@@ -2247,17 +2266,17 @@ std::unique_ptr<Polygon2d> GeometryEvaluator::applyToChildren2D(const AbstractNo
     }
   }
 
-  ClipperLib::ClipType clipType;
+  Clipper2Lib::ClipType clipType;
   switch (op) {
   case OpenSCADOperator::UNION:
   case OpenSCADOperator::OFFSET:
-    clipType = ClipperLib::ctUnion;
+    clipType = Clipper2Lib::ClipType::Union;
     break;
   case OpenSCADOperator::INTERSECTION:
-    clipType = ClipperLib::ctIntersection;
+    clipType = Clipper2Lib::ClipType::Intersection;
     break;
   case OpenSCADOperator::DIFFERENCE:
-    clipType = ClipperLib::ctDifference;
+    clipType = Clipper2Lib::ClipType::Difference;
     break;
   default:
     LOG(message_group::Error, "Unknown boolean operation %1$d", int(op));
@@ -2509,14 +2528,8 @@ Response GeometryEvaluator::visit(State& state, const TextNode& node)
   if (state.isPrefix()) {
     std::shared_ptr<const Geometry> geom;
     if (!isSmartCached(node)) {
-      auto geometrylist = node.createGeometryList();
-      std::vector<std::shared_ptr<const Polygon2d>> polygonlist;
-      for (const auto& geometry : geometrylist) {
-        const auto polygon = std::dynamic_pointer_cast<const Polygon2d>(geometry);
-        assert(polygon);
-        polygonlist.push_back(polygon);
-      }
-      geom = ClipperUtils::apply(polygonlist, ClipperLib::ctUnion);
+      auto polygonlist = node.createPolygonList();
+      geom = ClipperUtils::apply(polygonlist, Clipper2Lib::ClipType::Union);
     } else {
       geom = GeometryCache::instance()->get(this->tree.getIdString(node));
     }
@@ -3283,7 +3296,7 @@ std::shared_ptr<const Geometry> GeometryEvaluator::projectionNoCut(const Project
 {
 #ifdef ENABLE_MANIFOLD
   if (RenderSettings::inst()->backend3D == RenderBackend3D::ManifoldBackend) {
-    std::shared_ptr<const Geometry> newgeom = applyToChildren3D(node, OpenSCADOperator::UNION).constptr();
+    const std::shared_ptr<const Geometry> newgeom = applyToChildren3D(node, OpenSCADOperator::UNION).constptr();
     if (newgeom) {
         auto manifold = ManifoldUtils::createManifoldFromGeometry(newgeom);
         auto poly2d = manifold->project();
@@ -3294,9 +3307,7 @@ std::shared_ptr<const Geometry> GeometryEvaluator::projectionNoCut(const Project
   }
 #endif
 
-  std::shared_ptr<const Geometry> geom;
-  std::vector<std::unique_ptr<Polygon2d>> tmp_geom;
-  BoundingBox bounds;
+  std::vector<std::shared_ptr<const Polygon2d>> tmp_geom;
   for (const auto& [chnode, chgeom] : this->visitedchildren[node.index()]) {
     if (chnode->modinst->isBackground()) continue;
 
@@ -3306,32 +3317,12 @@ std::shared_ptr<const Geometry> GeometryEvaluator::projectionNoCut(const Project
     // project chgeom -> polygon2d
     if (auto chPS = PolySetUtils::getGeometryAsPolySet(chgeom)) {
       if (auto poly = PolySetUtils::project(*chPS)) {
-        bounds.extend(poly->getBoundingBox());
-        tmp_geom.push_back(std::move(poly));
+        tmp_geom.push_back(std::shared_ptr(std::move(poly)));
       }
     }
   }
-  int pow2 = ClipperUtils::getScalePow2(bounds);
-
-  ClipperLib::Clipper sumclipper;
-  for (auto &poly : tmp_geom) {
-    ClipperLib::Paths result = ClipperUtils::fromPolygon2d(*poly, pow2);
-    // Using NonZero ensures that we don't create holes from polygons sharing
-    // edges since we're unioning a mesh
-    result = ClipperUtils::process(result, ClipperLib::ctUnion, ClipperLib::pftNonZero);
-    // Add correctly winded polygons to the main clipper
-    sumclipper.AddPaths(result, ClipperLib::ptSubject, true);
-  }
-
-  ClipperLib::PolyTree sumresult;
-  // This is key - without StrictlySimple, we tend to get self-intersecting results
-  sumclipper.StrictlySimple(true);
-  sumclipper.Execute(ClipperLib::ctUnion, sumresult, ClipperLib::pftNonZero, ClipperLib::pftNonZero);
-  if (sumresult.Total() > 0) {
-    geom = ClipperUtils::toPolygon2d(sumresult, pow2);
-  }
-
-  return geom;
+  auto projected = ClipperUtils::applyProjection(tmp_geom);
+  return std::shared_ptr(std::move(projected));
 }
 
 

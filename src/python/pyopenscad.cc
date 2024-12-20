@@ -42,10 +42,12 @@ PyObject *pythonMainModule = nullptr ;
 std::list<std::string> pythonInventory;
 AssignmentList customizer_parameters;
 AssignmentList customizer_parameters_finished;
+bool pythonDryRun=false;
 std::shared_ptr<AbstractNode> python_result_node = nullptr; /* global result veriable containing the python created result */
 std::vector<SelectedObject> python_result_handle;
 bool python_active;  /* if python is actually used during evaluation */
 bool python_trusted; /* global Python trust flag */
+bool python_runipython = false;
 #include "PlatformUtils.h"
 bool pythonMainModuleInitialized = false;
 bool pythonRuntimeInitialized = false;
@@ -53,6 +55,7 @@ bool pythonRuntimeInitialized = false;
 std::vector<std::string> mapping_name;
 std::vector<std::string> mapping_code;
 std::vector<int> mapping_level;
+std::shared_ptr<const FileContext> osinclude_context = nullptr;
 
 
 void PyOpenSCADObject_dealloc(PyOpenSCADObject *self)
@@ -102,18 +105,19 @@ PyObject *PyOpenSCADObjectFromNode(PyTypeObject *type, const std::shared_ptr<Abs
   return nullptr;
 }
 
-PyGILState_STATE gstate=PyGILState_LOCKED;
+//PyGILState_STATE gstate=PyGILState_LOCKED;
+PyThreadState *tstate=nullptr;
 
 void python_lock(void){
-#ifndef _WIN32	
-//  gstate = PyGILState_Ensure();	
-#endif  
+//#ifndef _WIN32	
+  if(tstate != nullptr && pythonInitDict != nullptr) PyEval_RestoreThread(tstate);
+//#endif  
 }
 
 void python_unlock(void) {
-#ifndef _WIN32	
-//  PyGILState_Release(gstate);	
-#endif  
+//#ifndef _WIN32	
+  if(pythonInitDict != nullptr)	tstate = PyEval_SaveThread();
+//#endif  
 }
 
 /*
@@ -186,26 +190,27 @@ std::shared_ptr<AbstractNode> PyOpenSCADObjectToNodeMulti(PyObject *objs,PyObjec
   return result;
 }
 
-std::string python_hierdump(const std::shared_ptr<AbstractNode> &node)
+void  python_hierdump(std::ostringstream &stream, const std::shared_ptr<AbstractNode> &node)
 {
-  std::string dump = node->toString();	
+  stream <<  node->toString();	
   auto children = node->getChildren();
-  if(children.size() < 1) dump += ";";
-  else if(children.size() < 2) dump += python_hierdump(children[0]);
+  if(children.size() < 1) stream << ";";
+  else if(children.size() < 2)  python_hierdump(stream, children[0]);
   else {
-   dump += "{ ";	  
-   for(unsigned int i=0;i<children.size();i++) dump += python_hierdump(children[i]);
-   dump += " }";	  
+   stream <<  "{ ";	  
+   for(unsigned int i=0;i<children.size();i++) python_hierdump(stream, children[i]);
+   stream << " }";	  
   }
-
-  return dump;
 }
-void python_build_hashmap(const std::shared_ptr<AbstractNode> &node)
+void python_build_hashmap(const std::shared_ptr<AbstractNode> &node, int level)
 {
+	
   PyObject *maindict = PyModule_GetDict(pythonMainModule);
   PyObject *key, *value;
   Py_ssize_t pos = 0;
-  std::string code=python_hierdump(node);
+  std::ostringstream stream;
+  python_hierdump(stream, node);
+  std::string code = stream.str();
   while (PyDict_Next(maindict, &pos, &key, &value)) {
     if(value->ob_type != &PyOpenSCADType) continue;
     std::shared_ptr<AbstractNode> testnode = ((PyOpenSCADObject *) value)->node;
@@ -217,17 +222,21 @@ void python_build_hashmap(const std::shared_ptr<AbstractNode> &node)
     mapping_name.push_back(key_str);
     mapping_code.push_back(code);
     mapping_level.push_back(pos);
-  }  
-  for(const auto &child:node->getChildren()) {
-    python_build_hashmap(child);	  
   }
+  if(level < 5) { // no  many level are unclear and error prone(overwrites memory)
+    for(const auto &child:node->getChildren()) {
+      python_build_hashmap(child,level+1);	  
+    }
+  }  
 }
 
 void python_retrieve_pyname(const std::shared_ptr<AbstractNode> &node)
 {
   std::string name;	
   int level=-1;
-  std::string my_code = python_hierdump(node);
+  std::ostringstream stream;
+  python_hierdump(stream, node);
+  std::string my_code = stream.str();
   for(unsigned int i=0;i<mapping_code.size();i++) {
     if(mapping_code[i] == my_code) {
       if(level == -1 || level > mapping_level[i]) {	    
@@ -307,6 +316,48 @@ int python_vectorval(PyObject *vec, int minval, int maxval, double *x, double *y
     return 0;
   }
   return 1;
+}
+
+std::vector<Vector3d> python_vectors(PyObject *vec, int mindim, int maxdim) 
+{
+  std::vector<Vector3d> results;	
+  Vector3d result;	
+  if (PyList_Check(vec)) {
+    // check if its a valid vec<Vector3d>
+    int valid=1;
+    for(int i=0;valid && i<PyList_Size(vec);i++) {
+      PyObject *item = PyList_GetItem(vec,i);
+      if(!PyList_Check(item)) valid=0;
+    }	    
+    if(valid) {
+      for(int j=0;valid && j<PyList_Size(vec);j++) {
+        PyObject *item = PyList_GetItem(vec,j);
+        if(PyList_Size(item) >= mindim && PyList_Size(item) <= maxdim) {	  
+          for(int i=0;i<PyList_Size(item);i++) {
+            if (PyList_Size(item) > i) {
+              if (python_numberval(PyList_GetItem(item, i), &result[i])) return results; // Error
+            }
+          }	
+        }  
+	results.push_back(result);
+      }	
+      return results;
+    }
+    if(PyList_Size(vec) >= mindim && PyList_Size(vec) <= maxdim) {	  
+      for(int i=0;i<PyList_Size(vec);i++) {
+        if (PyList_Size(vec) > i) {
+          if (python_numberval(PyList_GetItem(vec, i), &result[i])) return results; // Error
+        }
+      }	
+    }  
+    results.push_back(result);
+  }
+  if (!python_numberval(vec, &result[0])) {
+    result[1] = result[0];
+    result[2] = result[1];
+    results.push_back(result);
+  }
+  return results; // Error
 }
 
 /*
@@ -402,34 +453,102 @@ double python_doublefunc(void *v_cbfunc, double arg)
 /*
  * Try to call a python function by name using OpenSCAD module childs and OpenSCAD function arguments: argument order is childs, arguments
  */
+PyObject *python_fromopenscad(const Value &val)
+{	
+    switch(val.type())
+    {
+      case Value::Type::UNDEFINED:
+	return Py_None;
+      case Value::Type::BOOL:
+	return val.toBool()?Py_True:Py_False;
+      case Value::Type::NUMBER:
+	return  PyFloat_FromDouble(val.toDouble());
+      case Value::Type::STRING:
+	return PyUnicode_FromString(val.toString().c_str());
+      case Value::Type::VECTOR:
+	{
+	  const VectorType& vec = val.toVector();
+  	  PyObject *result=PyList_New(vec.size());
+	  for(int j=0;j<vec.size();j++)
+		PyList_SetItem(result,j,python_fromopenscad(vec[j]));
+	  return result;
+	}
+//TODO  more types RANGE, OBJECT, FUNCTION
+      default:
+	return Py_None;
+    }
+    return Py_None;
+}
+void python_catch_error(std::string &errorstr)
+{
+    PyObject *pyExcType;
+    PyObject *pyExcValue;
+    PyObject *pyExcTraceback;
+    PyErr_Fetch(&pyExcType, &pyExcValue, &pyExcTraceback);
+    PyErr_NormalizeException(&pyExcType, &pyExcValue, &pyExcTraceback);
+    if(pyExcType != nullptr) Py_XDECREF(pyExcType);
 
-PyObject *python_callfunction(const std::shared_ptr<const Context> &cxt , const std::string &name, const std::vector<std::shared_ptr<Assignment> > &op_args, const char *&errorstr)
+    if(pyExcValue != nullptr){
+      PyObject* str_exc_value = PyObject_Repr(pyExcValue);
+      PyObject* pyExcValueStr = PyUnicode_AsEncodedString(str_exc_value, "utf-8", "~");
+      Py_XDECREF(str_exc_value);
+      char *suberror = PyBytes_AS_STRING(pyExcValueStr);
+      if(suberror != nullptr) errorstr +=  suberror;
+      Py_XDECREF(pyExcValueStr);
+      Py_XDECREF(pyExcValue);
+    }
+    if(pyExcTraceback != nullptr) {
+      auto *tb_o = (PyTracebackObject *)pyExcTraceback;
+      int line_num = tb_o->tb_lineno;
+      errorstr += " in line ";
+      errorstr += std::to_string(line_num);
+      Py_XDECREF(pyExcTraceback);
+    }
+}
+
+PyObject *python_callfunction(const std::shared_ptr<const Context> &cxt , const std::string &name, const std::vector<std::shared_ptr<Assignment> > &op_args, std::string &errorstr)
 {
   PyObject *pFunc = nullptr;
   if(!pythonMainModule){
     return nullptr;
   }
-  PyObject *maindict = PyModule_GetDict(pythonMainModule);
 
-  // search the function in all modules
-  PyObject *key, *value;
-  Py_ssize_t pos = 0;
-
-  while (PyDict_Next(maindict, &pos, &key, &value)) {
-    PyObject *module = PyObject_GetAttrString(pythonMainModule, PyUnicode_AsUTF8(key));
-    if(module != nullptr){
-      PyObject *moduledict = PyModule_GetDict(module);
-      Py_DECREF(module);
-      if(moduledict != nullptr) {
-        pFunc = PyDict_GetItemString(moduledict, name.c_str());
-        if(pFunc != nullptr) break;
-      }
+  int dotpos=name.find(".");
+  if(dotpos >= 0) {
+    std::string varname = name.substr(1,dotpos-1); // assume its always in paranthesis
+    std::string methodname = name.substr(dotpos+1,name.size()-dotpos-2);
+    Value var = cxt->lookup_variable(varname, Location::NONE).clone();
+    if(var.type() == Value::Type::PYTHONCLASS) {
+      const PythonClassType &python_class = var.toPythonClass();
+      PyObject* methodobj = PyUnicode_FromString(methodname.c_str());
+      pFunc = PyObject_GenericGetAttr((PyObject *) python_class.ptr,methodobj);
     }
   }
+  if(!pFunc) {
+    PyObject *maindict = PyModule_GetDict(pythonMainModule);
+
+    // search the function in all modules
+    PyObject *key, *value;
+    Py_ssize_t pos = 0;
+
+    while (PyDict_Next(maindict, &pos, &key, &value)) {
+      PyObject *module = PyObject_GetAttrString(pythonMainModule, PyUnicode_AsUTF8(key));
+      if(module != nullptr){
+        PyObject *moduledict = PyModule_GetDict(module);
+        Py_DECREF(module);
+        if(moduledict != nullptr) {
+          pFunc = PyDict_GetItemString(moduledict, name.c_str());
+         if(pFunc != nullptr) break;
+        } 
+      }
+    }  
+  }
   if (!pFunc) {
+    errorstr="Function not found";    	  
     return nullptr;
   }
   if (!PyCallable_Check(pFunc)) {
+    errorstr="Function not callable";    	  
     return nullptr;
   }
 
@@ -439,21 +558,7 @@ PyObject *python_callfunction(const std::shared_ptr<const Context> &cxt , const 
     Assignment *op_arg=op_args[i].get();
 
     std::shared_ptr<Expression> expr=op_arg->getExpr();
-    Value val = expr.get()->evaluate(cxt);
-    PyObject *value=nullptr;
-    switch(val.type())
-    {
-      case Value::Type::NUMBER:
-	value =  PyFloat_FromDouble(val.toDouble());
-        break;
-      case Value::Type::STRING:
-	value = PyUnicode_FromString(val.toString().c_str());
-        break;
-//TODO  more types RANGE, VECTOR, OBEJCT, FUNCTION
-      default:
-	value= PyLong_FromLong(-1);
-        break;
-    }
+    PyObject *value= python_fromopenscad( expr.get()->evaluate(cxt));
     if(value != nullptr) {
       PyTuple_SetItem(args, i, value);
     }
@@ -462,24 +567,10 @@ PyObject *python_callfunction(const std::shared_ptr<const Context> &cxt , const 
   PyObject* funcresult = PyObject_CallObject(pFunc, args);
   Py_XDECREF(args);
 
+  errorstr="";
   if(funcresult == nullptr) {
-    PyObject *pyExcType;
-    PyObject *pyExcValue;
-    PyObject *pyExcTraceback;
-    PyErr_Fetch(&pyExcType, &pyExcValue, &pyExcTraceback);
-    PyErr_NormalizeException(&pyExcType, &pyExcValue, &pyExcTraceback);
-    if(pyExcType != nullptr) Py_XDECREF(pyExcType);
-    if(pyExcTraceback != nullptr) Py_XDECREF(pyExcTraceback);
-
-    if(pyExcValue != nullptr){
-      PyObject* str_exc_value = PyObject_Repr(pyExcValue);
-      PyObject* pyExcValueStr = PyUnicode_AsEncodedString(str_exc_value, "utf-8", "~");
-      Py_XDECREF(str_exc_value);
-      errorstr =  PyBytes_AS_STRING(pyExcValueStr);
-      PyErr_SetString(PyExc_TypeError, errorstr);
-      Py_XDECREF(pyExcValueStr);
-      Py_XDECREF(pyExcValue);
-    }
+    python_catch_error(errorstr);	  
+    PyErr_SetString(PyExc_TypeError, errorstr.c_str());
 
     return nullptr;
   }
@@ -490,21 +581,22 @@ PyObject *python_callfunction(const std::shared_ptr<const Context> &cxt , const 
  * Actually trying use python to evaluate a OpenSCAD Module
  */
 
-std::shared_ptr<AbstractNode> python_modulefunc(const ModuleInstantiation *op_module,const std::shared_ptr<const Context> &cxt, std::string &error)
+std::shared_ptr<AbstractNode> python_modulefunc(const ModuleInstantiation *op_module,const std::shared_ptr<const Context> &cxt, std::string &error) // null & error: error, else: None
 {
   PyObject *dummydict;   
   std::shared_ptr<AbstractNode> result=nullptr;
-  const char *errorstr = nullptr;
+  std::string errorstr = "";
   {
     PyObject *funcresult = python_callfunction(cxt,op_module->name(),op_module->arguments, errorstr);
-    if (errorstr != nullptr){
+    if (errorstr.size() > 0){
       error = errorstr;
       return nullptr;
     }
-    if(funcresult == nullptr) return nullptr;
+    if(funcresult == nullptr) {error="function not executed"; return nullptr; }
 
     if(funcresult->ob_type == &PyOpenSCADType) result=PyOpenSCADObjectToNode(funcresult, &dummydict);
     Py_XDECREF(funcresult);
+    errorstr="";
   }
   return result;
 }
@@ -513,48 +605,52 @@ std::shared_ptr<AbstractNode> python_modulefunc(const ModuleInstantiation *op_mo
  * Converting a python result to an openscad result. extra function required as it might call itself hierarchically
  */
 
-Value python_convertresult(PyObject *arg)
+Value python_convertresult(PyObject *arg, int &error)
 {
+  error=0;	
   if(arg == nullptr) return Value::undefined.clone();
   if(PyList_Check(arg)) {
     VectorType vec(nullptr);
     for(int i=0;i<PyList_Size(arg);i++) {
       PyObject *item=PyList_GetItem(arg,i);
-      vec.emplace_back(python_convertresult(item));
+      int suberror;
+      vec.emplace_back(python_convertresult(item,suberror));
+      error |= suberror;
     }
     return std::move(vec);
   } else if(PyFloat_Check(arg)) { return { PyFloat_AsDouble(arg) }; }
   else if(PyLong_Check(arg))  { return { (double) PyLong_AsLong(arg) }; }
   else if(PyUnicode_Check(arg)) {
-    PyObject* repr = PyObject_Repr(arg);
-    PyObject* strobj = PyUnicode_AsEncodedString(repr, "utf-8", "~");
-    Py_XDECREF(repr);
-    const char *chars =  PyBytes_AS_STRING(strobj);
-    auto str = std::string(chars);
-    Py_XDECREF(strobj);
+    auto str = std::string(PyUnicode_AsUTF8(arg));
     return { str } ;
+  } else if(arg == Py_None) { return Value::undefined.clone(); 
+  } else if(arg->ob_type->tp_base == &PyBaseObject_Type) {
+	  Py_INCREF(arg);
+	  return PythonClassType(arg);
   } else {
+    printf("unsupported type %s\n",arg->ob_type->tp_base->tp_name);	  
     PyErr_SetString(PyExc_TypeError, "Unsupported function result\n");
-    return Value::undefined.clone();
+    error=1;
   }
+  return Value::undefined.clone();
 }
 
 /*
  * Actually trying use python to evaluate a OpenSCAD Function
  */
 
-Value python_functionfunc(const FunctionCall *call,const std::shared_ptr<const Context> &cxt  )
+Value python_functionfunc(const FunctionCall *call,const std::shared_ptr<const Context> &cxt, int &error  )
 {
-  const char *errorstr = nullptr;
+  std::string errorstr = "";
   PyObject *funcresult = python_callfunction(cxt,call->name, call->arguments, errorstr);
-  if (errorstr != nullptr)
+  if (errorstr.size() > 0)
   {
-    PyErr_SetString(PyExc_TypeError, errorstr);
+    PyErr_SetString(PyExc_TypeError, errorstr.c_str());
     return Value::undefined.clone();
   }
   if(funcresult == nullptr) return Value::undefined.clone();
 
-  Value res = python_convertresult(funcresult);
+  Value res = python_convertresult(funcresult, error);
   Py_XDECREF(funcresult);
   return res;
 }
@@ -598,6 +694,7 @@ void initPython(double time)
     PyPreConfig preconfig;
     PyPreConfig_InitPythonConfig(&preconfig);
     Py_PreInitialize(&preconfig);
+//    PyEval_InitThreads(); // https://stackoverflow.com/questions/47167251/pygilstate-ensure-causing-deadlock
 
 #ifdef HAVE_PYTHON_YIELD
     set_object_callback(openscad_object_callback);
@@ -607,13 +704,17 @@ void initPython(double time)
     PyConfig config;
     PyConfig_InitPythonConfig(&config);
     std::string libdir;
+    std::ostringstream stream;
 #ifdef _WIN32
-    libdir= PlatformUtils::applicationPath()+"\\..\\libraries\\python;"+PlatformUtils::userLibraryPath()+";.";
+    char sepchar = ';';
+    stream << PlatformUtils::applicationPath() << "\\..\\libraries\\python";
 #else
-    libdir= PlatformUtils::applicationPath()+"/../libraries/python:"+ PlatformUtils::userLibraryPath()+":.";
+    char sepchar = ':';
+    stream << PlatformUtils::applicationPath() << "/../libraries/python";
+    stream << sepchar + PlatformUtils::applicationPath() << "/../lib/python"  <<  PY_MAJOR_VERSION  <<  "."  <<  PY_MINOR_VERSION ; // find it where linuxdeply put it
 #endif   
-//    libdir=PlatformUtils::userLibraryPath();
-    PyConfig_SetBytesString(&config, &config.pythonpath_env, libdir.c_str());
+    stream << sepchar << PlatformUtils::userLibraryPath() << sepchar << ".";
+    PyConfig_SetBytesString(&config, &config.pythonpath_env, stream.str().c_str());
     PyStatus status = Py_InitializeFromConfig(&config);
     if (PyStatus_Exception(status)) {
       LOG( message_group::Error, "Python not found. Is it installed ?");
@@ -641,9 +742,9 @@ void initPython(double time)
     }
 
   }
-  char run_str[250];
-  sprintf(run_str,"fa=12.0\nfn=0.0\nfs=2.0\nt=%g\nphi=%g",time,2*G_PI*time);
-  PyRun_String(run_str, Py_file_input, pythonInitDict, pythonInitDict);
+  std::ostringstream stream;
+  stream << "fa=12.0\nfn=0.0\nfs=2.0\nt=" << time << "\nphi=" << 2*G_PI*time;
+  PyRun_String(stream.str().c_str(), Py_file_input, pythonInitDict, pythonInitDict);
   customizer_parameters_finished = customizer_parameters;
   customizer_parameters.clear();
 }
@@ -669,7 +770,7 @@ void finishPython(void)
 #endif
 }
 
-std::string evaluatePython(const std::string & code)
+std::string evaluatePython(const std::string & code, bool dry_run)
 {
   std::string error;
   python_result_node = nullptr;
@@ -678,6 +779,7 @@ std::string evaluatePython(const std::string & code)
   PyObject *pyExcValue = nullptr;
   PyObject *pyExcTraceback = nullptr;
   /* special python code to catch errors from stdout and stderr and make them available in OpenSCAD console */
+  pythonDryRun=dry_run;
   if(!pythonMainModuleInitialized)
 	  return "Python not initialized";
   const char *python_init_code="\
@@ -711,13 +813,15 @@ sys.stderr = stderr_bak\n\
     PyObject *result = PyRun_String(code.c_str(), Py_file_input, pythonInitDict, pythonInitDict); /* actual code is run here */
 
 
-    if(result  == nullptr) PyErr_Print();
-    PyRun_SimpleString(python_exit_code);
-
+    if(result  == nullptr) {
+      PyErr_Print();
+      error = ""; 
+      python_catch_error(error);
+    } 
     for(int i=0;i<2;i++)
     {
       PyObject* catcher = PyObject_GetAttrString(pythonMainModule, i==1?"catcher_err":"catcher_out");
-	if(catcher == nullptr) continue;
+      if(catcher == nullptr) continue;
       PyObject* command_output = PyObject_GetAttrString(catcher, "data");
       Py_XDECREF(catcher);
       PyObject* command_output_value = PyUnicode_AsEncodedString(command_output, "utf-8", "~");
@@ -730,25 +834,7 @@ sys.stderr = stderr_bak\n\
       }
       Py_XDECREF(command_output_value);
     }
-
-    PyErr_Fetch(&pyExcType, &pyExcValue, &pyExcTraceback); /* extract actual python stack trace in case of an expception and return the error string to the caller */
-    if(pyExcType != nullptr) Py_XDECREF(pyExcType);
-    if(pyExcValue != nullptr) {
-      PyObject* str_exc_value = PyObject_Repr(pyExcValue);
-      if(pyExcValue != nullptr) Py_XDECREF(pyExcValue);
-      PyObject* pyExcValueStr = PyUnicode_AsEncodedString(str_exc_value, "utf-8", "~");
-      const char *strExcValue =  PyBytes_AS_STRING(pyExcValueStr);
-      if(strExcValue != nullptr && strcmp(strExcValue,"<NULL>") != 0) error += strExcValue;
-      if(str_exc_value != nullptr) Py_XDECREF(str_exc_value);
-    }
-    if(pyExcTraceback != nullptr) {
-      auto *tb_o = (PyTracebackObject *)pyExcTraceback;
-      int line_num = tb_o->tb_lineno;
-      error += " in line ";
-      error += std::to_string(line_num);
-      Py_XDECREF(pyExcTraceback);
-    }
-
+    PyRun_SimpleString(python_exit_code);
     return error;
 }
 /*
@@ -840,5 +926,241 @@ PyMODINIT_FUNC PyInit_PyOpenSCAD(void)
   Py_INCREF(&PyOpenSCADType);
   PyModule_AddObject(m, "openscad", (PyObject *)&PyOpenSCADType);
   return m;
+}
+
+// ----------------------------------------------
+// IPython Interpreter side
+// ----------------------------------------------
+
+static PyStatus
+pymain_init(void)
+{
+    PyStatus status;
+
+//    if (_PyStatus_EXCEPTION(status)) {
+//        return status;
+//    }
+
+    PyPreConfig preconfig;
+    PyPreConfig_InitPythonConfig(&preconfig);
+//    status = _Py_PreInitializeFromPyArgv(&preconfig, args);
+//    if (_PyStatus_EXCEPTION(status)) {
+//        return status;
+//    }
+
+    PyConfig config;
+    PyConfig_InitPythonConfig(&config);
+
+//    if (args->use_bytes_argv) {
+//        status = PyConfig_SetBytesArgv(&config, args->argc, args->bytes_argv);
+//    }
+//    else {
+//        status = PyConfig_SetArgv(&config, args->argc, args->wchar_argv);
+//    }
+//    if (_PyStatus_EXCEPTION(status)) {
+//        goto done;
+//    }
+
+    status = Py_InitializeFromConfig(&config);
+//    if (_PyStatus_EXCEPTION(status)) {
+//        goto done;
+//    }
+//    status = 0; // PyStatus_Ok;
+
+done:
+    PyConfig_Clear(&config);
+    return status;
+}
+
+
+/* Write an exitcode into *exitcode and return 1 if we have to exit Python.
+   Return 0 otherwise. */
+static int
+pymain_run_interactive_hook(int *exitcode)
+{
+    PyObject *sys, *hook, *result;
+    sys = PyImport_ImportModule("sys");
+    if (sys == NULL) {
+        goto error;
+    }
+
+    hook = PyObject_GetAttrString(sys, "__interactivehook__");
+    Py_DECREF(sys);
+    if (hook == NULL) {
+        PyErr_Clear();
+        return 0;
+    }
+
+    if (PySys_Audit("cpython.run_interactivehook", "O", hook) < 0) {
+        goto error;
+    }
+    result  =  PyObject_CallNoArgs(hook);
+    Py_DECREF(hook);
+    if (result == NULL) {
+        goto error;
+    }
+    Py_DECREF(result);
+    return 0;
+
+error:
+    PySys_WriteStderr("Failed calling sys.__interactivehook__\n");
+//    return pymain_err_print(exitcode);
+    return 0;
+}
+
+
+
+
+
+
+static void
+pymain_repl(PyConfig *config, int *exitcode)
+{
+//    if (!config->inspect && _Py_GetEnv(config->use_environment, "PYTHONINSPECT")) {
+//        pymain_set_inspect(config, 1);
+//    }
+
+//    if (!(config->inspect && stdin_is_interactive(config) && config_run_code(config))) {
+//        return;
+//    }
+
+//    pymain_set_inspect(config, 0);
+    if (pymain_run_interactive_hook(exitcode)) {
+        return;
+    }
+    PyCompilerFlags cf = _PyCompilerFlags_INIT;
+
+    int res = PyRun_AnyFileFlags(stdin, "<stdin>", &cf);
+//    *exitcode = (res != 0);
+}
+
+
+static void
+pymain_run_python(int *exitcode)
+{
+    PyObject *main_importer_path = NULL;
+    PyInterpreterState *interp = PyInterpreterState_Get();
+    /* pymain_run_stdin() modify the config */
+    PyConfig *config = (PyConfig*)_PyInterpreterState_GetConfig(interp);
+
+//    if (_PyStatus_EXCEPTION(_PyPathConfig_UpdateGlobal(config))) {
+//        goto error;
+//    }
+
+//    if (config->run_filename != NULL) {
+//        if (pymain_get_importer(config->run_filename, &main_importer_path,
+//                                exitcode)) {
+//            return;
+//        }
+//    }
+    // import readline and rlcompleter before script dir is added to sys.path
+//    pymain_import_readline(config);
+
+//    PyObject *path0 = NULL;
+//    if (main_importer_path != NULL) {
+//        path0 = Py_NewRef(main_importer_path);
+//    }
+//    else if (!config->safe_path) {
+//        int res = _PyPathConfig_ComputeSysPath0(&config->argv, &path0);
+//        if (res < 0) {
+//            goto error;
+//        }
+//        else if (res == 0) {
+//            Py_CLEAR(path0);
+//        }
+//    }
+//    if (path0 != NULL) {
+//        wchar_t *wstr = PyUnicode_AsWideCharString(path0, NULL);
+//        if (wstr == NULL) {
+//            Py_DECREF(path0);
+//            goto error;
+//        }
+//        config->sys_path_0 = _PyMem_RawWcsdup(wstr);
+//        PyMem_Free(wstr);
+//        if (config->sys_path_0 == NULL) {
+//            Py_DECREF(path0);
+//            goto error;
+//        }
+//        int res = pymain_sys_path_add_path0(interp, path0);
+//        Py_DECREF(path0);
+//        if (res < 0) {
+//            goto error;
+//        }
+//    }
+//
+//    pymain_header(config);
+//
+//    _PyInterpreterState_SetRunningMain(interp);
+//    assert(!PyErr_Occurred());
+//
+//    if (config->run_command) {
+//        *exitcode = pymain_run_command(config->run_command);
+//    }
+//    else if (config->run_module) {
+//        *exitcode = pymain_run_module(config->run_module, 1);
+//    }
+//    else if (main_importer_path != NULL) {
+//        *exitcode = pymain_run_module(L"__main__", 0);
+//    }
+//    else if (config->run_filename != NULL) {
+//        *exitcode = pymain_run_file(config);
+//    }
+//    else {
+//        *exitcode = pymain_run_stdin(config);
+//    }
+
+    pymain_repl(config, exitcode);
+    goto done;
+
+error:
+//    *exitcode = pymain_exit_err_print();
+
+done:
+//    _PyInterpreterState_SetNotRunningMain(interp);
+    Py_XDECREF(main_importer_path);
+}
+
+int
+Py_RunMain(void)
+{
+    int exitcode = 0;
+
+    pymain_run_python(&exitcode);
+
+//    if (Py_FinalizeEx() < 0) {
+//        exitcode = 120;
+//    }
+
+//    pymain_free();
+
+//    if (_PyRuntime.signals.unhandled_keyboard_interrupt) {
+//        exitcode = exit_sigint();
+//    }
+
+    return exitcode;
+}
+
+
+void ipython(void) {
+/*	
+    _PyArgv args = {
+        .argc = argc,
+        .use_bytes_argv = 1,
+        .bytes_argv = argv,
+        .wchar_argv = NULL};
+*/
+//    PyStatus status = pymain_init();
+    initPython(0.0);
+/*    
+    if (_PyStatus_IS_EXIT(status)) {
+        pymain_free();
+        return status.exitcode;
+    }
+    if (_PyStatus_EXCEPTION(status)) {
+        pymain_exit_error(status);
+    }
+
+*/
+    Py_RunMain();
 }
 
