@@ -1516,9 +1516,6 @@ void MainWindow::compileCSG()
   } catch (const HardWarningException&) {
     exceptionCleanup();
   }
-//  csgworker->start();
-//  compileCSGThread();
-//  compileCSGDone();
 
   csgworker->start();
   //compileCSGThread();
