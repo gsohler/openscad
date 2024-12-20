@@ -813,29 +813,27 @@ sys.stderr = stderr_bak\n\
     PyObject *result = PyRun_String(code.c_str(), Py_file_input, pythonInitDict, pythonInitDict); /* actual code is run here */
 
 
-    if(result  != nullptr) 
-    {
-      for(int i=0;i<2;i++)
-      {
-        PyObject* catcher = PyObject_GetAttrString(pythonMainModule, i==1?"catcher_err":"catcher_out");
-  	if(catcher == nullptr) continue;
-        PyObject* command_output = PyObject_GetAttrString(catcher, "data");
-        Py_XDECREF(catcher);
-        PyObject* command_output_value = PyUnicode_AsEncodedString(command_output, "utf-8", "~");
-        Py_XDECREF(command_output);
-        const char *command_output_bytes =  PyBytes_AS_STRING(command_output_value);
-        if(command_output_bytes != nullptr && *command_output_bytes != '\0')
-        {
-          if(i ==1) error += command_output_bytes; /* output to console */
-          else LOG(command_output_bytes); /* error to LOG */
-        }
-        Py_XDECREF(command_output_value);
-      }
-    } else {  
-      PyErr_Print(); // prints SystemError: /builddir/build/BUILD/Python-3.12.0/Objects/moduleobject.c:504: bad argument to internal function
-      error="";
+    if(result  == nullptr) {
+      PyErr_Print();
+      error = ""; 
       python_catch_error(error);
-    }  
+    } 
+    for(int i=0;i<2;i++)
+    {
+      PyObject* catcher = PyObject_GetAttrString(pythonMainModule, i==1?"catcher_err":"catcher_out");
+      if(catcher == nullptr) continue;
+      PyObject* command_output = PyObject_GetAttrString(catcher, "data");
+      Py_XDECREF(catcher);
+      PyObject* command_output_value = PyUnicode_AsEncodedString(command_output, "utf-8", "~");
+      Py_XDECREF(command_output);
+      const char *command_output_bytes =  PyBytes_AS_STRING(command_output_value);
+      if(command_output_bytes != nullptr && *command_output_bytes != '\0')
+      {
+        if(i ==1) error += command_output_bytes; /* output to console */
+        else LOG(command_output_bytes); /* error to LOG */
+      }
+      Py_XDECREF(command_output_value);
+    }
     PyRun_SimpleString(python_exit_code);
     return error;
 }
