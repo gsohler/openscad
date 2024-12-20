@@ -3473,15 +3473,15 @@ PyObject *python_offset_core(PyObject *obj,double r, double delta, PyObject *cha
 
   node->delta = 1;
   node->chamfer = false;
-  node->join_type = ClipperLib::jtRound;
+  node->join_type = Clipper2Lib::JoinType::Round;
   if (!isnan(r)) {
     node->delta = r;
   } else if (!isnan(delta)) {
     node->delta = delta;
-    node->join_type = ClipperLib::jtMiter;
+    node->join_type = Clipper2Lib::JoinType::Miter;
     if (chamfer == Py_True) {
       node->chamfer = true;
-      node->join_type = ClipperLib::jtSquare;
+      node->join_type = Clipper2Lib::JoinType::Square;
     }
     else if (chamfer == Py_False || chamfer == NULL )  node->chamfer = 0;
     else {
