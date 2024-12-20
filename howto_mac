@@ -2,3 +2,10 @@ source scripts/setenv-macosx.sh
 #cmake -DEXPERIMENTAL=1 -DENABLE_PYTHON=1 -DUSE_QT6=1 -DCMAKE_PREFIX_PATH=/usr/local/Qt-6.7.2 . 
 cmake -DEXPERIMENTAL=1 -DENABLE_PYTHON=1 -DUSE_QT6=1 -DCMAKE_PREFIX_PATH=/Users/apple/git/libraries -DCMAKE_OSX_ARCHITECTURES='x86_64;arm64' ..
 cmake -DEXPERIMENTAL=1 -DENABLE_PYTHON=1 -DUSE_QT6=1 -DUSE_BUILTIN_CLIPPER2=ON -DCMAKE_PREFIX_PATH=/Users/apple/git/libraries ..
+#! /bin/sh
+pwd
+VERSIONDATE=`date "+%Y.%m.%d"`
+#/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $VERSIONDATE" OpenSCAD.app/Contents/Info.plist
+rm OpenSCAD.dmg
+/usr/local/Qt-6.7.2/bin/macdeployqt ./OpenSCAD.app -codesign=- -dmg -no-strip
+
