@@ -3904,7 +3904,7 @@ PyObject *python_scad(PyObject *self, PyObject *args, PyObject *kwargs)
   return PyOpenSCADObjectFromNode(&PyOpenSCADType,resultnode);
 }
 
-PyObject *python_osinclude(PyObject *self, PyObject *args, PyObject *kwargs)
+PyObject *python_osuse_include(int mode, PyObject *self, PyObject *args, PyObject *kwargs)
 {
   DECLARE_INSTANCE
   auto empty = std::make_shared<CubeNode>(instance);
@@ -3914,7 +3914,8 @@ PyObject *python_osinclude(PyObject *self, PyObject *args, PyObject *kwargs)
   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s", kwlist,
                                    &file
                                    )) {
-    PyErr_SetString(PyExc_TypeError, "Error during parsing osinclude(path)");
+    if(mode) PyErr_SetString(PyExc_TypeError, "Error during parsing osinclude(path)");
+    else PyErr_SetString(PyExc_TypeError, "Error during parsing osuse(path)");
     return NULL;
   }
   const std::string filename = lookup_file(file, ".",".");
@@ -3925,6 +3926,7 @@ PyObject *python_osinclude(PyObject *self, PyObject *args, PyObject *kwargs)
     PyErr_SetString(PyExc_TypeError, "Error in SCAD code");
     return Py_None;
   }
+  if(mode == 0) source->scope.moduleInstantiations.clear();	  
   source->handleDependencies(true);
 
   EvaluationSession *session = new EvaluationSession("python");
@@ -3966,10 +3968,18 @@ PyObject *python_osinclude(PyObject *self, PyObject *args, PyObject *kwargs)
       PyDict_SetItemString(result->dict, ass->getName().c_str(),res);
     }
   }
-
-
+ // SourceFileCache::instance()->clear();
   return (PyObject *) result;
+}
 
+PyObject *python_osuse(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+  return python_osuse_include(0,self, args, kwargs);
+}
+
+PyObject *python_osinclude(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+  return python_osuse_include(1,self, args, kwargs);
 }
 
 PyObject *python_debug_modifier(PyObject *arg,int mode) {
@@ -4124,7 +4134,8 @@ PyMethodDef PyOpenSCADFunctions[] = {
   {"render", (PyCFunction) python_render, METH_VARARGS | METH_KEYWORDS, "Render Object."},
   {"osimport", (PyCFunction) python_import, METH_VARARGS | METH_KEYWORDS, "Import Object."},
   {"nimport", (PyCFunction) python_nimport, METH_VARARGS | METH_KEYWORDS, "Import Networked Object."},
-  {"osinclude", (PyCFunction) python_osinclude, METH_VARARGS | METH_KEYWORDS, "Import OpenSCAD Library."},
+  {"osuse", (PyCFunction) python_osuse, METH_VARARGS | METH_KEYWORDS, "Use OpenSCAD Library."},
+  {"osinclude", (PyCFunction) python_osinclude, METH_VARARGS | METH_KEYWORDS, "Include OpenSCAD Library."},
   {"version", (PyCFunction) python_version, METH_VARARGS | METH_KEYWORDS, "Output openscad Version."},
   {"version_num", (PyCFunction) python_version_num, METH_VARARGS | METH_KEYWORDS, "Output openscad Version."},
   {"add_parameter", (PyCFunction) python_add_parameter, METH_VARARGS | METH_KEYWORDS, "Add Parameter for Customizer."},
