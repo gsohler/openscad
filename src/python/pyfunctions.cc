@@ -396,7 +396,6 @@ std::unique_ptr<const Geometry> sphereCreateFuncGeometry(void *funcptr, double f
     builder.appendPolygon({tri[0], tri[1], tri[2]});
   }
   auto ps = builder.build();
-
   return ps; 
 }
 

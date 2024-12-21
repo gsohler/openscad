@@ -331,9 +331,10 @@ void MainWindow::addMenuItemCB(QString callback)
   evaluatePython(content);
   evaluatePython(cbstr);
   finishPython();
-#endif  
+#endif
 }
 
+#ifdef ENABLE_PYTHON
 void MainWindow::addMenuItem(const char * menuname, const char *itemname, const char *callback)
 {
 
@@ -368,7 +369,6 @@ void MainWindow::addMenuItem(const char * menuname, const char *itemname, const 
 
 //  menubar->show();
 }
-#ifdef ENABLE_PYTHON
 
 MainWindow *addmenuitem_this = nullptr;
 void  add_menuitem_trampoline(const char *menuname, const char *itemname, const char *callback)
@@ -1516,6 +1516,7 @@ void MainWindow::compileCSG()
   } catch (const HardWarningException&) {
     exceptionCleanup();
   }
+
   csgworker->start();
   //compileCSGThread();
   //compileCSGDone();
