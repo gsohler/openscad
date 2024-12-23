@@ -21,6 +21,9 @@ typedef struct {
   /* Type-specific fields go here. */
 } PyOpenSCADObject;
 
+void PyObjectDeleter (PyObject *pObject);
+using PyObjectUniquePtr = std::unique_ptr<PyObject, const decltype(PyObjectDeleter)&>;
+
 PyMODINIT_FUNC PyInit_PyOpenSCAD(void);
 
 extern PyTypeObject PyOpenSCADType;
@@ -63,5 +66,5 @@ extern PyMappingMethods PyOpenSCADMapping;
 extern PyMethodDef PyOpenSCADFunctions[];
 extern PyMethodDef PyOpenSCADMethods[];
 
-extern PyObject *pythonMainModule;
-extern PyObject *pythonInitDict;
+extern PyObjectUniquePtr pythonInitDict;
+extern PyObjectUniquePtr pythonMainModule;
