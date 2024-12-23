@@ -329,7 +329,6 @@ PyObject *python_lv_negate(PyObject *arg) { return  Py_None; }
 Value python_convertresult(PyObject *arg, int &error);
 
 extern bool parse(SourceFile *& file, const std::string& text, const std::string& filename, const std::string& mainFile, int debug);
-std::shared_ptr<AbstractNode> resultnode_datasave = nullptr; // TODO this is needed unless we get the automatic deleter
 
 PyObject *PyDataObject_call(PyObject *self, PyObject *args, PyObject *kwargs)
 {
@@ -424,9 +423,8 @@ PyObject *PyDataObject_call(PyObject *self, PyObject *args, PyObject *kwargs)
   std::shared_ptr<const FileContext> dummy_context;
   source->scope.moduleInstantiations.clear();
   source->scope.moduleInstantiations.push_back(modinst);
-  std::shared_ptr<AbstractNode> resultnode = source->instantiate(*builtin_context, &dummy_context);  // <- hier macht das problem
-  //resultnode = resultnode->clone();												     
-  resultnode_datasave = resultnode;												     
+  std::shared_ptr<AbstractNode> resultnode = source->instantiate(*builtin_context, &dummy_context);  
+  resultnode = resultnode->clone();// use own ModuleInstatiation												      
   delete source;
   source = nullptr;
 

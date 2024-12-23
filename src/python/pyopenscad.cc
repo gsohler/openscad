@@ -773,6 +773,9 @@ std::string evaluatePython(const std::string & code, bool dry_run)
   PyObjectUniquePtr pyExcValue (nullptr, PyObjectDeleter);
   PyObjectUniquePtr pyExcTraceback (nullptr, PyObjectDeleter);
   /* special python code to catch errors from stdout and stderr and make them available in OpenSCAD console */
+  for(ModuleInstantiation *mi : modinsts_list){
+	    delete mi; // best time to delete it
+  }
   pythonDryRun=dry_run;
   if(!pythonMainModuleInitialized)
 	  return "Python not initialized";
@@ -831,6 +834,7 @@ sys.stderr = stderr_bak\n\
       }
     }
     PyRun_SimpleString(python_exit_code);
+    modinsts_list.clear();
     return error;
 }
 /*

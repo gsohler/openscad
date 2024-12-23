@@ -1593,7 +1593,6 @@ PyObject *python_oo_wrap(PyObject *obj, PyObject *args, PyObject *kwargs)
   return python_wrap_core(obj, r, fn, fa, fs);
 }
 
-std::shared_ptr<AbstractNode> python_result_node_bak; // TODO why is that needed ? python_result_nose is nullptr
 PyObject *python_output_core(PyObject *obj)
 {
   PyObject *child_dict;
@@ -1606,7 +1605,6 @@ PyObject *python_output_core(PyObject *obj)
   PyObject *key, *value;
   Py_ssize_t pos = 0;
   python_result_node = child;
-  python_result_node_bak = child;
   mapping_name.clear();
   mapping_code.clear();
   mapping_level.clear();
@@ -3900,7 +3898,9 @@ PyObject *python_scad(PyObject *self, PyObject *args, PyObject *kwargs)
   ContextHandle<BuiltinContext> builtin_context{Context::create<BuiltinContext>(&session)};
   std::shared_ptr<const FileContext> file_context;
   std::shared_ptr<AbstractNode> resultnode = parsed_file->instantiate(*builtin_context, &file_context);
+  resultnode = resultnode->clone(); // instmod will go out of scope
   delete parsed_file;
+  parsed_file = nullptr;
   return PyOpenSCADObjectFromNode(&PyOpenSCADType,resultnode);
 }
 
@@ -4057,8 +4057,8 @@ PyObject *python_model(PyObject *self, PyObject *args, PyObject *kwargs, int mod
     PyErr_SetString(PyExc_TypeError, "Error during parsing model");
     return NULL;
   }
-  if(python_result_node_bak == nullptr) return Py_None;
-  return PyOpenSCADObjectFromNode(&PyOpenSCADType, python_result_node_bak);
+  if(python_result_node == nullptr) return Py_None;
+  return PyOpenSCADObjectFromNode(&PyOpenSCADType, python_result_node);
 }
 
 PyMethodDef PyOpenSCADFunctions[] = {

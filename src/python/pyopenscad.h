@@ -11,7 +11,8 @@
 
 #define DECLARE_INSTANCE	std::string instance_name; \
 	AssignmentList inst_asslist;\
-	ModuleInstantiation *instance = new ModuleInstantiation(instance_name,inst_asslist, Location::NONE);
+	ModuleInstantiation *instance = new ModuleInstantiation(instance_name,inst_asslist, Location::NONE); \
+	modinsts_list.push_back(instance);
 
 
 typedef struct {
