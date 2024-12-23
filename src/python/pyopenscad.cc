@@ -31,14 +31,17 @@
 #include "PlatformUtils.h"
 #include <Context.h>
 #include <Selection.h>
+#include "PlatformUtils.h"
 
 // #define HAVE_PYTHON_YIELD
 static PyObject *PyInit_openscad(void);
 
 // https://docs.python.org/3.10/extending/newtypes.html
 
-PyObject *pythonInitDict = nullptr;
-PyObject *pythonMainModule = nullptr ;
+void PyObjectDeleter (PyObject *pObject) { Py_XDECREF(pObject); };
+
+PyObjectUniquePtr pythonInitDict(nullptr, PyObjectDeleter) ;
+PyObjectUniquePtr pythonMainModule(nullptr, PyObjectDeleter) ;
 std::list<std::string> pythonInventory;
 AssignmentList customizer_parameters;
 AssignmentList customizer_parameters_finished;
@@ -48,7 +51,6 @@ std::vector<SelectedObject> python_result_handle;
 bool python_active;  /* if python is actually used during evaluation */
 bool python_trusted; /* global Python trust flag */
 bool python_runipython = false;
-#include "PlatformUtils.h"
 bool pythonMainModuleInitialized = false;
 bool pythonRuntimeInitialized = false;
 
@@ -205,7 +207,7 @@ void  python_hierdump(std::ostringstream &stream, const std::shared_ptr<Abstract
 void python_build_hashmap(const std::shared_ptr<AbstractNode> &node, int level)
 {
 	
-  PyObject *maindict = PyModule_GetDict(pythonMainModule);
+  PyObject *maindict = PyModule_GetDict(pythonMainModule.get());
   PyObject *key, *value;
   Py_ssize_t pos = 0;
   std::ostringstream stream;
@@ -367,20 +369,17 @@ std::vector<Vector3d> python_vectors(PyObject *vec, int mindim, int maxdim)
 void get_fnas(double& fn, double& fa, double& fs) {
   PyObject *mainModule = PyImport_AddModule("__main__");
   if (mainModule == nullptr) return;
-  PyObject *varFn = PyObject_GetAttrString(mainModule, "fn");
-  PyObject *varFa = PyObject_GetAttrString(mainModule, "fa");
-  PyObject *varFs = PyObject_GetAttrString(mainModule, "fs");
-  if (varFn != nullptr){
-    fn = PyFloat_AsDouble(varFn);
-    Py_XDECREF(varFn);
+  PyObjectUniquePtr varFn(PyObject_GetAttrString(mainModule, "fn"),PyObjectDeleter);
+  PyObjectUniquePtr varFa(PyObject_GetAttrString(mainModule, "fa"),PyObjectDeleter);
+  PyObjectUniquePtr varFs(PyObject_GetAttrString(mainModule, "fs"),PyObjectDeleter);
+  if (varFn.get() != nullptr){
+    fn = PyFloat_AsDouble(varFn.get());
   }
-  if (varFa != nullptr){
-    fa = PyFloat_AsDouble(varFa);
-    Py_XDECREF(varFa);
+  if (varFa.get() != nullptr){
+    fa = PyFloat_AsDouble(varFa.get());
   }
-  if (varFs != nullptr){
-    fs = PyFloat_AsDouble(varFs);
-    Py_XDECREF(varFs);
+  if (varFs.get() != nullptr){
+    fs = PyFloat_AsDouble(varFs.get());
   }
 }
 
@@ -489,12 +488,10 @@ void python_catch_error(std::string &errorstr)
     if(pyExcType != nullptr) Py_XDECREF(pyExcType);
 
     if(pyExcValue != nullptr){
-      PyObject* str_exc_value = PyObject_Repr(pyExcValue);
-      PyObject* pyExcValueStr = PyUnicode_AsEncodedString(str_exc_value, "utf-8", "~");
-      Py_XDECREF(str_exc_value);
-      char *suberror = PyBytes_AS_STRING(pyExcValueStr);
+      PyObjectUniquePtr str_exc_value( PyObject_Repr(pyExcValue), PyObjectDeleter);
+      PyObjectUniquePtr pyExcValueStr( PyUnicode_AsEncodedString(str_exc_value.get(), "utf-8", "~"), PyObjectDeleter);
+      char *suberror = PyBytes_AS_STRING(pyExcValueStr.get());
       if(suberror != nullptr) errorstr +=  suberror;
-      Py_XDECREF(pyExcValueStr);
       Py_XDECREF(pyExcValue);
     }
     if(pyExcTraceback != nullptr) {
@@ -525,14 +522,14 @@ PyObject *python_callfunction(const std::shared_ptr<const Context> &cxt , const 
     }
   }
   if(!pFunc) {
-    PyObject *maindict = PyModule_GetDict(pythonMainModule);
+    PyObject *maindict = PyModule_GetDict(pythonMainModule.get());
 
     // search the function in all modules
     PyObject *key, *value;
     Py_ssize_t pos = 0;
 
     while (PyDict_Next(maindict, &pos, &key, &value)) {
-      PyObject *module = PyObject_GetAttrString(pythonMainModule, PyUnicode_AsUTF8(key));
+      PyObject *module = PyObject_GetAttrString(pythonMainModule.get(), PyUnicode_AsUTF8(key));
       if(module != nullptr){
         PyObject *moduledict = PyModule_GetDict(module);
         Py_DECREF(module);
@@ -677,7 +674,7 @@ void initPython(double time)
   if(pythonInitDict) { /* If already initialized, undo to reinitialize after */
     PyObject *key, *value;
     Py_ssize_t pos = 0;
-    PyObject *maindict = PyModule_GetDict(pythonMainModule);
+    PyObject *maindict = PyModule_GetDict(pythonMainModule.get());
     while (PyDict_Next(maindict, &pos, &key, &value)) {
       PyObject* key1 = PyUnicode_AsEncodedString(key, "utf-8", "~");
       if(key1 != nullptr) {
@@ -722,29 +719,26 @@ void initPython(double time)
     }
     PyConfig_Clear(&config);
 
-    pythonMainModule =  PyImport_AddModule("__main__");
-    Py_XINCREF(pythonMainModule);
+    pythonMainModule.reset(PyImport_AddModule("__main__"));
     pythonMainModuleInitialized = pythonMainModule != nullptr;
-    pythonInitDict = PyModule_GetDict(pythonMainModule);
-    Py_XINCREF(pythonInitDict);
+    pythonInitDict.reset(PyModule_GetDict(pythonMainModule.get()));
     pythonRuntimeInitialized = pythonInitDict != nullptr;
     PyInit_PyOpenSCAD();
     PyInit_PyData();
-    PyRun_String("from builtins import *\n", Py_file_input, pythonInitDict, pythonInitDict);
+    PyRun_String("from builtins import *\n", Py_file_input, pythonInitDict.get(), pythonInitDict.get());
     PyObject *key, *value;
     Py_ssize_t pos = 0;
-    PyObject *maindict = PyModule_GetDict(pythonMainModule);
+    PyObject *maindict = PyModule_GetDict(pythonMainModule.get());
     while (PyDict_Next(maindict, &pos, &key, &value)) {
-      PyObject* key1 = PyUnicode_AsEncodedString(key, "utf-8", "~");
-      const char *key_str =  PyBytes_AsString(key1);
+      PyObjectUniquePtr key1(PyUnicode_AsEncodedString(key, "utf-8", "~"), PyObjectDeleter);
+      const char *key_str =  PyBytes_AsString(key1.get());
       if(key_str != NULL) pythonInventory.push_back(key_str);
-      Py_XDECREF(key1);
     }
 
   }
   std::ostringstream stream;
   stream << "fa=12.0\nfn=0.0\nfs=2.0\nt=" << time << "\nphi=" << 2*G_PI*time;
-  PyRun_String(stream.str().c_str(), Py_file_input, pythonInitDict, pythonInitDict);
+  PyRun_String(stream.str().c_str(), Py_file_input, pythonInitDict.get(), pythonInitDict.get());
   customizer_parameters_finished = customizer_parameters;
   customizer_parameters.clear();
 }
@@ -776,8 +770,8 @@ std::string evaluatePython(const std::string & code, bool dry_run)
   python_result_node = nullptr;
   python_result_handle.clear();
   PyObject *pyExcType = nullptr;
-  PyObject *pyExcValue = nullptr;
-  PyObject *pyExcTraceback = nullptr;
+  PyObjectUniquePtr pyExcValue (nullptr, PyObjectDeleter);
+  PyObjectUniquePtr pyExcTraceback (nullptr, PyObjectDeleter);
   /* special python code to catch errors from stdout and stderr and make them available in OpenSCAD console */
   pythonDryRun=dry_run;
   if(!pythonMainModuleInitialized)
@@ -810,7 +804,8 @@ sys.stderr = stderr_bak\n\
     }
     python_orphan_objs.clear();
 #endif
-    PyObject *result = PyRun_String(code.c_str(), Py_file_input, pythonInitDict, pythonInitDict); /* actual code is run here */
+    PyObjectUniquePtr result(nullptr, PyObjectDeleter);
+    result.reset(PyRun_String(code.c_str(), Py_file_input, pythonInitDict.get(), pythonInitDict.get())); /* actual code is run here */
 
 
     if(result  == nullptr) {
@@ -820,19 +815,20 @@ sys.stderr = stderr_bak\n\
     } 
     for(int i=0;i<2;i++)
     {
-      PyObject* catcher = PyObject_GetAttrString(pythonMainModule, i==1?"catcher_err":"catcher_out");
+      PyObjectUniquePtr catcher(nullptr, PyObjectDeleter);
+      catcher.reset( PyObject_GetAttrString(pythonMainModule.get(), i==1?"catcher_err":"catcher_out"));
       if(catcher == nullptr) continue;
-      PyObject* command_output = PyObject_GetAttrString(catcher, "data");
-      Py_XDECREF(catcher);
-      PyObject* command_output_value = PyUnicode_AsEncodedString(command_output, "utf-8", "~");
-      Py_XDECREF(command_output);
-      const char *command_output_bytes =  PyBytes_AS_STRING(command_output_value);
+      PyObjectUniquePtr command_output(nullptr, PyObjectDeleter);
+      command_output.reset(PyObject_GetAttrString(catcher.get(), "data"));
+
+      PyObjectUniquePtr command_output_value(nullptr,  PyObjectDeleter);
+      command_output_value.reset(PyUnicode_AsEncodedString(command_output.get(), "utf-8", "~"));
+      const char *command_output_bytes =  PyBytes_AS_STRING(command_output_value.get());
       if(command_output_bytes != nullptr && *command_output_bytes != '\0')
       {
         if(i ==1) error += command_output_bytes; /* output to console */
         else LOG(command_output_bytes); /* error to LOG */
       }
-      Py_XDECREF(command_output_value);
     }
     PyRun_SimpleString(python_exit_code);
     return error;

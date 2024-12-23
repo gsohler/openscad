@@ -3870,7 +3870,7 @@ PyObject *python_add_parameter(PyObject *self, PyObject *args, PyObject *kwargs,
 	  }  
       }
     }
-    PyObject *maindict = PyModule_GetDict(pythonMainModule);
+    PyObject *maindict = PyModule_GetDict(pythonMainModule.get());
     PyDict_SetItemString(maindict, name,value_effective);
 
   }

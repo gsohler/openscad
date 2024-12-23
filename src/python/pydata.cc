@@ -425,6 +425,7 @@ PyObject *PyDataObject_call(PyObject *self, PyObject *args, PyObject *kwargs)
   source->scope.moduleInstantiations.clear();
   source->scope.moduleInstantiations.push_back(modinst);
   std::shared_ptr<AbstractNode> resultnode = source->instantiate(*builtin_context, &dummy_context);  // <- hier macht das problem
+  //resultnode = resultnode->clone();												     
   resultnode_datasave = resultnode;												     
   delete source;
   source = nullptr;
