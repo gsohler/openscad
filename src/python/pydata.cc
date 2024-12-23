@@ -12,6 +12,7 @@
 #include "pyopenscad.h"
 
 #include "../src/geometry/GeometryEvaluator.h"
+#include "../src/core/primitives.h"
 #include "core/Tree.h"
 #include <PolySet.h>
 #include <PolySetUtils.h>
@@ -328,9 +329,15 @@ PyObject *python_lv_negate(PyObject *arg) { return  Py_None; }
 Value python_convertresult(PyObject *arg, int &error);
 
 extern bool parse(SourceFile *& file, const std::string& text, const std::string& filename, const std::string& mainFile, int debug);
+std::shared_ptr<AbstractNode> resultnode_datasave = nullptr; // TODO this is needed unless we get the automatic deleter
+
 PyObject *PyDataObject_call(PyObject *self, PyObject *args, PyObject *kwargs)
 {
-  if(pythonDryRun) return Py_None;	
+  if(pythonDryRun){
+    DECLARE_INSTANCE
+    auto empty = std::make_shared<CubeNode>(instance);
+    return PyOpenSCADObjectFromNode(&PyOpenSCADType, empty);
+  }
   std::string modulepath, modulename;
   PyDataObjectToModule(self,modulepath, modulename);
   AssignmentList pargs;
@@ -402,11 +409,11 @@ PyObject *PyDataObject_call(PyObject *self, PyObject *args, PyObject *kwargs)
   std::shared_ptr<ModuleInstantiation> modinst = std::make_shared<ModuleInstantiation>(modulename ,pargs, Location::NONE);
    modinst->scope.moduleInstantiations = modinsts;
 
-  char code[100];
-  sprintf(code,"include <%s>\n",modulepath.c_str());
+  std::ostringstream stream;
+  stream << "include <" << modulepath << ">";
 
   SourceFile *source;
-  if(!parse(source, code, "python", "python", false)) {
+  if(!parse(source, stream.str(), "python", "python", false)) {
     PyErr_SetString(PyExc_TypeError, "Error in SCAD code");
     return Py_None;
   }
@@ -418,8 +425,10 @@ PyObject *PyDataObject_call(PyObject *self, PyObject *args, PyObject *kwargs)
   source->scope.moduleInstantiations.clear();
   source->scope.moduleInstantiations.push_back(modinst);
   std::shared_ptr<AbstractNode> resultnode = source->instantiate(*builtin_context, &dummy_context);  // <- hier macht das problem
+  resultnode_datasave = resultnode;												     
+  delete source;
+  source = nullptr;
 
-//  delete source;
   auto result = PyOpenSCADObjectFromNode(&PyOpenSCADType, resultnode);
   return result;
 }

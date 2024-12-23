@@ -2644,8 +2644,8 @@ PyObject *python_csg_sub(PyObject *self, PyObject *args, PyObject *kwargs, OpenS
   node->r=0;
   node->fn=1;
   PyObject *obj;
-  PyObject *child_dict;	  
-  PyObject *dummy_dict;	  
+  PyObject *child_dict = nullptr;	  
+  PyObject *dummy_dict = nullptr;	  
   std::shared_ptr<AbstractNode> child;
   if(kwargs != nullptr) {
     PyObject *key, *value;
@@ -3772,7 +3772,7 @@ PyObject *python_nimport(PyObject *self, PyObject *args, PyObject *kwargs)
   const char *c_url = nullptr;
   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s", kwlist,
                                    &c_url)) {
-    PyErr_SetString(PyExc_TypeError, "Error during parsing osimport(filename)");
+    PyErr_SetString(PyExc_TypeError, "Error during parsing nimport(filename)");
     return NULL;
   }
   if(c_url == nullptr) return Py_None;
@@ -3936,8 +3936,6 @@ PyObject *python_osuse_include(int mode, PyObject *self, PyObject *args, PyObjec
   std::shared_ptr<AbstractNode> resultnode = source->instantiate(*builtin_context, &osinclude_context); // TODO keine globakle var, kollision!
 
   LocalScope scope = source->scope;
-  PyObject *dict;
-  dict = PyDict_New();
   PyOpenSCADObject *result = (PyOpenSCADObject *) PyOpenSCADObjectFromNode(&PyOpenSCADType, empty); 
 
   for(auto mod : source->scope.modules) { // copy modules
