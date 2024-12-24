@@ -2176,18 +2176,31 @@ void MainWindow::parseTopLevelDocument()
 
     initPython(this->animateWidget->getAnim_tval());
     this->activeEditor->resetHighlighting();
-    if (this->root_file != nullptr) {
+    this->activeEditor->parameterWidget->setEnabled(false);
+    do {
+      if (this->root_file == nullptr) break;
+      int pos=-1, pos1;	    
+      while(1)
+      {
+        pos1 =  fulltext_py.find("add_parameter",pos+1);	    
+	if(pos1 == -1) break;
+	pos=pos1;
+      }	      
+      if(pos == -1) break; // no paremter statements included
+      pos = fulltext_py.find("\n",pos);			   
+      if(pos == -1) break; // no paremter statements included
+      std::string par_text = fulltext_py.substr(0,pos);
+      //
       //add parameters as annotation in AST
-      auto error = evaluatePython(fulltext_py,true); // run dummy
+      auto error = evaluatePython(par_text,true); // run dummy
       this->root_file->scope.assignments=customizer_parameters;
       CommentParser::collectParameters(fulltext_py, this->root_file, '#');  // add annotations
       this->activeEditor->parameterWidget->setParameters(this->root_file, "\n"); // set widgets values
       this->activeEditor->parameterWidget->applyParameters(this->root_file); // use widget values
       this->activeEditor->parameterWidget->setEnabled(true);
       this->activeEditor->setIndicator(this->root_file->indicatorData);
-    } else {
-      this->activeEditor->parameterWidget->setEnabled(false);
     }
+    while(0);
 
     customizer_parameters_finished = this->root_file->scope.assignments;
     customizer_parameters.clear();
