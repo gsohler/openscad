@@ -615,8 +615,10 @@ Value python_convertresult(PyObject *arg, int &error)
       error |= suberror;
     }
     return std::move(vec);
-  } else if(PyFloat_Check(arg)) { return { PyFloat_AsDouble(arg) }; }
-  else if(PyLong_Check(arg))  { return { (double) PyLong_AsLong(arg) }; }
+  } else if(PyFloat_Check(arg)) { return { PyFloat_AsDouble(arg) }; 
+  } else if(arg == Py_False) { return false;
+  } else if(arg == Py_True) {  return true; 
+  } else if(PyLong_Check(arg))  { return { (double) PyLong_AsLong(arg) }; }
   else if(PyUnicode_Check(arg)) {
     auto str = std::string(PyUnicode_AsUTF8(arg));
     return { str } ;
