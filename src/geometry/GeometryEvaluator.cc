@@ -2900,7 +2900,7 @@ static std::unique_ptr<Geometry> extrudePolygon(const PathExtrudeNode& node, con
 
   }
   if(intersect == true && node.allow_intersect == false) {
-  	return std::unique_ptr<PolySet>();
+          LOG(message_group::Warning, "Model is self intersecting. Result is unpredictable. ");
   }
   return builder.build();
 }
@@ -2951,6 +2951,7 @@ Response GeometryEvaluator::visit(State& state, const PathExtrudeNode& node)
       if (geometry) {
         const auto polygons = std::dynamic_pointer_cast<const Polygon2d>(geometry);
         auto extruded = extrudePolygon(node, *polygons);
+//	printf("extrude = %p\n",extruded);
         assert(extruded);
         geom = std::move(extruded);
       }
