@@ -46,7 +46,6 @@
 #include <Selection.h>
 #ifdef ENABLE_CGAL
 #include "geometry/cgal/CGALCache.h"
-#include "geometry/cgal/CGALHybridPolyhedron.h"
 #include "geometry/cgal/cgalutils.h"
 #include <CGAL/convex_hull_2.h>
 #include <CGAL/Point_2.h>
@@ -75,7 +74,7 @@ GeometryEvaluator::GeometryEvaluator(const Tree& tree) : tree(tree) { }
    There are some guarantees on the returned geometry:
    * 2D and 3D geometry cannot be mixed; we will return either _only_ 2D or _only_ 3D geometries
    * PolySet geometries are always 3D. 2D Polysets are only created for special-purpose rendering operations downstream from here.
-   * Needs validation: Implementation-specific geometries shouldn't be mixed (Nef polyhedron, Manifold, CGAL Hybrid polyhedrons)
+   * Needs validation: Implementation-specific geometries shouldn't be mixed (Nef polyhedron, Manifold)
  */
 std::shared_ptr<const Geometry> GeometryEvaluator::evaluateGeometry(const AbstractNode& node,
                                                                bool allownef)
@@ -1974,9 +1973,6 @@ GeometryEvaluator::ResultObject GeometryEvaluator::applyToChildren3D(const Abstr
     }
 #endif
 #ifdef ENABLE_CGAL
-    else if (Feature::ExperimentalFastCsg.is_enabled()) {
-      return ResultObject::mutableResult(std::shared_ptr<Geometry>(CGALUtils::applyUnion3DHybrid(actualchildren.begin(), actualchildren.end())));
-    }
     return ResultObject::constResult(std::shared_ptr<const Geometry>(CGALUtils::applyUnion3D(*csgOpNode, actualchildren.begin(), actualchildren.end())));
 #else
     assert(false && "No boolean backend available");
@@ -2033,10 +2029,6 @@ GeometryEvaluator::ResultObject GeometryEvaluator::applyToChildren3D(const Abstr
     }
 #endif
 #ifdef ENABLE_CGAL
-    if (Feature::ExperimentalFastCsg.is_enabled()) {
-      // FIXME: It's annoying to have to disambiguate here:
-      return ResultObject::mutableResult(std::shared_ptr<Geometry>(CGALUtils::applyOperator3DHybrid(children, op)));
-    }
     const CsgOpNode *csgOpNode = dynamic_cast<const CsgOpNode *>(&node);
     return ResultObject::constResult(CGALUtils::applyOperator3D(*csgOpNode, children, op));
 #else
