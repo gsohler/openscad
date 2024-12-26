@@ -2677,12 +2677,15 @@ PyObject *python_csg_sub(PyObject *self, PyObject *args, PyObject *kwargs, OpenS
       switch(mode) {
         case OpenSCADOperator::UNION:	    
           PyErr_SetString(PyExc_TypeError, "Error during parsing union. arguments must be solids or arrays.");
+	  return nullptr;
   	break;
         case OpenSCADOperator::DIFFERENCE:	    
           PyErr_SetString(PyExc_TypeError, "Error during parsing difference. arguments must be solids or arrays.");
+	  return nullptr;
   	break;
         case OpenSCADOperator::INTERSECTION:	    
           PyErr_SetString(PyExc_TypeError, "Error during parsing intersection. arguments must be solids or arrays.");
+	  return nullptr;
 	  break;
         case OpenSCADOperator::MINKOWSKI:	    
       	  break;
