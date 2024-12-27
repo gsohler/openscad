@@ -325,6 +325,7 @@
     <addaction name="separator"/>
     <addaction name="designCheckValidity"/>
     <addaction name="designActionDisplayAST"/>
+    <addaction name="designActionDisplayPython"/>
     <addaction name="designActionDisplayCSGTree"/>
     <addaction name="designActionDisplayCSGProducts"/>
     <addaction name="separator"/>
@@ -1046,6 +1047,11 @@
   <action name="designActionDisplayAST">
    <property name="text">
     <string>Display A&amp;ST...</string>
+   </property>
+  </action>
+  <action name="designActionDisplayPython">
+   <property name="text">
+    <string>Display Python conversion</string>
    </property>
   </action>
   <action name="designActionDisplayCSGTree">

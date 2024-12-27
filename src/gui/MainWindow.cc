@@ -633,6 +633,7 @@ MainWindow::MainWindow(const QStringList& filenames)
   connect(this->designLoadShareDesign, SIGNAL(triggered()), this, SLOT(actionLoadShareDesign()));
   connect(this->designCheckValidity, SIGNAL(triggered()), this, SLOT(actionCheckValidity()));
   connect(this->designActionDisplayAST, SIGNAL(triggered()), this, SLOT(actionDisplayAST()));
+  connect(this->designActionDisplayPython, SIGNAL(triggered()), this, SLOT(actionDisplayPython()));
   connect(this->designActionDisplayCSGTree, SIGNAL(triggered()), this, SLOT(actionDisplayCSGTree()));
   connect(this->designActionDisplayCSGProducts, SIGNAL(triggered()), this, SLOT(actionDisplayCSGProducts()));
 
@@ -2870,9 +2871,28 @@ void MainWindow::actionDisplayAST()
   e->setWindowTitle("AST Dump");
   e->setReadOnly(true);
   if (root_file) {
-    e->setPlainText(QString::fromStdString(root_file->dump_python("")));
+    e->setPlainText(QString::fromStdString(root_file->dump("")));
   } else {
     e->setPlainText("No AST to dump. Please try compiling first...");
+  }
+  e->resize(600, 400);
+  e->show();
+  clearCurrentOutput();
+}
+
+void MainWindow::actionDisplayPython()
+{
+  setCurrentOutput();
+  auto e = new QTextEdit(this);
+  e->setAttribute(Qt::WA_DeleteOnClose);
+  e->setWindowFlags(Qt::Window);
+  e->setTabStopDistance(tabStopWidth);
+  e->setWindowTitle("Python Dump");
+  e->setReadOnly(true);
+  if (root_file) {
+    e->setPlainText(QString::fromStdString(root_file->dump_python("")));
+  } else {
+    e->setPlainText("No Python to dump. Please try compiling first...");
   }
   e->resize(600, 400);
   e->show();

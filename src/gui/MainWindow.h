@@ -290,6 +290,7 @@ private slots:
   void actionLoadShareDesign();
   void actionCheckValidity();
   void actionDisplayAST();
+  void actionDisplayPython();
   void actionDisplayCSGTree();
   void actionDisplayCSGProducts();
   bool canExport(unsigned int dim);
