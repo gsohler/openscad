@@ -678,15 +678,48 @@ void initPython(double time)
     Py_ssize_t pos = 0;
     PyObject *maindict = PyModule_GetDict(pythonMainModule.get());
     while (PyDict_Next(maindict, &pos, &key, &value)) {
-      PyObject* key1 = PyUnicode_AsEncodedString(key, "utf-8", "~");
-      if(key1 != nullptr) {
-        const char *key_str =  PyBytes_AS_STRING(key1);
-        if(key_str == nullptr) continue;
-        if (std::find(std::begin(pythonInventory), std::end(pythonInventory), key_str) == std::end(pythonInventory))
-        {
-          PyDict_DelItemString(maindict, key_str);
+      PyObjectUniquePtr key_(PyUnicode_AsEncodedString(key, "utf-8", "~"), PyObjectDeleter);
+      if(key_ == nullptr) continue;
+      const char *key_str =  PyBytes_AS_STRING(key_.get());
+      if(key_str == nullptr) continue;
+      if (std::find(std::begin(pythonInventory), std::end(pythonInventory), key_str) == std::end(pythonInventory))
+      {
+        PyDict_DelItemString(maindict, key_str);
+      }
+      // bug in  PyDict_GetItemString, thus iterating
+      if(strcmp(key_str,"sys") == 0) {
+        PyObject *sysdict = PyModule_GetDict(value);
+	if(sysdict == nullptr) continue;
+	// get builtin_module_names
+        PyObject *key1, *value1;
+        Py_ssize_t pos1 = 0;
+        while (PyDict_Next(sysdict, &pos1, &key1, &value1)) {
+          PyObjectUniquePtr key1_(PyUnicode_AsEncodedString(key1, "utf-8", "~"), PyObjectDeleter);
+          if(key1_ == nullptr) continue;
+          const char *key1_str =  PyBytes_AS_STRING(key1_.get());
+          if(strcmp(key1_str,"modules") == 0) {
+            PyObject *key2, *value2;
+            Py_ssize_t pos2 = 0;
+            while (PyDict_Next(value1, &pos2, &key2, &value2)) {
+              PyObjectUniquePtr key2_(PyUnicode_AsEncodedString(key2, "utf-8", "~"), PyObjectDeleter);
+              if(key2_ == nullptr) continue;
+              const char *key2_str =  PyBytes_AS_STRING(key2_.get());
+	      if(key2_str == nullptr) continue;
+	      if(!PyModule_Check(value2)) continue;
+
+	      PyObject *modrepr = PyObject_Repr(value2);
+	      PyObject* modreprobj = PyUnicode_AsEncodedString(modrepr, "utf-8", "~");
+              const char *modreprstr = PyBytes_AS_STRING(modreprobj);
+	      if(modreprstr == nullptr) continue;
+	      if(strstr(modreprstr,"(frozen)") != nullptr) continue;
+	      if(strstr(modreprstr,"(built-in)") != nullptr) continue;
+	      if(strstr(modreprstr,"/encodings/") != nullptr) continue;
+	      if(strstr(modreprstr,"_frozen_") != nullptr) continue;
+              PyDict_DelItem(value1, key2);
+
+	    }
+          }
         }
-        Py_XDECREF(key1);
       }
     }
   } else {
@@ -783,6 +816,13 @@ std::string evaluatePython(const std::string & code, bool dry_run)
 	  return "Python not initialized";
   const char *python_init_code="\
 import sys\n\
+class InputCatcher:\n\
+   def __init__(self):\n\
+      self.data = \"modules\"\n\
+   def read(self):\n\
+      return self.data\n\
+   def readline(self):\n\
+      return self.data\n\
 class OutputCatcher:\n\
    def __init__(self):\n\
       self.data = ''\n\
@@ -790,14 +830,18 @@ class OutputCatcher:\n\
       self.data = self.data + stuff\n\
    def flush(self):\n\
       pass\n\
+catcher_in = InputCatcher()\n\
 catcher_out = OutputCatcher()\n\
 catcher_err = OutputCatcher()\n\
+stdin_bak=sys.stdin\n\
 stdout_bak=sys.stdout\n\
 stderr_bak=sys.stderr\n\
+sys.stdin = catcher_in\n\
 sys.stdout = catcher_out\n\
 sys.stderr = catcher_err\n\
 ";
   const char *python_exit_code="\
+sys.stdin = stdin_bak\n\
 sys.stdout = stdout_bak\n\
 sys.stderr = stderr_bak\n\
 ";
