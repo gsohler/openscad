@@ -41,7 +41,6 @@
 
 #ifdef ENABLE_CGAL
 #include "geometry/cgal/CGAL_Nef_polyhedron.h"
-#include "geometry/cgal/CGALHybridPolyhedron.h"
 #include "geometry/cgal/cgal.h"
 #include "geometry/cgal/cgalutils.h"
 #endif
@@ -62,7 +61,7 @@ namespace {
 #define DC_MAX_LEADING_ZEROES (5)
 #define DC_MAX_TRAILING_ZEROES (0)
 
-std::string toString(const Vector3f& v)
+std::string toString(const Vector3d& v)
 {
   double_conversion::DoubleToStringConverter dc(
     DC_FLAGS, DC_INF, DC_NAN, DC_EXP,
@@ -72,11 +71,11 @@ std::string toString(const Vector3f& v)
   char buffer[DC_BUFFER_SIZE];
 
   double_conversion::StringBuilder builder(buffer, DC_BUFFER_SIZE);
-  dc.ToShortestSingle(v[0], &builder);
+  dc.ToShortest(v[0], &builder);
   builder.AddCharacter(' ');
-  dc.ToShortestSingle(v[1], &builder);
+  dc.ToShortest(v[1], &builder);
   builder.AddCharacter(' ');
-  dc.ToShortestSingle(v[2], &builder);
+  dc.ToShortest(v[2], &builder);
   builder.Finalize();
 
   return buffer;
@@ -127,8 +126,7 @@ uint64_t append_stl(std::shared_ptr<const PolySet> polyset, std::ostream& output
   if (!binary) {
     vertexStrings.resize(ps->vertices.size());
     std::transform(ps->vertices.begin(), ps->vertices.end(), vertexStrings.begin(),
-      [](const auto& p)
-     { return toString({static_cast<float>(p.x()), static_cast<float>(p.y()) , static_cast<float>(p.z()) }); });
+      [](const auto& p) { return toString(p); });
   }
 
   // Used for binary mode only
@@ -172,8 +170,7 @@ uint64_t append_stl(std::shared_ptr<const PolySet> polyset, std::ostream& output
       assert(s0 != s1 && s0 != s2 && s1 != s2);
 
       output << "  facet normal ";
-      output << toString(
-        {static_cast<float>(normal.x()), static_cast<float>(normal.y()), static_cast<float>(normal.z()) }) << "\n";
+      output << toString(normal) << "\n";
       output << "    outer loop\n";
       output << "      vertex " << s0 << "\n";
       output << "      vertex " << s1 << "\n";
@@ -209,27 +206,6 @@ uint64_t append_stl(const CGAL_Nef_polyhedron& root_N, std::ostream& output,
   return triangle_count;
 }
 
-/*!
-   Saves the current 3D CGAL Nef polyhedron as STL to the given file.
-   The file must be open.
- */
-uint64_t append_stl(const CGALHybridPolyhedron& hybrid, std::ostream& output,
-                    bool binary)
-{
-  uint64_t triangle_count = 0;
-  if (!hybrid.isManifold()) {
-    LOG(message_group::Export_Warning, "Exported object may not be a valid 2-manifold and may need repair");
-  }
-
-  const auto ps = hybrid.toPolySet();
-  if (ps) {
-    triangle_count += append_stl(ps, output, binary);
-  } else {
-    LOG(message_group::Export_Error, "Nef->PolySet failed");
-  }
-
-  return triangle_count;
-}
 #endif  // ENABLE_CGAL
 
 #ifdef ENABLE_MANIFOLD
@@ -270,8 +246,6 @@ uint64_t append_stl(const std::shared_ptr<const Geometry>& geom, std::ostream& o
 #ifdef ENABLE_CGAL
   } else if (const auto N = std::dynamic_pointer_cast<const CGAL_Nef_polyhedron>(geom)) {
     triangle_count += append_stl(*N, output, binary);
-  } else if (const auto hybrid = std::dynamic_pointer_cast<const CGALHybridPolyhedron>(geom)) {
-    triangle_count += append_stl(*hybrid, output, binary);
 #endif
 #ifdef ENABLE_MANIFOLD
   } else if (const auto mani = std::dynamic_pointer_cast<const ManifoldGeometry>(geom)) {

@@ -70,6 +70,7 @@ if [ ! -e $MXEDIR ]; then
 	mkdir -p $MXEDIR
 	cd $MXEDIR/..
 	echo "Downloading MXE into " $PWD
+	echo "MXEDIR is $MXEDIR"
 	git clone https://github.com/openscad/mxe.git $MXEDIR
 fi
 
@@ -82,10 +83,11 @@ fi
 if [ "`echo $* | grep download`" ]; then
 PACKAGES='download-mpfr download-eigen download-opencsg download-cgal download-qtbase download-qtmultimedia download-ninja download-nsis download-glib download-libxml2 download-freetype download-fontconfig download-harfbuzz download-libzip download-lib3mf download-double-conversion download-zip download-nettle download-glm download-libunistring download-libidn2 download-curl'
 else
-PACKAGES='qtbase qtmultimedia qscintilla2 mpfr eigen opencsg cgal ninja nsis glib libxml2 freetype fontconfig harfbuzz libzip lib3mf double-conversion zip cryptopp intel-tbb nettle glm  curl'
+PACKAGES='qtbase qtmultimedia qscintilla2 mpfr eigen opencsg cgal ninja nsis glib libxml2 freetype fontconfig harfbuzz libzip lib3mf double-conversion zip cryptopp intel-tbb nettle glm  curl clipper2'
 fi
-echo make MXE_PLUGIN_DIRS=plugins/gcc11 $PACKAGES MXE_TARGETS=$MXE_TARGETS -j $NUMCPU JOBS=$NUMJOBS
-make MXE_PLUGIN_DIRS=plugins/gcc11 $PACKAGES MXE_TARGETS=$MXE_TARGETS -j $NUMCPU JOBS=$NUMJOBS
+echo aaa
+echo make MXE_PLUGIN_DIRS=plugins/gcc11 $PACKAGES MXE_TARGETS=$MXE_TARGETS -j $NUMCPU JOBS=$NUMJOBS VERBSE=1
+make MXE_PLUGIN_DIRS=plugins/gcc11 $PACKAGES MXE_TARGETS=$MXE_TARGETS -j $NUMCPU JOBS=$NUMJOBS VERBOSE=1
 
 echo "leaving" $MXEDIR
 

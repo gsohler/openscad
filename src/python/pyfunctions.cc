@@ -396,7 +396,6 @@ std::unique_ptr<const Geometry> sphereCreateFuncGeometry(void *funcptr, double f
     builder.appendPolygon({tri[0], tri[1], tri[2]});
   }
   auto ps = builder.build();
-
   return ps; 
 }
 
@@ -1594,7 +1593,6 @@ PyObject *python_oo_wrap(PyObject *obj, PyObject *args, PyObject *kwargs)
   return python_wrap_core(obj, r, fn, fa, fs);
 }
 
-std::shared_ptr<AbstractNode> python_result_node_bak; // TODO why is that needed ? python_result_nose is nullptr
 PyObject *python_output_core(PyObject *obj)
 {
   PyObject *child_dict;
@@ -1603,14 +1601,14 @@ PyObject *python_output_core(PyObject *obj)
     PyErr_SetString(PyExc_TypeError, "Invalid type for Object in output");
     return NULL;
   }
+  // TODO fix or clean tag_highlight here
   PyObject *key, *value;
   Py_ssize_t pos = 0;
   python_result_node = child;
-  python_result_node_bak = child;
   mapping_name.clear();
   mapping_code.clear();
   mapping_level.clear();
-  python_build_hashmap(child);
+  python_build_hashmap(child,0);
   python_result_handle.clear();
   Matrix4d raw;
   SelectedObject sel;
@@ -2644,8 +2642,8 @@ PyObject *python_csg_sub(PyObject *self, PyObject *args, PyObject *kwargs, OpenS
   node->r=0;
   node->fn=1;
   PyObject *obj;
-  PyObject *child_dict;	  
-  PyObject *dummy_dict;	  
+  PyObject *child_dict = nullptr;	  
+  PyObject *dummy_dict = nullptr;	  
   std::shared_ptr<AbstractNode> child;
   if(kwargs != nullptr) {
     PyObject *key, *value;
@@ -2679,12 +2677,15 @@ PyObject *python_csg_sub(PyObject *self, PyObject *args, PyObject *kwargs, OpenS
       switch(mode) {
         case OpenSCADOperator::UNION:	    
           PyErr_SetString(PyExc_TypeError, "Error during parsing union. arguments must be solids or arrays.");
+	  return nullptr;
   	break;
         case OpenSCADOperator::DIFFERENCE:	    
           PyErr_SetString(PyExc_TypeError, "Error during parsing difference. arguments must be solids or arrays.");
+	  return nullptr;
   	break;
         case OpenSCADOperator::INTERSECTION:	    
           PyErr_SetString(PyExc_TypeError, "Error during parsing intersection. arguments must be solids or arrays.");
+	  return nullptr;
 	  break;
         case OpenSCADOperator::MINKOWSKI:	    
       	  break;
@@ -3472,15 +3473,15 @@ PyObject *python_offset_core(PyObject *obj,double r, double delta, PyObject *cha
 
   node->delta = 1;
   node->chamfer = false;
-  node->join_type = ClipperLib::jtRound;
+  node->join_type = Clipper2Lib::JoinType::Round;
   if (!isnan(r)) {
     node->delta = r;
   } else if (!isnan(delta)) {
     node->delta = delta;
-    node->join_type = ClipperLib::jtMiter;
+    node->join_type = Clipper2Lib::JoinType::Miter;
     if (chamfer == Py_True) {
       node->chamfer = true;
-      node->join_type = ClipperLib::jtSquare;
+      node->join_type = Clipper2Lib::JoinType::Square;
     }
     else if (chamfer == Py_False || chamfer == NULL )  node->chamfer = 0;
     else {
@@ -3772,7 +3773,7 @@ PyObject *python_nimport(PyObject *self, PyObject *args, PyObject *kwargs)
   const char *c_url = nullptr;
   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s", kwlist,
                                    &c_url)) {
-    PyErr_SetString(PyExc_TypeError, "Error during parsing osimport(filename)");
+    PyErr_SetString(PyExc_TypeError, "Error during parsing nimport(filename)");
     return NULL;
   }
   if(c_url == nullptr) return Py_None;
@@ -3804,15 +3805,15 @@ PyObject *python_nimport(PyObject *self, PyObject *args, PyObject *kwargs)
 }
 
 PyObject *python_str(PyObject *self) {
-	char str[40];
+  std::ostringstream stream;
   PyObject *dummydict;	  
-	auto node=PyOpenSCADObjectToNode(self, &dummydict);
-	if(*str != '\0')
-		sprintf(str,"OpenSCAD (%d)",(int) node->index());
-	else
-		sprintf(str,"Invalid OpenSCAD Object");
+  std::shared_ptr<AbstractNode> node=PyOpenSCADObjectToNode(self, &dummydict);
+  if(node != nullptr)
+    stream << "OpenSCAD (" << (int) node->index() << ")";
+  else
+    stream << "Invalid OpenSCAD Object";
 
-	return PyUnicode_FromStringAndSize(str,strlen(str));
+  return PyUnicode_FromStringAndSize(stream.str().c_str(),stream.str().size());
 }
 
 PyObject *python_add_parameter(PyObject *self, PyObject *args, PyObject *kwargs, ImportType type)
@@ -3870,7 +3871,7 @@ PyObject *python_add_parameter(PyObject *self, PyObject *args, PyObject *kwargs,
 	  }  
       }
     }
-    PyObject *maindict = PyModule_GetDict(pythonMainModule);
+    PyObject *maindict = PyModule_GetDict(pythonMainModule.get());
     PyDict_SetItemString(maindict, name,value_effective);
 
   }
@@ -3894,50 +3895,92 @@ PyObject *python_scad(PyObject *self, PyObject *args, PyObject *kwargs)
     PyErr_SetString(PyExc_TypeError, "Error in SCAD code");
     return Py_None;
   }
+  parsed_file->handleDependencies(true);
 
   EvaluationSession session{"python"};
   ContextHandle<BuiltinContext> builtin_context{Context::create<BuiltinContext>(&session)};
   std::shared_ptr<const FileContext> file_context;
   std::shared_ptr<AbstractNode> resultnode = parsed_file->instantiate(*builtin_context, &file_context);
+  resultnode = resultnode->clone(); // instmod will go out of scope
   delete parsed_file;
+  parsed_file = nullptr;
   return PyOpenSCADObjectFromNode(&PyOpenSCADType,resultnode);
 }
 
-PyObject *python_use(PyObject *self, PyObject *args, PyObject *kwargs)
+PyObject *python_osuse_include(int mode, PyObject *self, PyObject *args, PyObject *kwargs)
 {
   DECLARE_INSTANCE
+  auto empty = std::make_shared<CubeNode>(instance);
   char *kwlist[] = {"file", NULL};
   const char *file = NULL;
+  std::ostringstream stream;
   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s", kwlist,
                                    &file
                                    )) {
-    PyErr_SetString(PyExc_TypeError, "Error during parsing osuse(path)");
+    if(mode) PyErr_SetString(PyExc_TypeError, "Error during parsing osinclude(path)");
+    else PyErr_SetString(PyExc_TypeError, "Error during parsing osuse(path)");
     return NULL;
   }
   const std::string filename = lookup_file(file, ".",".");
-  SourceFile *source_file = new SourceFile(".","."); // filename, filename);
-  source_file->registerUse(std::string(filename), Location::NONE);
-  source_file->handleDependencies(true);
-  EvaluationSession session{"."};
+  stream << "include <" << filename << ">\n";
 
-  ContextHandle<BuiltinContext> c_handle{Context::create<BuiltinContext>(&session)};
-  std::shared_ptr<const BuiltinContext> cxt = *c_handle;
+  SourceFile *source;
+  if(!parse(source, stream.str(), "python", "python", false)) {
+    PyErr_SetString(PyExc_TypeError, "Error in SCAD code");
+    return Py_None;
+  }
+  if(mode == 0) source->scope.moduleInstantiations.clear();	  
+  source->handleDependencies(true);
 
-  ContextHandle<FileContext> fc_handle{Context::create<FileContext>(cxt, source_file)};
-  std::shared_ptr<const FileContext> file_cxt = *fc_handle;
- 
-  auto namelist = file_cxt->list_local_modules();
-  PyObject *dict;
-  dict = PyDict_New();
-  std::shared_ptr<AbstractNode> empty;
+  EvaluationSession *session = new EvaluationSession("python");
+  ContextHandle<BuiltinContext> builtin_context{Context::create<BuiltinContext>(session)};
+
+  std::shared_ptr<const FileContext> osinclude_context;
+  std::shared_ptr<AbstractNode> resultnode = source->instantiate(*builtin_context, &osinclude_context); // TODO keine globakle var, kollision!
+
+  LocalScope scope = source->scope;
   PyOpenSCADObject *result = (PyOpenSCADObject *) PyOpenSCADObjectFromNode(&PyOpenSCADType, empty); 
 
-  for(std::string name: namelist) {
-    boost::optional<InstantiableModule> mod = file_cxt->lookup_local_module(name, Location::NONE);
-    PyDict_SetItemString(result->dict, name.c_str(),PyDataObjectFromModule(&PyDataType, mod) );
+  for(auto mod : source->scope.modules) { // copy modules
+    std::shared_ptr<UserModule> usmod = mod.second;
+    InstantiableModule m;
+//    m.defining_context=osinclude_context;
+//    m.module=mod.second.get();
+//    boost::optional<InstantiableModule> res(m);
+    PyDict_SetItemString(result->dict, mod.first.c_str(),PyDataObjectFromModule(&PyDataType, filename, mod.first ));
   }
-  return (PyObject *) result;
 
+ for(auto fun : source->scope.functions) { // copy functions
+    std::shared_ptr<UserFunction> usfunc = fun.second; // install lambda functions ?
+//    printf("%s\n",fun.first.c_str());
+//    InstantiableModule m;
+//    m.defining_context=osinclude_context;
+//    m.module=mod.second.get();
+//    boost::optional<InstantiableModule> res(m);
+//    PyDict_SetItemString(result->dict, mod.first.c_str(),PyDataObjectFromModule(&PyDataType, res ));
+  }
+
+  for(auto ass : source->scope.assignments) { // copy assignments
+//    printf("Var %s\n",ass->getName().c_str());						   
+    const std::shared_ptr<Expression> expr = ass->getExpr();
+    Value val = expr->evaluate(osinclude_context);
+    if(val.isDefined()) {
+      PyObject *res= python_fromopenscad(std::move(val));
+      PyDict_SetItemString(result->dict, ass->getName().c_str(),res);
+    }
+  }
+ // SourceFileCache::instance()->clear();
+  return (PyObject *) result;
+}
+
+PyObject *python_osuse(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+  return python_osuse_include(0,self, args, kwargs);
+}
+
+PyObject *python_osinclude(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+  return python_osuse_include(1,self, args, kwargs);
 }
 
 PyObject *python_debug_modifier(PyObject *arg,int mode) {
@@ -4017,8 +4060,8 @@ PyObject *python_model(PyObject *self, PyObject *args, PyObject *kwargs, int mod
     PyErr_SetString(PyExc_TypeError, "Error during parsing model");
     return NULL;
   }
-  if(python_result_node_bak == nullptr) return Py_None;
-  return PyOpenSCADObjectFromNode(&PyOpenSCADType, python_result_node_bak);
+  if(python_result_node == nullptr) return Py_None;
+  return PyOpenSCADObjectFromNode(&PyOpenSCADType, python_result_node);
 }
 
 PyMethodDef PyOpenSCADFunctions[] = {
@@ -4092,7 +4135,8 @@ PyMethodDef PyOpenSCADFunctions[] = {
   {"render", (PyCFunction) python_render, METH_VARARGS | METH_KEYWORDS, "Render Object."},
   {"osimport", (PyCFunction) python_import, METH_VARARGS | METH_KEYWORDS, "Import Object."},
   {"nimport", (PyCFunction) python_nimport, METH_VARARGS | METH_KEYWORDS, "Import Networked Object."},
-  {"osuse", (PyCFunction) python_use, METH_VARARGS | METH_KEYWORDS, "Import OpenSCAD Library."},
+  {"osuse", (PyCFunction) python_osuse, METH_VARARGS | METH_KEYWORDS, "Use OpenSCAD Library."},
+  {"osinclude", (PyCFunction) python_osinclude, METH_VARARGS | METH_KEYWORDS, "Include OpenSCAD Library."},
   {"version", (PyCFunction) python_version, METH_VARARGS | METH_KEYWORDS, "Output openscad Version."},
   {"version_num", (PyCFunction) python_version_num, METH_VARARGS | METH_KEYWORDS, "Output openscad Version."},
   {"add_parameter", (PyCFunction) python_add_parameter, METH_VARARGS | METH_KEYWORDS, "Add Parameter for Customizer."},

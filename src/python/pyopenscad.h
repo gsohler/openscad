@@ -4,12 +4,15 @@
 #include "node.h"
 #include <geometry/Polygon2d.h>
 #include "src/core/function.h"
+#include "src/core/ScopeContext.h"
+#include "src/core/UserModule.h"
 
 #pragma GCC diagnostic ignored "-Wwrite-strings"
 
 #define DECLARE_INSTANCE	std::string instance_name; \
 	AssignmentList inst_asslist;\
-	ModuleInstantiation *instance = new ModuleInstantiation(instance_name,inst_asslist, Location::NONE);
+	ModuleInstantiation *instance = new ModuleInstantiation(instance_name,inst_asslist, Location::NONE); \
+	modinsts_list.push_back(instance);
 
 
 typedef struct {
@@ -18,6 +21,9 @@ typedef struct {
   PyObject *dict;
   /* Type-specific fields go here. */
 } PyOpenSCADObject;
+
+void PyObjectDeleter (PyObject *pObject);
+using PyObjectUniquePtr = std::unique_ptr<PyObject, const decltype(PyObjectDeleter)&>;
 
 PyMODINIT_FUNC PyInit_PyOpenSCAD(void);
 
@@ -45,11 +51,14 @@ std::vector<Vector3d> python_vectors(PyObject *vec, int mindim, int maxdim);
 int python_numberval(PyObject *number, double *result);
 void get_fnas(double& fn, double& fa, double& fs);
 void python_retrieve_pyname(const std::shared_ptr<AbstractNode> &node);
-void python_build_hashmap(const std::shared_ptr<AbstractNode> &node);
+void python_build_hashmap(const std::shared_ptr<AbstractNode> &node, int level);
+PyObject *python_fromopenscad(const Value &val);
+
 
 extern std::vector<std::string> mapping_name;
 extern std::vector<std::string> mapping_code;
 extern std::vector<int> mapping_level;
+extern SourceFile *osinclude_source;
 
 PyObject *python_str(PyObject *self);
 
@@ -58,5 +67,5 @@ extern PyMappingMethods PyOpenSCADMapping;
 extern PyMethodDef PyOpenSCADFunctions[];
 extern PyMethodDef PyOpenSCADMethods[];
 
-extern PyObject *pythonMainModule;
-extern PyObject *pythonInitDict;
+extern PyObjectUniquePtr pythonInitDict;
+extern PyObjectUniquePtr pythonMainModule;

@@ -52,7 +52,10 @@ public:
 
   void insertEnd(const size_t nodeidx, const long endindex) {
     // throws std::out_of_range on miss
-    auto indexpair = this->cache.at(nodeidx);
+    std::pair<long int, long int> indexpair;
+    try {
+      indexpair = this->cache.at(nodeidx); 
+    } catch(std::exception &ex) { return; }
 #ifdef ENABLE_PYTHON
   if(true) { // should be MainWindow::python_active, fix is true
     if(indexpair.second == -1L)

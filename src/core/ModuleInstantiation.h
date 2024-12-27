@@ -16,6 +16,9 @@ public:
   ModuleInstantiation(std::string name, AssignmentList args = AssignmentList(), const Location& loc = Location::NONE)
     : ASTNode(loc), arguments(std::move(args)), modname(std::move(name)) { }
 
+  ModuleInstantiation(const ModuleInstantiation &ref)
+    : ASTNode(ref.loc), arguments(std::move(ref.arguments)), modname(std::move(ref.modname)) { }
+
   virtual void print(std::ostream& stream, const std::string& indent, const bool inlined) const;
   virtual void print_python(std::ostream& stream, std::ostream& stream_def, const std::string& indent, const bool inlined, const int context_mode) const;
   void print(std::ostream& stream, const std::string& indent) const override { print(stream, indent, false); }

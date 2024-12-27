@@ -16,6 +16,7 @@
 extern int progress_report_count;
 extern void (*progress_report_f)(const std::shared_ptr<const AbstractNode>&, void *, int);
 extern void *progress_report_vp;
+extern std::vector<ModuleInstantiation *> modinsts_list;
 
 void progress_report_prep(const std::shared_ptr<AbstractNode>& root, void (*f)(const std::shared_ptr<const AbstractNode>& node, void *vp, int mark), void *vp);
 void progress_report_fin();
@@ -67,6 +68,7 @@ public:
 
   std::shared_ptr<const AbstractNode> getNodeByID(int idx, std::deque<std::shared_ptr<const AbstractNode>>& path) const;
   std::shared_ptr<AbstractNode> clone(void);
+  void  dump_counts(int indent, int use_cnt);
 #ifdef ENABLE_PYTHON  
   std::string py_name;
   void setPyName(const std::string &name);

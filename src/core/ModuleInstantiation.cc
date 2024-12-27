@@ -136,7 +136,7 @@ std::shared_ptr<AbstractNode> ModuleInstantiation::evaluate(const std::shared_pt
       return nullptr;
     }
 #endif
-//    if(result == nullptr) LOG(message_group::Warning, loc, context->documentRoot(), "Ignoring unknown module '%1$s'", this->name());
+    if(result == nullptr && error.size() > 0) LOG(message_group::Warning, loc, context->documentRoot(), "Ignoring unknown module '%1$s'", this->name()); // TODO muss anschlagen, wenn das modul NIRGENDS gefunden wurde
     return result;
   }
 
@@ -144,6 +144,7 @@ std::shared_ptr<AbstractNode> ModuleInstantiation::evaluate(const std::shared_pt
     auto node = module->module->instantiate(module->defining_context, this, context);
     return node;
   } catch (EvaluationException& e) {
+  printf("throw1\n");
     if (e.traceDepth > 0) {
       print_trace(this, context);
       e.traceDepth--;

@@ -46,7 +46,7 @@ public:
            << y << ", "
            << z << "], center = " ;
     if(center[0] == center[1] && center[1] == center[2])
-	    stream << (center[0] == 0) ? "true" : "false";
+	    stream << ((center[0] == 0) ? "true" : "false");
     else {
       stream << "\"";	      
       for(int i = 0; i<3;i++) {

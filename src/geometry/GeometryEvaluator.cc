@@ -46,7 +46,6 @@
 #include <Selection.h>
 #ifdef ENABLE_CGAL
 #include "geometry/cgal/CGALCache.h"
-#include "geometry/cgal/CGALHybridPolyhedron.h"
 #include "geometry/cgal/cgalutils.h"
 #include <CGAL/convex_hull_2.h>
 #include <CGAL/Point_2.h>
@@ -75,7 +74,7 @@ GeometryEvaluator::GeometryEvaluator(const Tree& tree) : tree(tree) { }
    There are some guarantees on the returned geometry:
    * 2D and 3D geometry cannot be mixed; we will return either _only_ 2D or _only_ 3D geometries
    * PolySet geometries are always 3D. 2D Polysets are only created for special-purpose rendering operations downstream from here.
-   * Needs validation: Implementation-specific geometries shouldn't be mixed (Nef polyhedron, Manifold, CGAL Hybrid polyhedrons)
+   * Needs validation: Implementation-specific geometries shouldn't be mixed (Nef polyhedron, Manifold)
  */
 std::shared_ptr<const Geometry> GeometryEvaluator::evaluateGeometry(const AbstractNode& node,
                                                                bool allownef)
@@ -1974,9 +1973,6 @@ GeometryEvaluator::ResultObject GeometryEvaluator::applyToChildren3D(const Abstr
     }
 #endif
 #ifdef ENABLE_CGAL
-    else if (Feature::ExperimentalFastCsg.is_enabled()) {
-      return ResultObject::mutableResult(std::shared_ptr<Geometry>(CGALUtils::applyUnion3DHybrid(actualchildren.begin(), actualchildren.end())));
-    }
     return ResultObject::constResult(std::shared_ptr<const Geometry>(CGALUtils::applyUnion3D(*csgOpNode, actualchildren.begin(), actualchildren.end())));
 #else
     assert(false && "No boolean backend available");
@@ -2033,10 +2029,6 @@ GeometryEvaluator::ResultObject GeometryEvaluator::applyToChildren3D(const Abstr
     }
 #endif
 #ifdef ENABLE_CGAL
-    if (Feature::ExperimentalFastCsg.is_enabled()) {
-      // FIXME: It's annoying to have to disambiguate here:
-      return ResultObject::mutableResult(std::shared_ptr<Geometry>(CGALUtils::applyOperator3DHybrid(children, op)));
-    }
     const CsgOpNode *csgOpNode = dynamic_cast<const CsgOpNode *>(&node);
     return ResultObject::constResult(CGALUtils::applyOperator3D(*csgOpNode, children, op));
 #else
@@ -2095,7 +2087,8 @@ std::unique_ptr<Polygon2d> GeometryEvaluator::applyHull2D(const AbstractNode& no
 std::unique_ptr<Polygon2d> GeometryEvaluator::applyFill2D(const AbstractNode& node)
 {
   // Merge and sanitize input geometry
-  auto geometry_in = ClipperUtils::apply(collectChildren2D(node), ClipperLib::ctUnion);
+  auto geometry_in = ClipperUtils::apply(collectChildren2D(node), Clipper2Lib::ClipType::Union);
+  assert(geometry_in->isSanitized());
 
   std::vector<std::shared_ptr<const Polygon2d>> newchildren;
   // Keep only the 'positive' outlines, eg: the outside edges
@@ -2106,7 +2099,7 @@ std::unique_ptr<Polygon2d> GeometryEvaluator::applyFill2D(const AbstractNode& no
   }
 
   // Re-merge geometry in case of nested outlines
-  return ClipperUtils::apply(newchildren, ClipperLib::ctUnion);
+  return ClipperUtils::apply(newchildren, Clipper2Lib::ClipType::Union);
 }
 
 std::unique_ptr<Geometry> GeometryEvaluator::applyHull3D(const AbstractNode& node)
@@ -2200,6 +2193,7 @@ bool GeometryEvaluator::isSmartCached(const AbstractNode& node)
 std::shared_ptr<const Geometry> GeometryEvaluator::smartCacheGet(const AbstractNode& node, bool preferNef)
 {
   const std::string& key = this->tree.getIdString(node);
+  if(key.empty() ) return {};
   const bool hasgeom = GeometryCache::instance()->contains(key);
   const bool hascgal = CGALCache::instance()->contains(key);
   if (hascgal && (preferNef || !hasgeom)) return CGALCache::instance()->get(key);
@@ -2264,17 +2258,17 @@ std::unique_ptr<Polygon2d> GeometryEvaluator::applyToChildren2D(const AbstractNo
     }
   }
 
-  ClipperLib::ClipType clipType;
+  Clipper2Lib::ClipType clipType;
   switch (op) {
   case OpenSCADOperator::UNION:
   case OpenSCADOperator::OFFSET:
-    clipType = ClipperLib::ctUnion;
+    clipType = Clipper2Lib::ClipType::Union;
     break;
   case OpenSCADOperator::INTERSECTION:
-    clipType = ClipperLib::ctIntersection;
+    clipType = Clipper2Lib::ClipType::Intersection;
     break;
   case OpenSCADOperator::DIFFERENCE:
-    clipType = ClipperLib::ctDifference;
+    clipType = Clipper2Lib::ClipType::Difference;
     break;
   default:
     LOG(message_group::Error, "Unknown boolean operation %1$d", int(op));
@@ -2526,14 +2520,8 @@ Response GeometryEvaluator::visit(State& state, const TextNode& node)
   if (state.isPrefix()) {
     std::shared_ptr<const Geometry> geom;
     if (!isSmartCached(node)) {
-      auto geometrylist = node.createGeometryList();
-      std::vector<std::shared_ptr<const Polygon2d>> polygonlist;
-      for (const auto& geometry : geometrylist) {
-        const auto polygon = std::dynamic_pointer_cast<const Polygon2d>(geometry);
-        assert(polygon);
-        polygonlist.push_back(polygon);
-      }
-      geom = ClipperUtils::apply(polygonlist, ClipperLib::ctUnion);
+      auto polygonlist = node.createPolygonList();
+      geom = ClipperUtils::apply(polygonlist, Clipper2Lib::ClipType::Union);
     } else {
       geom = GeometryCache::instance()->get(this->tree.getIdString(node));
     }
@@ -2904,7 +2892,7 @@ static std::unique_ptr<Geometry> extrudePolygon(const PathExtrudeNode& node, con
 
   }
   if(intersect == true && node.allow_intersect == false) {
-  	return std::unique_ptr<PolySet>();
+          LOG(message_group::Warning, "Model is self intersecting. Result is unpredictable. ");
   }
   return builder.build();
 }
@@ -2955,6 +2943,7 @@ Response GeometryEvaluator::visit(State& state, const PathExtrudeNode& node)
       if (geometry) {
         const auto polygons = std::dynamic_pointer_cast<const Polygon2d>(geometry);
         auto extruded = extrudePolygon(node, *polygons);
+//	printf("extrude = %p\n",extruded);
         assert(extruded);
         geom = std::move(extruded);
       }
@@ -3300,7 +3289,7 @@ std::shared_ptr<const Geometry> GeometryEvaluator::projectionNoCut(const Project
 {
 #ifdef ENABLE_MANIFOLD
   if (RenderSettings::inst()->backend3D == RenderBackend3D::ManifoldBackend) {
-    std::shared_ptr<const Geometry> newgeom = applyToChildren3D(node, OpenSCADOperator::UNION).constptr();
+    const std::shared_ptr<const Geometry> newgeom = applyToChildren3D(node, OpenSCADOperator::UNION).constptr();
     if (newgeom) {
         auto manifold = ManifoldUtils::createManifoldFromGeometry(newgeom);
         auto poly2d = manifold->project();
@@ -3311,9 +3300,7 @@ std::shared_ptr<const Geometry> GeometryEvaluator::projectionNoCut(const Project
   }
 #endif
 
-  std::shared_ptr<const Geometry> geom;
-  std::vector<std::unique_ptr<Polygon2d>> tmp_geom;
-  BoundingBox bounds;
+  std::vector<std::shared_ptr<const Polygon2d>> tmp_geom;
   for (const auto& [chnode, chgeom] : this->visitedchildren[node.index()]) {
     if (chnode->modinst->isBackground()) continue;
 
@@ -3323,32 +3310,12 @@ std::shared_ptr<const Geometry> GeometryEvaluator::projectionNoCut(const Project
     // project chgeom -> polygon2d
     if (auto chPS = PolySetUtils::getGeometryAsPolySet(chgeom)) {
       if (auto poly = PolySetUtils::project(*chPS)) {
-        bounds.extend(poly->getBoundingBox());
-        tmp_geom.push_back(std::move(poly));
+        tmp_geom.push_back(std::shared_ptr(std::move(poly)));
       }
     }
   }
-  int pow2 = ClipperUtils::getScalePow2(bounds);
-
-  ClipperLib::Clipper sumclipper;
-  for (auto &poly : tmp_geom) {
-    ClipperLib::Paths result = ClipperUtils::fromPolygon2d(*poly, pow2);
-    // Using NonZero ensures that we don't create holes from polygons sharing
-    // edges since we're unioning a mesh
-    result = ClipperUtils::process(result, ClipperLib::ctUnion, ClipperLib::pftNonZero);
-    // Add correctly winded polygons to the main clipper
-    sumclipper.AddPaths(result, ClipperLib::ptSubject, true);
-  }
-
-  ClipperLib::PolyTree sumresult;
-  // This is key - without StrictlySimple, we tend to get self-intersecting results
-  sumclipper.StrictlySimple(true);
-  sumclipper.Execute(ClipperLib::ctUnion, sumresult, ClipperLib::pftNonZero, ClipperLib::pftNonZero);
-  if (sumresult.Total() > 0) {
-    geom = ClipperUtils::toPolygon2d(sumresult, pow2);
-  }
-
-  return geom;
+  auto projected = ClipperUtils::applyProjection(tmp_geom);
+  return std::shared_ptr(std::move(projected));
 }
 
 

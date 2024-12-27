@@ -352,7 +352,7 @@ xmlTextReaderPtr AmfImporterZIP::createXmlReader(const char *filepath)
 }
 
 std::unique_ptr<PolySet> import_amf(const std::string& filename, const Location& loc) {
-  LOG(message_group::Deprecated, "AMF import is deprecated. Please use 3MF instead.");
+  LOG(message_group::Deprecated, "AMF import is deprecated. Please use 3mf instead.");
   AmfImporterZIP importer(loc);
   return importer.read(filename);
 }
@@ -360,7 +360,7 @@ std::unique_ptr<PolySet> import_amf(const std::string& filename, const Location&
 #else
 
 std::unique_ptr<PolySet> import_amf(const std::string& filename, const Location& loc) {
-  LOG(message_group::Deprecated, "AMF import is deprecated. Please use 3MF instead.");
+  LOG(message_group::Deprecated, "AMF import is deprecated. Please use 3mf instead.");
   AmfImporter importer(loc);
   return importer.read(filename);
 }

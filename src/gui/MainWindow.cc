@@ -39,6 +39,7 @@
 #include <QList>
 #include <QMetaObject>
 #include <QPoint>
+#include <QScreen>
 #include <QSoundEffect>
 #include <QStringList>
 #include <QTextEdit>
@@ -199,7 +200,7 @@ int curl_download(std::string url, std::string path)
           std::filesystem::rename(path+"_", path);	      
 	}catch(const std::exception& ex)
         {
-	  std::cerr << ex.what() << endl;
+	  std::cerr << ex.what() << std::endl;
           LOG(message_group::Error, "Exception during installing file!");
         }  
       } else {
@@ -231,7 +232,6 @@ int curl_download(std::string url, std::string path)
 #include "geometry/cgal/cgalutils.h"
 #include "geometry/cgal/CGALCache.h"
 #include "geometry/cgal/CGAL_Nef_polyhedron.h"
-#include "geometry/cgal/CGALHybridPolyhedron.h"
 #endif // ENABLE_CGAL
 
 #ifdef ENABLE_MANIFOLD
@@ -322,6 +322,7 @@ void addExportActions(const MainWindow *mainWindow, QToolBar *toolbar, QAction *
 
 void MainWindow::addMenuItemCB(QString callback)
 {
+#ifdef ENABLE_PYTHON  
   const char *cbstr = callback.toStdString().c_str();
   std::string content = loadInitFile();
   if(content.size() == 0) return;
@@ -329,8 +330,10 @@ void MainWindow::addMenuItemCB(QString callback)
   evaluatePython(content);
   evaluatePython(cbstr);
   finishPython();
+#endif
 }
 
+#ifdef ENABLE_PYTHON
 void MainWindow::addMenuItem(const char * menuname, const char *itemname, const char *callback)
 {
 
@@ -365,7 +368,6 @@ void MainWindow::addMenuItem(const char * menuname, const char *itemname, const 
 
 //  menubar->show();
 }
-#ifdef ENABLE_PYTHON
 
 MainWindow *addmenuitem_this = nullptr;
 void  add_menuitem_trampoline(const char *menuname, const char *itemname, const char *callback)
@@ -840,6 +842,15 @@ MainWindow::MainWindow(const QStringList& filenames)
   // make sure it looks nice..
   const auto windowState = settings.value("window/state", QByteArray()).toByteArray();
   restoreGeometry(settings.value("window/geometry", QByteArray()).toByteArray());
+#if QT_VERSION >= QT_VERSION_CHECK(5, 14, 0)
+  // Workaround for a Qt bug (possible QTBUG-46620, but it's still there in Qt-6.5.3)
+  // Blindly restoring a maximized window to a different screen resolution causes a crash
+  // on the next move/resize operation on macOS:
+  // https://github.com/openscad/openscad/issues/5486
+  if (isMaximized()) {
+    setGeometry(screen()->availableGeometry());
+  }
+#endif
   restoreState(windowState);
 
   if (windowState.size() == 0) {
@@ -1467,7 +1478,7 @@ void MainWindow::instantiateRoot()
         this->root_node = this->absolute_root_node;
       }
       if (nextLocation) {
-        LOG(message_group::NONE, *nextLocation, builtin_context->documentRoot(), "More than one Root Modifier (!)");
+//        LOG(message_group::NONE, *nextLocation, builtin_context->documentRoot(), "More than one Root Modifier (!)"); TODO activate
       }
 
       // FIXME: Consider giving away ownership of root_node to the Tree, or use reference counted pointers
@@ -1504,6 +1515,7 @@ void MainWindow::compileCSG()
   } catch (const HardWarningException&) {
     exceptionCleanup();
   }
+
   csgworker->start();
   //compileCSGThread();
   //compileCSGDone();
@@ -2163,18 +2175,31 @@ void MainWindow::parseTopLevelDocument()
 
     initPython(this->animateWidget->getAnim_tval());
     this->activeEditor->resetHighlighting();
-    if (this->root_file != nullptr) {
+    this->activeEditor->parameterWidget->setEnabled(false);
+    do {
+      if (this->root_file == nullptr) break;
+      int pos=-1, pos1;	    
+      while(1)
+      {
+        pos1 =  fulltext_py.find("add_parameter",pos+1);	    
+	if(pos1 == -1) break;
+	pos=pos1;
+      }	      
+      if(pos == -1) break; // no paremter statements included
+      pos = fulltext_py.find("\n",pos);			   
+      if(pos == -1) break; // no paremter statements included
+      std::string par_text = fulltext_py.substr(0,pos);
+      //
       //add parameters as annotation in AST
-      auto error = evaluatePython(fulltext_py);
+      auto error = evaluatePython(par_text,true); // run dummy
       this->root_file->scope.assignments=customizer_parameters;
       CommentParser::collectParameters(fulltext_py, this->root_file, '#');  // add annotations
       this->activeEditor->parameterWidget->setParameters(this->root_file, "\n"); // set widgets values
       this->activeEditor->parameterWidget->applyParameters(this->root_file); // use widget values
       this->activeEditor->parameterWidget->setEnabled(true);
       this->activeEditor->setIndicator(this->root_file->indicatorData);
-    } else {
-      this->activeEditor->parameterWidget->setEnabled(false);
     }
+    while(0);
 
     customizer_parameters_finished = this->root_file->scope.assignments;
     customizer_parameters.clear();
@@ -3105,8 +3130,6 @@ void MainWindow::actionCheckValidity()
 #ifdef ENABLE_CGAL 
  if (auto N = std::dynamic_pointer_cast<const CGAL_Nef_polyhedron>(this->root_geom)) {
     valid = N->p3 ? const_cast<CGAL_Nef_polyhedron3&>(*N->p3).is_valid() : false;
-  } else if (auto hybrid = std::dynamic_pointer_cast<const CGALHybridPolyhedron>(this->root_geom)) {
-    valid = hybrid->isValid();
   } else
 #endif
 #ifdef ENABLE_MANIFOLD
