@@ -194,6 +194,7 @@ std::shared_ptr<AbstractNode> PyOpenSCADObjectToNodeMulti(PyObject *objs,PyObjec
 
 void  python_hierdump(std::ostringstream &stream, const std::shared_ptr<AbstractNode> &node)
 {
+  if(node == nullptr) return;	
   stream <<  node->toString();	
   auto children = node->getChildren();
   if(children.size() < 1) stream << ";";
@@ -211,7 +212,7 @@ void python_build_hashmap(const std::shared_ptr<AbstractNode> &node, int level)
   PyObject *key, *value;
   Py_ssize_t pos = 0;
   std::ostringstream stream;
-  python_hierdump(stream, node);
+//  python_hierdump(stream, node);
   std::string code = stream.str();
   while (PyDict_Next(maindict, &pos, &key, &value)) {
     if(value->ob_type != &PyOpenSCADType) continue;
@@ -809,8 +810,9 @@ std::string evaluatePython(const std::string & code, bool dry_run)
   PyObjectUniquePtr pyExcTraceback (nullptr, PyObjectDeleter);
   /* special python code to catch errors from stdout and stderr and make them available in OpenSCAD console */
   for(ModuleInstantiation *mi : modinsts_list){
-	    delete mi; // best time to delete it
+    delete mi; // best time to delete it
   }
+  modinsts_list.clear();
   pythonDryRun=dry_run;
   if(!pythonMainModuleInitialized)
 	  return "Python not initialized";
@@ -880,7 +882,6 @@ sys.stderr = stderr_bak\n\
       }
     }
     PyRun_SimpleString(python_exit_code);
-    modinsts_list.clear();
     return error;
 }
 /*
