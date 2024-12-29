@@ -86,7 +86,7 @@ set(CMAKE_OSX_DEPLOYMENT_TARGET ${DEPLOYMENT_TARGET} CACHE STRING "Minimum OS X 
 project(OpenSCAD
   VERSION ${PROJECT_VERSION}
   DESCRIPTION "The Programmer's Solid 3D CAD Modeler"
-  HOMEPAGE_URL "https://openscad.org/"
+  HOMEPAGE_URL "https://pythonscad.org/"
   LANGUAGES C CXX
 )
 
@@ -1609,9 +1609,10 @@ endif()
 # Packaging: CPACK_* settings should be configured before `include(CPack)`
 include(InstallRequiredSystemLibraries)
 set(CPACK_PACKAGE_NAME "PythonSCAD")
-set(CPACK_PACKAGE_VENDOR "The OpenSCAD Developers")
+set(CPACK_PACKAGE_VENDOR "The OpenSCAD and PythonSCAD Developers")
 set(CPACK_PACKAGE_VERSION "${OPENSCAD_VERSION}")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "The Programmer's Solid 3D CAD Modeler")
+
 
 if(MXECROSS)
   set(CPACK_GENERATOR ZIP;NSIS)
@@ -1638,6 +1639,21 @@ if(MXECROSS)
   set(CPACK_NSIS_CREATE_ICONS_EXTRA
 	  "CreateShortCut '$INSTDIR\\\\OpenSCAD.lnk'   '$INSTDIR\\\\bin\\\\OpenSCAD.exe' '' "
   )
+  else()
+  set(CPACK_GENERATOR RPM)
+  set(CPACK_RPM_COMPONENT_INSTALL OFF)
+  set(CPACK_RPM_PACKAGE_SUMMARY "The Programmer's Solid 3D CAD Modeler")
+  set(CPACK_RPM_FILE_NAME "pythonscad-${OPENSCAD_YEAR}${OPENSCAD_MONTH}${OPENSCAD_DAY}.x86_64.rpm")
+  set(CPACK_RPM_PACKAGE_ARCHITECTURE "x86_64")
+  set(CPACK_RPM_PACKAGE_RELEASE 1)
+  set(CPACK_RPM_PACKAGE_RELEASE_DIST "Release")
+  set(CPACK_RPM_PACKAGE_LICENSE "GPL")
+  set(CPACK_RPM_PACKAGE_GROUP  "PythonSCAD designers")
+  set(CPACK_RPM_PACKAGE_VENDOR "PythonSCAD designers")
+  set(CPACK_RPM_PACKAGE_DESCRIPTION "PythonSCAD RPM Package")
+  execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink "./openscad" "pythonscad")
+  install(FILES ${CMAKE_CURRENT_BINARY_DIR}/pythonscad DESTINATION "bin" COMPONENT libraries)
+
 endif()
 set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/COPYING")
 # None of config time variables are available for CPACK_PROJECT_CONFIG_FILE, so we configure it now with values.
