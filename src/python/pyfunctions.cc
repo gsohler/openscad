@@ -1660,7 +1660,7 @@ PyObject *python_oo_show(PyObject *obj, PyObject *args, PyObject *kwargs){
 }
 
 
-void Export3mfInfo::writeProps(void *obj) const
+void Export3mfPartInfo::writeProps(void *obj) const
 {
   if(this->props == nullptr) return;
   PyObject *prop = (PyObject *) this->props;
@@ -1696,7 +1696,7 @@ PyObject *python_export_core(PyObject *obj, char *file)
     LOG("Invalid suffix %1$s. Defaulting to binary STL.", suffix);
   }
 
-  std::vector<Export3mfInfo> export3mfInfos;
+  std::vector<Export3mfPartInfo> export3mfPartInfos;
   std::vector<std::string>  names;
 
   PyObject *child_dict;
@@ -1704,8 +1704,8 @@ PyObject *python_export_core(PyObject *obj, char *file)
   if(child != nullptr ) {
     Tree tree(child, "parent");
     GeometryEvaluator geomevaluator(tree);
-    Export3mfInfo info(geomevaluator.evaluateGeometry(*tree.root(), false), "OpenSCAD Model", nullptr);
-    export3mfInfos.push_back(info);
+    Export3mfPartInfo info(geomevaluator.evaluateGeometry(*tree.root(), false), "OpenSCAD Model", nullptr);
+    export3mfPartInfos.push_back(info);
   } else if(PyDict_Check(obj)) {
     PyObject *key, *value;
     Py_ssize_t pos = 0;
@@ -1723,11 +1723,11 @@ PyObject *python_export_core(PyObject *obj, char *file)
       }
       Tree tree(child, "parent");
       GeometryEvaluator geomevaluator(tree);
-      Export3mfInfo info(geomevaluator.evaluateGeometry(*tree.root(), false),value_str, prop);
-      export3mfInfos.push_back(info);
+      Export3mfPartInfo info(geomevaluator.evaluateGeometry(*tree.root(), false),value_str, prop);
+      export3mfPartInfos.push_back(info);
     }
   }
-  if ( export3mfInfos.size() == 0) {
+  if ( export3mfPartInfos.size() == 0) {
     PyErr_SetString(PyExc_TypeError, "Object not recognized");
     return NULL;
   }  
@@ -1741,14 +1741,14 @@ PyObject *python_export_core(PyObject *obj, char *file)
       LOG(_("Can't open file \"%1$s\" for export"), file);
       return nullptr;
     }
-    export_3mf(export3mfInfos, fstream);
+    export_3mf(export3mfPartInfos, fstream, exportInfo);
   }
   else{
-    if(export3mfInfos.size() > 1) {
+    if(export3mfPartInfos.size() > 1) {
       LOG("This Format can at most export one object");
       return nullptr;
     }	    
-    exportFileByName(export3mfInfos[0].geom, file, exportInfo);
+    exportFileByName(export3mfPartInfos[0].geom, file, exportInfo);
   }
   return Py_None;
 }

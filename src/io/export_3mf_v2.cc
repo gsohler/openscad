@@ -24,11 +24,17 @@
  *
  */
 
+#include <unordered_map>
 #include "geometry/GeometryUtils.h"
 #include "io/export.h"
 #include "geometry/PolySet.h"
 #include "geometry/PolySetUtils.h"
+#include "linalg.h"
 #include "utils/printutils.h"
+#ifdef ENABLE_CGAL
+#include "geometry/cgal/cgalutils.h"
+#include "geometry/cgal/CGAL_Nef_polyhedron.h"
+#endif
 #ifdef ENABLE_MANIFOLD
 #include "geometry/manifold/ManifoldGeometry.h"
 #endif
@@ -39,60 +45,91 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <lib3mf_implicit.hpp>
 
-static uint32_t lib3mf_write_callback(const char *data, uint32_t bytes, std::ostream *stream)
-{
-  stream->write(data, bytes);
-  return !(*stream);
-}
+template<> struct std::hash<Color4f> {
+    std::size_t operator()(Color4f const& c) const noexcept {
+      std::size_t hash = 0;
+      for (int idx = 0;idx < 4;idx++) {
+        std::size_t h = std::hash<float>{}(c[idx]);
+        hash = h ^ (hash << 1);
+      }
+      return hash;
+    }
+};
 
-static uint32_t lib3mf_seek_callback(uint64_t pos, std::ostream *stream)
-{
-  stream->seekp(pos);
-  return !(*stream);
-}
+using ColorMap = std::unordered_map<Color4f, Lib3MF_uint32>;
 
-#include "lib3mf_implicit.hpp"
-
-
-#ifdef ENABLE_CGAL
-#include "geometry/cgal/cgal.h"
-#include "geometry/cgal/cgalutils.h"
-#include "geometry/cgal/CGAL_Nef_polyhedron.h"
-#endif
-
-static void export_3mf_error(std::string msg)
-{
-  LOG(message_group::Export_Error, std::move(msg));
-}
-
-/*
- * PolySet must be triangulated.
- */
-void Export3mfInfo::writePropsFloat(void *pobj, const  char *name, float f) const
+void Export3mfPartInfo::writePropsFloat(void *pobj, const  char *name, float f) const
 {
 	Lib3MF::PMeshObject  *obj = (Lib3MF::PMeshObject *) pobj;
 //	printf("Writing %s: %f\n",name, f);
 	//void SetObjectLevelProperty(const Lib3MF_uint32 nUniqueResourceID, const Lib3MF_uint32 nPropertyID);
 }
-void Export3mfInfo::writePropsLong(void *pobj, const  char *name, long l) const
+void Export3mfPartInfo::writePropsLong(void *pobj, const  char *name, long l) const
 {
 //	printf("Writing %s: %d\n",name, l);
 }
-void Export3mfInfo::writePropsString(void *pobj, const  char *name, const char *val) const
+void Export3mfPartInfo::writePropsString(void *pobj, const  char *name, const char *val) const
 {
 //	printf("Writing %s: %s\n",name, val);
 }
 
-static bool append_polyset(std::shared_ptr<const PolySet> ps, const Export3mfInfo info, Lib3MF::PWrapper& wrapper, Lib3MF::PModel& model)
+
+namespace {
+
+struct ExportContext {
+  Lib3MF::PWrapper wrapper;
+  Lib3MF::PModel model;
+  Lib3MF::PBaseMaterialGroup basematerialgroup;
+  int modelcount;
+  ColorMap colors;
+};
+
+uint32_t lib3mf_write_callback(const char *data, uint32_t bytes, std::ostream *stream)
+{
+  stream->write(data, bytes);
+  return !(*stream);
+}
+
+uint32_t lib3mf_seek_callback(uint64_t pos, std::ostream *stream)
+{
+  stream->seekp(pos);
+  return !(*stream);
+}
+
+void export_3mf_error(std::string msg)
+{
+  LOG(message_group::Export_Error, std::move(msg));
+}
+
+Lib3MF_uint8 get_color_channel(const Color4f& col, int idx)
+{
+  return std::clamp(static_cast<int>(255.0 * col[idx]), 0, 255);
+}
+
+int count_mesh_objects(const Lib3MF::PModel& model) {
+    const auto mesh_object_it = model->GetMeshObjects();
+    int count = 0;
+    while (mesh_object_it->MoveNext()) ++count;
+    return count;
+}
+
+/*
+ * PolySet must be triangulated.
+ */
+static bool append_polyset(const std::shared_ptr<const PolySet> & ps, const Export3mfPartInfo info, ExportContext& ctx)
 {
   try {
-    Lib3MF::PMeshObject mesh = model->AddMeshObject();
+    auto mesh = ctx.model->AddMeshObject();
     if (!mesh) return false;
-    mesh->SetName(info.name);
 #ifdef ENABLE_PYTHON    
     info.writeProps((void *) &mesh);
 #endif    
+    int mesh_count = count_mesh_objects(ctx.model);
+    const auto partname = ctx.modelcount == 1 ? "" : "Part " + std::to_string(mesh_count);
+    mesh->SetName(info.name);
+    mesh->SetObjectLevelProperty(ctx.basematerialgroup->GetUniqueResourceID(), 1);
 
     auto vertexFunc = [&](const Vector3d& coords) -> bool {
       const auto f = coords.cast<float>();
@@ -106,10 +143,39 @@ static bool append_polyset(std::shared_ptr<const PolySet> ps, const Export3mfInf
       return true;
     };
 
-    auto triangleFunc = [&](const IndexedFace& indices) -> bool {
+    auto triangleFunc = [&](const IndexedFace& indices, int color_index) -> bool {
       try {
-        Lib3MF::sTriangle t{(Lib3MF_uint32)indices[0], (Lib3MF_uint32)indices[1], (Lib3MF_uint32)indices[2]};
-        mesh->AddTriangle(t);
+        const auto triangle = mesh->AddTriangle({
+          static_cast<Lib3MF_uint32>(indices[0]),
+          static_cast<Lib3MF_uint32>(indices[1]),
+          static_cast<Lib3MF_uint32>(indices[2])
+        });
+
+        if (!ps->colors.empty()) {
+          const auto col = ps->colors[color_index];
+          const auto col_it = ctx.colors.find(col);
+          Lib3MF_uint32 col_idx;
+          if (col_it == ctx.colors.end()) {
+            const Lib3MF::sColor materialcolor{
+              .m_Red = get_color_channel(col, 0),
+              .m_Green = get_color_channel(col, 1),
+              .m_Blue = get_color_channel(col, 2),
+              .m_Alpha = get_color_channel(col, 3)
+            };
+            col_idx = ctx.basematerialgroup->AddMaterial("Color " + std::to_string(ctx.basematerialgroup->GetCount()), materialcolor);
+            ctx.colors[col] = col_idx;
+          } else {
+            col_idx = (*col_it).second;
+          }
+          mesh->SetTriangleProperties(triangle, {
+            ctx.basematerialgroup->GetUniqueResourceID(),
+            {
+              col_idx,
+              col_idx,
+              col_idx
+            }
+          });
+        }
       } catch (Lib3MF::ELib3MFException& e) {
         export_3mf_error(e.what());
         return false;
@@ -129,8 +195,9 @@ static bool append_polyset(std::shared_ptr<const PolySet> ps, const Export3mfInf
       }
     }
 
-    for (const auto& poly : out_ps->indices) {
-      if (!triangleFunc(poly)) {
+    for (size_t i = 0; i < out_ps->indices.size(); i++) {
+      auto color_index = i < out_ps->color_indices.size() ? out_ps->color_indices[i] : -1;
+      if (!triangleFunc(out_ps->indices[i], color_index)) {
         export_3mf_error("Can't add triangle to 3MF model.");
         return false;
       }
@@ -138,7 +205,10 @@ static bool append_polyset(std::shared_ptr<const PolySet> ps, const Export3mfInf
 
     Lib3MF::PBuildItem builditem;
     try {
-      model->AddBuildItem(mesh.get(), wrapper->GetIdentityTransform());
+      auto builditem = ctx.model->AddBuildItem(mesh.get(), ctx.wrapper->GetIdentityTransform());
+      if (!partname.empty()) {
+        builditem->SetPartNumber(partname);
+      }
     } catch (Lib3MF::ELib3MFException& e) {
       export_3mf_error(e.what());
     }
@@ -150,7 +220,7 @@ static bool append_polyset(std::shared_ptr<const PolySet> ps, const Export3mfInf
 }
 
 #ifdef ENABLE_CGAL
-static bool append_nef(const CGAL_Nef_polyhedron& root_N, const Export3mfInfo &info, Lib3MF::PWrapper& wrapper, Lib3MF::PModel& model)
+static bool append_nef(const CGAL_Nef_polyhedron& root_N, const Export3mfPartInfo &info, ExportContext& ctx)
 {
   if (!root_N.p3) {
     LOG(message_group::Export_Error, "Export failed, empty geometry.");
@@ -162,29 +232,30 @@ static bool append_nef(const CGAL_Nef_polyhedron& root_N, const Export3mfInfo &i
   }
 
   if (std::shared_ptr<PolySet> ps = CGALUtils::createPolySetFromNefPolyhedron3(*root_N.p3)) {
-    return append_polyset(ps, info, wrapper, model);
+    return append_polyset(ps, info, ctx);
   }
   export_3mf_error("Error converting NEF Polyhedron.");
   return false;
 }
 #endif
 
-static bool append_3mf(const std::shared_ptr<const Geometry>& geom, const Export3mfInfo &info, Lib3MF::PWrapper& wrapper, Lib3MF::PModel& model)
+static bool append_3mf(const std::shared_ptr<const Geometry>& geom, const Export3mfPartInfo info, ExportContext& ctx)
 {
   if (const auto geomlist = std::dynamic_pointer_cast<const GeometryList>(geom)) {
+    ctx.modelcount = geomlist->getChildren().size();
     for (const auto& item : geomlist->getChildren()) {
-      if (!append_3mf(item.second, info, wrapper, model)) return false;
+      if (!append_3mf(item.second, info, ctx)) return false;
     }
 #ifdef ENABLE_CGAL
   } else if (const auto N = std::dynamic_pointer_cast<const CGAL_Nef_polyhedron>(geom)) {
-    return append_nef(*N, info, wrapper, model);
+    return append_nef(*N, info, ctx);
 #endif
 #ifdef ENABLE_MANIFOLD
   } else if (const auto mani = std::dynamic_pointer_cast<const ManifoldGeometry>(geom)) {
-    return append_polyset(mani->toPolySet(), info, wrapper, model);
+    return append_polyset(mani->toPolySet(), info, ctx);
 #endif
   } else if (const auto ps = std::dynamic_pointer_cast<const PolySet>(geom)) {
-    return append_polyset(PolySetUtils::tessellate_faces(*ps), info, wrapper, model);
+    return append_polyset(PolySetUtils::tessellate_faces(*ps), info, ctx);
   } else if (std::dynamic_pointer_cast<const Polygon2d>(geom)) {
     assert(false && "Unsupported file format");
   } else {
@@ -194,12 +265,13 @@ static bool append_3mf(const std::shared_ptr<const Geometry>& geom, const Export
   return true;
 }
 
+} // namespace
+
 /*!
     Saves the current 3D Geometry as 3MF to the given file.
     The file must be open.
  */
-
-void export_3mf(const std::vector<struct Export3mfInfo> & infos, std::ostream& output) 
+void export_3mf(const std::vector<struct Export3mfPartInfo> & infos, std::ostream& output, const ExportInfo& exportInfo) 
 {
   Lib3MF_uint32 interfaceVersionMajor, interfaceVersionMinor, interfaceVersionMicro;
   Lib3MF::PWrapper wrapper;
@@ -235,8 +307,23 @@ void export_3mf(const std::vector<struct Export3mfInfo> & infos, std::ostream& o
     return;
   }
 
+  auto basematerialgroup = model->AddBaseMaterialGroup();
+  basematerialgroup->AddMaterial("Default", {
+    .m_Red = get_color_channel(exportInfo.defaultColor, 0),
+    .m_Green = get_color_channel(exportInfo.defaultColor, 1),
+    .m_Blue = get_color_channel(exportInfo.defaultColor, 2),
+    .m_Alpha = 0xff
+  });
+
+  const auto metadatagroup = model->GetMetaDataGroup();
+  metadatagroup->AddMetaData("", "Title", exportInfo.title, "xs:string", true);
+  metadatagroup->AddMetaData("", "Application", EXPORT_CREATOR, "xs:string", true);
+  metadatagroup->AddMetaData("", "CreationDate", get_current_iso8601_date_time_utc(), "xs:string", true);
+
+  ExportContext ctx{wrapper, model, basematerialgroup, 1};
+
   for(int i=0;i<infos.size();i++) {
-    if (!append_3mf(infos[i].geom, infos[i], wrapper, model)) {
+    if (!append_3mf(infos[i].geom, infos[i], ctx)) {
       return;
     }
   }  

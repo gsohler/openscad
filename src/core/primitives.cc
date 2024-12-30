@@ -144,7 +144,6 @@ std::unique_ptr<const Geometry> CubeNode::createGeometry() const
      coord2[i] = size/2;
     }
   }
-  int dimension = 3;
   auto ps = std::make_unique<PolySet>(3, /*convex*/true);
   for (int i = 0; i < 8; i++) {
     ps->vertices.emplace_back(i & 1 ? coord2[0] : coord1[0], i & 2 ? coord2[1] : coord1[1],

@@ -13,6 +13,7 @@
 
 #include "core/Tree.h"
 #include "glview/Camera.h"
+#include "linalg.h"
 
 class PolySet;
 
@@ -46,6 +47,8 @@ struct FileFormatInfo {
   std::string suffix;
   std::string description;
 };
+
+constexpr inline auto EXPORT_CREATOR = "OpenSCAD (https://www.openscad.org/)";
 
 namespace fileformat {
 
@@ -112,17 +115,19 @@ struct ExportPdfOptions {
 
 struct ExportInfo {
   FileFormat format;
+  std::string title;
   std::string sourceFilePath; // Full path to the OpenSCAD source file
   ExportPdfOptions *options;
   const Camera *camera;
+  Color4f defaultColor; // CGAL_FACE_FRONT_COLOR, should later come from active color scheme
 };
 
-class Export3mfInfo{
+class Export3mfPartInfo{
   public:
   std::shared_ptr<const Geometry>  geom;
   std::string name;
   void *props;
-  Export3mfInfo(std::shared_ptr<const Geometry>  geom, std::string name, void *props) {
+  Export3mfPartInfo(std::shared_ptr<const Geometry>  geom, std::string name, void *props) {
     this->geom=geom;
     this->name=name;
     this->props=props;	  
@@ -138,7 +143,7 @@ bool exportFileStdOut(const std::shared_ptr<const class Geometry>& root_geom, co
 
 void export_stl(const std::shared_ptr<const Geometry>& geom, std::ostream& output,
                 bool binary = true);
-void export_3mf(const std::vector<Export3mfInfo> & exportInfo, std::ostream& output);
+void export_3mf(const std::vector<struct Export3mfPartInfo> & infos, std::ostream& output, const ExportInfo& exportInfo);
 void export_obj(const std::shared_ptr<const Geometry>& geom, std::ostream& output);
 void export_off(const std::shared_ptr<const Geometry>& geom, std::ostream& output);
 void export_wrl(const std::shared_ptr<const Geometry>& geom, std::ostream& output);
@@ -190,6 +195,8 @@ struct ViewOptions {
 };
 
 class OffscreenView;
+
+std::string get_current_iso8601_date_time_utc();
 
 std::unique_ptr<OffscreenView> prepare_preview(Tree& tree, const ViewOptions& options, Camera& camera);
 bool export_png(const std::shared_ptr<const class Geometry>& root_geom, const ViewOptions& options, Camera& camera, std::ostream& output);

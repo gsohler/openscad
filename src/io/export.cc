@@ -88,21 +88,10 @@ Containers &containers() {
     add_item(*containers, {FileFormat::POV, "pov", "pov", "POV"});
 
     // Alias
-    containers->identifierToInfo["stl"] = containers->identifierToInfo["asciistl"];
-  
-    return std::move(containers);
+    containers->identifierToInfo["stl"] = containers->identifierToInfo["asciistl"];  
+    return containers;
   }();
   return *containers;
-}
-
-std::unordered_map<std::string, FileFormatInfo> &identifierToInfo() {
-  static auto identifierToInfo = std::make_unique<std::unordered_map<std::string, FileFormatInfo>>();
-  return *identifierToInfo;
-}
-
-std::unordered_map<FileFormat, FileFormatInfo> &fileFormatToInfo() {
-  static auto fileFormatToInfo = std::make_unique<std::unordered_map<FileFormat, FileFormatInfo>>();
-  return *fileFormatToInfo;
 }
 
 }  // namespace
@@ -214,10 +203,10 @@ void exportFile(const std::shared_ptr<const Geometry>& root_geom, std::ostream& 
     break;
   case FileFormat::_3MF:
     {
-      Export3mfInfo info(root_geom,"OpenSCAD Model", nullptr);
-      std::vector<Export3mfInfo> infos;
+      Export3mfPartInfo info(root_geom,"OpenSCAD Model", nullptr);
+      std::vector<Export3mfPartInfo> infos;
       infos.push_back(info);
-      export_3mf(infos, output);
+      export_3mf(infos, output,exportInfo); 
     }  
     break;
   case FileFormat::DXF:
@@ -323,6 +312,12 @@ struct LexographicLess {
 #endif
 
 } // namespace
+
+std::string get_current_iso8601_date_time_utc() {
+  auto now = std::chrono::system_clock::now();
+  auto time = std::chrono::system_clock::to_time_t(now);
+  return STR(std::put_time(gmtime(&time), "%FT%TZ"));
+}
 
 std::unique_ptr<PolySet> createSortedPolySet(const PolySet& ps)
 {
