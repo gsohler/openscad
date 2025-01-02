@@ -716,6 +716,16 @@ void initPython(double time)
 	      if(strstr(modreprstr,"(built-in)") != nullptr) continue;
 	      if(strstr(modreprstr,"/encodings/") != nullptr) continue;
 	      if(strstr(modreprstr,"_frozen_") != nullptr) continue;
+	      if(strstr(modreprstr,"site-packages") != nullptr) continue;
+	      if(strstr(modreprstr,"usr/lib") != nullptr) continue;
+
+//  PyObject *mod_dict = PyModule_GetDict(value2);
+//  PyObject *loader = PyDict_GetItemString(mod_dict,"__loader__");
+//  PyObject *loaderrepr = PyObject_Repr(loader);
+//  PyObject* loaderreprobj = PyUnicode_AsEncodedString(loaderrepr, "utf-8", "~");
+//  const char *loaderreprstr = PyBytes_AS_STRING(loaderreprobj);
+//  if(strstr(loaderreprstr, "ExtensionFileLoader") != nullptr) continue; // dont delete extension files
+
               PyDict_DelItem(value1, key2);
 
 	    }
