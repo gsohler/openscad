@@ -69,6 +69,16 @@
 #include "utils/StackCheck.h"
 #include "printutils.h"
 
+#include "xeus/xeus_context.hpp"
+#include "xeus/xkernel.hpp"
+#include "xeus/xkernel_configuration.hpp"
+#include "xeus/xserver.hpp"
+
+#include "xeus-zmq/xserver_zmq_split.hpp"
+#include "xeus-zmq/xzmq_context.hpp"
+
+#include "openscad_jupyter.h"
+
 
 #ifdef ENABLE_PYTHON
 #include "python/python_public.h"
@@ -797,6 +807,7 @@ int main(int argc, char **argv)
 #ifdef ENABLE_PYTHON
   ("trust-python",  "Trust python")
   ("ipython",  "Run ipython Interpreter")
+  ("jupyter", po::value<std::string>(), "Run inside Jupyter")
 #endif
   ;
 
@@ -834,6 +845,10 @@ int main(int argc, char **argv)
   if (vm.count("ipython")) {
     LOG("Running ipython interpreter", OpenSCAD::debug);
     python_runipython = true;
+  }
+  if (vm.count("juptyter")) {
+    LOG("Running jupyter", OpenSCAD::debug);
+    python_jupyterconfig = vm["jupyter"].as<std::string>();
   }
 #endif
   if (vm.count("quiet")) {
@@ -990,6 +1005,24 @@ int main(int argc, char **argv)
 #ifdef ENABLE_PYTHON  
   if(python_runipython) {
     ipython();	  
+    exit(0);
+  }
+  if(python_jupyterconfig.size() > 0) {
+    xeus::xconfiguration config = xeus::load_configuration(python_jupyterconfig);
+    std::unique_ptr<xeus::xcontext> context = xeus::make_zmq_context();
+    
+    // Create interpreter instance
+    using interpreter_ptr = std::unique_ptr<openscad_jupyter::interpreter>;
+    interpreter_ptr interpreter = interpreter_ptr(new openscad_jupyter::interpreter());
+
+    // Create kernel instance and start it
+    xeus::xkernel kernel(config,
+                         xeus::get_user_name(),
+                         std::move(context),
+                         std::move(interpreter),
+                         xeus::make_xserver_shell_main);
+	
+    kernel.start();
     exit(0);
   }
 #endif  

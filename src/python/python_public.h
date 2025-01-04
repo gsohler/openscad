@@ -7,6 +7,7 @@
 extern bool python_active;
 extern bool python_trusted;
 extern bool python_runipython;
+extern std::string python_jupyterconfig;
 extern AssignmentList customizer_parameters;
 extern AssignmentList customizer_parameters_finished;
 

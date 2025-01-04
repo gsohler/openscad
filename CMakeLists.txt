@@ -505,7 +505,7 @@ if(ENABLE_PYTHON)
        target_compile_definitions(OpenSCADPy PRIVATE BUILD_PYTHON_BINDINGS=OFF)
        target_compile_definitions(OpenSCADPy PRIVATE ENABLE_DEBUG=OFF)
      endif()
-  message(STATUS "Python enabled, using Nettle ")
+  message(STATUS "Python enabled, using Nettle ${Python_Eff_LIBRARIES}")
   target_compile_definitions(OpenSCAD PRIVATE ENABLE_PYTHON)
   target_compile_definitions(OpenSCADPy PRIVATE ENABLE_PYTHON)
   if(WIN32) 
@@ -581,7 +581,8 @@ if(ENABLE_PYTHON)
     OPENSCAD_VERSION=${OPENSCAD_VERSION}
     OPENSCAD_SHORTVERSION=${OPENSCAD_SHORTVERSION}
     OPENSCAD_YEAR=${OPENSCAD_YEAR}
-    OPENSCAD_MONTH=${OPENSCAD_MONTH})
+    OPENSCAD_MONTH=${OPENSCAD_MONTH}
+    OPENSCAD_DAY=${OPENSCAD_DAY})
   target_include_directories(OpenSCADPy SYSTEM PRIVATE ${Boost_INCLUDE_DIRS})
   target_include_directories(OpenSCADPy SYSTEM PRIVATE ${GLIB2_INCLUDE_DIRS})
   target_include_directories(OpenSCADPy PRIVATE
@@ -606,6 +607,14 @@ if(ENABLE_PYTHON)
   )
   target_link_libraries(OpenSCAD PRIVATE OpenSCADPy)
 endif()
+
+set(xeus-zmq_REQUIRED_VERSION 3.0.0)
+find_package(xeus-zmq ${xeus-zmq_REQUIRED_VERSION} REQUIRED)
+target_link_libraries(OpenSCAD PRIVATE xeus)
+target_link_libraries(OpenSCAD PRIVATE xeus-zmq)
+message(STATUS "A ${XEUS_LIBRARIES}")
+message(STATUS "B ${XEUS_LIBRARY}")
+
 if(MXECROSS)
   find_package(CURL REQUIRED)
 #  message(STATUS ${CURL_FOUND})
@@ -854,7 +863,7 @@ if(USE_CCACHE)
   endif()
 endif()
 
-target_compile_definitions(OpenSCAD PRIVATE OPENSCAD_VERSION=${OPENSCAD_VERSION} OPENSCAD_SHORTVERSION=${OPENSCAD_SHORTVERSION} OPENSCAD_YEAR=${OPENSCAD_YEAR} OPENSCAD_MONTH=${OPENSCAD_MONTH})
+target_compile_definitions(OpenSCAD PRIVATE OPENSCAD_VERSION=${OPENSCAD_VERSION} OPENSCAD_SHORTVERSION=${OPENSCAD_SHORTVERSION} OPENSCAD_YEAR=${OPENSCAD_YEAR} OPENSCAD_MONTH=${OPENSCAD_MONTH} OPENSCAD_DAY=${OPENSCAD_DAY}  )
 if (DEFINED OPENSCAD_DAY)
   target_compile_definitions(OpenSCAD PRIVATE OPENSCAD_DAY=${OPENSCAD_DAY})
 endif()
@@ -1417,7 +1426,7 @@ endif()
 if (ENABLE_MANIFOLD AND ENABLE_CGAL)
   list(APPEND Sources ${MANIFOLD_CGAL_SOURCES})
 endif()
-list(APPEND Sources src/openscad.cc ${CORE_SOURCES} ${OFFSCREEN_SOURCES})
+list(APPEND Sources src/openscad.cc src/openscad_jupyter.cc ${CORE_SOURCES} ${OFFSCREEN_SOURCES})
 
 set_source_files_properties(
   # flex and bison tends to generate many macros, which does not work well with
@@ -1628,7 +1637,8 @@ if(MXECROSS)
   ")
   set (CPACK_NSIS_MODIFY_PATH "ON")
   else()
-  set(CPACK_GENERATOR RPM)
+  set(CPACK_GENERATOR RPM;DEB)
+
   set(CPACK_RPM_COMPONENT_INSTALL OFF)
   set(CPACK_RPM_PACKAGE_SUMMARY "The Programmer's Solid 3D CAD Modeler")
   set(CPACK_RPM_FILE_NAME "pythonscad-${OPENSCAD_YEAR}${OPENSCAD_MONTH}${OPENSCAD_DAY}.x86_64.rpm")
@@ -1639,6 +1649,20 @@ if(MXECROSS)
   set(CPACK_RPM_PACKAGE_GROUP  "PythonSCAD designers")
   set(CPACK_RPM_PACKAGE_VENDOR "PythonSCAD designers")
   set(CPACK_RPM_PACKAGE_DESCRIPTION "PythonSCAD RPM Package")
+
+  set(CPACK_DEBIAN_PACKAGE_NAME "pythonscad")
+  set(CPACK_DEBIAN_FILE_NAME "pythonscad-${OPENSCAD_YEAR}${OPENSCAD_MONTH}${OPENSCAD_DAY}.x86_64.deb")
+  set(CPACK_DEBIAN_PACKAGE_VERSION "${OPENSCAD_YEAR}${OPENSCAD_MONTH}${OPENSCAD_DAY}")
+  set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE "x86_64")
+  set(CPACK_DEBIAN_PACKAGE_MAINTAINER "PythonSCAD designers")
+  set(CPACK_DEBIAN_PACKAGE_DESCRIPTION "PythonSCAD Debian Package")
+  set(CPACK_DEBIAN_PACKAGE_SECTION "devel")
+  set(CPACK_DEBIAN_ARCHIVE_TYPE  "gnutar")
+  set(CPACK_DEBIAN_COMPRESSION_TYPE "gzip")
+  set(CPACK_DEBIAN_PACKAGE_PRIORITY "optional")
+  set(CPACK_DEBIAN_PACKAGE_DEPENDS "")
+
+
   execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink "./openscad" "pythonscad")
   install(FILES ${CMAKE_CURRENT_BINARY_DIR}/pythonscad DESTINATION "." COMPONENT libraries)
 

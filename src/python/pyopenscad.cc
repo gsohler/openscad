@@ -51,6 +51,7 @@ std::vector<SelectedObject> python_result_handle;
 bool python_active;  /* if python is actually used during evaluation */
 bool python_trusted; /* global Python trust flag */
 bool python_runipython = false;
+std::string python_jupyterconfig = "";
 bool pythonMainModuleInitialized = false;
 bool pythonRuntimeInitialized = false;
 
