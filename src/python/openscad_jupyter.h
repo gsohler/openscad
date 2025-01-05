@@ -43,12 +43,5 @@ namespace openscad_jupyter
         void shutdown_request_impl() override;
     };
 
-    using publish_type = std::function<void(const std::string& name, const std::string& text)>;
-
-    XEUS_CALC_API std::string formating_expr(const std::string& expr);
-
-    XEUS_CALC_API std::string parse_rpn(const std::string& infix, publish_type publish = [](const std::string& /*name*/, const std::string& /*text*/){});
-
-    XEUS_CALC_API double compute_rpn(const std::string &expr, publish_type publish = [](const std::string& /*name*/, const std::string& /*text*/){});
 }
 #endif
