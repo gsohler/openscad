@@ -7,6 +7,10 @@
 * The full license is in the file LICENSE, distributed with this software. *
 ****************************************************************************/
 
+#include <Python.h>
+#include "pyopenscad.h"
+#include "openscad_jupyter.h"
+
 #include <iostream>
 #include <vector>
 #include <sstream>
@@ -15,7 +19,9 @@
 
 #include "xeus/xinterpreter.hpp"
 
-#include "openscad_jupyter.h"
+
+void PyObjectDeleter (PyObject *pObject);
+using PyObjectUniquePtr = std::unique_ptr<PyObject, const decltype(PyObjectDeleter)&>;
 
 namespace openscad_jupyter
 {
@@ -29,11 +35,35 @@ namespace openscad_jupyter
                                            xeus::execute_request_config config,
                                            nl::json user_expression)
     {
+	PyObject *emptystr = PyUnicode_FromString("");
         nl::json jresult;
         try
         {
+            int status = PyRun_SimpleString(code.c_str());
+	    printf("status=%d\n",status);
+            for(int i=0;i<2;i++)
+            {
+                PyObjectUniquePtr catcher(nullptr, PyObjectDeleter);
+                catcher.reset( PyObject_GetAttrString(pythonMainModule.get(), i==1?"catcher_err":"catcher_out"));
+                if(catcher == nullptr) continue;
+                PyObjectUniquePtr command_output(nullptr, PyObjectDeleter);
+                command_output.reset(PyObject_GetAttrString(catcher.get(), "data"));
+	                
+                PyObjectUniquePtr command_output_value(nullptr,  PyObjectDeleter);
+                command_output_value.reset(PyUnicode_AsEncodedString(command_output.get(), "utf-8", "~"));
+                const char *command_output_bytes =  PyBytes_AS_STRING(command_output_value.get());
+                if(command_output_bytes != nullptr && *command_output_bytes != '\0')
+                {
+                   publish_stream(i==0?"stdout":"stderr", command_output_bytes);
+                }
+                PyObject_SetAttrString(catcher.get(), "data", emptystr);
+            }
+//	    if(Py_TYPE(objs) == &PyOpenSCADType){
+//		    printf("solid\n"); else print("no solid\n");
+//	    }
+
+	    	
             nl::json pub_data;
-            publish_stream("stdout", "normal output\n");
             pub_data["text/plain"] = "my result"; // result;
             publish_execution_result(execution_counter, std::move(pub_data), nl::json::object());
             jresult["status"] = "ok";

@@ -69,16 +69,6 @@
 #include "utils/StackCheck.h"
 #include "printutils.h"
 
-#include "xeus/xeus_context.hpp"
-#include "xeus/xkernel.hpp"
-#include "xeus/xkernel_configuration.hpp"
-#include "xeus/xserver.hpp"
-
-#include "xeus-zmq/xserver_zmq_split.hpp"
-#include "xeus-zmq/xzmq_context.hpp"
-
-#include "openscad_jupyter.h"
-
 
 #ifdef ENABLE_PYTHON
 #include "python/python_public.h"
@@ -807,7 +797,9 @@ int main(int argc, char **argv)
 #ifdef ENABLE_PYTHON
   ("trust-python",  "Trust python")
   ("ipython",  "Run ipython Interpreter")
+#ifdef ENABLE_JUPYTER
   ("jupyter", po::value<std::string>(), "Run inside Jupyter")
+#endif
 #endif
   ;
 
@@ -846,10 +838,12 @@ int main(int argc, char **argv)
     LOG("Running ipython interpreter", OpenSCAD::debug);
     python_runipython = true;
   }
+#ifdef ENABLE_JUPYER
   if (vm.count("jupyter")) {
     LOG("Running jupyter", OpenSCAD::debug);
     python_jupyterconfig = vm["jupyter"].as<std::string>();
   }
+#endif
 #endif
   if (vm.count("quiet")) {
     OpenSCAD::quiet = true;
@@ -1007,10 +1001,12 @@ int main(int argc, char **argv)
     ipython();	  
     exit(0);
   }
+#ifdef ENABLE_JUPYTER
   if(python_jupyterconfig.size() > 0) {
     python_startjupyter();	  
     exit(0);
   }
+#endif
 #endif  
 
   auto cmdlinemode = false;

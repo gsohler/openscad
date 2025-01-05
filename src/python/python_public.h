@@ -7,7 +7,6 @@
 extern bool python_active;
 extern bool python_trusted;
 extern bool python_runipython;
-extern std::string python_jupyterconfig;
 extern AssignmentList customizer_parameters;
 extern AssignmentList customizer_parameters_finished;
 
@@ -17,7 +16,10 @@ void finishPython();
 void python_lock(void);
 void python_unlock(void);
 void ipython(void);
+#ifdef ENABLE_JUPYTER
 void python_startjupyter(void);
+extern std::string python_jupyterconfig;
+#endif
 
 std::string evaluatePython(const std::string &code, bool dry_run=0);
 

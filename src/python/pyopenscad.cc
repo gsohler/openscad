@@ -1002,242 +1002,36 @@ PyMODINIT_FUNC PyInit_PyOpenSCAD(void)
 // IPython Interpreter side
 // ----------------------------------------------
 
-static PyStatus
-pymain_init(void)
-{
-    PyStatus status;
-
-//    if (_PyStatus_EXCEPTION(status)) {
-//        return status;
-//    }
-
-    PyPreConfig preconfig;
-    PyPreConfig_InitPythonConfig(&preconfig);
-//    status = _Py_PreInitializeFromPyArgv(&preconfig, args);
-//    if (_PyStatus_EXCEPTION(status)) {
-//        return status;
-//    }
-
-    PyConfig config;
-    PyConfig_InitPythonConfig(&config);
-
-//    if (args->use_bytes_argv) {
-//        status = PyConfig_SetBytesArgv(&config, args->argc, args->bytes_argv);
-//    }
-//    else {
-//        status = PyConfig_SetArgv(&config, args->argc, args->wchar_argv);
-//    }
-//    if (_PyStatus_EXCEPTION(status)) {
-//        goto done;
-//    }
-
-    status = Py_InitializeFromConfig(&config);
-//    if (_PyStatus_EXCEPTION(status)) {
-//        goto done;
-//    }
-//    status = 0; // PyStatus_Ok;
-
-done:
-    PyConfig_Clear(&config);
-    return status;
-}
-
-
-/* Write an exitcode into *exitcode and return 1 if we have to exit Python.
-   Return 0 otherwise. */
-static int
-pymain_run_interactive_hook(int *exitcode)
-{
-    PyObject *sys, *hook, *result;
-    sys = PyImport_ImportModule("sys");
-    if (sys == NULL) {
-        goto error;
-    }
-
-    hook = PyObject_GetAttrString(sys, "__interactivehook__");
-    Py_DECREF(sys);
-    if (hook == NULL) {
-        PyErr_Clear();
-        return 0;
-    }
-
-    if (PySys_Audit("cpython.run_interactivehook", "O", hook) < 0) {
-        goto error;
-    }
-    result  =  PyObject_CallNoArgs(hook);
-    Py_DECREF(hook);
-    if (result == NULL) {
-        goto error;
-    }
-    Py_DECREF(result);
-    return 0;
-
-error:
-    PySys_WriteStderr("Failed calling sys.__interactivehook__\n");
-//    return pymain_err_print(exitcode);
-    return 0;
-}
-
-
-
-
-
-
-static void
-pymain_repl(PyConfig *config, int *exitcode)
-{
-//    if (!config->inspect && _Py_GetEnv(config->use_environment, "PYTHONINSPECT")) {
-//        pymain_set_inspect(config, 1);
-//    }
-
-//    if (!(config->inspect && stdin_is_interactive(config) && config_run_code(config))) {
-//        return;
-//    }
-
-//    pymain_set_inspect(config, 0);
-    if (pymain_run_interactive_hook(exitcode)) {
-        return;
-    }
-    PyCompilerFlags cf = _PyCompilerFlags_INIT;
-
-    int res = PyRun_AnyFileFlags(stdin, "<stdin>", &cf);
-//    *exitcode = (res != 0);
-}
-
-
-static void
-pymain_run_python(int *exitcode)
-{
-    PyObject *main_importer_path = NULL;
-    PyInterpreterState *interp = PyInterpreterState_Get();
-    /* pymain_run_stdin() modify the config */
-    PyConfig *config = (PyConfig*)_PyInterpreterState_GetConfig(interp);
-
-//    if (_PyStatus_EXCEPTION(_PyPathConfig_UpdateGlobal(config))) {
-//        goto error;
-//    }
-
-//    if (config->run_filename != NULL) {
-//        if (pymain_get_importer(config->run_filename, &main_importer_path,
-//                                exitcode)) {
-//            return;
-//        }
-//    }
-    // import readline and rlcompleter before script dir is added to sys.path
-//    pymain_import_readline(config);
-
-//    PyObject *path0 = NULL;
-//    if (main_importer_path != NULL) {
-//        path0 = Py_NewRef(main_importer_path);
-//    }
-//    else if (!config->safe_path) {
-//        int res = _PyPathConfig_ComputeSysPath0(&config->argv, &path0);
-//        if (res < 0) {
-//            goto error;
-//        }
-//        else if (res == 0) {
-//            Py_CLEAR(path0);
-//        }
-//    }
-//    if (path0 != NULL) {
-//        wchar_t *wstr = PyUnicode_AsWideCharString(path0, NULL);
-//        if (wstr == NULL) {
-//            Py_DECREF(path0);
-//            goto error;
-//        }
-//        config->sys_path_0 = _PyMem_RawWcsdup(wstr);
-//        PyMem_Free(wstr);
-//        if (config->sys_path_0 == NULL) {
-//            Py_DECREF(path0);
-//            goto error;
-//        }
-//        int res = pymain_sys_path_add_path0(interp, path0);
-//        Py_DECREF(path0);
-//        if (res < 0) {
-//            goto error;
-//        }
-//    }
-//
-//    pymain_header(config);
-//
-//    _PyInterpreterState_SetRunningMain(interp);
-//    assert(!PyErr_Occurred());
-//
-//    if (config->run_command) {
-//        *exitcode = pymain_run_command(config->run_command);
-//    }
-//    else if (config->run_module) {
-//        *exitcode = pymain_run_module(config->run_module, 1);
-//    }
-//    else if (main_importer_path != NULL) {
-//        *exitcode = pymain_run_module(L"__main__", 0);
-//    }
-//    else if (config->run_filename != NULL) {
-//        *exitcode = pymain_run_file(config);
-//    }
-//    else {
-//        *exitcode = pymain_run_stdin(config);
-//    }
-
-    pymain_repl(config, exitcode);
-    goto done;
-
-error:
-//    *exitcode = pymain_exit_err_print();
-
-done:
-//    _PyInterpreterState_SetNotRunningMain(interp);
-    Py_XDECREF(main_importer_path);
-}
-
-int
-Py_RunMain(void)
-{
-    int exitcode = 0;
-
-    pymain_run_python(&exitcode);
-
-//    if (Py_FinalizeEx() < 0) {
-//        exitcode = 120;
-//    }
-
-//    pymain_free();
-
-//    if (_PyRuntime.signals.unhandled_keyboard_interrupt) {
-//        exitcode = exit_sigint();
-//    }
-
-    return exitcode;
-}
-
 
 void ipython(void) {
-/*	
-    _PyArgv args = {
-        .argc = argc,
-        .use_bytes_argv = 1,
-        .bytes_argv = argv,
-        .wchar_argv = NULL};
-*/
-//    PyStatus status = pymain_init();
     initPython(0.0);
-/*    
-    if (_PyStatus_IS_EXIT(status)) {
-        pymain_free();
-        return status.exitcode;
-    }
-    if (_PyStatus_EXCEPTION(status)) {
-        pymain_exit_error(status);
-    }
-
-*/
     Py_RunMain();
+    return ;
 }
 // -------------------------
 
-
+#ifdef ENABLE_JUPYTER
 void python_startjupyter(void)
 {
+  const char *python_init_code="\
+import sys\n\
+class OutputCatcher:\n\
+   def __init__(self):\n\
+      self.data = ''\n\
+   def write(self, stuff):\n\
+      self.data = self.data + stuff\n\
+   def flush(self):\n\
+      pass\n\
+catcher_out = OutputCatcher()\n\
+catcher_err = OutputCatcher()\n\
+stdout_bak=sys.stdout\n\
+stderr_bak=sys.stderr\n\
+sys.stdout = catcher_out\n\
+sys.stderr = catcher_err\n\
+";
+    initPython(0.0);
+    PyRun_SimpleString(python_init_code);
+
     try{	
 	xeus::xconfiguration config = xeus::load_configuration(python_jupyterconfig);
 	std::unique_ptr<xeus::xcontext> context = xeus::make_zmq_context();
@@ -1258,4 +1052,4 @@ void python_startjupyter(void)
 	printf("Exception %s during startup of jupyter\n",e.what());	    
     }
 }
-
+#endif
