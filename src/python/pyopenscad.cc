@@ -33,6 +33,18 @@
 #include <Selection.h>
 #include "PlatformUtils.h"
 
+
+#include "xeus/xeus_context.hpp"
+#include "xeus/xkernel.hpp"
+#include "xeus/xkernel_configuration.hpp"
+#include "xeus/xserver.hpp"
+
+#include "xeus-zmq/xserver_zmq_split.hpp"
+#include "xeus-zmq/xzmq_context.hpp"
+
+#include "openscad_jupyter.h"
+
+
 // #define HAVE_PYTHON_YIELD
 static PyObject *PyInit_openscad(void);
 
@@ -1220,5 +1232,30 @@ void ipython(void) {
 
 */
     Py_RunMain();
+}
+// -------------------------
+
+
+void python_startjupyter(void)
+{
+    try{	
+	xeus::xconfiguration config = xeus::load_configuration(python_jupyterconfig);
+	std::unique_ptr<xeus::xcontext> context = xeus::make_zmq_context();
+	
+	// Create interpreter instance
+	using interpreter_ptr = std::unique_ptr<openscad_jupyter::interpreter>;
+	interpreter_ptr interpreter = interpreter_ptr(new openscad_jupyter::interpreter());
+		
+	// Create kernel instance and start it
+	xeus::xkernel kernel(config,
+                         xeus::get_user_name(),
+                         std::move(context),
+                         std::move(interpreter),
+                         xeus::make_xserver_shell_main);
+	
+	kernel.start();
+    } catch(std::exception &e) {
+	printf("Exception %s during startup of jupyter\n",e.what());	    
+    }
 }
 

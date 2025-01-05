@@ -17,6 +17,7 @@ void finishPython();
 void python_lock(void);
 void python_unlock(void);
 void ipython(void);
+void python_startjupyter(void);
 
 std::string evaluatePython(const std::string &code, bool dry_run=0);
 

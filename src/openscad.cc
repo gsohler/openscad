@@ -846,7 +846,7 @@ int main(int argc, char **argv)
     LOG("Running ipython interpreter", OpenSCAD::debug);
     python_runipython = true;
   }
-  if (vm.count("juptyter")) {
+  if (vm.count("jupyter")) {
     LOG("Running jupyter", OpenSCAD::debug);
     python_jupyterconfig = vm["jupyter"].as<std::string>();
   }
@@ -1008,21 +1008,7 @@ int main(int argc, char **argv)
     exit(0);
   }
   if(python_jupyterconfig.size() > 0) {
-    xeus::xconfiguration config = xeus::load_configuration(python_jupyterconfig);
-    std::unique_ptr<xeus::xcontext> context = xeus::make_zmq_context();
-    
-    // Create interpreter instance
-    using interpreter_ptr = std::unique_ptr<openscad_jupyter::interpreter>;
-    interpreter_ptr interpreter = interpreter_ptr(new openscad_jupyter::interpreter());
-
-    // Create kernel instance and start it
-    xeus::xkernel kernel(config,
-                         xeus::get_user_name(),
-                         std::move(context),
-                         std::move(interpreter),
-                         xeus::make_xserver_shell_main);
-	
-    kernel.start();
+    python_startjupyter();	  
     exit(0);
   }
 #endif  

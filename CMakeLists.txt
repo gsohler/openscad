@@ -610,10 +610,7 @@ endif()
 
 set(xeus-zmq_REQUIRED_VERSION 3.0.0)
 find_package(xeus-zmq ${xeus-zmq_REQUIRED_VERSION} REQUIRED)
-target_link_libraries(OpenSCAD PRIVATE xeus)
 target_link_libraries(OpenSCAD PRIVATE xeus-zmq)
-message(STATUS "A ${XEUS_LIBRARIES}")
-message(STATUS "B ${XEUS_LIBRARY}")
 
 if(MXECROSS)
   find_package(CURL REQUIRED)
@@ -1426,7 +1423,7 @@ endif()
 if (ENABLE_MANIFOLD AND ENABLE_CGAL)
   list(APPEND Sources ${MANIFOLD_CGAL_SOURCES})
 endif()
-list(APPEND Sources src/openscad.cc src/openscad_jupyter.cc ${CORE_SOURCES} ${OFFSCREEN_SOURCES})
+list(APPEND Sources src/openscad.cc src/python/openscad_jupyter.cc ${CORE_SOURCES} ${OFFSCREEN_SOURCES})
 
 set_source_files_properties(
   # flex and bison tends to generate many macros, which does not work well with
