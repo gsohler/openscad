@@ -838,7 +838,7 @@ int main(int argc, char **argv)
     LOG("Running ipython interpreter", OpenSCAD::debug);
     python_runipython = true;
   }
-#ifdef ENABLE_JUPYER
+#ifdef ENABLE_JUPYTER
   if (vm.count("jupyter")) {
     LOG("Running jupyter", OpenSCAD::debug);
     python_jupyterconfig = vm["jupyter"].as<std::string>();

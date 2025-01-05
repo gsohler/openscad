@@ -39,8 +39,21 @@ namespace openscad_jupyter
         nl::json jresult;
         try
         {
-            int status = PyRun_SimpleString(code.c_str());
-	    printf("status=%d\n",status);
+	    static int python_firstrun=1;
+//            if(python_firstrun) PyRun_SimpleString("print(\"\")\n");
+//	    python_firstrun=0;
+            nl::json pub_data;
+
+            std::ostringstream stream;
+	    int skip_eq=0;
+	    if(std::strstr(code.c_str(),"import ") != nullptr) skip_eq=1;
+	    if(std::strstr(code.c_str(),"=") != nullptr) skip_eq=1;
+
+	    if(!skip_eq) stream << "__res__=";
+	    stream << code;
+//	    printf("tot %s\n",stream.str().c_str());
+            int status = PyRun_SimpleString(stream.str().c_str());
+//	    printf("status=%d\n",status);
             for(int i=0;i<2;i++)
             {
                 PyObjectUniquePtr catcher(nullptr, PyObjectDeleter);
@@ -58,13 +71,23 @@ namespace openscad_jupyter
                 }
                 PyObject_SetAttrString(catcher.get(), "data", emptystr);
             }
-//	    if(Py_TYPE(objs) == &PyOpenSCADType){
-//		    printf("solid\n"); else print("no solid\n");
-//	    }
-
-	    	
-            nl::json pub_data;
-            pub_data["text/plain"] = "my result"; // result;
+	    if(status == 0) {
+                PyObjectUniquePtr cmdresult(nullptr, PyObjectDeleter);
+                cmdresult.reset( PyObject_GetAttrString(pythonMainModule.get(), "__res__"));
+		if(!skip_eq && cmdresult.get() != nullptr) {
+ //                   printf("result found\n");
+                    if(Py_TYPE(cmdresult.get()) == &PyOpenSCADType){
+                        pub_data["text/plain"] = "3D display coming soon";
+		    } else if(cmdresult.get() != Py_None) {
+                        PyObjectUniquePtr repr( PyObject_Repr(cmdresult.get()), PyObjectDeleter);
+                        PyObjectUniquePtr reprstr( PyUnicode_AsEncodedString(repr.get(), "utf-8", "~"), PyObjectDeleter);
+                        char *charstr = PyBytes_AS_STRING(reprstr.get());
+			if(charstr != nullptr) {
+                            pub_data["text/plain"] = charstr;
+			}
+		    }
+                }		   
+            }
             publish_execution_result(execution_counter, std::move(pub_data), nl::json::object());
             jresult["status"] = "ok";
             jresult["payload"] = nl::json::array();
