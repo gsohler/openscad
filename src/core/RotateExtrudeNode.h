@@ -18,13 +18,14 @@ public:
     fn = fs = fa = 0;
     origin_x = origin_y = scale = offset_x = offset_y = 0;
     angle = 360;
+    start = 0;
   }
   std::string toString() const override;
   std::string name() const override { return "rotate_extrude"; }
 
   int convexity;
   double fn, fs, fa;
-  double origin_x, origin_y, scale, offset_x, offset_y, angle;
+  double origin_x, origin_y, scale, offset_x, offset_y, angle, start;
   double twist;
   std::string method;
   Vector3d v;
