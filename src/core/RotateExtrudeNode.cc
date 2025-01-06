@@ -52,18 +52,28 @@ std::shared_ptr<AbstractNode> builtin_rotate_extrude(const ModuleInstantiation *
 #endif
 
   const Parameters parameters = Parameters::parse(std::move(arguments), inst->location(),
-                                            {"origin", "scale"},
-                                            {"convexity", "angle","v", "method" }
-                                            );
+                                            {"angle", "start","origin","scale"}, {"convexity","v", "method" });
 
   node->fn = parameters["$fn"].toDouble();
   node->fs = parameters["$fs"].toDouble();
   node->fa = parameters["$fa"].toDouble();
 
   node->convexity = static_cast<int>(parameters["convexity"].toDouble());
-  node->angle = 360;
-  parameters["angle"].getFiniteDouble(node->angle);
-  if ((node->angle <= -360) || (node->angle > 360)) node->angle = 360;
+  // If an angle is specified, use it, defaulting to starting at zero.
+  // If no angle is specified, use 360 and default to starting at 180.
+  // Regardless, if a start angle is specified, use it.
+  bool hasAngle = parameters["angle"].getFiniteDouble(node->angle);
+  if (hasAngle) {
+    node->start = 0;
+    if ((node->angle <= -360) || (node->angle > 360)) node->angle = 360;
+  } else {
+    node->angle = 360;
+    node->start = 180;
+  }
+  bool hasStart = parameters["start"].getFiniteDouble(node->start);
+  if (!hasAngle && !hasStart && (int)node->fn % 2 != 0) {
+    LOG(message_group::Deprecated, "In future releases, rotational extrusion without \"angle\" will start at zero, the +X axis.  Set start=180 to explicitly start on the -X axis.");
+  }
 
   if (node->convexity <= 0) node->convexity = 2;
 
@@ -111,32 +121,13 @@ std::string RotateExtrudeNode::toString() const
 {
   std::ostringstream stream;
 
-  stream << this->name() << "(";
-  if (!this->filename.empty()) { // Ignore deprecated parameters if empty
-    fs::path path((std::string)this->filename);
-    stream <<
-      "file = " << this->filename << ", "
-      "layer = " << QuotedString(this->layername) << ", "
-      "origin = [" << std::dec << this->origin_x << ", " << this->origin_y << "], "
-      "offset = [" << std::dec << this->offset_x << ", " << this->offset_y << "], "
-      "scale = " << this->scale << ", "
-           << "timestamp = " << fs_timestamp(path) << ", "
-    ;
-  }
-  stream <<
+  stream << this->name() << "("
     "angle = " << this->angle << ", "
-    "method = \"" << this->method << "\", "
-    "v = [ " << this->v[0] <<  ", " << this->v[1] << ", " << this->v[2] << "], "
-    "convexity = " << this->convexity << ", ";
-#ifdef ENABLE_PYTHON  
- if(this->profile_func != NULL) {
-    stream << ", profile = " << rand() ;
- }
- if(this->twist_func != NULL) {
-    stream << ", twist_func = " << rand() ;
- }
-#endif  
-    stream << "$fn = " << this->fn << ", $fa = " << this->fa << ", $fs = " << this->fs << ")";
+    "start = " << this->start << ", "
+    "convexity = " << this->convexity << ", "
+    "$fn = " << this->fn << ", "
+    "$fa = " << this->fa << ", "
+    "$fs = " << this->fs << ")";
 
   return stream.str();
 }
