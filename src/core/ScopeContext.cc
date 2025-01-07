@@ -73,7 +73,6 @@ void ScopeContext::init()
         }
         e.traceDepth--;
       }
-      printf("rx\n");
       throw;
     }
   }

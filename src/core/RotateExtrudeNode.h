@@ -25,12 +25,10 @@ public:
 
   int convexity;
   double fn, fs, fa;
-  double origin_x, origin_y, scale, offset_x, offset_y, angle, start;
+  double angle, start, origin_x, origin_y, scale, offset_x, offset_y;
   double twist;
   std::string method;
   Vector3d v;
-  Filename filename;
-  std::string layername;
  #ifdef ENABLE_PYTHON
   void *profile_func;
   void *twist_func;

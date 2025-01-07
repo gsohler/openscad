@@ -193,8 +193,6 @@ static std::shared_ptr<AbstractNode> builtin_cube(const ModuleInstantiation *ins
   return node;
 }
 
-std::unique_ptr<const Geometry> sphereCreateFuncGeometry(void *funcptr, double fs, int n);
-
 std::unique_ptr<const Geometry> SphereNode::createGeometry() const
 {
   if (this->r <= 0 || !std::isfinite(this->r)) {
@@ -372,15 +370,6 @@ static std::shared_ptr<AbstractNode> builtin_cylinder(const ModuleInstantiation 
           "cylinder(r1=%1$s, r2=%2$s, ...)",
           (r1.type() == Value::Type::NUMBER ? r1.toEchoStringNoThrow() : r.toEchoStringNoThrow()),
           (r2.type() == Value::Type::NUMBER ? r2.toEchoStringNoThrow() : r.toEchoStringNoThrow()));
-    }
-  }
-
-  if (parameters["angle"].isDefined()) {
-    if(!parameters["angle"].getFiniteDouble(node->angle)) {
-      LOG(message_group::Error, "Angle must be a double when specified.");
-    }  
-    if(node->angle < 0.0 || node->angle > 360.0) {
-      LOG(message_group::Error, "Angle must be between 0 and 360 degrees.");
     }
   }
 
@@ -603,15 +592,6 @@ static std::shared_ptr<AbstractNode> builtin_circle(const ModuleInstantiation *i
           "circle(r=%1$s)", r.toEchoStringNoThrow());
     }
   }
-  if (parameters["angle"].isDefined()) {
-    if(!parameters["angle"].getFiniteDouble(node->angle)) {
-      LOG(message_group::Error, "Angle must be a double when specified.");
-    }  
-    if(node->angle < 0.0 || node->angle > 360.0) {
-      LOG(message_group::Error, "Angle must be between 0 and 360 degrees.");
-    }
-  }
-
 
   return node;
 }
