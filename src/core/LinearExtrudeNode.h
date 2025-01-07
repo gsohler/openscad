@@ -31,7 +31,4 @@ public:
   void *profile_func;
   void *twist_func;
  #endif  
-
-  Filename filename;
-  std::string layername;
 };

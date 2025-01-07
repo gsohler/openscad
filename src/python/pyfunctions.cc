@@ -2248,7 +2248,7 @@ PyObject *python_oo_fillet(PyObject *obj, PyObject *args, PyObject *kwargs)
   return python_fillet_core(obj,r,fn,sel, minang);
 }
 
-PyObject *rotate_extrude_core(PyObject *obj, char *layer, int convexity, double scale, double angle, PyObject *twist, PyObject *origin, PyObject *offset, PyObject *vp, char *method, double fn, double fa, double fs)
+PyObject *rotate_extrude_core(PyObject *obj,  int convexity, double scale, double angle, PyObject *twist, PyObject *origin, PyObject *offset, PyObject *vp, char *method, double fn, double fa, double fs)
 {
   DECLARE_INSTANCE
   std::shared_ptr<AbstractNode> child;
@@ -2275,7 +2275,6 @@ PyObject *rotate_extrude_core(PyObject *obj, char *layer, int convexity, double 
   if (!isnan(fa)) node->fa = fa;
   if (!isnan(fs)) node->fs = fs;
 
-  if (layer != NULL) node->layername = layer;
   node->convexity = convexity;
   node->scale = scale;
   node->angle = angle;
@@ -2312,7 +2311,6 @@ PyObject *rotate_extrude_core(PyObject *obj, char *layer, int convexity, double 
 PyObject *python_rotate_extrude(PyObject *self, PyObject *args, PyObject *kwargs)
 {
   PyObject *obj = NULL;
-  char *layer = NULL;
   int convexity = 1;
   double scale = 1.0;
   double angle = 360.0;
@@ -2323,20 +2321,19 @@ PyObject *python_rotate_extrude(PyObject *self, PyObject *args, PyObject *kwargs
   PyObject *offset = NULL;
   double fn = NAN, fa = NAN, fs = NAN;
   get_fnas(fn,fa,fs);
-  char *kwlist[] = {"obj", "layer", "convexity", "scale", "angle", "twist", "origin", "offset", "v","method", "fn", "fa", "fs", NULL};
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|siddOOOOsddd", kwlist, 
-                          &obj, &layer, &convexity, &scale, &angle, &twist, &origin, &offset, &v,&method, &fn,&fa,&fs))
+  char *kwlist[] = {"obj", "convexity", "scale", "angle", "twist", "origin", "offset", "v","method", "fn", "fa", "fs", NULL};
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|iddOOOOsddd", kwlist, 
+                          &obj, &convexity, &scale, &angle, &twist, &origin, &offset, &v,&method, &fn,&fa,&fs))
     {
 
     PyErr_SetString(PyExc_TypeError, "Error during parsing rotate_extrude(object,...)");
     return NULL;
   }
-  return rotate_extrude_core(obj, layer, convexity, scale, angle, twist, origin, offset, v, method, fn, fa,fs);
+  return rotate_extrude_core(obj, convexity, scale, angle, twist, origin, offset, v, method, fn, fa,fs);
 }
 
 PyObject *python_oo_rotate_extrude(PyObject *obj, PyObject *args, PyObject *kwargs)
 {
-  char *layer = NULL;
   int convexity = 1;
   double scale = 1.0;
   double angle = 360.0;
@@ -2347,18 +2344,18 @@ PyObject *python_oo_rotate_extrude(PyObject *obj, PyObject *args, PyObject *kwar
   get_fnas(fn,fa,fs);
   PyObject *v = NULL;
   char *method = NULL;
-  char *kwlist[] = {"layer", "convexity", "scale", "angle", "twist", "origin", "offset", "v","method", "fn", "fa", "fs", NULL};
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|siddOOOOsddd", kwlist, 
-			  &layer, &convexity, &scale, &angle, &twist, &origin, &offset,&v, &method, &fn,&fa,&fs))
+  char *kwlist[] = {"convexity", "scale", "angle", "twist", "origin", "offset", "v","method", "fn", "fa", "fs", NULL};
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|iddOOOOsddd", kwlist, 
+			  &convexity, &scale, &angle, &twist, &origin, &offset,&v, &method, &fn,&fa,&fs))
    {
 
     PyErr_SetString(PyExc_TypeError, "error during parsing\n");
     return NULL;
   }
-  return rotate_extrude_core(obj, layer, convexity, scale, angle, twist, origin, offset, v, method, fn, fa,fs);
+  return rotate_extrude_core(obj, convexity, scale, angle, twist, origin, offset, v, method, fn, fa,fs);
 }
 
-PyObject *linear_extrude_core(PyObject *obj, PyObject *height, char *layer, int convexity, PyObject *origin, PyObject *scale, PyObject *center, int slices, int segments, PyObject *twist, double fn, double fa, double fs)
+PyObject *linear_extrude_core(PyObject *obj, PyObject *height, int convexity, PyObject *origin, PyObject *scale, PyObject *center, int slices, int segments, PyObject *twist, double fn, double fa, double fs)
 {
   DECLARE_INSTANCE
   std::shared_ptr<AbstractNode> child;
@@ -2397,7 +2394,6 @@ PyObject *linear_extrude_core(PyObject *obj, PyObject *height, char *layer, int 
   }
 
   node->convexity = convexity;
-  if (layer != NULL) node->layername = layer;
 
   node->origin_x = 0.0; node->origin_y = 0.0;
   if (origin != NULL && PyList_Check(origin) && PyList_Size(origin) == 2) {
@@ -2439,7 +2435,6 @@ PyObject *python_linear_extrude(PyObject *self, PyObject *args, PyObject *kwargs
 {
   PyObject *obj = NULL;
   PyObject *height = NULL;
-  char *layer = NULL;
   int convexity = 1;
   PyObject *origin = NULL;
   PyObject *scale = NULL;
@@ -2449,21 +2444,20 @@ PyObject *python_linear_extrude(PyObject *self, PyObject *args, PyObject *kwargs
   PyObject *twist = NULL;
   double fn = NAN, fa = NAN, fs = NAN;
 
-  char * kwlist[] ={"obj","height","layer","convexity","origin","scale","center","slices","segments","twist","fn","fa","fs",NULL};
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|OsiOOOiiOddd", kwlist, 
-                                   &obj, &height, &layer, &convexity, &origin, &scale, &center, &slices, &segments, &twist, &fn, &fs, &fs))
+  char * kwlist[] ={"obj","height","convexity","origin","scale","center","slices","segments","twist","fn","fa","fs",NULL};
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|OiOOOiiOddd", kwlist, 
+                                   &obj, &height, &convexity, &origin, &scale, &center, &slices, &segments, &twist, &fn, &fs, &fs))
    {
     PyErr_SetString(PyExc_TypeError,"error during parsing\n");
     return NULL;
   }
 
-  return linear_extrude_core(obj,height, layer, convexity, origin, scale, center, slices,segments,twist,fn,fa,fs);
+  return linear_extrude_core(obj,height, convexity, origin, scale, center, slices,segments,twist,fn,fa,fs);
 }
 
 PyObject *python_oo_linear_extrude(PyObject *obj, PyObject *args, PyObject *kwargs)
 {
   PyObject *height = NULL;
-  char *layer = NULL;
   int convexity = 1;
   PyObject *origin = NULL;
   PyObject *scale = NULL;
@@ -2473,15 +2467,15 @@ PyObject *python_oo_linear_extrude(PyObject *obj, PyObject *args, PyObject *kwar
   PyObject *twist = NULL;
   double fn = NAN, fa = NAN, fs = NAN;
 
-  char * kwlist[] ={"height","layer","convexity","origin","scale","center","slices","segments","twist","fn","fa","fs",NULL};
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|OsiOOOiiOddd", kwlist, 
-                                  &height, &layer, &convexity, &origin, &scale, &center, &slices, &segments, &twist, &fn, &fs, &fs))
+  char * kwlist[] ={"height","convexity","origin","scale","center","slices","segments","twist","fn","fa","fs",NULL};
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|OiOOOiiOddd", kwlist, 
+                                  &height, &convexity, &origin, &scale, &center, &slices, &segments, &twist, &fn, &fs, &fs))
    {
     PyErr_SetString(PyExc_TypeError,"error during parsing\n");
     return NULL;
   }
 
-  return linear_extrude_core(obj,height, layer, convexity, origin, scale, center, slices,segments,twist,fn,fa,fs);
+  return linear_extrude_core(obj,height, convexity, origin, scale, center, slices,segments,twist,fn,fa,fs);
 }
 
 PyObject *path_extrude_core(PyObject *obj, PyObject *path, PyObject *xdir, int convexity, PyObject *origin, PyObject *scale, PyObject *twist, PyObject *closed, PyObject *allow_intersect, double fn, double fa, double fs)

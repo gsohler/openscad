@@ -52,7 +52,7 @@ std::shared_ptr<AbstractNode> builtin_rotate_extrude(const ModuleInstantiation *
 #endif
 
   const Parameters parameters = Parameters::parse(std::move(arguments), inst->location(),
-                                            {"angle", "start","origin","scale"}, {"convexity","v", "method" });
+                                            {"angle", "start", "origin","scale"}, {"convexity","v", "method" });
 
   node->fn = parameters["$fn"].toDouble();
   node->fs = parameters["$fs"].toDouble();
@@ -79,7 +79,6 @@ std::shared_ptr<AbstractNode> builtin_rotate_extrude(const ModuleInstantiation *
 
   if (node->scale <= 0) node->scale = 1;
 
-
   Vector3d v(0,0,0);
 
   if (parameters["v"].isDefined()) {
@@ -95,7 +94,7 @@ std::shared_ptr<AbstractNode> builtin_rotate_extrude(const ModuleInstantiation *
     // method can only be one of...
     if (node->method != "centered" && node->method != "linear") {
       LOG(message_group::Warning, inst->location(), parameters.documentRoot(),
-          "Unknown roof method '" + node->method + "'. Using 'centered'.");
+          "Unknown rotate_extrude method '" + node->method + "'. Using 'centered'.");
       node->method = "centered";
     }
   }
@@ -103,14 +102,7 @@ std::shared_ptr<AbstractNode> builtin_rotate_extrude(const ModuleInstantiation *
   if (node->angle > 360 && v.norm() == 0) node->angle = 360;
 
   node->v=v;
-
-  if (node->filename.empty()) {
-    children.instantiate(node);
-  } else if (!children.empty()) {
-    LOG(message_group::Warning, inst->location(), parameters.documentRoot(),
-        "module %1$s() does not support child modules when importing a file", inst->name());
-  }
-
+  children.instantiate(node);
 
   return node;
 }
@@ -122,9 +114,23 @@ std::string RotateExtrudeNode::toString() const
   std::ostringstream stream;
 
   stream << this->name() << "("
+      "origin = [" << std::dec << this->origin_x << ", " << this->origin_y << "], "
+      "offset = [" << std::dec << this->offset_x << ", " << this->offset_y << "], "
+      "scale = " << this->scale << ", "
     "angle = " << this->angle << ", "
+    "method = \"" << this->method << "\", "
+    "v = [ " << this->v[0] <<  ", " << this->v[1] << ", " << this->v[2] << "], "
     "start = " << this->start << ", "
-    "convexity = " << this->convexity << ", "
+    "convexity = " << this->convexity << ", ";
+#ifdef ENABLE_PYTHON  
+ if(this->profile_func != NULL) {
+    stream << ", profile = " << rand() ;
+ }
+ if(this->twist_func != NULL) {
+    stream << ", twist_func = " << rand() ;
+ }
+#endif  
+    stream <<
     "$fn = " << this->fn << ", "
     "$fa = " << this->fa << ", "
     "$fs = " << this->fs << ")";
