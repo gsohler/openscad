@@ -138,6 +138,7 @@ namespace openscad_jupyter
         result["language_info"]["mimetype"] = "";
         result["language_info"]["file_extension"] = "py";
         return result;
+// https://blog.jupyter.org/authoring-custom-jupyter-widgets-2884a462e724#:~:text=The%20idea%20behind%20Jupyter%20widgets,in%20the%20JavaScript%20front%2Dend.	
     }
 
     void interpreter::shutdown_request_impl()

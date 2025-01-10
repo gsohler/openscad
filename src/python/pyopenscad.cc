@@ -1032,6 +1032,8 @@ sys.stderr = catcher_err\n\
     initPython(0.0);
     PyRun_SimpleString(python_init_code);
 
+    auto logger = xeus::make_console_logger(xeus::xlogger::msg_type,
+                                            xeus::make_file_logger(xeus::xlogger::full, "my_log_file.log"));
     try{	
 	xeus::xconfiguration config = xeus::load_configuration(python_jupyterconfig);
 	std::unique_ptr<xeus::xcontext> context = xeus::make_zmq_context();
@@ -1045,7 +1047,9 @@ sys.stderr = catcher_err\n\
                          xeus::get_user_name(),
                          std::move(context),
                          std::move(interpreter),
-                         xeus::make_xserver_shell_main);
+                         xeus::make_xserver_shell_main,
+			 xeus::make_in_memory_history_manager(),
+			 std::move(logger));
 	
 	kernel.start();
     } catch(std::exception &e) {
