@@ -89,16 +89,10 @@
 #ifdef ENABLE_OPENCSG
 #include "core/CSGTreeEvaluator.h"
 #include "glview/preview/OpenCSGRenderer.h"
-#ifdef USE_LEGACY_RENDERERS
-#include "glview/preview/LegacyOpenCSGRenderer.h"
-#endif
 #include <opencsg.h>
 #endif
 #include "gui/ProgressWidget.h"
 #include "glview/preview/ThrownTogetherRenderer.h"
-#ifdef USE_LEGACY_RENDERERS
-#include "glview/preview/LegacyThrownTogetherRenderer.h"
-#endif
 #include "glview/preview/CSGTreeNormalizer.h"
 #include "gui/QGLView.h"
 #include "gui/MouseSelector.h"
@@ -224,7 +218,6 @@ int curl_download(std::string url, std::string path)
 #include <sys/stat.h>
 
 #include "glview/cgal/CGALRenderer.h"
-#include "glview/cgal/LegacyCGALRenderer.h"
 #include "gui/CGALWorker.h"
 #include "gui/CSGWorker.h"
 
@@ -1559,26 +1552,14 @@ void MainWindow::compileCSGDone()
     else {
       LOG("Normalized tree has %1$d elements!",
           (this->root_products ? this->root_products->size() : 0));
-#ifdef USE_LEGACY_RENDERERS
-      this->opencsgRenderer = std::make_shared<LegacyOpenCSGRenderer>(this->root_products,
-                                                                      this->highlights_products,
-                                                                      this->background_products);
-#else
       this->opencsgRenderer = std::make_shared<OpenCSGRenderer>(this->root_products,
                                                                 this->highlights_products,
                                                                 this->background_products);
-#endif
     }
 #endif // ifdef ENABLE_OPENCSG
-#ifdef USE_LEGACY_RENDERERS
-    this->thrownTogetherRenderer = std::make_shared<LegacyThrownTogetherRenderer>(this->root_products,
-                                                                                  this->highlights_products,
-                                                                                  this->background_products);
-#else
     this->thrownTogetherRenderer = std::make_shared<ThrownTogetherRenderer>(this->root_products,
                                                                             this->highlights_products,
                                                                             this->background_products);
-#endif
     LOG("Compile and preview finished.");
     renderStatistic.printRenderingTime();
     this->processEvents();
@@ -2431,11 +2412,7 @@ void MainWindow::actionRenderDone(const std::shared_ptr<const Geometry>& root_ge
     LOG("Rendering finished.");
 
     this->root_geom = root_geom;
-#ifdef USE_LEGACY_RENDERERS
-    this->cgalRenderer = std::make_shared<LegacyCGALRenderer>(root_geom);
-#else
     this->cgalRenderer = std::make_shared<CGALRenderer>(root_geom);
-#endif
     // Go to CGAL view mode
     if (viewActionWireframe->isChecked()) viewModeWireframe();
     else viewModeSurface();
