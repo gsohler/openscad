@@ -1605,6 +1605,7 @@ PyObject *python_output_core(PyObject *obj)
   PyObject *key, *value;
   Py_ssize_t pos = 0;
   python_result_node = child;
+  python_result_obj = obj;
   mapping_name.clear();
   mapping_code.clear();
   mapping_level.clear();
@@ -1685,11 +1686,40 @@ void Export3mfPartInfo::writeProps(void *obj) const
   }
 }
 
+void python_export_obj_att(std::ostream& output)
+{
+  PyObject *child_dict= nullptr;
+  if(python_result_obj == nullptr) return;
+  std::shared_ptr<AbstractNode> child = PyOpenSCADObjectToNodeMulti(python_result_obj, &child_dict);
+  if(child_dict == nullptr) return;
+  if(!PyDict_Check(child_dict)) return;
+  PyObject *key, *value;
+  Py_ssize_t pos = 0;
+  while (PyDict_Next(child_dict, &pos, &key, &value)) {
+    PyObject* key1 = PyUnicode_AsEncodedString(key, "utf-8", "~");
+    const char *key_str =  PyBytes_AS_STRING(key1);
+    if(key_str == nullptr) continue;
+
+    if(PyLong_Check(value))  
+      output <<  "# " << key_str << " = " << PyLong_AsLong(value) << "\n" ;
+
+    if(PyFloat_Check(value))  
+      output <<  "# " << key_str << " = " << PyFloat_AsDouble(value) << "\n" ;
+
+    if(PyUnicode_Check(value)) {
+      auto valuestr = std::string(PyUnicode_AsUTF8(value));
+      output <<  "# " << key_str << " = \"" << valuestr << "\"\n" ;
+    }  
+  }
+
+}	
+
 PyObject *python_export_core(PyObject *obj, char *file)
 {
   const auto path = fs::path(file);
   std::string suffix = path.has_extension() ? path.extension().generic_string().substr(1) : "";
   boost::algorithm::to_lower(suffix);
+  python_result_obj = obj;
 
   FileFormat exportFileFormat = FileFormat::BINARY_STL;
   if (!fileformat::fromIdentifier(suffix, exportFileFormat)) {

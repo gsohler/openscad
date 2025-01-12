@@ -47,6 +47,7 @@ AssignmentList customizer_parameters;
 AssignmentList customizer_parameters_finished;
 bool pythonDryRun=false;
 std::shared_ptr<AbstractNode> python_result_node = nullptr; /* global result veriable containing the python created result */
+PyObject *python_result_obj = nullptr;
 std::vector<SelectedObject> python_result_handle;
 bool python_active;  /* if python is actually used during evaluation */
 bool python_trusted; /* global Python trust flag */
