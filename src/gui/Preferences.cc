@@ -55,7 +55,7 @@
 #include "geometry/GeometryCache.h"
 #include "gui/AutoUpdater.h"
 #include "Feature.h"
-#include "gui/Settings.h"
+#include "core/Settings.h"
 #include "printutils.h"
 #ifdef ENABLE_CGAL
 #include "geometry/cgal/CGALCache.h"
@@ -79,12 +79,12 @@ class SettingsReader : public Settings::SettingsVisitor
 {
   QSettingsCached settings;
 
-  void handle(Settings::SettingsEntry& entry) const override
+  void handle(Settings::SettingsEntryBase& entry) const override
   {
     if (settings.contains(QString::fromStdString(entry.key()))) {
       std::string value = settings.value(QString::fromStdString(entry.key())).toString().toStdString();
       PRINTDB("SettingsReader R: %s = '%s'", entry.key() % value);
-      entry.decode(value);
+      entry.set(value);
     }
   }
 };
@@ -174,6 +174,7 @@ void Preferences::init() {
   addPrefPage(group, prefsActionInputButton, pageInputButton);
   addPrefPage(group, prefsActionPython, pagePython);
   addPrefPage(group, prefsActionAdvanced, pageAdvanced);
+  addPrefPage(group, prefsActionDialogs, pageDialogs);
 
   connect(group, SIGNAL(triggered(QAction*)), this, SLOT(actionTriggered(QAction*)));
 
@@ -253,6 +254,9 @@ void Preferences::init() {
   if (!profile.isEmpty()) {
     this->comboBoxOctoPrintSlicingProfile->addItem(profileDesc, QVariant{profile});
   }
+
+  this->checkBoxAlwaysShowExportPdfDialog->setChecked(Settings::SettingsExportPdf::exportPdfAlwaysShowDialog.value());
+  this->checkBoxAlwaysShowExport3mfDialog->setChecked(Settings::SettingsExport3mf::export3mfAlwaysShowDialog.value());
 
   emit editorConfigChanged();
 }
@@ -1000,7 +1004,7 @@ void Preferences::updateLocalAppParams()
       items.emplace_back(Settings::LocalAppParameterType::sourcedir, std::string{});
     }
   }
-  Settings::Settings::localAppParameterList.setItems(items);
+  Settings::Settings::localAppParameterList.setValue(items);
   writeSettings();
 }
 
@@ -1126,6 +1130,18 @@ void Preferences::on_comboBoxOctoPrintSlicingProfile_activated(int val)
   const QString desc = text.isEmpty() ? QString{} : this->comboBoxOctoPrintSlicingProfile->itemText(val);
   Settings::Settings::octoPrintSlicerProfile.setValue(text.toStdString());
   Settings::Settings::octoPrintSlicerProfileDesc.setValue(desc.toStdString());
+  writeSettings();
+}
+
+void Preferences::on_checkBoxAlwaysShowExportPdfDialog_toggled(bool state)
+{
+  Settings::SettingsExportPdf::exportPdfAlwaysShowDialog.setValue(state);
+  writeSettings();
+}
+
+void Preferences::on_checkBoxAlwaysShowExport3mfDialog_toggled(bool state)
+{
+  Settings::SettingsExport3mf::export3mfAlwaysShowDialog.setValue(state);
   writeSettings();
 }
 
@@ -1296,7 +1312,7 @@ void Preferences::updateGUI()
   updateComboBox(this->comboBoxOctoPrintSlicingProfile, Settings::Settings::octoPrintSlicerProfile.value());
 }
 
-void Preferences::applyComboBox(QComboBox * /*comboBox*/, int val, Settings::SettingsEntryEnum& entry)
+void Preferences::applyComboBox(QComboBox * /*comboBox*/, int val, Settings::SettingsEntryEnum<std::string>& entry)
 {
   entry.setIndex(val);
   writeSettings();

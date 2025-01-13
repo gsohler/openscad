@@ -55,6 +55,7 @@ extern bool parse(SourceFile *& file, const std::string& text, const std::string
 #include "CgalAdvNode.h"
 #include "CsgOpNode.h"
 #include "ColorNode.h"
+#include "ColorUtil.h"
 #include "Expression.h"
 #include "RoofNode.h"
 #include "RenderNode.h"
@@ -87,7 +88,6 @@ extern bool parse(SourceFile *& file, const std::string& text, const std::string
 // Colors extracted from https://drafts.csswg.org/css-color/ on 2015-08-02
 // CSS Color Module Level 4 - Editor’s Draft, 29 May 2015
 extern std::unordered_map<std::string, Color4f> webcolors;
-extern boost::optional<Color4f> parse_hex_color(const std::string& hex);
 
 PyObject *python_cube(PyObject *self, PyObject *args, PyObject *kwargs)
 {
@@ -1987,7 +1987,7 @@ PyObject *python_color_core(PyObject *obj, PyObject *color, double alpha, int te
       node->color[3]=alpha;
     } else {
     // Try parsing it as a hex color such as "#rrggbb".
-      const auto hexColor = parse_hex_color(colorname);
+      const auto hexColor = OpenSCAD::parse_hex_color(colorname);
       if (hexColor) {
         node->color = *hexColor;
       } else {

@@ -946,6 +946,7 @@ set(CORE_SOURCES
   src/core/PullNode.cc
   src/core/WrapNode.cc
   src/core/TextureNode.cc
+  src/core/ColorUtil.cc
   src/core/Context.cc
   src/core/ContextFrame.cc
   src/core/ContextMemoryManager.cc
@@ -974,6 +975,7 @@ set(CORE_SOURCES
   src/core/RenderVariables.cc
   src/core/RotateExtrudeNode.cc
   src/core/ScopeContext.cc
+  src/core/Settings.cc
   src/core/SourceFile.cc
   src/core/SourceFileCache.cc
   src/core/StatCache.cc
@@ -1244,6 +1246,7 @@ set(GUI_SOURCES
   src/gui/Editor.cc
   src/gui/ErrorLog.cc
   src/gui/EventFilter.h
+  src/gui/Export3mfDialog.cc
   src/gui/ExportPdfDialog.cc
   src/gui/LoadShareDesignDialog.cc
   src/gui/ShareDesignDialog.cc
@@ -1272,7 +1275,6 @@ set(GUI_SOURCES
   src/gui/ScadApi.cc
   src/gui/ScadLexer.cc
   src/gui/ScintillaEditor.cc
-  src/gui/Settings.cc
   src/gui/SettingsWriter.cc
   src/gui/TabManager.cc
   src/gui/TabWidget.cc
@@ -1316,6 +1318,7 @@ set(GUI_HEADERS
     src/gui/EventFilter.h
     src/gui/LoadShareDesignDialog.h
     src/gui/ShareDesignDialog.h
+    src/gui/Export3mfDialog.h
     src/gui/ExportPdfDialog.h
     src/gui/FontList.h
     src/gui/FontListDialog.h
@@ -1341,7 +1344,6 @@ set(GUI_HEADERS
     src/gui/ScadApi.h
     src/gui/ScadLexer.h
     src/gui/ScintillaEditor.h
-    src/gui/Settings.h
     src/gui/SettingsWriter.h
     src/gui/TabManager.h
     src/gui/TabWidget.h
@@ -1369,6 +1371,7 @@ set(GUI_UIS
     src/gui/Animate.ui
     src/gui/Console.ui
     src/gui/ErrorLog.ui
+    src/gui/Export3mfDialog.ui
     src/gui/ExportPdfDialog.ui
     src/gui/ShareDesignDialog.ui
     src/gui/LoadShareDesignDialog.ui
