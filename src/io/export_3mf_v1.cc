@@ -50,7 +50,7 @@ void Export3mfPartInfo::writePropsString(void *pobj, const  char *name, const ch
 }
 
 
-static uint32_t lib3mf_seek_callback(uint64_t pos, std::ostream *stream)
+static uint32_t lib3mf_seek_callback_my(uint64_t pos, std::ostream *stream)
 {
   stream->seekp(pos);
   return !(*stream);
@@ -203,7 +203,6 @@ bool append_polyset(const std::shared_ptr<const PolySet>& ps, ExportContext& ctx
     MODELMESHVERTEX v{f[0], f[1], f[2]};
     return lib3mf_meshobject_addvertex(mesh, &v, nullptr) == LIB3MF_OK;
   };
-
 
   auto triangleFunc = [&](const IndexedFace& indices) -> bool {
     MODELMESHTRIANGLE t{(DWORD)indices[0], (DWORD)indices[1], (DWORD)indices[2]};
@@ -383,7 +382,7 @@ void add_meta_data(PLib3MFModelMeshObject *& model, const std::string& name, con
     Saves the current 3D Geometry as 3MF to the given file.
     The file must be open.
  */
-void export_3mf(const std::vector<struct Export3mfPartInfo> & infos, std::ostream& output, const ExportInfo& exportInfo ) 
+void export_3mf(const std::vector<struct Export3mfPartInfo> & infos, std::ostream& output, const ExportInfo& exportInfo)
 {
   DWORD interfaceVersionMajor, interfaceVersionMinor, interfaceVersionMicro;
   HRESULT result = lib3mf_getinterfaceversion(&interfaceVersionMajor, &interfaceVersionMinor, &interfaceVersionMicro);
@@ -489,10 +488,12 @@ void export_3mf(const std::vector<struct Export3mfPartInfo> & infos, std::ostrea
     .options = options3mf
   };
 
-  if (!append_3mf(geom, ctx)) {
-    if (model) lib3mf_release(model);
-    return;
-  }
+  for(auto &info : infos) {
+    if (!append_3mf(info.geom, ctx)) {
+      if (model) lib3mf_release(model);
+      return;
+    }
+  }  
 
   PLib3MFModelWriter *writer;
   if (lib3mf_model_querywriter(model, "3mf", &writer) != LIB3MF_OK) {
@@ -500,7 +501,7 @@ void export_3mf(const std::vector<struct Export3mfPartInfo> & infos, std::ostrea
     return;
   }
 
-  result = lib3mf_writer_writetocallback(writer, (void *)lib3mf_write_callback, (void *)lib3mf_seek_callback, &output);
+  result = lib3mf_writer_writetocallback(writer, (void *)lib3mf_write_callback, (void *)lib3mf_seek_callback_my, &output);
   output.flush();
   lib3mf_release(writer);
   lib3mf_release(model);

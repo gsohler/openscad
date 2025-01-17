@@ -103,12 +103,13 @@ get_debian_deps()
  apt-get update
  apt-get -y install \
   build-essential bison flex git curl cmake ninja-build libffi-dev \
-  libboost-all-dev libboost-dev libboost-program-options-dev libboost-regex-dev libboost-system-dev \
-  libboost-filesystem-dev libboost-thread-dev libboost-program-options-dev libmpfr-dev libglew-dev libcairo2-dev libharfbuzz-dev \
-  libeigen3-dev libcgal-dev libopencsg-dev libgmp-dev libgmp3-dev libopengl5-dev libcurl4-openssl-dev libtag1-dev \
-  imagemagick libfreetype6-dev libfreetype-dev libdouble-conversion-dev libxml2-dev python3-dev nettle-dev \
-  gtk-doc-tools libglib2.0-dev gettext xvfb pkg-config ragel libtbb-dev libxmu-dev libcrypto++-dev libdbus-1-dev \
-  libgl1-mesa-dev libxi-dev libfontconfig-dev libzip-dev libglm-dev nettle-dev get_qt5_deps_debian libjpeg-dev  qtmultimedia5-dev libqt5svg5-dev qt5multimedia5-dev libqt5multimedia5-dev qt5tools5-dev lib3mf-dev
+  libboost-program-options-dev libboost-regex-dev libboost-system-dev \
+  libmpfr-dev libglew-dev libcairo2-dev libharfbuzz-dev \
+  libeigen3-dev libcgal-dev libopencsg-dev libgmp-dev \
+  imagemagick libfreetype6-dev libdouble-conversion-dev libxml2-dev python3-dev nettle-dev \
+  gtk-doc-tools libglib2.0-dev gettext xvfb pkg-config ragel libtbb-dev libcrypto++-dev \
+  libgl1-mesa-dev libxi-dev libfontconfig-dev libzip-dev libjpeg-dev
+ get_qt5_deps_debian
 }
 
 get_qt5_deps_debian()
