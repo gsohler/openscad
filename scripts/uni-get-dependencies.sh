@@ -102,7 +102,7 @@ get_debian_deps()
 {
  apt-get update
  apt-get -y install \
-  build-essential bison flex git curl cmake ninja-build libffi-dev \
+  build-essential bison flex git curl libcurl4-openssl-dev cmake ninja-build libffi-dev \
   libboost-program-options-dev libboost-regex-dev libboost-system-dev \
   libmpfr-dev libglew-dev libcairo2-dev libharfbuzz-dev \
   libeigen3-dev libcgal-dev libopencsg-dev libgmp-dev \
