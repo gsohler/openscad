@@ -11,7 +11,7 @@ get_fedora_deps_yum()
   boost-devel mpfr-devel gmp-devel glew-devel CGAL-devel gcc gcc-c++ pkgconfig \
   opencsg-devel git libXmu-devel curl imagemagick ImageMagick glib2-devel make \
   xorg-x11-server-Xvfb gettext qscintilla-qt5-devel \
-  mesa-dri-drivers double-conversion-devel tbb-devel nettle-devel libjpeg-turbo-devel
+  mesa-dri-drivers double-conversion-devel tbb-devel python3-devel libcurl-devel nettle-devel libjpeg-turbo-devel
 }
 
 get_fedora_deps_dnf()

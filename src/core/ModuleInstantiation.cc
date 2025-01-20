@@ -117,9 +117,9 @@ std::shared_ptr<AbstractNode> ModuleInstantiation::evaluate(const std::shared_pt
   boost::optional<InstantiableModule> module = context->lookup_module(this->name(), this->loc);
   if (!module) {
     std::shared_ptr<AbstractNode> result=nullptr;
+    std::string error;
 #ifdef ENABLE_PYTHON
     int modulefound;
-    std::string error;
     result = python_modulefunc(this, context,error);
     if(!error.empty() && result == nullptr) {
       LOG(message_group::Warning, loc, context->documentRoot(), "Python:: '%1$s'", error);
