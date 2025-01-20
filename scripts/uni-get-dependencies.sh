@@ -19,7 +19,7 @@ get_fedora_deps_dnf()
  dnf -y install qt5-qtbase-devel bison flex eigen3-devel harfbuzz-devel \
   fontconfig-devel freetype-devel \
   boost-devel mpfr-devel gmp-devel glew-devel CGAL-devel gcc gcc-c++ pkgconfig \
-  opencsg-devel git libXmu-devel curl ImageMagick glib2-devel make \
+  opencsg-devel git libXmu-devel curl python3-devel libcurl-devel ImageMagick glib2-devel make \
   xorg-x11-server-Xvfb gettext qscintilla-qt5-devel \
   mesa-dri-drivers libzip-devel ccache qt5-qtmultimedia-devel qt5-qtsvg-devel \
   double-conversion-devel tbb-devel nettle-devel libjpeg-turbo-devel
