@@ -25,7 +25,6 @@ GLView::GLView()
 {
   aspectratio = 1;
   showedges = false;
-  showfaces = true;
   showaxes = false;
   showcrosshairs = false;
   showscale = false;
@@ -191,8 +190,8 @@ void GLView::paintGL()
       glEnable(GL_BLEND);
       glBlendFunc(GL_DST_COLOR, GL_ONE_MINUS_DST_COLOR); 
     }  
-    this->renderer->prepare(showfaces, showedges);
-    this->renderer->draw(showfaces, showedges);
+    this->renderer->prepare(showedges);
+    this->renderer->draw(showedges);
     if(this->handle_mode) glDisable(GL_BLEND);
   }
   glColor3f(1,0,0);

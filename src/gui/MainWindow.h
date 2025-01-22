@@ -349,11 +349,10 @@ public slots:
   void openFileFromPath(const QString&, int);
   void toolTipShow(QPoint,QString msg);
 
+  void viewModeRender();
 #ifdef ENABLE_OPENCSG
   void viewModePreview();
 #endif
-  void viewModeSurface();
-  void viewModeWireframe();
   void viewModeThrownTogether();
   void viewModeShowEdges();
   void viewModeShowAxes();

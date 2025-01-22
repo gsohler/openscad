@@ -246,7 +246,6 @@ struct ViewOptions {
     {"axes", false},
     {"scales", false},
     {"edges", false},
-    {"wireframe", false},
     {"crosshairs", false},
   };
 
