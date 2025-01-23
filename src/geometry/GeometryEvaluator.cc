@@ -1819,7 +1819,14 @@ std::shared_ptr<const Geometry> offset3D_round(const std::shared_ptr<const PolyS
 
     PolySetBuilder builder;
 
-    Vector3d normshift = faceNormal.head<3>()*off;
+    Vector3d botshift,topshift;
+    if(off > 0) {
+      botshift = -faceNormal.head<3>()*0.0001; 
+      topshift = faceNormal.head<3>()*off;
+    } else{
+      botshift = faceNormal.head<3>()*off;
+      topshift = faceNormal.head<3>()*0.0001; 
+    }
 
 
     std::vector<IndexedTriangle> triangles;
@@ -1829,8 +1836,8 @@ std::shared_ptr<const Geometry> offset3D_round(const std::shared_ptr<const PolyS
     for (const auto& base : triangles) {
       int bot[3], top[3];						     
       for(int i=0;i<3;i++){
-        bot[i] = builder.vertexIndex(ps->vertices[base[i]]);
-        top[i] = builder.vertexIndex(ps->vertices[base[i]]+normshift);
+        bot[i] = builder.vertexIndex(ps->vertices[base[i]]+botshift);
+        top[i] = builder.vertexIndex(ps->vertices[base[i]]+topshift);
       }
       builder.appendPolygon({bot[2],bot[1],bot[0]});
       builder.appendPolygon({top[0],top[1],top[2]});
@@ -1841,8 +1848,8 @@ std::shared_ptr<const Geometry> offset3D_round(const std::shared_ptr<const PolyS
       std::vector<int> top_pts;
       for(auto ind : face) { // for sides
         Vector3d pt = ps->vertices[ind];
-        base_pts.push_back( builder.vertexIndex(pt));
-        top_pts.push_back( builder.vertexIndex(pt+normshift));
+        base_pts.push_back( builder.vertexIndex(pt+botshift));
+        top_pts.push_back( builder.vertexIndex(pt+topshift));
       }	
       // side faces
       int n=base_pts.size();
@@ -1874,7 +1881,7 @@ std::shared_ptr<const Geometry> offset3D_round(const std::shared_ptr<const PolyS
     if(faceParents[e.second.faceb] != -1) fbn=-fbn;
     Vector3d axis=fan.cross(fbn);
     double conv = fan.cross(fbn).dot(p2-p1);
-    if(conv < 0) continue;
+    if(conv*off < 0) continue;
 
     corner_rounds[e.first.ind1].push_back(e.first.ind2);
     corner_rounds[e.first.ind2].push_back(e.first.ind1);
@@ -1883,7 +1890,7 @@ std::shared_ptr<const Geometry> offset3D_round(const std::shared_ptr<const PolyS
     // create arcs for begin and end
     startarc.push_back(p1+off*fan);
     endarc.push_back(p2+off*fan);
-    for(int i=1;i<fn-1;i++) {
+    for(int i=1;i<fn-1;i++) { // TODO reduce fn
       Transform3d matrix=Transform3d::Identity();
       auto M = angle_axis_degrees(180/3.14*totang*i/(double)(fn-1), axis);
       matrix.rotate(M);
@@ -1900,12 +1907,22 @@ std::shared_ptr<const Geometry> offset3D_round(const std::shared_ptr<const PolyS
 
   for(auto &e: edge_db) {
     if(!edge_startarc.count(e.first)) continue;	  
-    auto &startarc = edge_startarc[e.first];
-    auto &endarc = edge_endarc[e.first];
-    std::vector<int> start_inds, end_inds;
+    std::vector<Vector3d>  startarc; 
+    std::vector<Vector3d>  endarc; 
+    int startpt, endpt;
     PolySetBuilder builder;
-    int startpt = builder.vertexIndex(ps->vertices[e.first.ind1]);
-    int endpt = builder.vertexIndex(ps->vertices[e.first.ind2]);
+    if(off > 0) {
+      startarc = edge_startarc[e.first];
+      endarc = edge_endarc[e.first];
+      startpt  = builder.vertexIndex(ps->vertices[e.first.ind1]);
+      endpt  = builder.vertexIndex(ps->vertices[e.first.ind2]);
+    } else {
+      startarc = edge_endarc[e.first];
+      endarc = edge_startarc[e.first];
+      endpt  = builder.vertexIndex(ps->vertices[e.first.ind1]);
+      startpt  = builder.vertexIndex(ps->vertices[e.first.ind2]);
+    }
+    std::vector<int> start_inds, end_inds;
 
     int n = startarc.size();
     for(int i=0;i<n;i++) {
@@ -1943,7 +1960,6 @@ std::shared_ptr<const Geometry> offset3D_round(const std::shared_ptr<const PolyS
   
   for(int i=0;i<ps->vertices.size();i++)
   {
-    if(off < 0) break;	  
     PolySetBuilder builder; // for all corners create a nice sphere
     Vector3d basept=ps->vertices[i];	  
     int baseind = builder.vertexIndex(basept);
@@ -2034,24 +2050,32 @@ std::shared_ptr<const Geometry> offset3D_round(const std::shared_ptr<const PolyS
     for(int row=0;row<n;row++) {
       int nextlevel = baselevel+n+1-row;		
       for(int col=0;col<n-row;col++) {
-        builder.appendPolygon({pyramid[baselevel+col+1], pyramid[baselevel+col], pyramid[nextlevel+col]});
-        if(col < n-row-1) builder.appendPolygon({pyramid[baselevel+col+1], pyramid[nextlevel+col], pyramid[nextlevel+col+1]}); 
+        if(off > 0) {	      
+          builder.appendPolygon({pyramid[baselevel+col+1], pyramid[baselevel+col], pyramid[nextlevel+col]});
+          if(col < n-row-1) builder.appendPolygon({pyramid[baselevel+col+1], pyramid[nextlevel+col], pyramid[nextlevel+col+1]}); 
+	} else {
+          builder.appendPolygon({pyramid[baselevel+col], pyramid[baselevel+col+1], pyramid[nextlevel+col]});
+          if(col < n-row-1) builder.appendPolygon({pyramid[baselevel+col+1], pyramid[nextlevel+1+col], pyramid[nextlevel+col]}); 
+	}	
       }  
       baselevel=nextlevel;
     }  
 
     n=combined.size();
     for(int i=0;i<n;i++) {
-        builder.appendPolygon({baseind, combined[i], combined[(i+1)%n]}); 
+	if(off > 0) builder.appendPolygon({baseind, combined[i], combined[(i+1)%n]}); 
+	else builder.appendPolygon({combined[i], baseind, combined[(i+1)%n]}); 
     }
 
     auto result_u = builder.build();
     std::shared_ptr<PolySet> result_s = std::move(result_u);
     subgeoms.push_back(result_s); // corners
   }
-
-  if(off > 0) return union_geoms(subgeoms);
-  else return difference_geoms(subgeoms);
+  if(off > 0){
+	  return union_geoms(subgeoms);
+  } else {
+	  return difference_geoms(subgeoms);
+  }
 }
 
 std::shared_ptr<const Geometry> offset3D_convex(const std::shared_ptr<const PolySet> &ps,double off, int fn) {
