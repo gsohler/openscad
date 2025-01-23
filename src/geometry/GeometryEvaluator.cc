@@ -1764,48 +1764,330 @@ void  offset3D_reindex(const std::vector<Vector3d> &vertices, std::vector<Indexe
 #endif  
 }
 
-std::shared_ptr<const Geometry> offset3D_convex(const std::shared_ptr<const PolySet> &ps,double off) {
+std::shared_ptr<Geometry> union_geoms(std::vector<std::shared_ptr<PolySet>> parts) // TODO use widely
+{
+  std::shared_ptr<ManifoldGeometry> result = nullptr;
+  for(auto part: parts) {
+    std::shared_ptr<const ManifoldGeometry>part_mani = ManifoldUtils::createManifoldFromGeometry(part);
+    if(result == nullptr) result = std::make_shared<ManifoldGeometry>(*part_mani);
+    else *result = *result + *part_mani;
+  }
+  return result;
+}
+
+std::shared_ptr<Geometry> difference_geoms(std::vector<std::shared_ptr<PolySet>> parts) // TODO use widely
+{
+  std::shared_ptr<ManifoldGeometry> result = nullptr;
+  for(auto part: parts) {
+    std::shared_ptr<const ManifoldGeometry>part_mani = ManifoldUtils::createManifoldFromGeometry(part);
+    if(result == nullptr) result = std::make_shared<ManifoldGeometry>(*part_mani);
+    else *result = *result - *part_mani;
+  }
+  return result;
+}
+
+std::shared_ptr<const Geometry> offset3D_round(const std::shared_ptr<const PolySet> &ps,double off, int fn) {
+  std::vector<std::shared_ptr<PolySet> > subgeoms;	
+  std::shared_ptr<PolySet> inner = std::make_shared<PolySet>(*ps);
+  subgeoms.push_back(inner); // 1st add orignal polyhedron
+
+  if(fn == 0) fn=6;
+  std::vector<Vector4d> newNormals;
+  std::vector<int> faceParents;
+  std::vector<Vector4d>  faceNormal=calcTriangleNormals(ps->vertices, ps->indices);
+  auto  indicesNew  = mergeTriangles(ps->indices,faceNormal,newNormals, faceParents, ps->vertices );
+
+  intList empty;
+  std::vector<std::vector<int>> corner_rounds ;
+  for(int i=0;i<ps->vertices.size();i++) corner_rounds.push_back(empty);
+  std::vector<Vector3f> verticesFloat;
+  for(const auto &v: ps->vertices)
+    verticesFloat.push_back(v.cast<float>());
+ 
+  std::vector<Vector4d>  faceNormals;
+  // process all faces and bulid a prisma on top of it
+  for(int a=0;a<indicesNew.size();a++) {
+    Vector4d  faceNormal=calcTriangleNormal(ps->vertices, indicesNew[a]);
+    faceNormals.push_back(faceNormal);
+    if(faceParents[a] != -1) continue;	  // its a hole
+
+    std::vector<IndexedFace> face_set;
+    face_set.push_back(indicesNew[a]);
+    for(int b=0;b<faceParents.size();b++)
+      if(faceParents[b] == a)
+        face_set.push_back(indicesNew[b]);
+
+    PolySetBuilder builder;
+
+    Vector3d botshift,topshift;
+    if(off > 0) {
+      botshift = -faceNormal.head<3>()*0.0001; 
+      topshift = faceNormal.head<3>()*off;
+    } else{
+      botshift = faceNormal.head<3>()*off;
+      topshift = faceNormal.head<3>()*0.0001; 
+    }
+
+
+    std::vector<IndexedTriangle> triangles;
+    Vector3f faceNormalf(faceNormal[0], faceNormal[1], faceNormal[2]);
+    GeometryUtils::tessellatePolygonWithHoles(verticesFloat, face_set, triangles, &faceNormalf); 
+
+    for (const auto& base : triangles) {
+      int bot[3], top[3];						     
+      for(int i=0;i<3;i++){
+        bot[i] = builder.vertexIndex(ps->vertices[base[i]]+botshift);
+        top[i] = builder.vertexIndex(ps->vertices[base[i]]+topshift);
+      }
+      builder.appendPolygon({bot[2],bot[1],bot[0]});
+      builder.appendPolygon({top[0],top[1],top[2]});
+    }
+
+    for(auto face: face_set) {
+      std::vector<int> base_pts;
+      std::vector<int> top_pts;
+      for(auto ind : face) { // for sides
+        Vector3d pt = ps->vertices[ind];
+        base_pts.push_back( builder.vertexIndex(pt+botshift));
+        top_pts.push_back( builder.vertexIndex(pt+topshift));
+      }	
+      // side faces
+      int n=base_pts.size();
+      for(int i=0;i<n;i++) {
+        builder.appendPolygon({base_pts[i], base_pts[(i+1)%n], top_pts[(i+1)%n], top_pts[i]});
+      }
+    }
+
+
+    auto result_u = builder.build();
+    std::shared_ptr<PolySet> result_s = std::move(result_u);
+    subgeoms.push_back(result_s); // prisms
+
+  }
+
+ // create edge_db
+  std::unordered_map<EdgeKey, std::vector<Vector3d> ,boost::hash<EdgeKey>> edge_startarc;
+  std::unordered_map<EdgeKey, std::vector<Vector3d> ,boost::hash<EdgeKey>> edge_endarc;
+  auto edge_db =  createEdgeDb(indicesNew);
+  for(auto &e: edge_db) {
+    Vector3d p1=ps->vertices[e.first.ind1];	  
+    Vector3d p2=ps->vertices[e.first.ind2];
+    // schauen ob es eine konkave kante ist
+
+
+    Vector3d fan = faceNormals[e.second.facea].head<3>();
+    if(faceParents[e.second.facea] != -1) fan=-fan;
+    Vector3d fbn = faceNormals[e.second.faceb].head<3>();
+    if(faceParents[e.second.faceb] != -1) fbn=-fbn;
+    Vector3d axis=fan.cross(fbn);
+    double conv = fan.cross(fbn).dot(p2-p1);
+    if(conv*off < 0) continue;
+
+    corner_rounds[e.first.ind1].push_back(e.first.ind2);
+    corner_rounds[e.first.ind2].push_back(e.first.ind1);
+    double totang=acos(fan.dot(fbn));
+    std::vector<Vector3d> startarc, endarc;
+    // create arcs for begin and end
+    startarc.push_back(p1+off*fan);
+    endarc.push_back(p2+off*fan);
+    for(int i=1;i<fn-1;i++) { // TODO reduce fn
+      Transform3d matrix=Transform3d::Identity();
+      auto M = angle_axis_degrees(180/3.14*totang*i/(double)(fn-1), axis);
+      matrix.rotate(M);
+      Vector3d rotv = matrix * fan;
+      startarc.push_back(p1 + off*rotv);
+      endarc.push_back(p2 + off*rotv);
+    }
+    startarc.push_back(p1+off*fbn);
+    endarc.push_back(p2+off*fbn);
+
+    edge_startarc[e.first]= startarc;
+    edge_endarc[e.first]= endarc;
+  }
+
+  for(auto &e: edge_db) {
+    if(!edge_startarc.count(e.first)) continue;	  
+    std::vector<Vector3d>  startarc; 
+    std::vector<Vector3d>  endarc; 
+    int startpt, endpt;
+    PolySetBuilder builder;
+    if(off > 0) {
+      startarc = edge_startarc[e.first];
+      endarc = edge_endarc[e.first];
+      startpt  = builder.vertexIndex(ps->vertices[e.first.ind1]);
+      endpt  = builder.vertexIndex(ps->vertices[e.first.ind2]);
+    } else {
+      startarc = edge_endarc[e.first];
+      endarc = edge_startarc[e.first];
+      endpt  = builder.vertexIndex(ps->vertices[e.first.ind1]);
+      startpt  = builder.vertexIndex(ps->vertices[e.first.ind2]);
+    }
+    std::vector<int> start_inds, end_inds;
+
+    int n = startarc.size();
+    for(int i=0;i<n;i++) {
+      start_inds.push_back(builder.vertexIndex(startarc[i]));	    
+      end_inds.push_back(builder.vertexIndex(endarc[i]));	    
+    }
+    // end wall
+    builder.beginPolygon(n+1);
+    for(int i=0;i<end_inds.size();i++)
+      builder.addVertex(end_inds[i]);
+    builder.addVertex(endpt);
+
+    // top rounding
+    for(int i=0;i<fn-1;i++) {
+      builder.appendPolygon({start_inds[i],start_inds[i+1],  end_inds[i+1], end_inds[i]});
+    }
+   
+    // start wall
+    builder.beginPolygon(n+1);
+    for(int i=n-1;i>=0;i--)
+      builder.addVertex(start_inds[i]);
+    builder.addVertex(startpt);
+   
+    // front wall
+    builder.appendPolygon({startpt, start_inds[0],end_inds[0], endpt});
+
+    // back wall
+    builder.appendPolygon({startpt, endpt, end_inds[n-1],start_inds[n-1]});
+
+    auto result_u = builder.build();
+    std::shared_ptr<PolySet> result_s = std::move(result_u);
+    subgeoms.push_back(result_s); // edges
+  }
+
+  
+  for(int i=0;i<ps->vertices.size();i++)
+  {
+    PolySetBuilder builder; // for all corners create a nice sphere
+    Vector3d basept=ps->vertices[i];	  
+    int baseind = builder.vertexIndex(basept);
+    if(corner_rounds[i].size() < 3) continue;
+    std::vector<IndexedFace> stubs;
+    for(auto oth: corner_rounds[i]) {
+      EdgeKey key(i, oth);		
+      if(!edge_startarc.count(key)) continue;	  
+      std::vector<Vector3d> arc;
+      if(i < oth) arc=edge_startarc[key]; else {
+        arc=edge_endarc[key];
+        std::reverse(arc.begin(), arc.end());
+      }
+      IndexedFace stub;
+      for(auto pt: arc) 
+        stub.push_back(builder.vertexIndex(pt));	      
+      stubs.push_back(stub);
+    }
+
+    std::vector<Vector3d> vertices;
+    builder.copyVertices(vertices);
+        
+    IndexedFace combined = stubs[0];
+    stubs.erase(stubs.begin());
+    int conn = combined[combined.size()-1];
+    bool done=true;
+    while(stubs.size() > 0 && done) {
+      done=false;
+      for(int i=0;i<stubs.size();i++)
+      {
+        if(stubs[i][0] == conn) {
+          for(int j=1;j<stubs[i].size();j++) {
+            combined.push_back(stubs[i][j]);                
+          }                
+          stubs.erase(stubs.begin()+i);
+          done=true;
+          break; 
+        }                 
+      } 
+      conn = combined[combined.size()-1];
+    }
+    combined.erase(combined.end()-1);
+        
+
+    if((combined.size()%3) != 0) {
+      printf("Program errror %d!\n", combined.size());
+      continue;
+    }
+        
+    int n=combined.size()/3;
+        
+    std::vector<int> pyramid;
+    // 1st row of pyramid
+    for(int row=0;row<=n;row++) {
+      if(row == 0) {
+        for(int j=0;j<=n;j++) pyramid.push_back(combined[j]);
+      } else if(row < n) { 
+        // middle row of pyramid
+        for(int col=0;col<= n-row; col++) {
+          if(col == 0) pyramid.push_back(combined[3*n-row]); //1st is fixed
+          else if(col <  n-row) {							      
+            IndexedFace face1, face2, face3;
+        
+        
+            face1.push_back(combined[1*n+row]);	face1.push_back(combined[3*n-row]);	face1.push_back(baseind);
+            face2.push_back(combined[3*n-row-col]);	face2.push_back(combined[0*n+row+col]);	face2.push_back(baseind); 
+            face3.push_back(combined[0*n+col]);	face3.push_back(combined[2*n-col]);	face3.push_back(baseind);
+            Vector3d  f1n = calcTriangleNormal(vertices, face1).head<3>();
+            Vector3d  f2n = calcTriangleNormal(vertices, face2).head<3>();
+            Vector3d  f3n = calcTriangleNormal(vertices, face3).head<3>();
+            Vector3d  f12n=f2n.cross(f1n); 
+            Vector3d  f23n=f3n.cross(f2n);
+            Vector3d  f31n=f1n.cross(f3n);
+
+            Vector3d mn(0,0,0);
+            if(f12n.norm() > 1e-6) { mn += f12n.normalized(); }
+            if(f23n.norm() > 1e-6) { mn += f23n.normalized();  }
+            if(f31n.norm() > 1e-6) { mn += f31n.normalized();  }
+          
+            pyramid.push_back(builder.vertexIndex(basept + mn.normalized()*off));
+          }	 else pyramid.push_back(combined[n+row]); //last column
+        }  
+      }  else  pyramid.push_back(combined[2*n]); // last row
+    }  
+
+    // now draw pyramid
+    int baselevel=0;
+    for(int row=0;row<n;row++) {
+      int nextlevel = baselevel+n+1-row;		
+      for(int col=0;col<n-row;col++) {
+        if(off > 0) {	      
+          builder.appendPolygon({pyramid[baselevel+col+1], pyramid[baselevel+col], pyramid[nextlevel+col]});
+          if(col < n-row-1) builder.appendPolygon({pyramid[baselevel+col+1], pyramid[nextlevel+col], pyramid[nextlevel+col+1]}); 
+	} else {
+          builder.appendPolygon({pyramid[baselevel+col], pyramid[baselevel+col+1], pyramid[nextlevel+col]});
+          if(col < n-row-1) builder.appendPolygon({pyramid[baselevel+col+1], pyramid[nextlevel+1+col], pyramid[nextlevel+col]}); 
+	}	
+      }  
+      baselevel=nextlevel;
+    }  
+
+    n=combined.size();
+    for(int i=0;i<n;i++) {
+	if(off > 0) builder.appendPolygon({baseind, combined[i], combined[(i+1)%n]}); 
+	else builder.appendPolygon({combined[i], baseind, combined[(i+1)%n]}); 
+    }
+
+    auto result_u = builder.build();
+    std::shared_ptr<PolySet> result_s = std::move(result_u);
+    subgeoms.push_back(result_s); // corners
+  }
+  if(off > 0){
+	  return union_geoms(subgeoms);
+  } else {
+	  return difference_geoms(subgeoms);
+  }
+}
+
+std::shared_ptr<const Geometry> offset3D_convex(const std::shared_ptr<const PolySet> &ps,double off, int fn) {
 //  printf("Running offset3D %ld polygons\n",ps->indices.size());
 //  if(off == 0) return ps;
   std::vector<Vector3d> verticesNew;
   std::vector<IndexedFace> indicesNew;
   std::vector<Vector4d> normals;
   std::vector<intList>  pointToFaceInds, pointToFacePos;
-  if(off > 0 && 0) { // upsize
-    std::vector<std::shared_ptr<const PolySet>> decomposed =  offset3D_decompose(ps);
-    printf("%ld decompose results\n",decomposed.size());
-    //
-    std::shared_ptr<ManifoldGeometry> geom = nullptr;
-    for(unsigned int i=0;i<decomposed.size();i++) {													   
-      auto &ps = decomposed[i];	  
-
-      printf("Remove OverlapPoints\n");
-      std::vector<IndexedFace> indicesNew = offset3D_removeOverPoints(ps->vertices, ps->indices,0);
-
-      printf("Calc Normals\n");
-      std::vector<Vector4d>  faceNormal=calcTriangleNormals(ps->vertices, indicesNew);
-
-      printf("Merge Triangles %ld %ld\n",indicesNew.size(), faceNormal.size());
-      std::vector<Vector4d> newNormals;
-      std::vector<int> faceParents;
-      indicesNew  = mergeTriangles(indicesNew,faceNormal,newNormals, faceParents, ps->vertices );
-
-      printf("Remove Colinear Points\n");
-      offset3D_RemoveColinear(ps->vertices, indicesNew,pointToFaceInds, pointToFacePos);
-
-      printf("offset\n");
-      verticesNew = offset3D_offset(ps->vertices, indicesNew, newNormals, pointToFaceInds, pointToFacePos, off, 0);
-
-      PolySet *sub_result =  new PolySet(3,  true);
-      sub_result->vertices = verticesNew;
-      sub_result->indices = indicesNew;
-
-      std::shared_ptr<const ManifoldGeometry> term = ManifoldUtils::createManifoldFromGeometry(std::shared_ptr<const PolySet>(sub_result));
-//    std::shared_ptr<const ManifoldGeometry> term = ManifoldUtils::createManifoldFromGeometry(decomposed[i]);
-      if(i == 0) geom = std::make_shared<ManifoldGeometry>(*term);
-      else *geom = *geom + *term;	
-    }
-    return geom;
+  if(off == 0) return ps;
+  if(off > 0 || 1 ) { // upsize
+    return offset3D_round(ps, off,fn);
   } else {
 //    printf("Downsize %g\n",off);	  
 
@@ -1856,12 +2138,12 @@ std::shared_ptr<const Geometry> offset3D_convex(const std::shared_ptr<const Poly
   }
 }
 
-std::shared_ptr<const Geometry> offset3D(const std::shared_ptr<const PolySet> &ps,double off) {
+std::shared_ptr<const Geometry> offset3D(const std::shared_ptr<const PolySet> &ps,double off, int fn) {
   bool enabled=true; // geht mit 4faces
 		     // geht  mit boxes
 		     // sphere proigram error
 		     // singlepoint prog error
-  if(!enabled) return offset3D_convex(ps, off);
+  if(!enabled) return offset3D_convex(ps, off, fn);
 
 
   std::vector<std::shared_ptr<const PolySet>> decomposed;
@@ -1872,12 +2154,12 @@ std::shared_ptr<const Geometry> offset3D(const std::shared_ptr<const PolySet> &p
     return std::shared_ptr<PolySet>(offset_result);
   }
   if(decomposed.size() == 1) {
-  	return offset3D_convex(decomposed[0], off);
+  	return offset3D_convex(decomposed[0], off, fn);
   }
   std::shared_ptr<ManifoldGeometry> geom = nullptr;
   for(unsigned int i=0;i<decomposed.size();i++)
   {
-  	std::shared_ptr<const ManifoldGeometry>term = ManifoldUtils::createManifoldFromGeometry(offset3D_convex(decomposed[i], off));
+  	std::shared_ptr<const ManifoldGeometry>term = ManifoldUtils::createManifoldFromGeometry(offset3D_convex(decomposed[i], off, fn));
 //  	std::shared_ptr<const ManifoldGeometry> term = ManifoldUtils::createMutableManifoldFromGeometry(decomposed[i]);
         if(i == 0) geom = std::make_shared<ManifoldGeometry>(*term);
         else *geom = *geom + *term;	
@@ -2007,7 +2289,7 @@ GeometryEvaluator::ResultObject GeometryEvaluator::applyToChildren3D(const Abstr
  
     std::shared_ptr<const PolySet> ps= PolySetUtils::getGeometryAsPolySet(geom);
     if(ps != nullptr) {
-      auto ps_offset =  offset3D(ps,offNode->delta);
+      auto ps_offset =  offset3D(ps,offNode->delta, offNode->fn);
 
       geom = std::move(ps_offset);
       return ResultObject::mutableResult(geom);
