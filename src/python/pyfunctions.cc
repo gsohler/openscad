@@ -3325,7 +3325,7 @@ PyObject *python_text(PyObject *self, PyObject *args, PyObject *kwargs)
   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s|dsdsssssddd", kwlist,
                                    &text, &size, &font,
                                    &spacing, &direction, &language,
-                                   &script, &valign, &halign,
+                                   &script, &halign, &valign,
                                    &fn, &fa, &fs
                                    )) {
     PyErr_SetString(PyExc_TypeError, "Error during parsing text(string, ...))");
