@@ -1039,28 +1039,46 @@ std::shared_ptr<const Geometry> offset3D(const std::shared_ptr<const PolySet> &p
       conn = combined[combined.size()-1];
     }
     combined.erase(combined.end()-1);
-        
-    int l;
-    switch(combined.size()%3) {
-	    case 0: // perfectly divible by 3, nothing to do
-		    break;
-	    case 1:
-		    l=combined.size()/3;
-		    combined.insert(combined.begin()+2*l, combined[2*l]);
-		    combined.insert(combined.begin()+l, combined[l]);
-		    break;
+    
+    int cs = combined.size();
+    std::vector<double> angles;
+    for(int i=0;i<combined.size();i++) {
+      int ind0=combined[(i+cs-1)%cs];
+      int ind1=combined[i];
+      int ind2=combined[(i+1)%cs];
+      Vector3d v1=(vertices[ind1]-vertices[ind0]).normalized();
+      Vector3d v2=(vertices[ind2]-vertices[ind1]).normalized();
+      angles.push_back(acos(v1.dot(v2)));
+    }
+    // find biggest angle
+    int bigang[3]={-1,-1,-1};
+    for(int j=0;j<3;j++) {
+      for(int i=0;i<angles.size();i++)
+      {
+        if(bigang[j] == -1 ||  angles[i] > angles[bigang[j]]) {
+           if(i == bigang[0]) continue;		
+           if(i == bigang[1]) continue;		
+           if(i == bigang[2]) continue;		
+           bigang[j]=i;
+	}
+      }
+    }  
+    qsort(&bigang, 3, sizeof(int),[](const void *a, const void *b){return *((int *)a)-*((int *)b);});
+    int ns[3];
+    ns[0]=bigang[1]-bigang[0];
+    ns[1]=bigang[2]-bigang[1];
+    ns[2]=cs+bigang[0]-bigang[2];
 
-	    case 2: //duplicate one pt in the middle
-		    l=combined.size()/2;
-		    combined.insert(combined.begin()+l, combined[l]);
-		    break;
+    int n=(ns[1]>ns[0])?ns[1]:ns[0];
+    if(ns[2] > n) n=ns[2];
+
+    IndexedFace combined_new;
+    for (int i=0;i<3;i++) {
+      for(int j=0;j<n;j++) {
+        combined_new.push_back(combined[(bigang[i]+ns[i]*j/n)%cs]);	      
+      }	      
     }
-    if((combined.size()%3) != 0) {
-      printf("Program errror %d!\n", combined.size()); // TODO fix here
-      continue;
-    }
-        
-    int n=combined.size()/3;
+    combined = combined_new;
         
     std::vector<int> pyramid;
     // 1st row of pyramid
@@ -1857,6 +1875,7 @@ Response GeometryEvaluator::visit(State& state, const TransformNode& node)
 }
 
 Outline2d alterprofile(Outline2d profile,double scalex, double scaley, double origin_x, double origin_y,double offset_x, double offset_y, double rot)
+
 {
 	Outline2d result;
 	double ang=rot*3.14/180.0;
