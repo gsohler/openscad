@@ -1151,7 +1151,7 @@ if(ENABLE_MANIFOLD)
     find_package(TBB QUIET)
     if (NOT TBB_FOUND AND PKG_CONFIG_FOUND)
       pkg_check_modules(TBB tbb REQUIRED)
-      add_library(TBB::tbb UNKNOWN IMPORTED)
+      # add_library(TBB::tbb UNKNOWN IMPORTED)
       set_target_properties(TBB::tbb
         PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${TBB_INCLUDE_DIRS}")
       set_target_properties(TBB::tbb
