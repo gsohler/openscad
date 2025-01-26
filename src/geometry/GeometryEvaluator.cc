@@ -468,6 +468,7 @@ static indexedFaceList mergeTrianglesSub(const std::vector<IndexedFace> &triangl
 			}
 		}
 		while(repeat);
+                if(vert.size() != 0) {
 		// Reduce colinear points
 		int n=poly.size();
 		IndexedFace poly_new;
@@ -488,6 +489,7 @@ static indexedFaceList mergeTrianglesSub(const std::vector<IndexedFace> &triangl
 		}
 		
 		if(poly_new.size() > 2) result.push_back(poly_new);
+		} else result.push_back(poly);
 	}
 	return result;
 }
@@ -815,6 +817,8 @@ std::shared_ptr<Geometry> difference_geoms(std::vector<std::shared_ptr<PolySet>>
   return result;
 }
 
+void offset3D_subtri(PolySetBuilder &builder,  std::vector<IndexedFace> &triangles, const Vector3d &base, double r,const std::vector<Vector2d> &flatloop, const Matrix4d &invmat, const Vector3d &p1, const Vector3d &p2, const Vector3d &p3, int hier);
+
 std::shared_ptr<const Geometry> offset3D(const std::shared_ptr<const PolySet> &ps,double off, int fn, double fa, double fs) {
   std::vector<std::shared_ptr<PolySet> > subgeoms;	
   std::shared_ptr<PolySet> inner = std::make_shared<PolySet>(*ps);
@@ -923,7 +927,7 @@ std::shared_ptr<const Geometry> offset3D(const std::shared_ptr<const PolySet> &p
     int fn_a = totang*180.0/(3.14*fa);
     int fn_s = totang*off/fs;
     int eff_fn=fn_a;
-    if(fn_s > fn) eff_fn=fn_s;
+    if(fn_s > eff_fn) eff_fn=fn_s;
     if(fn != 0) eff_fn=fn;
 
 
@@ -1039,112 +1043,183 @@ std::shared_ptr<const Geometry> offset3D(const std::shared_ptr<const PolySet> &p
       conn = combined[combined.size()-1];
     }
     combined.erase(combined.end()-1);
-    
-    int cs = combined.size();
-    std::vector<double> angles;
+
+    // create normal vector of the opening
+    Vector3d norm(0,0,0);
+    int cs =combined.size();
+    for(int i=0;i<cs;i++) {
+      Vector3d p1=vertices[combined[i]];	    
+      Vector3d p2=vertices[combined[(i+1)%cs]];	    
+      Vector3d p3=vertices[combined[(i+2)%cs]];	    
+      norm += (p2-p1).cross(p2-p3);
+    }
+    Vector3d zdir=norm.normalized();
+    Vector3d tmp=(vertices[combined[(i+1)%cs]] - vertices[combined[i]]).normalized();	    
+    Vector3d ydir=-zdir.cross(tmp).normalized();
+    Vector3d xdir=-zdir.cross(ydir).normalized();
+
+    // setup matrix
+    Matrix4d mat;
+    mat <<  xdir[0], ydir[0], zdir[0], basept[0],
+          xdir[1], ydir[1], zdir[1], basept[1],
+          xdir[2], ydir[2], zdir[2], basept[2],
+          0      , 0      , 0      , 1;
+
+    printf("xdir is %g/%g/%g\n",xdir[0], xdir[1], xdir[2]);
+    printf("ydir is %g/%g/%g\n",ydir[0], ydir[1], ydir[2]);
+    printf("zdir is %g/%g/%g\n",zdir[0], zdir[1], zdir[2]);
+
+    Matrix4d invmat = mat.inverse();
+
+    std::vector<Vector2d> flatloop;
     for(int i=0;i<combined.size();i++) {
-      int ind0=combined[(i+cs-1)%cs];
-      int ind1=combined[i];
-      int ind2=combined[(i+1)%cs];
-      Vector3d v1=(vertices[ind1]-vertices[ind0]).normalized();
-      Vector3d v2=(vertices[ind2]-vertices[ind1]).normalized();
-      angles.push_back(acos(v1.dot(v2)));
+      Vector3d pt=vertices[combined[i]];    
+      flatloop.push_back(  (invmat*Vector4d(pt[0], pt[1], pt[2],0)).head<2>()  );	    
     }
-    // find biggest angle
-    int bigang[3]={-1,-1,-1};
-    for(int j=0;j<3;j++) {
-      for(int i=0;i<angles.size();i++)
-      {
-        if(bigang[j] == -1 ||  angles[i] > angles[bigang[j]]) {
-           if(i == bigang[0]) continue;		
-           if(i == bigang[1]) continue;		
-           if(i == bigang[2]) continue;		
-           bigang[j]=i;
-	}
+    // Lay flat all edge loop
+    for(int i=0;i<flatloop.size();i++) {
+	    printf("%g/%g \n",flatloop[i][0], flatloop[i][1]);
+    }
+
+
+
+    // now create a geodesic sphere from here
+
+    Vector3d sp_left = basept + Vector3d(-off,0,0);
+    Vector3d sp_right = basept + Vector3d(off,0,0);
+    Vector3d sp_front = basept + Vector3d(0,-off,0);
+    Vector3d sp_back = basept + Vector3d(0,off,0);
+    Vector3d sp_bot = basept + Vector3d(0,0,-off);
+    Vector3d sp_top = basept + Vector3d(0,0,off);
+
+    int hier=4;
+    std::vector<IndexedFace> triangles;
+
+
+    offset3D_subtri(builder, triangles, basept, off, flatloop, invmat, sp_front, sp_right, sp_top, hier);
+    offset3D_subtri(builder, triangles, basept, off, flatloop, invmat, sp_right, sp_back, sp_top, hier);
+    offset3D_subtri(builder, triangles, basept, off, flatloop, invmat, sp_back, sp_left, sp_top, hier);
+    offset3D_subtri(builder, triangles, basept, off, flatloop, invmat, sp_left, sp_front, sp_top, hier);
+
+    offset3D_subtri(builder, triangles, basept, off, flatloop, invmat, sp_front, sp_bot, sp_right, hier);
+    offset3D_subtri(builder, triangles, basept, off, flatloop, invmat, sp_right, sp_bot, sp_back, hier);
+    offset3D_subtri(builder, triangles, basept, off, flatloop, invmat, sp_back, sp_bot, sp_left, hier);
+    offset3D_subtri(builder, triangles, basept, off, flatloop, invmat, sp_left, sp_bot, sp_front, hier);
+
+    printf("collected %d triangles\n",triangles.size());
+    std::vector<Vector3d> dummyvert;
+    indexedFaceList triangles_merged = mergeTrianglesSub(triangles,dummyvert);
+//    assert(triangles_merged.size() == 1);
+    auto inner = triangles_merged[0];
+
+    builder.copyVertices(vertices);
+
+    // now connect combined with inner_tri
+    int combined_ind=0;
+    int combined_n = combined.size();
+
+    int inner_ind=-1;
+    int inner_n = inner.size();
+
+    double dist_min;
+    for(int i=0;i<inner.size();i++) {
+      double dist = (vertices[inner[i]] - vertices[combined[combined_ind]]).norm();
+      if(inner_ind == -1  || dist < dist_min) {
+        inner_ind=i;	      
+	dist_min=dist;
       }
-    }  
-    qsort(&bigang, 3, sizeof(int),[](const void *a, const void *b){return *((int *)a)-*((int *)b);});
-    int ns[3];
-    ns[0]=bigang[1]-bigang[0];
-    ns[1]=bigang[2]-bigang[1];
-    ns[2]=cs+bigang[0]-bigang[2];
-
-    int n=(ns[1]>ns[0])?ns[1]:ns[0];
-    if(ns[2] > n) n=ns[2];
-
-    IndexedFace combined_new;
-    for (int i=0;i<3;i++) {
-      for(int j=0;j<n;j++) {
-        combined_new.push_back(combined[(bigang[i]+ns[i]*j/n)%cs]);	      
-      }	      
     }
-    combined = combined_new;
-        
-    std::vector<int> pyramid;
-    // 1st row of pyramid
-    for(int row=0;row<=n;row++) {
-      if(row == 0) {
-        for(int j=0;j<=n;j++) pyramid.push_back(combined[j]);
-      } else if(row < n) { 
-        // middle row of pyramid
-        for(int col=0;col<= n-row; col++) {
-          if(col == 0) pyramid.push_back(combined[3*n-row]); //1st is fixed
-          else if(col <  n-row) {							      
-            IndexedFace face1, face2, face3;
-        
-        
-            face1.push_back(combined[1*n+row]);	face1.push_back(combined[3*n-row]);	face1.push_back(baseind);
-            face2.push_back(combined[3*n-row-col]);	face2.push_back(combined[0*n+row+col]);	face2.push_back(baseind); 
-            face3.push_back(combined[0*n+col]);	face3.push_back(combined[2*n-col]);	face3.push_back(baseind);
-            Vector3d  f1n = calcTriangleNormal(vertices, face1).head<3>();
-            Vector3d  f2n = calcTriangleNormal(vertices, face2).head<3>();
-            Vector3d  f3n = calcTriangleNormal(vertices, face3).head<3>();
-            Vector3d  f12n=f2n.cross(f1n); 
-            Vector3d  f23n=f3n.cross(f2n);
-            Vector3d  f31n=f1n.cross(f3n);
+    printf("inner_ind is %d\n", inner_ind);
+    int inner_ind_start = inner_ind;
+    int combined_ind_start = inner_ind_start;
 
-            Vector3d mn(0,0,0);
-            if(f12n.norm() > 1e-6) { mn += f12n.normalized(); }
-            if(f23n.norm() > 1e-6) { mn += f23n.normalized();  }
-            if(f31n.norm() > 1e-6) { mn += f31n.normalized();  }
-          
-            pyramid.push_back(builder.vertexIndex(basept + mn.normalized()*off));
-          }	 else pyramid.push_back(combined[n+row]); //last column
-        }  
-      }  else  pyramid.push_back(combined[2*n]); // last row
-    }  
+    do {
+      double dist1 = (vertices[inner[(inner_ind+inner_n-1)%inner_n]] - vertices[combined[combined_ind]]).norm(); // prog inner
+      double dist2 = (vertices[inner[inner_ind]] - vertices[combined[(combined_ind+1)%combined_n]]).norm(); // prog combined
+      if(dist1 < dist2) {
+  	  builder.appendPolygon({inner[inner_ind], inner[(inner_ind+inner_n-1)%inner_n], combined[combined_ind]});  // prog inner
+ 	  inner_ind=(inner_ind+inner_n-1)%inner_n;
+      } else {
+  	  builder.appendPolygon({inner[inner_ind], combined[(combined_ind+1)%combined_n], combined[combined_ind]});  // prog combined
+	  combined_ind=(combined_ind+1)%combined_n;
+      }
+    } while(combined_ind != 0); //  || inner_ind != inner_ind_start);
 
-    // now draw pyramid
-    int baselevel=0;
-    for(int row=0;row<n;row++) {
-      int nextlevel = baselevel+n+1-row;		
-      for(int col=0;col<n-row;col++) {
-        if(off > 0) {	      
-          builder.appendPolygon({pyramid[baselevel+col+1], pyramid[baselevel+col], pyramid[nextlevel+col]});
-          if(col < n-row-1) builder.appendPolygon({pyramid[baselevel+col+1], pyramid[nextlevel+col], pyramid[nextlevel+col+1]}); 
-	} else {
-          builder.appendPolygon({pyramid[baselevel+col], pyramid[baselevel+col+1], pyramid[nextlevel+col]});
-          if(col < n-row-1) builder.appendPolygon({pyramid[baselevel+col+1], pyramid[nextlevel+1+col], pyramid[nextlevel+col]}); 
-	}	
-      }  
-      baselevel=nextlevel;
-    }  
 
-    n=combined.size();
-    for(int i=0;i<n;i++) {
+    int n=combined.size(); 
+    for(int i=0;i<n;i++) { // unterer kranz
 	if(off > 0) builder.appendPolygon({baseind, combined[i], combined[(i+1)%n]}); 
 	else builder.appendPolygon({combined[i], baseind, combined[(i+1)%n]}); 
     }
 
     auto result_u = builder.build();
-    std::shared_ptr<PolySet> result_s = std::move(result_u);
-    subgeoms.push_back(result_s); // corners
+    if(i == 0) return result_u;
+//    std::shared_ptr<PolySet> result_s = std::move(result_u);
+//    subgeoms.push_back(result_s); // corners
   }
   if(off > 0){
 	  return union_geoms(subgeoms);
   } else {
 	  return difference_geoms(subgeoms);
   }
+}
+
+int offset3D_inside(const std::vector<Vector2d> &flatloop, const Matrix4d &invmat, const Vector3d &pt) {
+  Vector4d tmp = invmat*Vector4d(pt[0],pt[1], pt[2],0);
+  if(tmp[2] < 0) return 0; // not behind
+  Vector2d ptflat=tmp.head<2>();
+  int n = flatloop.size();
+  int count=0;
+  for(int i=0;i<n;i++) {
+    Vector2d p1=flatloop[i];
+    Vector2d p2=flatloop[(i+1)%n];
+    double x;
+    if(ptflat[1] >= p1[1] && ptflat[1] <= p2[1]) { //steigend
+      if(p1[1] != p2[1]) {
+        x = p1[0] + (p2[0]-p1[0])*(ptflat[1]-p1[1])/(p2[1]-p1[1]);	    
+        if(x > ptflat[0]) count++;
+      }
+    }
+    if(ptflat[1] >= p2[1] && ptflat[1] <= p1[1]) { //fallend
+      if(p1[1] != p2[1]) {
+        x = p1[0] + (p2[0]-p1[0])*(ptflat[1]-p1[1])/(p2[1]-p1[1]);	    
+        if(x > ptflat[0]) count--;
+      }
+    }
+
+  }
+  return count&1;	
+}
+
+void offset3D_subtri(PolySetBuilder &builder,  std::vector<IndexedFace> &triangles, const Vector3d &base, double r,const std::vector<Vector2d> &flatloop, const Matrix4d &invmat, const Vector3d &p1, const Vector3d &p2, const Vector3d &p3, int hier)
+{
+  int iterate=0;
+  if(hier > 0) iterate=1;  
+  if(iterate) {
+    Vector3d p12 = (p1+p2)/2.0;	  
+    Vector3d p23 = (p2+p3)/2.0;	  
+    Vector3d p31 = (p3+p1)/2.0;	  
+    p12 = (p12-base).normalized()*r+base;
+    p23 = (p23-base).normalized()*r+base;
+    p31 = (p31-base).normalized()*r+base;
+    offset3D_subtri(builder, triangles, base, r, flatloop, invmat, p31, p1, p12, hier-1);
+    offset3D_subtri(builder, triangles, base, r, flatloop, invmat, p12, p2, p23, hier-1);
+    offset3D_subtri(builder, triangles, base, r, flatloop, invmat, p23, p3, p31, hier-1);
+    offset3D_subtri(builder, triangles, base, r, flatloop, invmat, p12, p23, p31, hier-1);
+    return;
+  }
+  // check if p1,p2,p3 are inside corner
+  int p1_inside=offset3D_inside(flatloop, invmat, p1);
+  int p2_inside=offset3D_inside(flatloop, invmat, p2);
+  int p3_inside=offset3D_inside(flatloop, invmat, p3);
+  if(p1_inside && p2_inside && p3_inside) {
+    int ind1=builder.vertexIndex(p1);
+    int ind2=builder.vertexIndex(p2);
+    int ind3=builder.vertexIndex(p3);
+
+    builder.appendPolygon({ind1, ind2, ind3});
+    triangles.push_back({ind1, ind2, ind3});
+  }  
 }
 
 
