@@ -1,6 +1,6 @@
 #version 120
 
-uniform vec4 color1, color2;
+uniform vec4 color_area, color_edge;
 uniform float textureFactor;
 varying vec3 vBC;
 uniform sampler2D tex1;
@@ -23,5 +23,5 @@ float edgeFactor() {
 void main(void) {
   vec4 texel = texture2D(tex1,gl_TexCoord[0].st);
   vec4 gray; gray.r=0.5; gray.g=0.5; gray.b=0.5; gray.a=1.0; 
-  gl_FragColor = mix(color2, vec4((mix(color1.rgb , color1.rgb  + texel.rgb - gray.rgb , textureFactor)  )* shading, color1.a), edgeFactor());
+  gl_FragColor = mix(color_edge, vec4(mix(color_area.rgb, color_area.rgb +texel.rgb - gray.rgb, textureFactor) * shading, color_area.a), edgeFactor());
 }

@@ -43,6 +43,7 @@ signals:
 private:
   MainWindow *par;
   TabWidget *tabWidget;
+  bool use_gvim=false;
 
   bool maybeSave(int);
   bool save(EditorInterface *edt, const QString& path);

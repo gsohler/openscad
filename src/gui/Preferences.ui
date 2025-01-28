@@ -722,6 +722,16 @@
                 </property>
                </widget>
               </item>
+              <item row="3" column="1">
+               <widget class="QCheckBox" name="checkBoxUseGvim">
+                <property name="text">
+                 <string>Use gvim as editor</string>
+                </property>
+                <property name="checked">
+                 <bool>false</bool>
+                </property>
+               </widget>
+              </item>
               <item row="1" column="1">
                <layout class="QHBoxLayout" name="horizontalLayout_26">
                 <item>
@@ -754,7 +764,7 @@
               </item>
              </layout>
             </item>
-            <item row="1" column="0">
+  	    <item row="1" column="0">
              <widget class="QGroupBox" name="groupBoxIndentation">
               <property name="title">
                <string>Indentation</string>

@@ -117,6 +117,7 @@ void Preferences::init() {
 #else
   this->defaultmap["editor/ctrlmousewheelzoom"] = true;
 #endif
+  this->defaultmap["editor/usegvim"] = false;
 
   createFontSizeMenu(fontSize, "editor/fontsize");
   createFontSizeMenu(consoleFontSize, "advanced/consoleFontSize");
@@ -554,6 +555,12 @@ void Preferences::on_mouseWheelZoomBox_toggled(bool state)
 {
   QSettingsCached settings;
   settings.setValue("editor/ctrlmousewheelzoom", state);
+}
+
+void Preferences::on_checkBoxUseGvim_toggled(bool state)
+{
+  QSettingsCached settings;
+  settings.setValue("editor/usegvim", state);
 }
 
 void Preferences::on_launcherBox_toggled(bool state)
@@ -1220,6 +1227,7 @@ void Preferences::updateGUI()
   }
 
   BlockSignals<QCheckBox *>(this->mouseWheelZoomBox)->setChecked(getValue("editor/ctrlmousewheelzoom").toBool());
+  BlockSignals<QCheckBox *>(this->checkBoxUseGvim)->setChecked(getValue("editor/usegvim").toBool());
 
   if (AutoUpdater *updater = AutoUpdater::updater()) {
     BlockSignals<QCheckBox *>(this->updateCheckBox)->setChecked(updater->automaticallyChecksForUpdates());
@@ -1326,6 +1334,7 @@ void Preferences::apply_win() const
 
 void Preferences::create(const QStringList& colorSchemes)
 {
+//	int a=1/0;
   if (instance != nullptr) {
     return;
   }
