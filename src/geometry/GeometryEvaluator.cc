@@ -817,7 +817,63 @@ std::shared_ptr<Geometry> difference_geoms(std::vector<std::shared_ptr<PolySet>>
   return result;
 }
 
-void offset3D_subtri(PolySetBuilder &builder,  std::vector<IndexedFace> &triangles, const Vector3d &base, double r,const std::vector<Vector2d> &flatloop, const Matrix4d &invmat, const Vector3d &p1, const Vector3d &p2, const Vector3d &p3, int hier);
+class Offset3D_CornerContext
+{
+  public:
+    PolySetBuilder builder;	  
+    std::vector<IndexedFace> triangles;
+    Vector3d basept;
+    double r;
+    std::vector<Vector2d> flatloop;
+    double minx, miny, maxx, maxy;
+    Matrix4d invmat;
+    std::unordered_map<Vector3d, bool, boost::hash<Vector3d> > inside_map;
+
+};
+
+bool offset3D_inside(Offset3D_CornerContext &cxt, const Vector3d &pt,double delta) {
+  if(cxt.inside_map.count(pt) != 0) {
+    return cxt.inside_map.at(pt);	  
+  }
+	
+  Vector4d tmp = cxt.invmat*Vector4d(pt[0],pt[1], pt[2],1);
+  if(tmp[2] < 0){
+    cxt.inside_map[pt]=false;
+    return false; // not behind
+  }	
+  if(tmp[0] < cxt.minx+delta || tmp[0] > cxt.maxx-delta){
+    cxt.inside_map[pt]=false;
+    return false;
+  }
+  if(tmp[1] < cxt.miny+delta || tmp[1] > cxt.maxy-delta) {
+    cxt.inside_map[pt]=false;
+    return false;
+  }
+  Vector2d ptflat=tmp.head<2>();
+  int n = cxt.flatloop.size();
+  double mindist=1e9;
+  for(int i=0;i<n;i++) {
+    Vector2d p1=cxt.flatloop[i];
+    Vector2d p2=cxt.flatloop[(i+1)%n];
+    double x;
+    Vector2d dir=(p2-p1).normalized();
+    Vector2d dir_(-dir[1],dir[0]);
+
+    double dist=(ptflat-p1).dot(dir_);
+    double dist1=(ptflat-p1).dot(dir);
+//    if(dist1 >=0 && dist1 <= (p2-p1).norm()) { projecting check is not working, 
+      if(dist < mindist) {
+       mindist=dist;	    
+//      }
+    }  
+  }
+  bool result = (mindist > delta);
+  cxt.inside_map[pt]=result;
+  return result;
+
+}
+
+
 
 std::shared_ptr<const Geometry> offset3D(const std::shared_ptr<const PolySet> &ps,double off, int fn, double fa, double fs) {
   std::vector<std::shared_ptr<PolySet> > subgeoms;	
@@ -1003,9 +1059,10 @@ std::shared_ptr<const Geometry> offset3D(const std::shared_ptr<const PolySet> &p
   
   for(int i=0;i<ps->vertices.size();i++)
   {
-    PolySetBuilder builder; // for all corners create a nice sphere
-    Vector3d basept=ps->vertices[i];	  
-    int baseind = builder.vertexIndex(basept);
+    Offset3D_CornerContext cxt;
+    cxt.basept = ps->vertices[i];
+    cxt.r = off;
+    int baseind = cxt.builder.vertexIndex(cxt.basept);
     if(corner_rounds[i].size() < 3) continue;
     std::vector<IndexedFace> stubs;
     for(auto oth: corner_rounds[i]) {
@@ -1018,12 +1075,12 @@ std::shared_ptr<const Geometry> offset3D(const std::shared_ptr<const PolySet> &p
       }
       IndexedFace stub;
       for(auto pt: arc) 
-        stub.push_back(builder.vertexIndex(pt));	      
+        stub.push_back(cxt.builder.vertexIndex(pt));	      
       stubs.push_back(stub);
     }
 
     std::vector<Vector3d> vertices;
-    builder.copyVertices(vertices);
+    cxt.builder.copyVertices(vertices);
         
     IndexedFace combined = stubs[0];
     stubs.erase(stubs.begin());
@@ -1064,54 +1121,87 @@ std::shared_ptr<const Geometry> offset3D(const std::shared_ptr<const PolySet> &p
 
     // setup matrix
     Matrix4d mat;
-    mat <<  xdir[0], ydir[0], zdir[0], basept[0],
-          xdir[1], ydir[1], zdir[1], basept[1],
-          xdir[2], ydir[2], zdir[2], basept[2],
+    mat <<  xdir[0], ydir[0], zdir[0], cxt.basept[0],
+          xdir[1], ydir[1], zdir[1], cxt.basept[1],
+          xdir[2], ydir[2], zdir[2], cxt.basept[2],
           0      , 0      , 0      , 1;
 
-    Matrix4d invmat = mat.inverse();
+    cxt.invmat = mat.inverse();
 
-    std::vector<Vector2d> flatloop;
     for(int i=0;i<combined.size();i++) {
       Vector3d pt=vertices[combined[i]];    
-      flatloop.push_back(  (invmat*Vector4d(pt[0], pt[1], pt[2],1)).head<2>()  );	    
+      Vector2d pt2=(cxt.invmat*Vector4d(pt[0], pt[1], pt[2],1)).head<2>();
+      if(i == 0 || pt2[0] < cxt.minx) cxt.minx=pt2[0];
+      if(i == 0 || pt2[1] < cxt.miny) cxt.miny=pt2[1];
+      if(i == 0 || pt2[0] > cxt.maxx) cxt.maxx=pt2[0];
+      if(i == 0 || pt2[1] > cxt.maxy) cxt.maxy=pt2[1];
+      cxt.flatloop.push_back(pt2);
     }
     // Lay flat all edge loop
 
     // now create a geodesic sphere from here
 
-    Vector3d sp_left = basept + Vector3d(-off,0,0);
-    Vector3d sp_right = basept + Vector3d(off,0,0);
-    Vector3d sp_front = basept + Vector3d(0,-off,0);
-    Vector3d sp_back = basept + Vector3d(0,off,0);
-    Vector3d sp_bot = basept + Vector3d(0,0,-off);
-    Vector3d sp_top = basept + Vector3d(0,0,off);
+    Vector3d sp_left = cxt.basept + Vector3d(-off,0,0);
+    Vector3d sp_right = cxt.basept + Vector3d(off,0,0);
+    Vector3d sp_front = cxt.basept + Vector3d(0,-off,0);
+    Vector3d sp_back = cxt.basept + Vector3d(0,off,0);
+    Vector3d sp_bot = cxt.basept + Vector3d(0,0,-off);
+    Vector3d sp_top = cxt.basept + Vector3d(0,0,off);
 
-    int hier=(int)(log(abs_eff_fn)/log(2));
-    std::vector<IndexedFace> triangles;
-    do
-    {
-      hier++;	    
+    int hier=(int)(log(abs_eff_fn)/log(2))+1;
 
 
-      offset3D_subtri(builder, triangles, basept, off, flatloop, invmat, sp_front, sp_right, sp_top, hier);
-      offset3D_subtri(builder, triangles, basept, off, flatloop, invmat, sp_right, sp_back, sp_top, hier);
-      offset3D_subtri(builder, triangles, basept, off, flatloop, invmat, sp_back, sp_left, sp_top, hier);
-      offset3D_subtri(builder, triangles, basept, off, flatloop, invmat, sp_left, sp_front, sp_top, hier);
-
-      offset3D_subtri(builder, triangles, basept, off, flatloop, invmat, sp_front, sp_bot, sp_right, hier);
-      offset3D_subtri(builder, triangles, basept, off, flatloop, invmat, sp_right, sp_bot, sp_back, hier);
-      offset3D_subtri(builder, triangles, basept, off, flatloop, invmat, sp_back, sp_bot, sp_left, hier);
-      offset3D_subtri(builder, triangles, basept, off, flatloop, invmat, sp_left, sp_bot, sp_front, hier);
-
+  // cerate basic octaeder
+    std::vector<std::vector<Vector3d>> triangles;
+    triangles.push_back({sp_front, sp_right, sp_top});
+    triangles.push_back({sp_right, sp_back, sp_top});
+    triangles.push_back({sp_back, sp_left, sp_top});
+    triangles.push_back({sp_left, sp_front, sp_top});
+    triangles.push_back({sp_front, sp_bot, sp_right});
+    triangles.push_back({sp_right, sp_bot, sp_back});
+    triangles.push_back({sp_back, sp_bot, sp_left});
+    triangles.push_back({sp_left, sp_bot, sp_front});
+    for(int i=0;i<hier;i++) {
+      // subdivide them
+      std::vector<std::vector<Vector3d>> tri_new;	    
+      for(auto tri: triangles) {
+        Vector3d p12 = (tri[0]+tri[1])/2.0;	  
+        Vector3d p23 = (tri[1]+tri[2])/2.0;	  
+        Vector3d p31 = (tri[2]+tri[0])/2.0;	  
+        p12 = (p12-cxt.basept).normalized()*cxt.r+cxt.basept;
+        p23 = (p23-cxt.basept).normalized()*cxt.r+cxt.basept;
+        p31 = (p31-cxt.basept).normalized()*cxt.r+cxt.basept;
+        tri_new.push_back({p31, tri[0], p12});
+        tri_new.push_back({p12, tri[1], p23});
+        tri_new.push_back({p23, tri[2], p31});
+        tri_new.push_back({p12, p23, p31});
+      }
+      triangles = tri_new;
     }
-    while(triangles.size() == 0);
+    // now filter them // TODO apply adding hier again
+    assert(triangles.size() > 0);
+    double delta=(triangles[0][0]-triangles[0][1]).norm()*0.5;
+    for(auto tri: triangles) {
+      bool p1_inside=offset3D_inside(cxt, tri[0],delta);
+      bool p2_inside=offset3D_inside(cxt, tri[1],delta);
+      bool p3_inside=offset3D_inside(cxt, tri[2],delta);
+      if(p1_inside && p2_inside && p3_inside) {
+        int ind1=cxt.builder.vertexIndex(tri[0]);
+        int ind2=cxt.builder.vertexIndex(tri[1]);
+        int ind3=cxt.builder.vertexIndex(tri[2]);
+
+        cxt.builder.appendPolygon({ind1, ind2, ind3});
+        cxt.triangles.push_back({ind1, ind2, ind3});
+      }
+    }      
+
+
     std::vector<Vector3d> dummyvert;
-    indexedFaceList triangles_merged = mergeTrianglesSub(triangles,dummyvert);
+    indexedFaceList triangles_merged = mergeTrianglesSub(cxt.triangles,dummyvert);
     assert(triangles_merged.size() == 1);
     auto inner = triangles_merged[0];
 
-    builder.copyVertices(vertices);
+    cxt.builder.copyVertices(vertices);
 
     // now connect combined with inner_tri
     int combined_ind=0;
@@ -1134,86 +1224,32 @@ std::shared_ptr<const Geometry> offset3D(const std::shared_ptr<const PolySet> &p
       double dist1 = (vertices[inner[(inner_ind+inner_n-1)%inner_n]] - vertices[combined[combined_ind]]).norm(); // prog inner
       double dist2 = (vertices[inner[inner_ind]] - vertices[combined[(combined_ind+1)%combined_n]]).norm(); // prog combined
       if(dist1 < dist2) {
-  	  builder.appendPolygon({inner[inner_ind], inner[(inner_ind+inner_n-1)%inner_n], combined[combined_ind]});  // prog inner
+  	  cxt.builder.appendPolygon({inner[inner_ind], inner[(inner_ind+inner_n-1)%inner_n], combined[combined_ind]});  // prog inner
  	  inner_ind=(inner_ind+inner_n-1)%inner_n;
       } else {
-  	  builder.appendPolygon({inner[inner_ind], combined[(combined_ind+1)%combined_n], combined[combined_ind]});  // prog combined
+  	  cxt.builder.appendPolygon({inner[inner_ind], combined[(combined_ind+1)%combined_n], combined[combined_ind]});  // prog combined
 	  combined_ind=(combined_ind+1)%combined_n;
       }
     } while(combined_ind != 0 || inner_ind != inner_ind_start);
     int n=combined.size(); 
     for(int i=0;i<n;i++) { // unterer kranz
-	if(off > 0) builder.appendPolygon({baseind, combined[i], combined[(i+1)%n]}); 
-	else builder.appendPolygon({combined[i], baseind, combined[(i+1)%n]}); 
+	if(off > 0) cxt.builder.appendPolygon({baseind, combined[i], combined[(i+1)%n]}); 
+	else cxt.builder.appendPolygon({combined[i], baseind, combined[(i+1)%n]}); 
     }
 
-    auto result_u = builder.build();
+    auto result_u = cxt.builder.build();
     std::shared_ptr<PolySet> result_s = std::move(result_u);
     subgeoms.push_back(result_s); // corners
   }
   if(off > 0){
-	  return union_geoms(subgeoms);
+	  auto r= union_geoms(subgeoms);
+
+	  return r;
+
   } else {
 	  return difference_geoms(subgeoms);
   }
 }
-
-int offset3D_inside(const std::vector<Vector2d> &flatloop, const Matrix4d &invmat, const Vector3d &pt,double delta) {
-  Vector4d tmp = invmat*Vector4d(pt[0],pt[1], pt[2],1);
-  if(tmp[2] < 0) return 0; // not behind
-  Vector2d ptflat=tmp.head<2>();
-  int n = flatloop.size();
-  double mindist=1e9;
-  for(int i=0;i<n;i++) {
-    Vector2d p1=flatloop[i];
-    Vector2d p2=flatloop[(i+1)%n];
-    double x;
-    Vector2d dir=(p2-p1).normalized();
-    Vector2d dir_(-dir[1],dir[0]);
-
-    double dist=(ptflat-p1).dot(dir_);
-    double dist1=(ptflat-p1).dot(dir);
-//    if(dist1 >=0 && dist1 <= (p2-p1).norm()) { projecting check is not working, 
-      if(dist < mindist) {
-       mindist=dist;	    
-//      }
-    }  
-  }
-  return(mindist > delta);
-}
-
-void offset3D_subtri(PolySetBuilder &builder,  std::vector<IndexedFace> &triangles, const Vector3d &base, double r,const std::vector<Vector2d> &flatloop, const Matrix4d &invmat, const Vector3d &p1, const Vector3d &p2, const Vector3d &p3, int hier)
-{
-  int iterate=0;
-  if(hier > 0) iterate=1;  
-  if(iterate) {
-    Vector3d p12 = (p1+p2)/2.0;	  
-    Vector3d p23 = (p2+p3)/2.0;	  
-    Vector3d p31 = (p3+p1)/2.0;	  
-    p12 = (p12-base).normalized()*r+base;
-    p23 = (p23-base).normalized()*r+base;
-    p31 = (p31-base).normalized()*r+base;
-    offset3D_subtri(builder, triangles, base, r, flatloop, invmat, p31, p1, p12, hier-1);
-    offset3D_subtri(builder, triangles, base, r, flatloop, invmat, p12, p2, p23, hier-1);
-    offset3D_subtri(builder, triangles, base, r, flatloop, invmat, p23, p3, p31, hier-1);
-    offset3D_subtri(builder, triangles, base, r, flatloop, invmat, p12, p23, p31, hier-1);
-    return;
-  }
-  // check if p1,p2,p3 are inside corner
-  double delta=(p2-p1).norm()*0.5;
-  int p1_inside=offset3D_inside(flatloop, invmat, p1,delta);
-  int p2_inside=offset3D_inside(flatloop, invmat, p2,delta);
-  int p3_inside=offset3D_inside(flatloop, invmat, p3,delta);
-  if(p1_inside && p2_inside && p3_inside) {
-    int ind1=builder.vertexIndex(p1);
-    int ind2=builder.vertexIndex(p2);
-    int ind3=builder.vertexIndex(p3);
-
-    builder.appendPolygon({ind1, ind2, ind3});
-    triangles.push_back({ind1, ind2, ind3});
-  }  
-}
-
 
 std::unique_ptr<const Geometry> createFilletInt(std::shared_ptr<const PolySet> ps,  std::vector<bool> corner_selected, double r, int fn, double minang);
 
