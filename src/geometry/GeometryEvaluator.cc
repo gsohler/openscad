@@ -902,6 +902,7 @@ std::shared_ptr<const Geometry> offset3D(const std::shared_ptr<const PolySet> &p
   std::unordered_map<EdgeKey, std::vector<Vector3d> ,boost::hash<EdgeKey>> edge_startarc;
   std::unordered_map<EdgeKey, std::vector<Vector3d> ,boost::hash<EdgeKey>> edge_endarc;
   auto edge_db =  createEdgeDb(indicesNew);
+  int abs_eff_fn=0;
   for(auto &e: edge_db) {
     Vector3d p1=ps->vertices[e.first.ind1];	  
     Vector3d p2=ps->vertices[e.first.ind2];
@@ -929,6 +930,7 @@ std::shared_ptr<const Geometry> offset3D(const std::shared_ptr<const PolySet> &p
     int eff_fn=fn_a;
     if(fn_s > eff_fn) eff_fn=fn_s;
     if(fn != 0) eff_fn=fn;
+    if(eff_fn > abs_eff_fn) abs_eff_fn=eff_fn;
 
 
     for(int i=1;i<eff_fn-1;i++) { 
@@ -1053,10 +1055,12 @@ std::shared_ptr<const Geometry> offset3D(const std::shared_ptr<const PolySet> &p
       Vector3d p3=vertices[combined[(i+2)%cs]];	    
       norm += (p2-p1).cross(p2-p3);
     }
-    Vector3d zdir=norm.normalized();
-    Vector3d tmp=(vertices[combined[(i+1)%cs]] - vertices[combined[i]]).normalized();	    
-    Vector3d ydir=-zdir.cross(tmp).normalized();
-    Vector3d xdir=-zdir.cross(ydir).normalized();
+    Vector3d xdir, ydir, zdir;
+    zdir=norm.normalized();
+    ydir=-zdir.cross(Vector3d(1,0,0));
+    if(ydir.norm() < 1e-3) ydir=-zdir.cross(Vector3d(1,0,0));
+    ydir.normalized();
+    xdir=zdir.cross(ydir).normalized();
 
     // setup matrix
     Matrix4d mat;
@@ -1065,23 +1069,14 @@ std::shared_ptr<const Geometry> offset3D(const std::shared_ptr<const PolySet> &p
           xdir[2], ydir[2], zdir[2], basept[2],
           0      , 0      , 0      , 1;
 
-    printf("xdir is %g/%g/%g\n",xdir[0], xdir[1], xdir[2]);
-    printf("ydir is %g/%g/%g\n",ydir[0], ydir[1], ydir[2]);
-    printf("zdir is %g/%g/%g\n",zdir[0], zdir[1], zdir[2]);
-
     Matrix4d invmat = mat.inverse();
 
     std::vector<Vector2d> flatloop;
     for(int i=0;i<combined.size();i++) {
       Vector3d pt=vertices[combined[i]];    
-      flatloop.push_back(  (invmat*Vector4d(pt[0], pt[1], pt[2],0)).head<2>()  );	    
+      flatloop.push_back(  (invmat*Vector4d(pt[0], pt[1], pt[2],1)).head<2>()  );	    
     }
     // Lay flat all edge loop
-    for(int i=0;i<flatloop.size();i++) {
-	    printf("%g/%g \n",flatloop[i][0], flatloop[i][1]);
-    }
-
-
 
     // now create a geodesic sphere from here
 
@@ -1092,24 +1087,28 @@ std::shared_ptr<const Geometry> offset3D(const std::shared_ptr<const PolySet> &p
     Vector3d sp_bot = basept + Vector3d(0,0,-off);
     Vector3d sp_top = basept + Vector3d(0,0,off);
 
-    int hier=4;
+    int hier=(int)(log(abs_eff_fn)/log(2));
     std::vector<IndexedFace> triangles;
+    do
+    {
+      hier++;	    
 
 
-    offset3D_subtri(builder, triangles, basept, off, flatloop, invmat, sp_front, sp_right, sp_top, hier);
-    offset3D_subtri(builder, triangles, basept, off, flatloop, invmat, sp_right, sp_back, sp_top, hier);
-    offset3D_subtri(builder, triangles, basept, off, flatloop, invmat, sp_back, sp_left, sp_top, hier);
-    offset3D_subtri(builder, triangles, basept, off, flatloop, invmat, sp_left, sp_front, sp_top, hier);
+      offset3D_subtri(builder, triangles, basept, off, flatloop, invmat, sp_front, sp_right, sp_top, hier);
+      offset3D_subtri(builder, triangles, basept, off, flatloop, invmat, sp_right, sp_back, sp_top, hier);
+      offset3D_subtri(builder, triangles, basept, off, flatloop, invmat, sp_back, sp_left, sp_top, hier);
+      offset3D_subtri(builder, triangles, basept, off, flatloop, invmat, sp_left, sp_front, sp_top, hier);
 
-    offset3D_subtri(builder, triangles, basept, off, flatloop, invmat, sp_front, sp_bot, sp_right, hier);
-    offset3D_subtri(builder, triangles, basept, off, flatloop, invmat, sp_right, sp_bot, sp_back, hier);
-    offset3D_subtri(builder, triangles, basept, off, flatloop, invmat, sp_back, sp_bot, sp_left, hier);
-    offset3D_subtri(builder, triangles, basept, off, flatloop, invmat, sp_left, sp_bot, sp_front, hier);
+      offset3D_subtri(builder, triangles, basept, off, flatloop, invmat, sp_front, sp_bot, sp_right, hier);
+      offset3D_subtri(builder, triangles, basept, off, flatloop, invmat, sp_right, sp_bot, sp_back, hier);
+      offset3D_subtri(builder, triangles, basept, off, flatloop, invmat, sp_back, sp_bot, sp_left, hier);
+      offset3D_subtri(builder, triangles, basept, off, flatloop, invmat, sp_left, sp_bot, sp_front, hier);
 
-    printf("collected %d triangles\n",triangles.size());
+    }
+    while(triangles.size() == 0);
     std::vector<Vector3d> dummyvert;
     indexedFaceList triangles_merged = mergeTrianglesSub(triangles,dummyvert);
-//    assert(triangles_merged.size() == 1);
+    assert(triangles_merged.size() == 1);
     auto inner = triangles_merged[0];
 
     builder.copyVertices(vertices);
@@ -1129,10 +1128,8 @@ std::shared_ptr<const Geometry> offset3D(const std::shared_ptr<const PolySet> &p
 	dist_min=dist;
       }
     }
-    printf("inner_ind is %d\n", inner_ind);
     int inner_ind_start = inner_ind;
-    int combined_ind_start = inner_ind_start;
-
+    int combined_ind_start = combined_ind;
     do {
       double dist1 = (vertices[inner[(inner_ind+inner_n-1)%inner_n]] - vertices[combined[combined_ind]]).norm(); // prog inner
       double dist2 = (vertices[inner[inner_ind]] - vertices[combined[(combined_ind+1)%combined_n]]).norm(); // prog combined
@@ -1143,9 +1140,7 @@ std::shared_ptr<const Geometry> offset3D(const std::shared_ptr<const PolySet> &p
   	  builder.appendPolygon({inner[inner_ind], combined[(combined_ind+1)%combined_n], combined[combined_ind]});  // prog combined
 	  combined_ind=(combined_ind+1)%combined_n;
       }
-    } while(combined_ind != 0); //  || inner_ind != inner_ind_start);
-
-
+    } while(combined_ind != 0 || inner_ind != inner_ind_start);
     int n=combined.size(); 
     for(int i=0;i<n;i++) { // unterer kranz
 	if(off > 0) builder.appendPolygon({baseind, combined[i], combined[(i+1)%n]}); 
@@ -1153,9 +1148,8 @@ std::shared_ptr<const Geometry> offset3D(const std::shared_ptr<const PolySet> &p
     }
 
     auto result_u = builder.build();
-    if(i == 0) return result_u;
-//    std::shared_ptr<PolySet> result_s = std::move(result_u);
-//    subgeoms.push_back(result_s); // corners
+    std::shared_ptr<PolySet> result_s = std::move(result_u);
+    subgeoms.push_back(result_s); // corners
   }
   if(off > 0){
 	  return union_geoms(subgeoms);
@@ -1164,31 +1158,28 @@ std::shared_ptr<const Geometry> offset3D(const std::shared_ptr<const PolySet> &p
   }
 }
 
-int offset3D_inside(const std::vector<Vector2d> &flatloop, const Matrix4d &invmat, const Vector3d &pt) {
-  Vector4d tmp = invmat*Vector4d(pt[0],pt[1], pt[2],0);
+int offset3D_inside(const std::vector<Vector2d> &flatloop, const Matrix4d &invmat, const Vector3d &pt,double delta) {
+  Vector4d tmp = invmat*Vector4d(pt[0],pt[1], pt[2],1);
   if(tmp[2] < 0) return 0; // not behind
   Vector2d ptflat=tmp.head<2>();
   int n = flatloop.size();
-  int count=0;
+  double mindist=1e9;
   for(int i=0;i<n;i++) {
     Vector2d p1=flatloop[i];
     Vector2d p2=flatloop[(i+1)%n];
     double x;
-    if(ptflat[1] >= p1[1] && ptflat[1] <= p2[1]) { //steigend
-      if(p1[1] != p2[1]) {
-        x = p1[0] + (p2[0]-p1[0])*(ptflat[1]-p1[1])/(p2[1]-p1[1]);	    
-        if(x > ptflat[0]) count++;
-      }
-    }
-    if(ptflat[1] >= p2[1] && ptflat[1] <= p1[1]) { //fallend
-      if(p1[1] != p2[1]) {
-        x = p1[0] + (p2[0]-p1[0])*(ptflat[1]-p1[1])/(p2[1]-p1[1]);	    
-        if(x > ptflat[0]) count--;
-      }
-    }
+    Vector2d dir=(p2-p1).normalized();
+    Vector2d dir_(-dir[1],dir[0]);
 
+    double dist=(ptflat-p1).dot(dir_);
+    double dist1=(ptflat-p1).dot(dir);
+//    if(dist1 >=0 && dist1 <= (p2-p1).norm()) { projecting check is not working, 
+      if(dist < mindist) {
+       mindist=dist;	    
+//      }
+    }  
   }
-  return count&1;	
+  return(mindist > delta);
 }
 
 void offset3D_subtri(PolySetBuilder &builder,  std::vector<IndexedFace> &triangles, const Vector3d &base, double r,const std::vector<Vector2d> &flatloop, const Matrix4d &invmat, const Vector3d &p1, const Vector3d &p2, const Vector3d &p3, int hier)
@@ -1209,9 +1200,10 @@ void offset3D_subtri(PolySetBuilder &builder,  std::vector<IndexedFace> &triangl
     return;
   }
   // check if p1,p2,p3 are inside corner
-  int p1_inside=offset3D_inside(flatloop, invmat, p1);
-  int p2_inside=offset3D_inside(flatloop, invmat, p2);
-  int p3_inside=offset3D_inside(flatloop, invmat, p3);
+  double delta=(p2-p1).norm()*0.5;
+  int p1_inside=offset3D_inside(flatloop, invmat, p1,delta);
+  int p2_inside=offset3D_inside(flatloop, invmat, p2,delta);
+  int p3_inside=offset3D_inside(flatloop, invmat, p3,delta);
   if(p1_inside && p2_inside && p3_inside) {
     int ind1=builder.vertexIndex(p1);
     int ind2=builder.vertexIndex(p2);
