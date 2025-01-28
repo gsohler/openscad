@@ -860,12 +860,13 @@ bool offset3D_inside(Offset3D_CornerContext &cxt, const Vector3d &pt,double delt
     Vector2d dir_(-dir[1],dir[0]);
 
     double dist=(ptflat-p1).dot(dir_);
-    double dist1=(ptflat-p1).dot(dir);
-//    if(dist1 >=0 && dist1 <= (p2-p1).norm()) { projecting check is not working, 
-      if(dist < mindist) {
+    if(dist < mindist) {
        mindist=dist;	    
-//      }
     }  
+    if(mindist < delta) {
+      cxt.inside_map[pt]=false;
+      return false;
+    }
   }
   bool result = (mindist > delta);
   cxt.inside_map[pt]=result;
