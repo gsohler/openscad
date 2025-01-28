@@ -93,7 +93,13 @@ void TabManager::tabSwitched(int x)
   par->changedTopLevelConsole(par->consoleDock->isFloating());
   par->parameterTopLevelChanged(par->parameterDock->isFloating());
   par->setWindowTitle(tabWidget->tabText(x).replace("&&", "&"));
-
+  if(use_gvim) {
+// **MCH*
+   std::string str= tabWidget->tabToolTip(x).toUtf8().constData();
+   QString editorcmd="gvim --remote-send '<esc>:sb "+ QString::fromStdString(str)+"<cr>'";
+   system(editorcmd.toUtf8().constData());
+// **MCH*
+ }
   for (int idx = 0; idx < tabWidget->count(); ++idx) {
     QWidget *button = tabWidget->tabButton(idx, QTabBar::RightSide);
     if (button) {
@@ -121,12 +127,22 @@ void TabManager::closeTabRequested(int x)
   if (!maybeSave(x)) return;
 
   auto *temp = (EditorInterface *)tabWidget->widget(x);
+  if(use_gvim) {
+// **MCH**
+ 	std::string str= tabWidget->tabToolTip(x).toUtf8().constData();
+	QString editorcmd="gvim --remote-send '<esc>:sb "+ QString::fromStdString(str)+"<cr>:q!<cr>'";
+	system(editorcmd.toUtf8().constData());
+	std::cout << x;
+// **MCH**
+  }
+  if(x>=0 || !use_gvim) { // **MCH**
   editorList.remove(temp);
   tabWidget->removeTab(x);
   tabWidget->fireTabCountChanged();
 
   delete temp->parameterWidget;
   delete temp;
+}	//** MCH **
 }
 
 void TabManager::closeCurrentTab()
@@ -135,7 +151,10 @@ void TabManager::closeCurrentTab()
 
   /* Close tab or close the current window if only one tab is open. */
   if (tabWidget->count() > 1) this->closeTabRequested(tabWidget->currentIndex());
-  else par->close();
+  else {
+	 par->close();
+	 if(use_gvim) this->closeTabRequested(tabWidget->currentIndex());	// ** MCH **
+  }
 }
 
 void TabManager::nextTab()
@@ -160,6 +179,11 @@ void TabManager::open(const QString& filename)
 {
   assert(!filename.isEmpty());
 
+  if(use_gvim) {
+    QString editorcmd="gvim --remote-tab-silent ";
+    editorcmd += filename.toUtf8();
+    system(editorcmd.toUtf8().constData());
+  }
   for (auto edt: editorList) {
     if (filename == edt->filepath) {
       tabWidget->setCurrentWidget(tabWidget->indexOf(edt));
@@ -180,6 +204,7 @@ void TabManager::createTab(const QString& filename)
 
   editor = new ScintillaEditor(tabWidget, *par);
   Preferences::create(editor->colorSchemes()); // needs to be done only once, however handled
+  this->use_gvim = Preferences::inst()->getValue("editor/usegvim").toBool();
   par->activeEditor = editor;
   editor->parameterWidget = new ParameterWidget(par->parameterDock);
   connect(editor->parameterWidget, SIGNAL(parametersChanged()), par, SLOT(actionRenderPreview()));
@@ -516,6 +541,11 @@ void TabManager::openTabFile(const QString& filename)
   } else {
     setTabName(nullptr);
     editor->setPlainText(cmd.arg(filename));
+  }
+  if(use_gvim) {
+    QString editorcmd="gvim --remote-tab-silent "+filename.toUtf8();
+    system(editorcmd.toUtf8().constData());
+//**MCH**
   }
   par->fileChangedOnDisk(); // force cached autoReloadId to update
   bool opened = refreshDocument();
