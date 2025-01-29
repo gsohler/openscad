@@ -2028,7 +2028,7 @@ PyObject *python_color(PyObject *self, PyObject *args, PyObject *kwargs)
   PyObject *color = NULL;
   double alpha = 1.0;
   int textureind=-1;
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|sdi", kwlist,
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|Odi", kwlist,
                                    &obj,
                                    &color, &alpha, &textureind
                                    )) {
