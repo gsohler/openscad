@@ -4094,6 +4094,39 @@ PyObject *python_model(PyObject *self, PyObject *args, PyObject *kwargs, int mod
   return PyOpenSCADObjectFromNode(&PyOpenSCADType, python_result_node);
 }
 
+PyObject *python_stdout(PyObject *self, PyObject *args, PyObject *kwargs, int mode)
+{
+  char *kwlist[] = {"message", NULL};
+  char *name = NULL;
+  const char *message = NULL;
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s", kwlist,
+                                   &message)) {
+    PyErr_SetString(PyExc_TypeError, "Error during parsing stdout");
+    return NULL;
+  }
+  if(message != nullptr) {
+	  printf("(%s)%d\n",message, strlen(message));
+    LOG(message);	  
+  }
+  return Py_None;
+}
+
+PyObject *python_stderr(PyObject *self, PyObject *args, PyObject *kwargs, int mode)
+{
+  char *kwlist[] = {"message", NULL};
+  char *name = NULL;
+  const char *message = NULL;
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s", kwlist,
+                                   &message)) {
+    PyErr_SetString(PyExc_TypeError, "Error during parsing stderr");
+    return NULL;
+  }
+  if(message != nullptr) {
+    LOG(message_group::Error, message);	  
+  }
+  return Py_None;
+}
+
 PyMethodDef PyOpenSCADFunctions[] = {
   {"square", (PyCFunction) python_square, METH_VARARGS | METH_KEYWORDS, "Create Square."},
   {"circle", (PyCFunction) python_circle, METH_VARARGS | METH_KEYWORDS, "Create Circle."},
@@ -4174,6 +4207,8 @@ PyMethodDef PyOpenSCADFunctions[] = {
   {"align", (PyCFunction) python_align, METH_VARARGS | METH_KEYWORDS, "Align Object to another."},
   {"add_menuitem", (PyCFunction) python_add_menuitem, METH_VARARGS | METH_KEYWORDS, "Add Menuitem to the the openscad window."},
   {"model", (PyCFunction) python_model, METH_VARARGS | METH_KEYWORDS, "Yield Model"},
+  {"stdout", (PyCFunction) python_stdout, METH_VARARGS | METH_KEYWORDS, "Output to OpenSCAD console"}, // internal function
+  {"stderr", (PyCFunction) python_stderr, METH_VARARGS | METH_KEYWORDS, "Output to OpenSCAD error"}, // internal function
   {NULL, NULL, 0, NULL}
 };
 

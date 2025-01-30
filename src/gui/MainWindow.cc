@@ -2759,8 +2759,8 @@ void MainWindow::updateStatusBar(ProgressWidget *progressWidget)
 }
 
 void MainWindow::exceptionCleanup(){
-  LOG("Execution aborted");
-  LOG(" ");
+//  LOG("Execution aborted"); TODO fix
+//  LOG(" ");
   GuiLocker::unlock();
   if (designActionAutoReload->isChecked()) autoReloadTimer->start();
 }
