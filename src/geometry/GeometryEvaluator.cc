@@ -1199,8 +1199,13 @@ std::shared_ptr<const Geometry> offset3D(const std::shared_ptr<const PolySet> &p
 
     std::vector<Vector3d> dummyvert;
     indexedFaceList triangles_merged = mergeTrianglesSub(cxt.triangles,dummyvert);
-    assert(triangles_merged.size() == 1);
-    auto inner = triangles_merged[0];
+    // assume biggest one is main
+    assert(triangles_merged.size() > 0);
+    int bigind=0;
+    for(int i=1;i<triangles_merged.size();i++)
+      if(triangles_merged[i].size() > triangles_merged[bigind].size())
+        bigind=i;	      
+    auto inner = triangles_merged[bigind];
 
     cxt.builder.copyVertices(vertices);
 
