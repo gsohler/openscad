@@ -2163,13 +2163,14 @@ static std::unique_ptr<Geometry> extrudePolygon(const PathExtrudeNode& node, con
   }
 
   Vector3d lastPt, curPt, nextPt;
-  Vector3d vec_x_last(node.xdir_x,node.xdir_y,node.xdir_z);
-  Vector3d vec_y_last(0,0,0);
-  vec_x_last.normalize();
 
   // in case of custom profile,poly shall exactly have one dummy outline,will be replaced
   for(const Outline2d &profile2d: poly.outlines()) {
   
+    Vector3d vec_x_last(node.xdir_x,node.xdir_y,node.xdir_z);
+    Vector3d vec_y_last(0,0,0);
+    vec_x_last.normalize();
+
     std::vector<Vector3d> lastProfile;
     std::vector<Vector3d> startProfile; 
     unsigned int m=path_os.size();
