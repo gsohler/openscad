@@ -276,7 +276,7 @@ private slots:
   void csgRender();
   void csgReloadRender();
   void action3DPrint();
-  void sendToExternalTool(class ExternalToolInterface &externalToolService);
+  void sendToExternalTool(class ExternalToolInterface& externalToolService);
   void actionRender();
   void actionRenderDone(const std::shared_ptr<const Geometry>&);
   void cgalRender();
@@ -323,7 +323,7 @@ public:
   QList<double> getTranslation() const;
   QList<double> getRotation() const;
   QSignalMapper *addmenu_mapper;
-  std::unordered_map<FileFormat, QAction*>  exportMap;
+  std::unordered_map<FileFormat, QAction *> exportMap;
 
 public slots:
   void actionReloadRenderPreview();
