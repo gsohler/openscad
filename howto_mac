@@ -6,6 +6,13 @@ cmake -DEXPERIMENTAL=1 -DENABLE_PYTHON=1 -DUSE_QT6=1 -DUSE_BUILTIN_CLIPPER2=ON -
 pwd
 VERSIONDATE=`date "+%Y.%m.%d"`
 #/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $VERSIONDATE" OpenSCAD.app/Contents/Info.plist
-rm OpenSCAD.dmg
-/usr/local/Qt-6.7.2/bin/macdeployqt ./OpenSCAD.app -codesign=- -dmg -no-strip
 
+/usr/local/Qt-6.7.2/bin/macdeployqt ./OpenSCAD.app -codesign=- -no-strip
+cp -a /usr/local/lib/python3.12 OpenSCAD.app/Contents/Frameworks/
+
+rm OpenSCAD.dmg
+hdiutil create -fs HFS+ -volname "PythonSCAD" -srcfolder "./OpenSCAD.app/" OpenSCAD.dmg
+
+########
+export PIP_TARGET=/Users/apple/git/openscad/build/OpenSCAD.app/Contents/Frameworks/python3.12
+/usr/local/bin/python3.12 -m pip install numpy
