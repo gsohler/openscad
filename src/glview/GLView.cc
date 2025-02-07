@@ -231,8 +231,8 @@ void GLView::paintGL()
       glEnable(GL_BLEND);
       glBlendFunc(GL_DST_COLOR, GL_ONE_MINUS_DST_COLOR); 
     }  
-    this->renderer->prepare(showedges, showedges ? edge_shader.get() : nullptr);
-    this->renderer->draw(showedges, showedges ? edge_shader.get() : nullptr);
+    this->renderer->prepare(edge_shader.get());
+    this->renderer->draw(showedges, edge_shader.get());
     if(this->handle_mode) glDisable(GL_BLEND);
   }
   glColor3f(1,0,0);

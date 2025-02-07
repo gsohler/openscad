@@ -2028,7 +2028,7 @@ PyObject *python_color(PyObject *self, PyObject *args, PyObject *kwargs)
   PyObject *color = NULL;
   double alpha = 1.0;
   int textureind=-1;
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|sdi", kwlist,
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|Odi", kwlist,
                                    &obj,
                                    &color, &alpha, &textureind
                                    )) {
@@ -2938,6 +2938,12 @@ PyObject *python_nb_sub_vec3(PyObject *arg1, PyObject *arg2, int mode) // 0: tra
         for(auto x : vals[0])
           vecs.push_back(Vector3d(x,y,z));		
   } else vecs = python_vectors(arg2,2,3);
+
+  if(mode == 0 && vecs.size() == 1) {
+    PyObject *mat = python_matrix_trans(arg1,vecs[0]);
+    if(mat != nullptr) return mat;
+  }
+
   if (vecs.size() > 0) {
     if (child == NULL) {
       PyErr_SetString(PyExc_TypeError, "invalid argument left to operator");

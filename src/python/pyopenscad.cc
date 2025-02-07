@@ -686,7 +686,9 @@ void initPython(double time)
       if(key_str == nullptr) continue;
       if (std::find(std::begin(pythonInventory), std::end(pythonInventory), key_str) == std::end(pythonInventory))
       {
-        PyDict_DelItemString(maindict, key_str);
+        if(strlen(key_str) < 4 || strncmp(key_str,"stat",4) != 0){	      
+          PyDict_DelItemString(maindict, key_str);
+	}  
       }
       // bug in  PyDict_GetItemString, thus iterating
       if(strcmp(key_str,"sys") == 0) {

@@ -1199,8 +1199,13 @@ std::shared_ptr<const Geometry> offset3D(const std::shared_ptr<const PolySet> &p
 
     std::vector<Vector3d> dummyvert;
     indexedFaceList triangles_merged = mergeTrianglesSub(cxt.triangles,dummyvert);
-    assert(triangles_merged.size() == 1);
-    auto inner = triangles_merged[0];
+    // assume biggest one is main
+    assert(triangles_merged.size() > 0);
+    int bigind=0;
+    for(int i=1;i<triangles_merged.size();i++)
+      if(triangles_merged[i].size() > triangles_merged[bigind].size())
+        bigind=i;	      
+    auto inner = triangles_merged[bigind];
 
     cxt.builder.copyVertices(vertices);
 
@@ -2158,13 +2163,14 @@ static std::unique_ptr<Geometry> extrudePolygon(const PathExtrudeNode& node, con
   }
 
   Vector3d lastPt, curPt, nextPt;
-  Vector3d vec_x_last(node.xdir_x,node.xdir_y,node.xdir_z);
-  Vector3d vec_y_last(0,0,0);
-  vec_x_last.normalize();
 
   // in case of custom profile,poly shall exactly have one dummy outline,will be replaced
   for(const Outline2d &profile2d: poly.outlines()) {
   
+    Vector3d vec_x_last(node.xdir_x,node.xdir_y,node.xdir_z);
+    Vector3d vec_y_last(0,0,0);
+    vec_x_last.normalize();
+
     std::vector<Vector3d> lastProfile;
     std::vector<Vector3d> startProfile; 
     unsigned int m=path_os.size();
