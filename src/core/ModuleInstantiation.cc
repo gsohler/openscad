@@ -36,6 +36,31 @@ void ModuleInstantiation::print(std::ostream& stream, const std::string& indent,
   }
 }
 
+void ModuleInstantiation::print_python(std::ostream& stream, std::ostream& stream_def, const std::string& indent, const bool inlined, const int context_mode) const
+{
+  if (!inlined) stream << indent;
+//  if(context_mode == 1) stream << "return ";
+  stream  <<  modname << "(" ;
+  int n=0;
+  if(scope.numElements() > 1) {
+    scope.print_python(stream, stream_def, indent + "\t", false, 0);
+    n++;
+  }
+  else if(scope.numElements() == 1) {
+    scope.print_python(stream, stream_def, indent + "\t", true, 0);
+    n++;
+  }
+
+  for (size_t i = 0; i < this->arguments.size(); ++i) {
+    const auto& arg = this->arguments[i];
+    if (n > 0) stream << ", ";
+    if (!arg->getName().empty()) stream << arg->getName() << " = ";
+    stream << *arg->getExpr();
+    n++;
+  }
+  stream << ")" ;
+}
+
 void IfElseModuleInstantiation::print(std::ostream& stream, const std::string& indent, const bool inlined) const
 {
   ModuleInstantiation::print(stream, indent, inlined);
@@ -50,6 +75,26 @@ void IfElseModuleInstantiation::print(std::ostream& stream, const std::string& i
       } else {
         stream << "{\n";
         else_scope->print(stream, indent + "\t", false);
+        stream << indent << "}\n";
+      }
+    }
+  }
+}
+
+void IfElseModuleInstantiation::print_python(std::ostream& stream, std::ostream& stream_def,  const std::string& indent, const bool inlined, const int context_mode) const
+{
+  ModuleInstantiation::print(stream, indent, inlined);
+  if (else_scope) {
+    auto num_elements = else_scope->numElements();
+    if (num_elements == 0) {
+      stream << indent << "else;";
+    } else {
+      stream << indent << "else ";
+      if (num_elements == 1) {
+        else_scope->print_python(stream, stream_def, indent, true);
+      } else {
+        stream << "{\n";
+        else_scope->print_python(stream, stream_def, indent + "\t", false);
         stream << indent << "}\n";
       }
     }
@@ -72,9 +117,9 @@ std::shared_ptr<AbstractNode> ModuleInstantiation::evaluate(const std::shared_pt
   boost::optional<InstantiableModule> module = context->lookup_module(this->name(), this->loc);
   if (!module) {
     std::shared_ptr<AbstractNode> result=nullptr;
+    std::string error;
 #ifdef ENABLE_PYTHON
     int modulefound;
-    std::string error;
     result = python_modulefunc(this, context,error);
     if(!error.empty() && result == nullptr) {
       LOG(message_group::Warning, loc, context->documentRoot(), "Python:: '%1$s'", error);
@@ -89,7 +134,6 @@ std::shared_ptr<AbstractNode> ModuleInstantiation::evaluate(const std::shared_pt
     auto node = module->module->instantiate(module->defining_context, this, context);
     return node;
   } catch (EvaluationException& e) {
-  printf("throw1\n");
     if (e.traceDepth > 0) {
       print_trace(this, context);
       e.traceDepth--;

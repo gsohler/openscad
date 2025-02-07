@@ -55,6 +55,7 @@ extern bool parse(SourceFile *& file, const std::string& text, const std::string
 #include "CgalAdvNode.h"
 #include "CsgOpNode.h"
 #include "ColorNode.h"
+#include "ColorUtil.h"
 #include "Expression.h"
 #include "RoofNode.h"
 #include "RenderNode.h"
@@ -87,7 +88,6 @@ extern bool parse(SourceFile *& file, const std::string& text, const std::string
 // Colors extracted from https://drafts.csswg.org/css-color/ on 2015-08-02
 // CSS Color Module Level 4 - Editor’s Draft, 29 May 2015
 extern std::unordered_map<std::string, Color4f> webcolors;
-extern boost::optional<Color4f> parse_hex_color(const std::string& hex);
 
 PyObject *python_cube(PyObject *self, PyObject *args, PyObject *kwargs)
 {
@@ -1593,7 +1593,6 @@ PyObject *python_oo_wrap(PyObject *obj, PyObject *args, PyObject *kwargs)
   return python_wrap_core(obj, r, fn, fa, fs);
 }
 
-std::shared_ptr<AbstractNode> python_result_node_bak; // TODO why is that needed ? python_result_nose is nullptr
 PyObject *python_output_core(PyObject *obj)
 {
   PyObject *child_dict;
@@ -1606,7 +1605,7 @@ PyObject *python_output_core(PyObject *obj)
   PyObject *key, *value;
   Py_ssize_t pos = 0;
   python_result_node = child;
-  python_result_node_bak = child;
+  python_result_obj = obj;
   mapping_name.clear();
   mapping_code.clear();
   mapping_level.clear();
@@ -1662,7 +1661,7 @@ PyObject *python_oo_show(PyObject *obj, PyObject *args, PyObject *kwargs){
 }
 
 
-void Export3mfInfo::writeProps(void *obj) const
+void Export3mfPartInfo::writeProps(void *obj) const
 {
   if(this->props == nullptr) return;
   PyObject *prop = (PyObject *) this->props;
@@ -1687,18 +1686,47 @@ void Export3mfInfo::writeProps(void *obj) const
   }
 }
 
+void python_export_obj_att(std::ostream& output)
+{
+  PyObject *child_dict= nullptr;
+  if(python_result_obj == nullptr) return;
+  std::shared_ptr<AbstractNode> child = PyOpenSCADObjectToNodeMulti(python_result_obj, &child_dict);
+  if(child_dict == nullptr) return;
+  if(!PyDict_Check(child_dict)) return;
+  PyObject *key, *value;
+  Py_ssize_t pos = 0;
+  while (PyDict_Next(child_dict, &pos, &key, &value)) {
+    PyObject* key1 = PyUnicode_AsEncodedString(key, "utf-8", "~");
+    const char *key_str =  PyBytes_AS_STRING(key1);
+    if(key_str == nullptr) continue;
+
+    if(PyLong_Check(value))  
+      output <<  "# " << key_str << " = " << PyLong_AsLong(value) << "\n" ;
+
+    if(PyFloat_Check(value))  
+      output <<  "# " << key_str << " = " << PyFloat_AsDouble(value) << "\n" ;
+
+    if(PyUnicode_Check(value)) {
+      auto valuestr = std::string(PyUnicode_AsUTF8(value));
+      output <<  "# " << key_str << " = \"" << valuestr << "\"\n" ;
+    }  
+  }
+
+}	
+
 PyObject *python_export_core(PyObject *obj, char *file)
 {
   const auto path = fs::path(file);
   std::string suffix = path.has_extension() ? path.extension().generic_string().substr(1) : "";
   boost::algorithm::to_lower(suffix);
+  python_result_obj = obj;
 
   FileFormat exportFileFormat = FileFormat::BINARY_STL;
   if (!fileformat::fromIdentifier(suffix, exportFileFormat)) {
     LOG("Invalid suffix %1$s. Defaulting to binary STL.", suffix);
   }
 
-  std::vector<Export3mfInfo> export3mfInfos;
+  std::vector<Export3mfPartInfo> export3mfPartInfos;
   std::vector<std::string>  names;
 
   PyObject *child_dict;
@@ -1706,8 +1734,8 @@ PyObject *python_export_core(PyObject *obj, char *file)
   if(child != nullptr ) {
     Tree tree(child, "parent");
     GeometryEvaluator geomevaluator(tree);
-    Export3mfInfo info(geomevaluator.evaluateGeometry(*tree.root(), false), "OpenSCAD Model", nullptr);
-    export3mfInfos.push_back(info);
+    Export3mfPartInfo info(geomevaluator.evaluateGeometry(*tree.root(), false), "OpenSCAD Model", nullptr);
+    export3mfPartInfos.push_back(info);
   } else if(PyDict_Check(obj)) {
     PyObject *key, *value;
     Py_ssize_t pos = 0;
@@ -1725,11 +1753,11 @@ PyObject *python_export_core(PyObject *obj, char *file)
       }
       Tree tree(child, "parent");
       GeometryEvaluator geomevaluator(tree);
-      Export3mfInfo info(geomevaluator.evaluateGeometry(*tree.root(), false),value_str, prop);
-      export3mfInfos.push_back(info);
+      Export3mfPartInfo info(geomevaluator.evaluateGeometry(*tree.root(), false),value_str, prop);
+      export3mfPartInfos.push_back(info);
     }
   }
-  if ( export3mfInfos.size() == 0) {
+  if ( export3mfPartInfos.size() == 0) {
     PyErr_SetString(PyExc_TypeError, "Object not recognized");
     return NULL;
   }  
@@ -1743,14 +1771,14 @@ PyObject *python_export_core(PyObject *obj, char *file)
       LOG(_("Can't open file \"%1$s\" for export"), file);
       return nullptr;
     }
-    export_3mf(export3mfInfos, fstream);
+    export_3mf(export3mfPartInfos, fstream, exportInfo);
   }
   else{
-    if(export3mfInfos.size() > 1) {
+    if(export3mfPartInfos.size() > 1) {
       LOG("This Format can at most export one object");
       return nullptr;
     }	    
-    exportFileByName(export3mfInfos[0].geom, file, exportInfo);
+    exportFileByName(export3mfPartInfos[0].geom, file, exportInfo);
   }
   return Py_None;
 }
@@ -1959,7 +1987,7 @@ PyObject *python_color_core(PyObject *obj, PyObject *color, double alpha, int te
       node->color[3]=alpha;
     } else {
     // Try parsing it as a hex color such as "#rrggbb".
-      const auto hexColor = parse_hex_color(colorname);
+      const auto hexColor = OpenSCAD::parse_hex_color(colorname);
       if (hexColor) {
         node->color = *hexColor;
       } else {
@@ -2250,7 +2278,7 @@ PyObject *python_oo_fillet(PyObject *obj, PyObject *args, PyObject *kwargs)
   return python_fillet_core(obj,r,fn,sel, minang);
 }
 
-PyObject *rotate_extrude_core(PyObject *obj, char *layer, int convexity, double scale, double angle, PyObject *twist, PyObject *origin, PyObject *offset, PyObject *vp, char *method, double fn, double fa, double fs)
+PyObject *rotate_extrude_core(PyObject *obj,  int convexity, double scale, double angle, PyObject *twist, PyObject *origin, PyObject *offset, PyObject *vp, char *method, double fn, double fa, double fs)
 {
   DECLARE_INSTANCE
   std::shared_ptr<AbstractNode> child;
@@ -2277,7 +2305,6 @@ PyObject *rotate_extrude_core(PyObject *obj, char *layer, int convexity, double 
   if (!isnan(fa)) node->fa = fa;
   if (!isnan(fs)) node->fs = fs;
 
-  if (layer != NULL) node->layername = layer;
   node->convexity = convexity;
   node->scale = scale;
   node->angle = angle;
@@ -2314,7 +2341,6 @@ PyObject *rotate_extrude_core(PyObject *obj, char *layer, int convexity, double 
 PyObject *python_rotate_extrude(PyObject *self, PyObject *args, PyObject *kwargs)
 {
   PyObject *obj = NULL;
-  char *layer = NULL;
   int convexity = 1;
   double scale = 1.0;
   double angle = 360.0;
@@ -2325,20 +2351,19 @@ PyObject *python_rotate_extrude(PyObject *self, PyObject *args, PyObject *kwargs
   PyObject *offset = NULL;
   double fn = NAN, fa = NAN, fs = NAN;
   get_fnas(fn,fa,fs);
-  char *kwlist[] = {"obj", "layer", "convexity", "scale", "angle", "twist", "origin", "offset", "v","method", "fn", "fa", "fs", NULL};
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|siddOOOOsddd", kwlist, 
-                          &obj, &layer, &convexity, &scale, &angle, &twist, &origin, &offset, &v,&method, &fn,&fa,&fs))
+  char *kwlist[] = {"obj", "convexity", "scale", "angle", "twist", "origin", "offset", "v","method", "fn", "fa", "fs", NULL};
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|iddOOOOsddd", kwlist, 
+                          &obj, &convexity, &scale, &angle, &twist, &origin, &offset, &v,&method, &fn,&fa,&fs))
     {
 
     PyErr_SetString(PyExc_TypeError, "Error during parsing rotate_extrude(object,...)");
     return NULL;
   }
-  return rotate_extrude_core(obj, layer, convexity, scale, angle, twist, origin, offset, v, method, fn, fa,fs);
+  return rotate_extrude_core(obj, convexity, scale, angle, twist, origin, offset, v, method, fn, fa,fs);
 }
 
 PyObject *python_oo_rotate_extrude(PyObject *obj, PyObject *args, PyObject *kwargs)
 {
-  char *layer = NULL;
   int convexity = 1;
   double scale = 1.0;
   double angle = 360.0;
@@ -2349,18 +2374,18 @@ PyObject *python_oo_rotate_extrude(PyObject *obj, PyObject *args, PyObject *kwar
   get_fnas(fn,fa,fs);
   PyObject *v = NULL;
   char *method = NULL;
-  char *kwlist[] = {"layer", "convexity", "scale", "angle", "twist", "origin", "offset", "v","method", "fn", "fa", "fs", NULL};
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|siddOOOOsddd", kwlist, 
-			  &layer, &convexity, &scale, &angle, &twist, &origin, &offset,&v, &method, &fn,&fa,&fs))
+  char *kwlist[] = {"convexity", "scale", "angle", "twist", "origin", "offset", "v","method", "fn", "fa", "fs", NULL};
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|iddOOOOsddd", kwlist, 
+			  &convexity, &scale, &angle, &twist, &origin, &offset,&v, &method, &fn,&fa,&fs))
    {
 
     PyErr_SetString(PyExc_TypeError, "error during parsing\n");
     return NULL;
   }
-  return rotate_extrude_core(obj, layer, convexity, scale, angle, twist, origin, offset, v, method, fn, fa,fs);
+  return rotate_extrude_core(obj, convexity, scale, angle, twist, origin, offset, v, method, fn, fa,fs);
 }
 
-PyObject *linear_extrude_core(PyObject *obj, PyObject *height, char *layer, int convexity, PyObject *origin, PyObject *scale, PyObject *center, int slices, int segments, PyObject *twist, double fn, double fa, double fs)
+PyObject *linear_extrude_core(PyObject *obj, PyObject *height, int convexity, PyObject *origin, PyObject *scale, PyObject *center, int slices, int segments, PyObject *twist, double fn, double fa, double fs)
 {
   DECLARE_INSTANCE
   std::shared_ptr<AbstractNode> child;
@@ -2399,7 +2424,6 @@ PyObject *linear_extrude_core(PyObject *obj, PyObject *height, char *layer, int 
   }
 
   node->convexity = convexity;
-  if (layer != NULL) node->layername = layer;
 
   node->origin_x = 0.0; node->origin_y = 0.0;
   if (origin != NULL && PyList_Check(origin) && PyList_Size(origin) == 2) {
@@ -2441,7 +2465,6 @@ PyObject *python_linear_extrude(PyObject *self, PyObject *args, PyObject *kwargs
 {
   PyObject *obj = NULL;
   PyObject *height = NULL;
-  char *layer = NULL;
   int convexity = 1;
   PyObject *origin = NULL;
   PyObject *scale = NULL;
@@ -2451,21 +2474,20 @@ PyObject *python_linear_extrude(PyObject *self, PyObject *args, PyObject *kwargs
   PyObject *twist = NULL;
   double fn = NAN, fa = NAN, fs = NAN;
 
-  char * kwlist[] ={"obj","height","layer","convexity","origin","scale","center","slices","segments","twist","fn","fa","fs",NULL};
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|OsiOOOiiOddd", kwlist, 
-                                   &obj, &height, &layer, &convexity, &origin, &scale, &center, &slices, &segments, &twist, &fn, &fs, &fs))
+  char * kwlist[] ={"obj","height","convexity","origin","scale","center","slices","segments","twist","fn","fa","fs",NULL};
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|OiOOOiiOddd", kwlist, 
+                                   &obj, &height, &convexity, &origin, &scale, &center, &slices, &segments, &twist, &fn, &fs, &fs))
    {
     PyErr_SetString(PyExc_TypeError,"error during parsing\n");
     return NULL;
   }
 
-  return linear_extrude_core(obj,height, layer, convexity, origin, scale, center, slices,segments,twist,fn,fa,fs);
+  return linear_extrude_core(obj,height, convexity, origin, scale, center, slices,segments,twist,fn,fa,fs);
 }
 
 PyObject *python_oo_linear_extrude(PyObject *obj, PyObject *args, PyObject *kwargs)
 {
   PyObject *height = NULL;
-  char *layer = NULL;
   int convexity = 1;
   PyObject *origin = NULL;
   PyObject *scale = NULL;
@@ -2475,15 +2497,15 @@ PyObject *python_oo_linear_extrude(PyObject *obj, PyObject *args, PyObject *kwar
   PyObject *twist = NULL;
   double fn = NAN, fa = NAN, fs = NAN;
 
-  char * kwlist[] ={"height","layer","convexity","origin","scale","center","slices","segments","twist","fn","fa","fs",NULL};
-  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|OsiOOOiiOddd", kwlist, 
-                                  &height, &layer, &convexity, &origin, &scale, &center, &slices, &segments, &twist, &fn, &fs, &fs))
+  char * kwlist[] ={"height","convexity","origin","scale","center","slices","segments","twist","fn","fa","fs",NULL};
+  if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|OiOOOiiOddd", kwlist, 
+                                  &height, &convexity, &origin, &scale, &center, &slices, &segments, &twist, &fn, &fs, &fs))
    {
     PyErr_SetString(PyExc_TypeError,"error during parsing\n");
     return NULL;
   }
 
-  return linear_extrude_core(obj,height, layer, convexity, origin, scale, center, slices,segments,twist,fn,fa,fs);
+  return linear_extrude_core(obj,height, convexity, origin, scale, center, slices,segments,twist,fn,fa,fs);
 }
 
 PyObject *path_extrude_core(PyObject *obj, PyObject *path, PyObject *xdir, int convexity, PyObject *origin, PyObject *scale, PyObject *twist, PyObject *closed, PyObject *allow_intersect, double fn, double fa, double fs)
@@ -2644,8 +2666,8 @@ PyObject *python_csg_sub(PyObject *self, PyObject *args, PyObject *kwargs, OpenS
   node->r=0;
   node->fn=1;
   PyObject *obj;
-  PyObject *child_dict;	  
-  PyObject *dummy_dict;	  
+  PyObject *child_dict = nullptr;	  
+  PyObject *dummy_dict = nullptr;	  
   std::shared_ptr<AbstractNode> child;
   if(kwargs != nullptr) {
     PyObject *key, *value;
@@ -2679,12 +2701,15 @@ PyObject *python_csg_sub(PyObject *self, PyObject *args, PyObject *kwargs, OpenS
       switch(mode) {
         case OpenSCADOperator::UNION:	    
           PyErr_SetString(PyExc_TypeError, "Error during parsing union. arguments must be solids or arrays.");
+	  return nullptr;
   	break;
         case OpenSCADOperator::DIFFERENCE:	    
           PyErr_SetString(PyExc_TypeError, "Error during parsing difference. arguments must be solids or arrays.");
+	  return nullptr;
   	break;
         case OpenSCADOperator::INTERSECTION:	    
           PyErr_SetString(PyExc_TypeError, "Error during parsing intersection. arguments must be solids or arrays.");
+	  return nullptr;
 	  break;
         case OpenSCADOperator::MINKOWSKI:	    
       	  break;
@@ -3300,7 +3325,7 @@ PyObject *python_text(PyObject *self, PyObject *args, PyObject *kwargs)
   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s|dsdsssssddd", kwlist,
                                    &text, &size, &font,
                                    &spacing, &direction, &language,
-                                   &script, &valign, &halign,
+                                   &script, &halign, &valign,
                                    &fn, &fa, &fs
                                    )) {
     PyErr_SetString(PyExc_TypeError, "Error during parsing text(string, ...))");
@@ -3775,7 +3800,7 @@ PyObject *python_nimport(PyObject *self, PyObject *args, PyObject *kwargs)
   const char *c_url = nullptr;
   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s", kwlist,
                                    &c_url)) {
-    PyErr_SetString(PyExc_TypeError, "Error during parsing osimport(filename)");
+    PyErr_SetString(PyExc_TypeError, "Error during parsing nimport(filename)");
     return NULL;
   }
   if(c_url == nullptr) return Py_None;
@@ -3873,7 +3898,7 @@ PyObject *python_add_parameter(PyObject *self, PyObject *args, PyObject *kwargs,
 	  }  
       }
     }
-    PyObject *maindict = PyModule_GetDict(pythonMainModule);
+    PyObject *maindict = PyModule_GetDict(pythonMainModule.get());
     PyDict_SetItemString(maindict, name,value_effective);
 
   }
@@ -3903,11 +3928,13 @@ PyObject *python_scad(PyObject *self, PyObject *args, PyObject *kwargs)
   ContextHandle<BuiltinContext> builtin_context{Context::create<BuiltinContext>(&session)};
   std::shared_ptr<const FileContext> file_context;
   std::shared_ptr<AbstractNode> resultnode = parsed_file->instantiate(*builtin_context, &file_context);
+  resultnode = resultnode->clone(); // instmod will go out of scope
   delete parsed_file;
+  parsed_file = nullptr;
   return PyOpenSCADObjectFromNode(&PyOpenSCADType,resultnode);
 }
 
-PyObject *python_osinclude(PyObject *self, PyObject *args, PyObject *kwargs)
+PyObject *python_osuse_include(int mode, PyObject *self, PyObject *args, PyObject *kwargs)
 {
   DECLARE_INSTANCE
   auto empty = std::make_shared<CubeNode>(instance);
@@ -3917,7 +3944,8 @@ PyObject *python_osinclude(PyObject *self, PyObject *args, PyObject *kwargs)
   if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s", kwlist,
                                    &file
                                    )) {
-    PyErr_SetString(PyExc_TypeError, "Error during parsing osinclude(path)");
+    if(mode) PyErr_SetString(PyExc_TypeError, "Error during parsing osinclude(path)");
+    else PyErr_SetString(PyExc_TypeError, "Error during parsing osuse(path)");
     return NULL;
   }
   const std::string filename = lookup_file(file, ".",".");
@@ -3928,6 +3956,7 @@ PyObject *python_osinclude(PyObject *self, PyObject *args, PyObject *kwargs)
     PyErr_SetString(PyExc_TypeError, "Error in SCAD code");
     return Py_None;
   }
+  if(mode == 0) source->scope.moduleInstantiations.clear();	  
   source->handleDependencies(true);
 
   EvaluationSession *session = new EvaluationSession("python");
@@ -3937,8 +3966,6 @@ PyObject *python_osinclude(PyObject *self, PyObject *args, PyObject *kwargs)
   std::shared_ptr<AbstractNode> resultnode = source->instantiate(*builtin_context, &osinclude_context); // TODO keine globakle var, kollision!
 
   LocalScope scope = source->scope;
-  PyObject *dict;
-  dict = PyDict_New();
   PyOpenSCADObject *result = (PyOpenSCADObject *) PyOpenSCADObjectFromNode(&PyOpenSCADType, empty); 
 
   for(auto mod : source->scope.modules) { // copy modules
@@ -3969,10 +3996,18 @@ PyObject *python_osinclude(PyObject *self, PyObject *args, PyObject *kwargs)
       PyDict_SetItemString(result->dict, ass->getName().c_str(),res);
     }
   }
-
-
+ // SourceFileCache::instance()->clear();
   return (PyObject *) result;
+}
 
+PyObject *python_osuse(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+  return python_osuse_include(0,self, args, kwargs);
+}
+
+PyObject *python_osinclude(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+  return python_osuse_include(1,self, args, kwargs);
 }
 
 PyObject *python_debug_modifier(PyObject *arg,int mode) {
@@ -4052,8 +4087,8 @@ PyObject *python_model(PyObject *self, PyObject *args, PyObject *kwargs, int mod
     PyErr_SetString(PyExc_TypeError, "Error during parsing model");
     return NULL;
   }
-  if(python_result_node_bak == nullptr) return Py_None;
-  return PyOpenSCADObjectFromNode(&PyOpenSCADType, python_result_node_bak);
+  if(python_result_node == nullptr) return Py_None;
+  return PyOpenSCADObjectFromNode(&PyOpenSCADType, python_result_node);
 }
 
 PyMethodDef PyOpenSCADFunctions[] = {
@@ -4127,7 +4162,8 @@ PyMethodDef PyOpenSCADFunctions[] = {
   {"render", (PyCFunction) python_render, METH_VARARGS | METH_KEYWORDS, "Render Object."},
   {"osimport", (PyCFunction) python_import, METH_VARARGS | METH_KEYWORDS, "Import Object."},
   {"nimport", (PyCFunction) python_nimport, METH_VARARGS | METH_KEYWORDS, "Import Networked Object."},
-  {"osinclude", (PyCFunction) python_osinclude, METH_VARARGS | METH_KEYWORDS, "Import OpenSCAD Library."},
+  {"osuse", (PyCFunction) python_osuse, METH_VARARGS | METH_KEYWORDS, "Use OpenSCAD Library."},
+  {"osinclude", (PyCFunction) python_osinclude, METH_VARARGS | METH_KEYWORDS, "Include OpenSCAD Library."},
   {"version", (PyCFunction) python_version, METH_VARARGS | METH_KEYWORDS, "Output openscad Version."},
   {"version_num", (PyCFunction) python_version_num, METH_VARARGS | METH_KEYWORDS, "Output openscad Version."},
   {"add_parameter", (PyCFunction) python_add_parameter, METH_VARARGS | METH_KEYWORDS, "Add Parameter for Customizer."},

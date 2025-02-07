@@ -11,7 +11,7 @@ get_fedora_deps_yum()
   boost-devel mpfr-devel gmp-devel glew-devel CGAL-devel gcc gcc-c++ pkgconfig \
   opencsg-devel git libXmu-devel curl imagemagick ImageMagick glib2-devel make \
   xorg-x11-server-Xvfb gettext qscintilla-qt5-devel \
-  mesa-dri-drivers double-conversion-devel tbb-devel nettle-devel libjpeg-turbo-devel
+  mesa-dri-drivers double-conversion-devel tbb-devel python3-devel libcurl-devel nettle-devel libjpeg-turbo-devel
 }
 
 get_fedora_deps_dnf()
@@ -19,13 +19,14 @@ get_fedora_deps_dnf()
  dnf -y install qt5-qtbase-devel bison flex eigen3-devel harfbuzz-devel \
   fontconfig-devel freetype-devel \
   boost-devel mpfr-devel gmp-devel glew-devel CGAL-devel gcc gcc-c++ pkgconfig \
-  opencsg-devel git libXmu-devel curl ImageMagick glib2-devel make \
+  opencsg-devel git libXmu-devel curl python3-devel libcurl-devel ImageMagick glib2-devel make \
   xorg-x11-server-Xvfb gettext qscintilla-qt5-devel \
   mesa-dri-drivers libzip-devel ccache qt5-qtmultimedia-devel qt5-qtsvg-devel \
   double-conversion-devel tbb-devel nettle-devel libjpeg-turbo-devel
  dnf -y install libxml2-devel
  dnf -y install libffi-devel
  dnf -y install redhat-rpm-config
+ dnf -y install qtchooser
 }
 
 get_qomo_deps()
@@ -101,13 +102,14 @@ get_debian_deps()
 {
  apt-get update
  apt-get -y install \
-  build-essential bison flex git curl cmake ninja-build libffi-dev \
-  libboost-all-dev libboost-dev libboost-program-options-dev libboost-regex-dev libboost-system-dev \
-  libboost-filesystem-dev libboost-thread-dev libboost-program-options-dev libmpfr-dev libglew-dev libcairo2-dev libharfbuzz-dev \
-  libeigen3-dev libcgal-dev libopencsg-dev libgmp-dev libgmp3-dev libopengl5-dev libcurl4-openssl-dev libtag1-dev \
-  imagemagick libfreetype6-dev libfreetype-dev libdouble-conversion-dev libxml2-dev python3-dev nettle-dev \
-  gtk-doc-tools libglib2.0-dev gettext xvfb pkg-config ragel libtbb-dev libxmu-dev libcrypto++-dev libdbus-1-dev \
-  libgl1-mesa-dev libxi-dev libfontconfig-dev libzip-dev libglm-dev nettle-dev get_qt5_deps_debian libjpeg-dev  qtmultimedia5-dev libqt5svg5-dev qt5multimedia5-dev libqt5multimedia5-dev qt5tools5-dev lib3mf-dev
+  build-essential bison flex git curl libcurl4-openssl-dev cmake ninja-build libffi-dev \
+  libboost-program-options-dev libboost-regex-dev libboost-system-dev \
+  libmpfr-dev libglew-dev libcairo2-dev libharfbuzz-dev \
+  libeigen3-dev libcgal-dev libopencsg-dev libgmp-dev \
+  imagemagick libfreetype6-dev libdouble-conversion-dev libxml2-dev python3-dev nettle-dev \
+  gtk-doc-tools libglib2.0-dev gettext xvfb pkg-config ragel libtbb-dev libcrypto++-dev \
+  libgl1-mesa-dev libxi-dev libfontconfig-dev libzip-dev libjpeg-dev
+ get_qt5_deps_debian
 }
 
 get_qt5_deps_debian()

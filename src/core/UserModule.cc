@@ -82,7 +82,6 @@ std::shared_ptr<AbstractNode> UserModule::instantiate(const std::shared_ptr<cons
 {
   if (StackCheck::inst().check()) {
     print_err(inst->name(), loc, context);
-    printf("throw2a\n");
     throw RecursionException::create("module", inst->name(), loc);
     return nullptr;
   }
@@ -104,7 +103,6 @@ std::shared_ptr<AbstractNode> UserModule::instantiate(const std::shared_ptr<cons
   try{
     ret = this->body.instantiateModules(*module_context, std::make_shared<GroupNode>(inst, std::string("module ") + this->name));
   } catch (EvaluationException& e) {
-    printf("throw2\n");
     if (OpenSCAD::traceUsermoduleParameters && e.traceDepth > 0) {
       print_trace(this, *module_context, this->parameters);
       e.traceDepth--;
@@ -132,4 +130,26 @@ void UserModule::print(std::ostream& stream, const std::string& indent) const
   if (!this->name.empty()) {
     stream << indent << "}\n";
   }
+}
+
+void UserModule::print_python(std::ostream& stream, std::ostream& stream_def, const std::string& indent) const
+{
+  std::string tab;
+  if (!this->name.empty()) {
+    stream << indent << "def " << this->name << "(";
+    for (size_t i = 0; i < this->parameters.size(); ++i) {
+      const auto& parameter = this->parameters[i];
+      if (i > 0) stream << ", ";
+      stream << parameter->getName();
+      if (parameter->getExpr()) stream << " = " << *parameter->getExpr();
+    }
+    stream << "):\n";
+    tab = "\t";
+  }
+//  stream << "\t";
+  body.print_python(stream, stream_def, indent + tab,false, 1);
+  stream << "\n\n";
+//  if (!this->name.empty()) {
+//    stream << indent << "}\n";
+//  }
 }

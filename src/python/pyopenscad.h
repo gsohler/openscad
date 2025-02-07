@@ -11,7 +11,8 @@
 
 #define DECLARE_INSTANCE	std::string instance_name; \
 	AssignmentList inst_asslist;\
-	ModuleInstantiation *instance = new ModuleInstantiation(instance_name,inst_asslist, Location::NONE);
+	ModuleInstantiation *instance = new ModuleInstantiation(instance_name,inst_asslist, Location::NONE); \
+	modinsts_list.push_back(instance);
 
 
 typedef struct {
@@ -21,11 +22,15 @@ typedef struct {
   /* Type-specific fields go here. */
 } PyOpenSCADObject;
 
+void PyObjectDeleter (PyObject *pObject);
+using PyObjectUniquePtr = std::unique_ptr<PyObject, const decltype(PyObjectDeleter)&>;
+
 PyMODINIT_FUNC PyInit_PyOpenSCAD(void);
 
 extern PyTypeObject PyOpenSCADType;
 
 extern std::shared_ptr<AbstractNode> python_result_node;
+extern PyObject *python_result_obj;
 extern std::vector<SelectedObject> python_result_handle;
 
 extern bool python_active;
@@ -63,5 +68,5 @@ extern PyMappingMethods PyOpenSCADMapping;
 extern PyMethodDef PyOpenSCADFunctions[];
 extern PyMethodDef PyOpenSCADMethods[];
 
-extern PyObject *pythonMainModule;
-extern PyObject *pythonInitDict;
+extern PyObjectUniquePtr pythonInitDict;
+extern PyObjectUniquePtr pythonMainModule;
