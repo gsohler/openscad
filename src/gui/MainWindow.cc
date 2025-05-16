@@ -23,61 +23,97 @@
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
+#ifdef _WIN32
+#include "winsock2.h"
+#endif
+#include "gui/MainWindow.h"
+
+#include <deque>
+#include <cassert>
+#include <array>
+#include <functional>
+#include <exception>
+#include <sstream>
 #include <iostream>
 #include <memory>
+#include <string>
+#include <vector>
+#include <cstdio>
+#include <memory>
+#include <utility>
 
-#include "boost-utils.h"
-#include "Builtins.h"
-#include "BuiltinContext.h"
-#include "CommentParser.h"
-#include "RenderVariables.h"
-#include "openscad.h"
-#include "GeometryCache.h"
-#include "SourceFileCache.h"
-#include "MainWindow.h"
-#include "OpenSCADApp.h"
-#include "parsersettings.h"
-#include "RenderSettings.h"
-#include "Preferences.h"
-#include "printutils.h"
-#include "core/node.h"
-#include "CSGNode.h"
-#include "Expression.h"
-#include "ScopeContext.h"
-#include "progress.h"
-#include "dxfdim.h"
-#include "Settings.h"
-#include "AboutDialog.h"
-#include "FontListDialog.h"
-#include "LibraryInfoDialog.h"
-#include "ScintillaEditor.h"
-#ifdef ENABLE_OPENCSG
-#include "CSGTreeEvaluator.h"
-#include "OpenCSGRenderer.h"
-#ifdef USE_LEGACY_RENDERERS
-#include "LegacyOpenCSGRenderer.h"
+#include <QApplication>
+#include <QDialog>
+#include <QElapsedTimer>
+#include <QEvent>
+#include <QFont>
+#include <QFontMetrics>
+#include <QIcon>
+#include <QKeySequence>
+#include <QList>
+#include <QMetaObject>
+#include <QPoint>
+#include <QScreen>
+#include <QSoundEffect>
+#include <QStringList>
+#include <QTextEdit>
+#include <QToolBar>
+#include <QWidget>
+
+#include "openscad_gui.h"
+
+#ifdef ENABLE_MANIFOLD
+#include "geometry/manifold/manifoldutils.h"
 #endif
+#include "core/Builtins.h"
+#include "core/BuiltinContext.h"
+#include "core/customizer/CommentParser.h"
+#include "core/RenderVariables.h"
+#include "openscad.h"
+#include "geometry/GeometryCache.h"
+#include "core/SourceFileCache.h"
+#include "gui/OpenSCADApp.h"
+#include "core/parsersettings.h"
+#include "glview/RenderSettings.h"
+#include "gui/Preferences.h"
+#include "utils/printutils.h"
+#include "core/node.h"
+#include "core/ColorUtil.h"
+#include "core/CSGNode.h"
+#include "core/Expression.h"
+#include "core/ScopeContext.h"
+#include "core/progress.h"
+#include "io/dxfdim.h"
+#include "io/fileutils.h"
+#include "core/Settings.h"
+#include "gui/AboutDialog.h"
+#include "gui/FontListDialog.h"
+#include "gui/LibraryInfoDialog.h"
+#include "gui/ScintillaEditor.h"
+#include <fileutils.h>
+#include <fstream>
+#ifdef ENABLE_OPENCSG
+#include "core/CSGTreeEvaluator.h"
+#include "glview/preview/OpenCSGRenderer.h"
 #include <opencsg.h>
 #endif
-#include "ProgressWidget.h"
-#include "ThrownTogetherRenderer.h"
-#ifdef USE_LEGACY_RENDERERS
-#include "LegacyThrownTogetherRenderer.h"
-#endif
-#include "CSGTreeNormalizer.h"
-#include "QGLView.h"
-#include "MouseSelector.h"
+#include "gui/ProgressWidget.h"
+#include "glview/preview/ThrownTogetherRenderer.h"
+#include "glview/preview/CSGTreeNormalizer.h"
+#include "gui/QGLView.h"
+#include "gui/MouseSelector.h"
 #ifdef Q_OS_MACOS
-#include "CocoaUtils.h"
+#include "platform/CocoaUtils.h"
 #endif
 #ifdef Q_OS_WIN
 #include <QScreen>
 #endif
-#include "PlatformUtils.h"
+#include "platform/PlatformUtils.h"
 #ifdef OPENSCAD_UPDATER
-#include "AutoUpdater.h"
+#include "gui/AutoUpdater.h"
 #endif
-#include "TabManager.h"
+#include "gui/TabManager.h"
+#include "gui/ExternalToolInterface.h"
 
 #include <QMenu>
 #include <QTime>
@@ -102,12 +138,16 @@
 #include <QDockWidget>
 #include <QClipboard>
 #include <QToolTip>
+#include <QProcess>
 #include <memory>
 #include <string>
-#include "QWordSearchField.h"
+#include "gui/QWordSearchField.h"
 #include <QSettings> //Include QSettings for direct operations on settings arrays
-#include "QSettingsCached.h"
+#include "gui/QSettingsCached.h"
 
+#include <curl/curl.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #ifdef ENABLE_PYTHON
 #include "python/python_public.h"
 #include "nettle/sha2.h"
@@ -131,15 +171,54 @@ std::string SHA256HashString(std::string aString){
     return digest_base64;
 }
 
-#endif
+#include <iostream>
+static size_t curl_download_write(void *ptr, size_t size, size_t nmemb, void *stream)
+{
+        
+  size_t written = fwrite(ptr, size, nmemb, (FILE *)stream);
+  return written;
+}
+	
+int curl_download(std::string url, std::string path)
+{
+    CURLcode status;
+    FILE *fh=fopen((path+"_").c_str(),"wb");
+    if(fh != nullptr) {
+      CURL *curl = curl_easy_init();
+      if(curl) {
+        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, fh);
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, curl_download_write);
+        curl_easy_setopt(curl, CURLOPT_FORBID_REUSE, 1L);
+ 
+        status = curl_easy_perform(curl);
+        curl_easy_cleanup(curl);
+      }	
+      fclose(fh);
+      if(status == CURLE_OK) {
+	try {
+	  if(std::filesystem::exists(path)) std::filesystem::remove(path);
+          std::filesystem::rename(path+"_", path);	      
+	}catch(const std::exception& ex)
+        {
+	  std::cerr << ex.what() << std::endl;
+          LOG(message_group::Error, "Exception during installing file!");
+        }  
+      } else {
+        LOG(message_group::Error, "Could not download!");
+      }
+    }
+    return 0;
+}
+#endif // ifdef ENABLE_PYTHON
 
 #ifdef ENABLE_JS
 #include "js/js_public.h"
 #endif
 
 #define ENABLE_3D_PRINTING
-#include "OctoPrint.h"
-#include "PrintService.h"
+#include "gui/OctoPrint.h"
+#include "gui/PrintService.h"
 
 #include <fstream>
 
@@ -148,40 +227,36 @@ std::string SHA256HashString(std::string aString){
 #include <boost/regex.hpp>
 #include <sys/stat.h>
 
-#include "CGALRenderer.h"
-#include "LegacyCGALRenderer.h"
-#include "CGALWorker.h"
-#include "CSGWorker.h"
+#include "glview/cgal/CGALRenderer.h"
+#include "gui/CGALWorker.h"
+#include "gui/CSGWorker.h"
 
 #ifdef ENABLE_CGAL
-#include "cgal.h"
-#include "cgalutils.h"
-#include "CGALCache.h"
-#include "CGAL_Nef_polyhedron.h"
-#include "CGALHybridPolyhedron.h"
+#include "geometry/cgal/cgal.h"
+#include "geometry/cgal/cgalutils.h"
+#include "geometry/cgal/CGALCache.h"
+#include "geometry/cgal/CGAL_Nef_polyhedron.h"
 #endif // ENABLE_CGAL
 
 #ifdef ENABLE_MANIFOLD
-#include "ManifoldGeometry.h"
+#include "geometry/manifold/ManifoldGeometry.h"
 #endif // ENABLE_MANIFOLD
 
-#include "GeometryEvaluator.h"
+#include "geometry/GeometryEvaluator.h"
 
-#include "PrintInitDialog.h"
-//#include "ExportPdfDialog.h"
-#include "input/InputDriverEvent.h"
-#include "input/InputDriverManager.h"
-#include <cstdio>
-#include <memory>
+#include "gui/PrintInitDialog.h"
+#include "gui/LoadShareDesignDialog.h"
+#include "gui/ShareDesignDialog.h"
+#include "gui/ExportPdfDialog.h"
+#include "gui/Export3mfDialog.h"
+#include "gui/input/InputDriverEvent.h"
+#include "gui/input/InputDriverManager.h"
 #include <QtNetwork>
-#include <utility>
-
-#include "qt-obsolete.h" // IWYU pragma: keep
 
 static const int autoReloadPollingPeriodMS = 200;
 
 // Global application state
-unsigned int GuiLocker::gui_locked = 0;
+unsigned int GuiLocker::guiLocked = 0;
 
 static char copyrighttext[] =
   "<p>Copyright (C) 2009-2024 The OpenSCAD Developers</p>"
@@ -215,44 +290,8 @@ QAction *findAction(const QList<QAction *>& actions, const std::string& name)
   return nullptr;
 }
 
-void fileExportedMessage(const char *format, const QString& filename) {
-  LOG("%1$s export finished: %2$s", format, filename.toUtf8().constData());
-}
-
-QAction *getExport3DAction(const MainWindow *mainWindow) {
-  const QString format = QString::fromStdString(Settings::Settings::toolbarExport3D.value());
-  if (format == "STL") {
-    return mainWindow->fileActionExportSTL;
-  } else if (format == "OBJ") {
-    return mainWindow->fileActionExportOBJ;
-  } else if (format == "OFF") {
-    return mainWindow->fileActionExportOFF;
-  } else if (format == "WRL") {
-    return mainWindow->fileActionExportWRL;
-  } else if (format == "AMF") {
-    return mainWindow->fileActionExportAMF;
-  } else if (format == "3MF") {
-    return mainWindow->fileActionExport3MF;
-  } else if (format == "PS") {
-    return mainWindow->fileActionExportFoldable;
-  } else {
-    return nullptr;
-  }
-}
-
-QAction *getExport2DAction(const MainWindow *mainWindow) {
-  const QString format = QString::fromStdString(Settings::Settings::toolbarExport2D.value());
-  if (format == "DXF") {
-    return mainWindow->fileActionExportDXF;
-  } else if (format == "SVG") {
-    return mainWindow->fileActionExportSVG;
-  } else if (format == "PDF") {
-    return mainWindow->fileActionExportPDF;
-  } else if (format == "PS") {
-    return mainWindow->fileActionExportFoldable;
-  } else {
-    return nullptr;
-  }
+void fileExportedMessage(const QString& format, const QString& filename) {
+  LOG("%1$s export finished: %2$s", format.toUtf8().constData(), filename.toUtf8().constData());
 }
 
 void removeExportActions(QToolBar *toolbar, QAction *action) {
@@ -267,21 +306,116 @@ void removeExportActions(QToolBar *toolbar, QAction *action) {
 }
 
 void addExportActions(const MainWindow *mainWindow, QToolBar *toolbar, QAction *action) {
-  QAction *export3D = getExport3DAction(mainWindow);
-  if (export3D) {
-    toolbar->insertAction(action, export3D);
-  }
-  QAction *export2D = getExport2DAction(mainWindow);
-  if (export2D) {
-    toolbar->insertAction(action, export2D);
+  for (const std::string& identifier : {Settings::Settings::toolbarExport3D.value(),
+                                        Settings::Settings::toolbarExport2D.value()}) {
+    FileFormat format;
+    fileformat::fromIdentifier(identifier, format);
+    const auto it = mainWindow->exportMap.find(format);
+    // FIXME: Allow turning off the toolbar entry?
+    if (it != mainWindow->exportMap.end()) {
+      toolbar->insertAction(action, it->second);
+    }
   }
 }
 
 } // namespace
 
+void MainWindow::addMenuItemCB(QString callback)
+{
+#ifdef ENABLE_PYTHON  
+  const char *cbstr = callback.toStdString().c_str();
+  std::string content = loadInitFile();
+  if(content.size() == 0) return;
+  initPython(0.0);
+  evaluatePython(content);
+  evaluatePython(cbstr);
+  finishPython();
+#endif
+}
+
+#ifdef ENABLE_PYTHON
+void MainWindow::addMenuItem(const char * menuname, const char *itemname, const char *callback)
+{
+
+  // Find or create menu
+  QMenu *menu_found = nullptr;
+  foreach (QAction *menu, menubar->actions()) {
+        if (menu->menu()) {
+            const char *menutext = qUtf8Printable(menu->text());
+            if(strstr(menutext,menuname) != nullptr)
+		menu_found = (QMenu *) menu;
+        }
+    }
+
+  if(menu_found == nullptr) {
+  	menu_found = new QMenu(menubar);
+	menu_found->setObjectName(QString(menuname));
+	menu_found->setTitle(q_(menuname, nullptr));
+	menu_found->show();
+	menubar->addAction(menu_found->menuAction());
+//	menubar->addMenu(menu_found);
+  }
+
+  menu_found = menu_File;
+
+  // Create Menu Item
+  QAction *my_menu_item = new QAction(this);
+  my_menu_item->setObjectName(itemname);
+  my_menu_item->setText(q_(itemname, nullptr));
+  connect(my_menu_item, SIGNAL(triggered()), addmenu_mapper, SLOT(map()));
+  addmenu_mapper->setMapping(my_menu_item, callback);
+  menu_found->addAction(my_menu_item);
+
+//  menubar->show();
+}
+
+MainWindow *addmenuitem_this = nullptr;
+void  add_menuitem_trampoline(const char *menuname, const char *itemname, const char *callback)
+{
+  if(addmenuitem_this == nullptr) return;	
+  addmenuitem_this->addMenuItem(menuname, itemname, callback);
+}
+
+std::string MainWindow::loadInitFile(void) {
+  std::string path = lookup_file(".pythonscadrc", ".","");
+  if(path.size() == 0) return "";
+  std::ifstream fh(path);
+
+  // confirm file opening
+  if (!fh.is_open()) return "";
+  std::string line, content;
+  while (getline(fh, line)) {
+    content += line;
+    content += "\n";
+  }
+  return content;
+}
+
+void MainWindow::customSetup(void)
+{
+  // check if .pythonscadrc is available and readable
+  //
+  std::string content = loadInitFile();
+  if(content == "") return;
+
+  this->addmenu_mapper = new QSignalMapper(this);
+  connect (this->addmenu_mapper, SIGNAL(mapped(QString)), this, SLOT(addMenuItemCB(QString))) ;
+  initPython(0.0);
+  evaluatePython(content);
+  addmenuitem_this = this;
+  evaluatePython("setup()");
+  addmenuitem_this = nullptr;
+  finishPython();
+}
+
+#endif
+
 MainWindow::MainWindow(const QStringList& filenames)
 {
   setupUi(this);
+#ifdef ENABLE_PYTHON  
+  customSetup();
+#endif  
 
   consoleUpdater = new QTimer(this);
   consoleUpdater->setSingleShot(true);
@@ -292,6 +426,7 @@ MainWindow::MainWindow(const QStringList& filenames)
   parameterDockTitleWidget = new QWidget();
   errorLogDockTitleWidget = new QWidget();
   animateDockTitleWidget = new QWidget();
+  fontListDockTitleWidget = new QWidget();
   viewportControlTitleWidget = new QWidget();
 
   this->animateWidget->setMainWindow(this);
@@ -302,6 +437,8 @@ MainWindow::MainWindow(const QStringList& filenames)
 
   this->editorDock->setConfigKey("view/hideEditor");
   this->editorDock->setAction(this->windowActionHideEditor);
+  this->editorDock->setWindowTitle("Editor");
+
   this->consoleDock->setConfigKey("view/hideConsole");
   this->consoleDock->setAction(this->windowActionHideConsole);
   this->parameterDock->setConfigKey("view/hideCustomizer");
@@ -310,6 +447,8 @@ MainWindow::MainWindow(const QStringList& filenames)
   this->errorLogDock->setAction(this->windowActionHideErrorLog);
   this->animateDock->setConfigKey("view/hideAnimate");
   this->animateDock->setAction(this->windowActionHideAnimate);
+  this->fontListDock->setConfigKey("view/hideFontList");
+  this->fontListDock->setAction(this->windowActionHideFontList);
   this->viewportControlDock->setConfigKey("view/hideViewportControl");
   this->viewportControlDock->setAction(this->windowActionHideViewportControl);
 
@@ -323,6 +462,7 @@ MainWindow::MainWindow(const QStringList& filenames)
   const QString surfaceStatement = "surface(\"%1\");\n";
   const QString importFunction = "data = import(\"%1\");\n";
   knownFileExtensions["stl"] = importStatement;
+  knownFileExtensions["step"] = importStatement;
   knownFileExtensions["obj"] = importStatement;
   knownFileExtensions["3mf"] = importStatement;
   knownFileExtensions["off"] = importStatement;
@@ -341,9 +481,9 @@ MainWindow::MainWindow(const QStringList& filenames)
 #endif
   knownFileExtensions["csg"] = "";
 
-  root_file = nullptr;
-  parsed_file = nullptr;
-  absolute_root_node = nullptr;
+  rootFile = nullptr;
+  parsedFile = nullptr;
+  absoluteRootNode = nullptr;
 
   this->csgworker = new CSGWorker(this);
   connect(this->csgworker, SIGNAL(done(void)),
@@ -361,9 +501,6 @@ MainWindow::MainWindow(const QStringList& filenames)
   // Preferences initialization happens on first tab creation, and depends on colorschemes from editor.
   // Any code dependent on Preferences must come after the TabManager instantiation
   tabManager = new TabManager(this, filenames.isEmpty() ? QString() : filenames[0]);
-  connect(tabManager, SIGNAL(tabCountChanged(int)), this, SLOT(setTabToolBarVisible(int)));
-  this->setTabToolBarVisible(tabManager->count());
-  tabToolBarContents->layout()->addWidget(tabManager->getTabHeader());
   editorDockContents->layout()->addWidget(tabManager->getTabContent());
 
   connect(Preferences::inst(), SIGNAL(consoleFontChanged(const QString&,uint)), this->console, SLOT(setFont(const QString&,uint)));
@@ -401,7 +538,7 @@ MainWindow::MainWindow(const QStringList& filenames)
   connect(this->cgalworker, SIGNAL(done(std::shared_ptr<const Geometry>)),
           this, SLOT(actionRenderDone(std::shared_ptr<const Geometry>)));
 
-  root_node = nullptr;
+  rootNode = nullptr;
 
   this->qglview->statusLabel = new QLabel(this);
   this->qglview->statusLabel->setMinimumWidth(100);
@@ -411,13 +548,20 @@ MainWindow::MainWindow(const QStringList& filenames)
   this->qglview->setMouseCentricZoom(Settings::Settings::mouseCentricZoom.value());
   this->qglview->setMouseSwapButtons(Settings::Settings::mouseSwapButtons.value());
   this->meas.setView(qglview);
-  this->designActionMeasureDist->setEnabled(false);
+  this->designActionMeasureDistance->setEnabled(false);
   this->designActionMeasureAngle->setEnabled(false);
 
   autoReloadTimer = new QTimer(this);
   autoReloadTimer->setSingleShot(false);
   autoReloadTimer->setInterval(autoReloadPollingPeriodMS);
   connect(autoReloadTimer, SIGNAL(timeout()), this, SLOT(checkAutoReload()));
+
+  this->exportFormatMapper = new QSignalMapper(this);
+#if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
+  connect(this->exportFormatMapper, &QSignalMapper::mappedInt, this, &MainWindow::actionExportFileFormat);
+#else
+  connect(this->exportFormatMapper, static_cast<void (QSignalMapper::*)(int)>(&QSignalMapper::mapped), this, &MainWindow::actionExportFileFormat);
+#endif
 
   waitAfterReloadTimer = new QTimer(this);
   waitAfterReloadTimer->setSingleShot(true);
@@ -487,26 +631,38 @@ MainWindow::MainWindow(const QStringList& filenames)
   connect(this->designActionReloadAndPreview, SIGNAL(triggered()), this, SLOT(actionReloadRenderPreview()));
   connect(this->designActionPreview, SIGNAL(triggered()), this, SLOT(actionRenderPreview()));
   connect(this->designActionRender, SIGNAL(triggered()), this, SLOT(actionRender()));
-  connect(this->designActionMeasureDist, SIGNAL(triggered()), this, SLOT(actionMeasureDistance()));
+  connect(this->designActionMeasureDistance, SIGNAL(triggered()), this, SLOT(actionMeasureDistance()));
   connect(this->designActionMeasureAngle, SIGNAL(triggered()), this, SLOT(actionMeasureAngle()));
   connect(this->designActionFindHandle, SIGNAL(triggered()), this, SLOT(actionFindHandle()));
   connect(this->designAction3DPrint, SIGNAL(triggered()), this, SLOT(action3DPrint()));
+  connect(this->designShareDesign, SIGNAL(triggered()), this, SLOT(actionShareDesign()));
+  connect(this->designLoadShareDesign, SIGNAL(triggered()), this, SLOT(actionLoadShareDesign()));
   connect(this->designCheckValidity, SIGNAL(triggered()), this, SLOT(actionCheckValidity()));
   connect(this->designActionDisplayAST, SIGNAL(triggered()), this, SLOT(actionDisplayAST()));
+  connect(this->designActionDisplayPython, SIGNAL(triggered()), this, SLOT(actionDisplayPython()));
   connect(this->designActionDisplayCSGTree, SIGNAL(triggered()), this, SLOT(actionDisplayCSGTree()));
   connect(this->designActionDisplayCSGProducts, SIGNAL(triggered()), this, SLOT(actionDisplayCSGProducts()));
-  connect(this->fileActionExportSTL, SIGNAL(triggered()), this, SLOT(actionExportSTL()));
-  connect(this->fileActionExport3MF, SIGNAL(triggered()), this, SLOT(actionExport3MF()));
-  connect(this->fileActionExportOBJ, SIGNAL(triggered()), this, SLOT(actionExportOBJ()));
-  connect(this->fileActionExportOFF, SIGNAL(triggered()), this, SLOT(actionExportOFF()));
-  connect(this->fileActionExportWRL, SIGNAL(triggered()), this, SLOT(actionExportWRL()));
-  connect(this->fileActionExportFoldable, SIGNAL(triggered()), this, SLOT(actionExportFoldable()));
-  connect(this->fileActionExportAMF, SIGNAL(triggered()), this, SLOT(actionExportAMF()));
-  connect(this->fileActionExportDXF, SIGNAL(triggered()), this, SLOT(actionExportDXF()));
-  connect(this->fileActionExportSVG, SIGNAL(triggered()), this, SLOT(actionExportSVG()));
-  connect(this->fileActionExportPDF, SIGNAL(triggered()), this, SLOT(actionExportPDF()));
-  connect(this->fileActionExportCSG, SIGNAL(triggered()), this, SLOT(actionExportCSG()));
-  connect(this->fileActionExportImage, SIGNAL(triggered()), this, SLOT(actionExportImage()));
+
+  exportMap[FileFormat::BINARY_STL] = this->fileActionExportBinarySTL;
+  exportMap[FileFormat::ASCII_STL] = this->fileActionExportAsciiSTL;
+  exportMap[FileFormat::_3MF] = this->fileActionExport3MF;
+  exportMap[FileFormat::OBJ] = this->fileActionExportOBJ;
+  exportMap[FileFormat::OFF] = this->fileActionExportOFF;
+  exportMap[FileFormat::WRL] = this->fileActionExportWRL;
+  exportMap[FileFormat::POV] = this->fileActionExportPOV;
+  exportMap[FileFormat::PS] =  this->fileActionExportFoldable;
+  exportMap[FileFormat::STEP] =  this->fileActionExportSTP;
+  exportMap[FileFormat::AMF] = this->fileActionExportAMF;
+  exportMap[FileFormat::DXF] = this->fileActionExportDXF;
+  exportMap[FileFormat::SVG] = this->fileActionExportSVG;
+  exportMap[FileFormat::PDF] = this->fileActionExportPDF;
+  exportMap[FileFormat::CSG] = this->fileActionExportCSG;
+  exportMap[FileFormat::PNG] = this->fileActionExportImage;
+
+  for (auto& pair : exportMap) {
+    connect(pair.second, SIGNAL(triggered()), this->exportFormatMapper, SLOT(map()));
+    this->exportFormatMapper->setMapping(pair.second, int(pair.first));
+  }
   connect(this->designActionFlushCaches, SIGNAL(triggered()), this, SLOT(actionFlushCaches()));
 
 #ifndef ENABLE_LIB3MF
@@ -519,17 +675,17 @@ MainWindow::MainWindow(const QStringList& filenames)
 #endif
 
   // View menu
-#ifndef ENABLE_OPENCSG
-  this->viewActionPreview->setVisible(false);
-#else
-  connect(this->viewActionPreview, SIGNAL(triggered()), this, SLOT(viewModePreview()));
-  if (!this->qglview->hasOpenCSGSupport()) {
-    this->viewActionPreview->setEnabled(false);
+  this->viewActionThrownTogether->setEnabled(false);
+  this->viewActionPreview->setEnabled(false);
+  if (this->qglview->hasOpenCSGSupport()) {
+    this->viewActionPreview->setChecked(true);
+    this->viewActionThrownTogether->setChecked(false);
+  } else {
+    this->viewActionPreview->setChecked(false);
+    this->viewActionThrownTogether->setChecked(true);
   }
-#endif
 
-  connect(this->viewActionSurfaces, SIGNAL(triggered()), this, SLOT(viewModeSurface()));
-  connect(this->viewActionWireframe, SIGNAL(triggered()), this, SLOT(viewModeWireframe()));
+  connect(this->viewActionPreview, SIGNAL(triggered()), this, SLOT(viewModePreview()));
   connect(this->viewActionThrownTogether, SIGNAL(triggered()), this, SLOT(viewModeThrownTogether()));
   connect(this->viewActionShowEdges, SIGNAL(triggered()), this, SLOT(viewModeShowEdges()));
   connect(this->viewActionShowAxes, SIGNAL(triggered()), this, SLOT(viewModeShowAxes()));
@@ -556,6 +712,7 @@ MainWindow::MainWindow(const QStringList& filenames)
   connect(this->windowActionHideCustomizer, SIGNAL(triggered()), this, SLOT(hideParameters()));
   connect(this->windowActionHideErrorLog, SIGNAL(triggered()), this, SLOT(hideErrorLog()));
   connect(this->windowActionHideAnimate, SIGNAL(triggered()), this, SLOT(hideAnimate()));
+  connect(this->windowActionHideFontList, SIGNAL(triggered()), this, SLOT(hideFontList()));
   connect(this->windowActionHideViewportControl, SIGNAL(triggered()), this, SLOT(hideViewportControl()));
 
   // Help menu
@@ -626,52 +783,6 @@ MainWindow::MainWindow(const QStringList& filenames)
 
   Preferences *instance = Preferences::inst();
 
-  initActionIcon(fileActionNew, ":/icons/svg-default/new.svg", ":/icons/svg-default/new-white.svg");
-  initActionIcon(fileActionOpen, ":/icons/svg-default/open.svg", ":/icons/svg-default/open-white.svg");
-  initActionIcon(fileActionSave, ":/icons/svg-default/save.svg", ":/icons/svg-default/save-white.svg");
-  initActionIcon(editActionZoomTextIn, ":/icons/svg-default/zoom-text-in.svg", ":/icons/svg-default/zoom-text-in-white.svg");
-  initActionIcon(editActionZoomTextOut, ":/icons/svg-default/zoom-text-out.svg", ":/icons/svg-default/zoom-text-out-white.svg");
-  initActionIcon(designActionRender, ":/icons/svg-default/render.svg", ":/icons/svg-default/render-white.svg");
-  initActionIcon(designAction3DPrint, ":/icons/svg-default/send.svg", ":/icons/svg-default/send-white.svg");
-  initActionIcon(viewActionShowAxes, ":/icons/svg-default/axes.svg", ":/icons/svg-default/axes-white.svg");
-  initActionIcon(viewActionShowEdges, ":/icons/svg-default/show-edges.svg", ":/icons/svg-default/show-edges-white.svg");
-  initActionIcon(viewActionZoomIn, ":/icons/svg-default/zoom-in.svg", ":/icons/svg-default/zoom-in-white.svg");
-  initActionIcon(viewActionZoomOut, ":/icons/svg-default/zoom-out.svg", ":/icons/svg-default/zoom-out-white.svg");
-  initActionIcon(viewActionTop, ":/icons/svg-default/view-top.svg", ":/icons/svg-default/view-top-white.svg");
-  initActionIcon(viewActionBottom, ":/icons/svg-default/view-bottom.svg", ":/icons/svg-default/view-bottom-white.svg");
-  initActionIcon(viewActionLeft, ":/icons/svg-default/view-left.svg", ":/icons/svg-default/view-left-white.svg");
-  initActionIcon(viewActionRight, ":/icons/svg-default/view-right.svg", ":/icons/svg-default/view-right-white.svg");
-  initActionIcon(viewActionFront, ":/icons/svg-default/view-front.svg", ":/icons/svg-default/view-front-white.svg");
-  initActionIcon(viewActionBack, ":/icons/svg-default/view-back.svg", ":/icons/svg-default/view-back-white.svg");
-  initActionIcon(viewActionSurfaces, ":/icons/svg-default/surface.svg", ":/icons/svg-default/surface-white.svg");
-  initActionIcon(viewActionWireframe, ":/icons/svg-default/wireframe.svg", ":/icons/svg-default/wireframe-white.svg");
-  initActionIcon(viewActionShowCrosshairs, ":/icons/svg-default/crosshairs.svg", ":/icons/svg-default/crosshairs-white.svg");
-  initActionIcon(viewActionThrownTogether, ":/icons/svg-default/throwntogether.svg", ":/icons/svg-default/throwntogether-white.svg");
-  initActionIcon(viewActionPerspective, ":/icons/svg-default/perspective.svg", ":/icons/svg-default/perspective-white.svg");
-  initActionIcon(viewActionOrthogonal, ":/icons/svg-default/orthogonal.svg", ":/icons/svg-default/orthogonal-white.svg");
-  initActionIcon(designActionPreview, ":/icons/svg-default/preview.svg", ":/icons/svg-default/preview-white.svg");
-  initActionIcon(designActionMeasureDist, ":/icons/svg-default/measure-dist.svg", ":/icons/svg-default/measure-dist-white.svg");
-  initActionIcon(designActionMeasureAngle, ":/icons/svg-default/measure-ang.svg", ":/icons/svg-default/measure-ang-white.svg");
-  initActionIcon(designActionFindHandle, ":/icons/svg-default/find-handle.svg", ":/icons/svg-default/find-handle-white.svg");
-  initActionIcon(fileActionExportSTL, ":/icons/svg-default/export-stl.svg", ":/icons/svg-default/export-stl-white.svg");
-  initActionIcon(fileActionExportAMF, ":/icons/svg-default/export-amf.svg", ":/icons/svg-default/export-amf-white.svg");
-  initActionIcon(fileActionExport3MF, ":/icons/svg-default/export-3mf.svg", ":/icons/svg-default/export-3mf-white.svg");
-  initActionIcon(fileActionExportOBJ, ":/icons/svg-default/export-obj.svg", ":/icons/svg-default/export-obj-white.svg");
-  initActionIcon(fileActionExportOFF, ":/icons/svg-default/export-off.svg", ":/icons/svg-default/export-off-white.svg");
-  initActionIcon(fileActionExportWRL, ":/icons/svg-default/export-wrl.svg", ":/icons/svg-default/export-wrl-white.svg");
-  initActionIcon(fileActionExportDXF, ":/icons/svg-default/export-dxf.svg", ":/icons/svg-default/export-dxf-white.svg");
-  initActionIcon(fileActionExportSVG, ":/icons/svg-default/export-svg.svg", ":/icons/svg-default/export-svg-white.svg");
-  initActionIcon(fileActionExportCSG, ":/icons/svg-default/export-csg.svg", ":/icons/svg-default/export-csg-white.svg");
-  initActionIcon(fileActionExportPDF, ":/icons/svg-default/export-pdf.svg", ":/icons/svg-default/export-pdf-white.svg");
-  initActionIcon(fileActionExportImage, ":/icons/svg-default/export-png.svg", ":/icons/svg-default/export-png-white.svg");
-  initActionIcon(viewActionViewAll, ":/icons/svg-default/zoom-all.svg", ":/icons/svg-default/zoom-all-white.svg");
-  initActionIcon(editActionUndo, ":/icons/svg-default/undo.svg", ":/icons/svg-default/undo-white.svg");
-  initActionIcon(editActionRedo, ":/icons/svg-default/redo.svg", ":/icons/svg-default/redo-white.svg");
-  initActionIcon(editActionUnindent, ":/icons/svg-default/unindent.svg", ":/icons/svg-default/unindent-white.svg");
-  initActionIcon(editActionIndent, ":/icons/svg-default/indent.svg", ":/icons/svg-default/indent-white.svg");
-  initActionIcon(viewActionResetView, ":/icons/svg-default/reset-view.svg", ":/icons/svg-default/reset-view-white.svg");
-  initActionIcon(viewActionShowScaleProportional, ":/icons/svg-default/scalemarkers.svg", ":/icons/svg-default/scalemarkers-white.svg");
-
   InputDriverManager::instance()->registerActions(this->menuBar()->actions(), "", "");
   InputDriverManager::instance()->registerActions(this->animateWidget->actions(), "animation", "animate");
   instance->ButtonConfig->init();
@@ -682,6 +793,7 @@ MainWindow::MainWindow(const QStringList& filenames)
   bool hideCustomizer = settings.value("view/hideCustomizer").toBool();
   bool hideErrorLog = settings.value("view/hideErrorLog").toBool();
   bool hideAnimate = settings.value("view/hideAnimate").toBool();
+  bool hideFontList = settings.value("view/hideFontList").toBool();
   bool hideViewportControl = settings.value("view/hideViewportControl").toBool();
   bool hideEditorToolbar = settings.value("view/hideEditorToolbar").toBool();
   bool hide3DViewToolbar = settings.value("view/hide3DViewToolbar").toBool();
@@ -689,6 +801,15 @@ MainWindow::MainWindow(const QStringList& filenames)
   // make sure it looks nice..
   const auto windowState = settings.value("window/state", QByteArray()).toByteArray();
   restoreGeometry(settings.value("window/geometry", QByteArray()).toByteArray());
+#if QT_VERSION >= QT_VERSION_CHECK(5, 14, 0)
+  // Workaround for a Qt bug (possible QTBUG-46620, but it's still there in Qt-6.5.3)
+  // Blindly restoring a maximized window to a different screen resolution causes a crash
+  // on the next move/resize operation on macOS:
+  // https://github.com/openscad/openscad/issues/5486
+  if (isMaximized()) {
+    setGeometry(screen()->availableGeometry());
+  }
+#endif
   restoreState(windowState);
 
   if (windowState.size() == 0) {
@@ -706,7 +827,8 @@ MainWindow::MainWindow(const QStringList& filenames)
      */
     activeEditor->setInitialSizeHint(QSize((5 * this->width() / 11), 100));
     tabifyDockWidget(consoleDock, errorLogDock);
-    tabifyDockWidget(errorLogDock, animateDock);
+    tabifyDockWidget(errorLogDock, fontListDock);
+    tabifyDockWidget(fontListDock, animateDock);
     showConsole();
     hideCustomizer = true;
     hideViewportControl = true;
@@ -730,13 +852,13 @@ MainWindow::MainWindow(const QStringList& filenames)
 #endif // ifdef Q_OS_WIN
   }
 
-  updateWindowSettings(hideConsole, hideEditor, hideCustomizer, hideErrorLog, hideEditorToolbar, hide3DViewToolbar, hideAnimate, hideViewportControl);
+  updateWindowSettings(hideConsole, hideEditor, hideCustomizer, hideErrorLog, hideEditorToolbar, hide3DViewToolbar, hideAnimate, hideFontList, hideViewportControl);
 
-  connect(this->editorDock, SIGNAL(topLevelChanged(bool)), this, SLOT(editorTopLevelChanged(bool)));
   connect(this->consoleDock, SIGNAL(topLevelChanged(bool)), this, SLOT(consoleTopLevelChanged(bool)));
   connect(this->parameterDock, SIGNAL(topLevelChanged(bool)), this, SLOT(parameterTopLevelChanged(bool)));
   connect(this->errorLogDock, SIGNAL(topLevelChanged(bool)), this, SLOT(errorLogTopLevelChanged(bool)));
   connect(this->animateDock, SIGNAL(topLevelChanged(bool)), this, SLOT(animateTopLevelChanged(bool)));
+  connect(this->fontListDock, SIGNAL(topLevelChanged(bool)), this, SLOT(fontListTopLevelChanged(bool)));
   connect(this->viewportControlDock, SIGNAL(topLevelChanged(bool)), this, SLOT(viewportControlTopLevelChanged(bool)));
 
   connect(this->activeEditor, SIGNAL(escapePressed()), this, SLOT(measureFinished()));
@@ -793,17 +915,6 @@ void MainWindow::toolTipShow(QPoint pt,QString msg)
   QToolTip::showText(pos,msg,this);
 }
 
-bool MainWindow::isLightTheme(){
-  int defaultcolor = viewerToolBar->palette().window().color().lightness();
-  return (defaultcolor > 165);
-}
-
-void MainWindow::initActionIcon(QAction *action, const char *darkResource, const char *lightResource)
-{
-  const char *resource = this->isLightTheme() ? darkResource : lightResource;
-  action->setIcon(QIcon(resource));
-}
-
 void MainWindow::addKeyboardShortCut(const QList<QAction *>& actions)
 {
   for (auto& action : actions) {
@@ -827,7 +938,7 @@ void MainWindow::addKeyboardShortCut(const QList<QAction *>& actions)
  * Qt call. So the values are loaded before the call and restored here
  * regardless of the (potential outdated) serialized state.
  */
-void MainWindow::updateWindowSettings(bool console, bool editor, bool customizer, bool errorLog, bool editorToolbar, bool viewToolbar, bool animate, bool viewportControl)
+void MainWindow::updateWindowSettings(bool console, bool editor, bool customizer, bool errorLog, bool editorToolbar, bool viewToolbar, bool animate, bool fontList, bool viewportControl)
 {
   windowActionHideEditor->setChecked(editor);
   hideEditor();
@@ -839,6 +950,8 @@ void MainWindow::updateWindowSettings(bool console, bool editor, bool customizer
   hideParameters();
   windowActionHideAnimate->setChecked(animate);
   hideAnimate();
+  windowActionHideFontList->setChecked(fontList);
+  hideFontList();
   windowActionHideViewportControl->setChecked(viewportControl);
   hideViewportControl();
 
@@ -867,7 +980,6 @@ void MainWindow::onTranslateEvent(InputEventTranslate *event)
   } else {
     qglview->translate(zoomFactor * event->x, event->y, zoomFactor * event->z, event->relative, false);
   }
-
 }
 
 void MainWindow::onRotateEvent(InputEventRotate *event)
@@ -944,6 +1056,8 @@ void MainWindow::loadDesignSettings()
   GeometryCache::instance()->setMaxSizeMB(polySetCacheSizeMB);
   auto cgalCacheSizeMB = Preferences::inst()->getValue("advanced/cgalCacheSizeMB").toUInt();
   CGALCache::instance()->setMaxSizeMB(cgalCacheSizeMB);
+  auto backend3D = Preferences::inst()->getValue("advanced/renderBackend3D").toString().toStdString();
+  RenderSettings::inst()->backend3D = renderBackend3DFromString(backend3D);
 }
 
 void MainWindow::updateUndockMode(bool undockMode)
@@ -955,8 +1069,8 @@ void MainWindow::updateUndockMode(bool undockMode)
     parameterDock->setFeatures(parameterDock->features() | QDockWidget::DockWidgetFloatable);
     errorLogDock->setFeatures(errorLogDock->features() | QDockWidget::DockWidgetFloatable);
     animateDock->setFeatures(animateDock->features() | QDockWidget::DockWidgetFloatable);
+    fontListDock->setFeatures(fontListDock->features() | QDockWidget::DockWidgetFloatable);
     viewportControlDock->setFeatures(viewportControlDock->features() | QDockWidget::DockWidgetFloatable);
-
   } else {
     if (editorDock->isFloating()) {
       editorDock->setFloating(false);
@@ -983,6 +1097,11 @@ void MainWindow::updateUndockMode(bool undockMode)
     }
     animateDock->setFeatures(animateDock->features() & ~QDockWidget::DockWidgetFloatable);
 
+    if (fontListDock->isFloating()) {
+      fontListDock->setFloating(false);
+    }
+    fontListDock->setFeatures(fontListDock->features() & ~QDockWidget::DockWidgetFloatable);
+
     if (viewportControlDock->isFloating()) {
       viewportControlDock->setFloating(false);
     }
@@ -998,14 +1117,15 @@ void MainWindow::updateReorderMode(bool reorderMode)
   parameterDock->setTitleBarWidget(reorderMode ? nullptr : parameterDockTitleWidget);
   errorLogDock->setTitleBarWidget(reorderMode ? nullptr : errorLogDockTitleWidget);
   animateDock->setTitleBarWidget(reorderMode ? nullptr : animateDockTitleWidget);
+  fontListDock->setTitleBarWidget(reorderMode ? nullptr : fontListDockTitleWidget);
   viewportControlDock->setTitleBarWidget(reorderMode ? nullptr : viewportControlWidget);
 }
 
 MainWindow::~MainWindow()
 {
-  // If root_file is not null then it will be the same as parsed_file,
+  // If root_file is not null then it will be the same as parsedFile,
   // so no need to delete it.
-  delete parsed_file;
+  delete parsedFile;
   scadApp->windowManager.remove(this);
   if (scadApp->windowManager.getWindows().size() == 0) {
     // Quit application even in case some other windows like
@@ -1065,12 +1185,6 @@ void MainWindow::updateRecentFiles(const QString& FileSavedOrOpened)
   }
 }
 
-void MainWindow::setTabToolBarVisible(int count)
-{
-  tabCount = count;
-  tabToolBar->setVisible((tabCount > 1) && editorDock->isVisible());
-}
-
 /*!
    compiles the design. Calls compileDone() if anything was compiled
  */
@@ -1105,7 +1219,7 @@ void MainWindow::compile(bool reload, bool forcedone)
       // if we haven't yet compiled the current text.
       else {
         auto current_doc = activeEditor->toPlainText();
-        if (current_doc.size() && last_compiled_doc.size() == 0) {
+        if (current_doc.size() && lastCompiledDoc.size() == 0) {
           shouldcompiletoplevel = true;
         }
       }
@@ -1113,10 +1227,10 @@ void MainWindow::compile(bool reload, bool forcedone)
       shouldcompiletoplevel = true;
     }
 
-    if (this->parsed_file) {
-      auto mtime = this->parsed_file->includesChanged();
-      if (mtime > this->includes_mtime) {
-        this->includes_mtime = mtime;
+    if (this->parsedFile) {
+      auto mtime = this->parsedFile->includesChanged();
+      if (mtime > this->includesMTime) {
+        this->includesMTime = mtime;
         shouldcompiletoplevel = true;
       }
     }
@@ -1134,16 +1248,16 @@ void MainWindow::compile(bool reload, bool forcedone)
       didcompile = true;
     }
 
-    if (didcompile && parser_error_pos != last_parser_error_pos) {
-      if (last_parser_error_pos >= 0) emit unhighlightLastError();
+    if (didcompile && parser_error_pos != lastParserErrorPos) {
+      if (lastParserErrorPos >= 0) emit unhighlightLastError();
       if (parser_error_pos >= 0) emit highlightError(parser_error_pos);
-      last_parser_error_pos = parser_error_pos;
+      lastParserErrorPos = parser_error_pos;
     }
 
-    if (this->root_file) {
-      auto mtime = this->root_file->handleDependencies();
-      if (mtime > this->deps_mtime) {
-        this->deps_mtime = mtime;
+    if (this->rootFile) {
+      auto mtime = this->rootFile->handleDependencies();
+      if (mtime > this->depsMTime) {
+        this->depsMTime = mtime;
         LOG("Used file cache size: %1$d files", SourceFileCache::instance()->size());
         didcompile = true;
       }
@@ -1153,8 +1267,8 @@ void MainWindow::compile(bool reload, bool forcedone)
     if (would_have_thrown()) throw HardWarningException("");
     // If we're auto-reloading, listen for a cascade of changes by starting a timer
     // if something changed _and_ there are any external dependencies
-    if (reload && didcompile && this->root_file) {
-      if (this->root_file->hasIncludes() || this->root_file->usesLibraries()) {
+    if (reload && didcompile && this->rootFile) {
+      if (this->rootFile->hasIncludes() || this->rootFile->usesLibraries()) {
         this->waitAfterReloadTimer->start();
         this->procevents = false;
         return;
@@ -1174,9 +1288,9 @@ void MainWindow::compile(bool reload, bool forcedone)
 void MainWindow::waitAfterReload()
 {
   no_exceptions_for_warnings();
-  auto mtime = this->root_file->handleDependencies();
+  auto mtime = this->rootFile->handleDependencies();
   auto stop = would_have_thrown();
-  if (mtime > this->deps_mtime) this->deps_mtime = mtime;
+  if (mtime > this->depsMTime) this->depsMTime = mtime;
   else if (!stop) {
     compile(true, true); // In case file itself or top-level includes changed during dependency updates
     return;
@@ -1264,19 +1378,19 @@ void MainWindow::instantiateRoot()
   this->thrownTogetherRenderer = nullptr;
 
   // Remove previous CSG tree
-  this->absolute_root_node.reset();
+  this->absoluteRootNode.reset();
 
   this->csgRoot.reset();
   this->normalizedRoot.reset();
-  this->root_products.reset();
+  this->rootProduct.reset();
 
-  this->root_node.reset();
+  this->rootNode.reset();
   this->tree.setRoot(nullptr);
 
-  boost::filesystem::path doc(activeEditor->filepath.toStdString());
+  std::filesystem::path doc(activeEditor->filepath.toStdString());
   this->tree.setDocumentPath(doc.parent_path().string());
 
-  if (this->root_file) {
+  if (this->rootFile) {
     // Evaluate CSG tree
     LOG("Compiling design (CSG Tree generation)...");
     this->processEvents();
@@ -1289,35 +1403,35 @@ void MainWindow::instantiateRoot()
 
     std::shared_ptr<const FileContext> file_context;
 #ifdef ENABLE_PYTHON
-    if (python_result_node != NULL && this->python_active) this->absolute_root_node = python_result_node;
+    if (python_result_node != NULL && this->python_active) this->absoluteRootNode = python_result_node;
     else
 #endif
 #ifdef ENABLE_JS
-    if (js_result_node != NULL && this->js_active) this->absolute_root_node = js_result_node;
+    if (js_result_node != NULL && this->js_active) this->absoluteRootNode = js_result_node;
     else
 #endif
-    this->absolute_root_node = this->root_file->instantiate(*builtin_context, &file_context);
+    this->absoluteRootNode = this->rootFile->instantiate(*builtin_context, &file_context);
     if (file_context) {
       this->qglview->cam.updateView(file_context, false);
       viewportControlWidget->cameraChanged();
     }
 
-    if (this->absolute_root_node) {
+    if (this->absoluteRootNode) {
       // Do we have an explicit root node (! modifier)?
       const Location *nextLocation = nullptr;
-      if (!(this->root_node = find_root_tag(this->absolute_root_node, &nextLocation))) {
-        this->root_node = this->absolute_root_node;
+      if (!(this->rootNode = find_root_tag(this->absoluteRootNode, &nextLocation))) {
+        this->rootNode = this->absoluteRootNode;
       }
       if (nextLocation) {
-        LOG(message_group::NONE, *nextLocation, builtin_context->documentRoot(), "More than one Root Modifier (!)");
+//        LOG(message_group::NONE, *nextLocation, builtin_context->documentRoot(), "More than one Root Modifier (!)"); TODO activate
       }
 
       // FIXME: Consider giving away ownership of root_node to the Tree, or use reference counted pointers
-      this->tree.setRoot(this->root_node);
+      this->tree.setRoot(this->rootNode);
     }
   }
 
-  if (!this->root_node) {
+  if (!this->rootNode) {
     if (parser_error_pos < 0) {
       LOG(message_group::Error, "Compilation failed! (no top level object found)");
     } else {
@@ -1336,7 +1450,7 @@ void MainWindow::compileCSG()
 {
   OpenSCAD::hardwarnings = Preferences::inst()->getValue("advanced/enableHardwarnings").toBool();
   try{
-    assert(this->root_node);
+    assert(this->rootNode);
     LOG("Compiling design (CSG Products generation)...");
     this->processEvents();
 
@@ -1346,7 +1460,10 @@ void MainWindow::compileCSG()
   } catch (const HardWarningException&) {
     exceptionCleanup();
   }
+
   csgworker->start();
+  //compileCSGThread();
+  //compileCSGDone();
 }
 
 void MainWindow::compileCSGThread(void)
@@ -1356,12 +1473,12 @@ void MainWindow::compileCSGThread(void)
     this->csgrenderer = new CSGTreeEvaluator(this->tree, &geomevaluator);
 #endif
 
-    if (!isClosing) progress_report_prep(this->root_node, report_func, this);
+    if (!isClosing) progress_report_prep(this->rootNode, report_func, this);
     else return;
     try {
 #ifdef ENABLE_OPENCSG
       this->processEvents();
-      this->csgRoot = this->csgrenderer->buildCSGTree(*root_node);
+      this->csgRoot = this->csgrenderer->buildCSGTree(*rootNode);
 #endif
       renderStatistic.printCacheStatistic();
       this->processEvents();
@@ -1373,6 +1490,9 @@ void MainWindow::compileCSGThread(void)
 }
 void MainWindow::compileCSGDone()
 {
+#ifdef ENABLE_PYTHON
+  python_lock();	
+#endif
   try{
     progress_report_fin();
     updateStatusBar(nullptr);
@@ -1386,10 +1506,10 @@ void MainWindow::compileCSGDone()
     if (this->csgRoot) {
       this->normalizedRoot = normalizer.normalize(this->csgRoot);
       if (this->normalizedRoot) {
-        this->root_products.reset(new CSGProducts());
-        this->root_products->import(this->normalizedRoot);
+        this->rootProduct.reset(new CSGProducts());
+        this->rootProduct->import(this->normalizedRoot);
       } else {
-        this->root_products.reset();
+        this->rootProduct.reset();
         LOG(message_group::Warning, "CSG normalization resulted in an empty tree");
         this->processEvents();
       }
@@ -1400,62 +1520,51 @@ void MainWindow::compileCSGDone()
       LOG("Compiling highlights (%1$d CSG Trees)...", highlight_terms.size());
       this->processEvents();
 
-      this->highlights_products.reset(new CSGProducts());
+      this->highlightsProducts.reset(new CSGProducts());
       for (const auto& highlight_term : highlight_terms) {
         auto nterm = normalizer.normalize(highlight_term);
         if (nterm) {
-          this->highlights_products->import(nterm);
+          this->highlightsProducts->import(nterm);
         }
       }
     } else {
-      this->highlights_products.reset();
+      this->highlightsProducts.reset();
     }
+
     const auto& background_terms = this->csgrenderer->getBackgroundNodes();
     if (background_terms.size() > 0) {
       LOG("Compiling background (%1$d CSG Trees)...", background_terms.size());
       this->processEvents();
 
-      this->background_products.reset(new CSGProducts());
+      this->backgroundProducts.reset(new CSGProducts());
       for (const auto& background_term : background_terms) {
         auto nterm = normalizer.normalize(background_term);
         if (nterm) {
-          this->background_products->import(nterm);
+          this->backgroundProducts->import(nterm);
         }
       }
     } else {
-      this->background_products.reset();
+      this->backgroundProducts.reset();
     }
 
-    if (this->root_products &&
-        (this->root_products->size() >
+    if (this->rootProduct &&
+        (this->rootProduct->size() >
          Preferences::inst()->getValue("advanced/openCSGLimit").toUInt())) {
-      LOG(message_group::UI_Warning, "Normalized tree has %1$d elements!", this->root_products->size());
+      LOG(message_group::UI_Warning, "Normalized tree has %1$d elements!", this->rootProduct->size());
       LOG(message_group::UI_Warning, "OpenCSG rendering has been disabled.");
     }
 #ifdef ENABLE_OPENCSG
     else {
       LOG("Normalized tree has %1$d elements!",
-          (this->root_products ? this->root_products->size() : 0));
-#ifdef USE_LEGACY_RENDERERS
-      this->opencsgRenderer = std::make_shared<LegacyOpenCSGRenderer>(this->root_products,
-                                                                      this->highlights_products,
-                                                                      this->background_products);
-#else
-      this->opencsgRenderer = std::make_shared<OpenCSGRenderer>(this->root_products,
-                                                                this->highlights_products,
-                                                						    this->background_products);
-#endif
+          (this->rootProduct ? this->rootProduct->size() : 0));
+      this->opencsgRenderer = std::make_shared<OpenCSGRenderer>(this->rootProduct,
+                                                                this->highlightsProducts,
+                                                                this->backgroundProducts);
     }
-#endif
-#ifdef USE_LEGACY_RENDERERS
-    this->thrownTogetherRenderer = std::make_shared<LegacyThrownTogetherRenderer>(this->root_products,
-                                                                                  this->highlights_products,
-                                                                                  this->background_products);
-#else
-    this->thrownTogetherRenderer = std::make_shared<ThrownTogetherRenderer>(this->root_products,
-                                                                            this->highlights_products,
-                                                                            this->background_products);
-#endif
+#endif // ifdef ENABLE_OPENCSG
+    this->thrownTogetherRenderer = std::make_shared<ThrownTogetherRenderer>(this->rootProduct,
+                                                                            this->highlightsProducts,
+                                                                            this->backgroundProducts);
     LOG("Compile and preview finished.");
     renderStatistic.printRenderingTime();
     this->processEvents();
@@ -1618,10 +1727,10 @@ void MainWindow::actionSaveAs()
 void MainWindow::actionRevokeTrustedFiles()
 {
   QSettingsCached settings;
-#ifdef ENABLE_PYTHON  
+#ifdef ENABLE_PYTHON
   python_trusted = false;
-  this->trusted_edit_document_name="";
-#endif  
+  this->trusted_edit_document_name = "";
+#endif
   settings.remove("python_hash");
   QMessageBox::information(this, _("Trusted Files"), "All trusted python files revoked", QMessageBox::Ok);
 
@@ -1860,8 +1969,8 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event)
 void MainWindow::setRenderVariables(ContextHandle<BuiltinContext>& context)
 {
   RenderVariables r = {
-    .preview = this->is_preview,
-    .time = this->animateWidget->getAnim_tval(),
+    .preview = this->isPreview,
+    .time = this->animateWidget->getAnimTval(),
     .camera = qglview->cam,
   };
   r.applyToContext(context);
@@ -1895,57 +2004,57 @@ bool MainWindow::fileChangedOnDisk()
  */
 
 #ifdef ENABLE_PYTHON
-bool MainWindow::trust_python_file(const std::string &file,  const std::string &content) {
+bool MainWindow::trust_python_file(const std::string& file,  const std::string& content) {
   QSettingsCached settings;
   char setting_key[256];
-  if(python_trusted) return true;
+  if (python_trusted) return true;
 
   std::string act_hash, ref_hash;
-  snprintf(setting_key,sizeof(setting_key)-1,"python_hash/%s",file.c_str());
+  snprintf(setting_key, sizeof(setting_key) - 1, "python_hash/%s", file.c_str());
   act_hash = SHA256HashString(content);
 
-  if(file == this->untrusted_edit_document_name) return false;
-  
-  if(file == this->trusted_edit_document_name) {
-    settings.setValue(setting_key,act_hash.c_str());
+  if (file == this->untrusted_edit_document_name) return false;
+
+  if (file == this->trusted_edit_document_name) {
+    settings.setValue(setting_key, act_hash.c_str());
     return true;
   }
 
-  if(content.size() <= 1) { // 1st character already typed
-    this->trusted_edit_document_name=file;
+  if (content.size() <= 1) { // 1st character already typed
+    this->trusted_edit_document_name = file;
     return true;
   }
-  if(content == "from openscad import *\n") { // 1st character already typed
+  if(content.rfind("from openscad import",0) == 0) { // 1st character already typed
     this->trusted_edit_document_name=file;
     return true;
   }
 
-  if(settings.contains(setting_key)) {
-    QString str=settings.value(setting_key).toString();
+  if (settings.contains(setting_key)) {
+    QString str = settings.value(setting_key).toString();
     QByteArray ba = str.toLocal8Bit();
     ref_hash = std::string(ba.data());
   }
- 
-  if(act_hash == ref_hash) {
-	  this->trusted_edit_document_name=file;
-	  return true;
+
+  if (act_hash == ref_hash) {
+    this->trusted_edit_document_name = file;
+    return true;
   }
 
   auto ret = QMessageBox::warning(this, "Application",
-    _( "Python files can potentially contain harmful stuff.\n"
-    "Do you trust this file ?\n"), QMessageBox::Yes  | QMessageBox::YesAll | QMessageBox::No);
-  if (ret == QMessageBox::YesAll)  {
+                                  _("Python files can potentially contain harmful stuff.\n"
+                                    "Do you trust this file ?\n"), QMessageBox::Yes | QMessageBox::YesAll | QMessageBox::No);
+  if (ret == QMessageBox::YesAll) {
     python_trusted = true;
     return true;
   }
-  if (ret == QMessageBox::Yes)  {
-    this->trusted_edit_document_name=file;
-    settings.setValue(setting_key,act_hash.c_str());
+  if (ret == QMessageBox::Yes) {
+    this->trusted_edit_document_name = file;
+    settings.setValue(setting_key, act_hash.c_str());
     return true;
   }
 
   if (ret == QMessageBox::No) {
-    this->untrusted_edit_document_name=file;
+    this->untrusted_edit_document_name = file;
     return false;
   }
   return false;
@@ -1962,10 +2071,8 @@ void MainWindow::recomputePythonActive()
   this->python_active = false;
   if (fname != NULL) {
     if(boost::algorithm::ends_with(fname, ".py")) {
-	    std::string content = std::string(this->last_compiled_doc.toUtf8().constData());
-      if (
-        Feature::ExperimentalPythonEngine.is_enabled() 
-		&& trust_python_file(std::string(fname), content)) this->python_active = true;
+	    std::string content = std::string(this->lastCompiledDoc.toUtf8().constData());
+      if ( trust_python_file(std::string(fname), content)) this->python_active = true;
       else LOG(message_group::Warning, Location::NONE, "", "Python is not enabled");
     }
   }
@@ -1985,7 +2092,7 @@ void MainWindow::recomputeJsActive()
   this->js_active = false;
   if (fname != NULL) {
     if(boost::algorithm::ends_with(fname, ".js")) {
-	    std::string content = std::string(this->last_compiled_doc.toUtf8().constData());
+	    std::string content = std::string(this->lastCompiledDoc.toUtf8().constData());
 	this->js_active = true;
     }
   }
@@ -2000,19 +2107,17 @@ void MainWindow::parseTopLevelDocument()
 {
   resetSuppressedMessages();
 
-  this->last_compiled_doc = activeEditor->toPlainText();
+  this->lastCompiledDoc = activeEditor->toPlainText();
 
   auto fulltext =
-    std::string(this->last_compiled_doc.toUtf8().constData()) +
+    std::string(this->lastCompiledDoc.toUtf8().constData()) +
     "\n\x03\n" + commandline_commands;
   auto fulltext_py =
-      std::string(this->last_compiled_doc.toUtf8().constData());
+      std::string(this->lastCompiledDoc.toUtf8().constData());
 
   auto fnameba = activeEditor->filepath.toLocal8Bit();
   const char *fname = activeEditor->filepath.isEmpty() ? "" : fnameba;
-  delete this->parsed_file;
-  boost::regex ex_number( R"(^(\w+)\s*=\s*(-?[\d.]+))");
-  boost::regex ex_string( R"(^(\w+)\s*=\s*\"([^\"]*)\")");
+  delete this->parsedFile;
 #ifdef ENABLE_PYTHON
   recomputePythonActive();
 #endif
@@ -2022,28 +2127,41 @@ void MainWindow::parseTopLevelDocument()
 #ifdef ENABLE_PYTHON
   if (this->python_active) {
 
-    this->parsed_file = nullptr; // because the parse() call can throw and we don't want a stale pointer!
-    this->root_file = nullptr;  // ditto
+    this->parsedFile = nullptr; // because the parse() call can throw and we don't want a stale pointer!
+    this->rootFile = nullptr;  // ditto
     fs::path parser_sourcefile = fs::path(fname).generic_string();				
-    this->root_file =new SourceFile(parser_sourcefile.parent_path().string(), parser_sourcefile.filename().string());
-    this->parsed_file = this->root_file;
+    this->rootFile =new SourceFile(parser_sourcefile.parent_path().string(), parser_sourcefile.filename().string());
+    this->parsedFile = this->rootFile;
 
-    initPython(this->animateWidget->getAnim_tval());
+    initPython(this->animateWidget->getAnimTval());
     this->activeEditor->resetHighlighting();
-    if (this->root_file != nullptr) {
+    this->activeEditor->parameterWidget->setEnabled(false);
+    do {
+      if (this->rootFile == nullptr) break;
+      int pos=-1, pos1;	    
+      while(1)
+      {
+        pos1 =  fulltext_py.find("add_parameter",pos+1);	    
+	if(pos1 == -1) break;
+	pos=pos1;
+      }	      
+      if(pos == -1) break; // no paremter statements included
+      pos = fulltext_py.find("\n",pos);			   
+      if(pos == -1) break; // no paremter statements included
+      std::string par_text = fulltext_py.substr(0,pos);
+      //
       //add parameters as annotation in AST
-      auto error = evaluatePython(fulltext_py);
-      this->root_file->scope.assignments=customizer_parameters;
-      CommentParser::collectParameters(fulltext_py, this->root_file, '#');  // add annotations
-      this->activeEditor->parameterWidget->setParameters(this->root_file, "\n"); // set widgets values
-      this->activeEditor->parameterWidget->applyParameters(this->root_file); // use widget values
+      auto error = evaluatePython(par_text,true); // run dummy
+      this->rootFile->scope.assignments=customizer_parameters;
+      CommentParser::collectParameters(fulltext_py, this->rootFile, '#');  // add annotations
+      this->activeEditor->parameterWidget->setParameters(this->rootFile, "\n"); // set widgets values
+      this->activeEditor->parameterWidget->applyParameters(this->rootFile); // use widget values
       this->activeEditor->parameterWidget->setEnabled(true);
-      this->activeEditor->setIndicator(this->root_file->indicatorData);
-    } else {
-      this->activeEditor->parameterWidget->setEnabled(false);
+      this->activeEditor->setIndicator(this->rootFile->indicatorData);
     }
+    while(0);
 
-    customizer_parameters_finished = this->root_file->scope.assignments;
+    customizer_parameters_finished = this->rootFile->scope.assignments;
     customizer_parameters.clear();
     auto error = evaluatePython(fulltext_py); // add assignments 
     if (error.size() > 0) LOG(message_group::Error, Location::NONE, "", error.c_str());
@@ -2054,28 +2172,28 @@ void MainWindow::parseTopLevelDocument()
 #ifdef ENABLE_JS
   if (this->js_active) {
 
-    this->parsed_file = nullptr; // because the parse() call can throw and we don't want a stale pointer!
-    this->root_file = nullptr;  // ditto
+    this->parsedFile = nullptr; // because the parse() call can throw and we don't want a stale pointer!
+    this->rootFile = nullptr;  // ditto
     fs::path parser_sourcefile = fs::path(fname).generic_string();				
-    this->root_file =new SourceFile(parser_sourcefile.parent_path().string(), parser_sourcefile.filename().string());
-    this->parsed_file = this->root_file;
+    this->rootFile =new SourceFile(parser_sourcefile.parent_path().string(), parser_sourcefile.filename().string());
+    this->parsedFile = this->rootFile;
 
-    initJs(this->animateWidget->getAnim_tval());
+    initJs(this->animateWidget->getAnimTval());
     this->activeEditor->resetHighlighting();
-    if (this->root_file != nullptr) {
+    if (this->rootFile != nullptr) {
       //add parameters as annotation in AST
       auto error = evaluateJs(fulltext_py);
-      this->root_file->scope.assignments=customizer_parameters;
-      CommentParser::collectParameters(fulltext_py, this->root_file, '#');  // add annotations
-      this->activeEditor->parameterWidget->setParameters(this->root_file, "\n"); // set widgets values
-      this->activeEditor->parameterWidget->applyParameters(this->root_file); // use widget values
+      this->rootFile->scope.assignments=customizer_parameters;
+      CommentParser::collectParameters(fulltext_py, this->rootFile, '#');  // add annotations
+      this->activeEditor->parameterWidget->setParameters(this->rootFile, "\n"); // set widgets values
+      this->activeEditor->parameterWidget->applyParameters(this->rootFile); // use widget values
       this->activeEditor->parameterWidget->setEnabled(true);
-      this->activeEditor->setIndicator(this->root_file->indicatorData);
+      this->activeEditor->setIndicator(this->rootFile->indicatorData);
     } else {
       this->activeEditor->parameterWidget->setEnabled(false);
     }
 
-    customizer_parameters_finished = this->root_file->scope.assignments;
+    customizer_parameters_finished = this->rootFile->scope.assignments;
     customizer_parameters.clear();
     auto error = evaluateJs(fulltext_py); // add assignments 
     if (error.size() > 0) LOG(message_group::Error, Location::NONE, "", error.c_str());
@@ -2084,18 +2202,18 @@ void MainWindow::parseTopLevelDocument()
   } else // python not enabled
 #endif // ifdef ENABLE_JS
 {
-  this->parsed_file = nullptr; // because the parse() call can throw and we don't want a stale pointer!
-  this->root_file = nullptr;  // ditto
-  this->root_file = parse(this->parsed_file, fulltext, fname, fname, false) ? this->parsed_file : nullptr;
+  this->parsedFile = nullptr; // because the parse() call can throw and we don't want a stale pointer!
+  this->rootFile = nullptr;  // ditto
+  this->rootFile = parse(this->parsedFile, fulltext, fname, fname, false) ? this->parsedFile : nullptr;
 
   this->activeEditor->resetHighlighting();
-  if (this->root_file != nullptr) {
+  if (this->rootFile != nullptr) {
     //add parameters as annotation in AST
-    CommentParser::collectParameters(fulltext, this->root_file, '/' );
-    this->activeEditor->parameterWidget->setParameters(this->root_file, fulltext);
-    this->activeEditor->parameterWidget->applyParameters(this->root_file);
+    CommentParser::collectParameters(fulltext, this->rootFile, '/' );
+    this->activeEditor->parameterWidget->setParameters(this->rootFile, fulltext);
+    this->activeEditor->parameterWidget->applyParameters(this->rootFile);
     this->activeEditor->parameterWidget->setEnabled(true);
-    this->activeEditor->setIndicator(this->root_file->indicatorData);
+    this->activeEditor->setIndicator(this->rootFile->indicatorData);
   } else {
     this->activeEditor->parameterWidget->setEnabled(false);
   }
@@ -2148,13 +2266,13 @@ void MainWindow::actionReloadRenderPreview()
 
   this->afterCompileSlot = "csgReloadRender";
   this->procevents = true;
-  this->is_preview = true;
+  this->isPreview = true;
   compile(true);
 }
 
 void MainWindow::csgReloadRender()
 {
-  if (this->root_node) compileCSG();
+  if (this->rootNode) compileCSG();
 
 }
 
@@ -2167,7 +2285,7 @@ void MainWindow::prepareCompile(const char *afterCompileSlot, bool procevents, b
   this->processEvents();
   this->afterCompileSlot = afterCompileSlot;
   this->procevents = procevents;
-  this->is_preview = preview;
+  this->isPreview = preview;
 }
 
 void MainWindow::actionRenderPreview()
@@ -2179,7 +2297,7 @@ void MainWindow::actionRenderPreview()
   GuiLocker::lock();
   preview_requested = false;
 
-  this->designActionMeasureDist->setEnabled(false);
+  this->designActionMeasureDistance->setEnabled(false);
   this->designActionMeasureAngle->setEnabled(false);
 
   prepareCompile("csgRender", windowActionHideAnimate->isChecked(), true);
@@ -2194,7 +2312,7 @@ void MainWindow::actionRenderPreview()
 
 void MainWindow::csgRender()
 {
-  if (this->root_node) compileCSG();
+    if (this->rootNode) compileCSG();
 }
 
 void MainWindow::csgRenderFinished()
@@ -2220,6 +2338,57 @@ void MainWindow::csgRenderFinished()
   compileEnded();
 }
 
+std::unique_ptr<ExternalToolInterface> createExternalToolService(
+  print_service_t serviceType, const QString& serviceName, FileFormat fileFormat)
+{
+  switch (serviceType) {
+  case print_service_t::NONE:
+    // TODO: Print warning
+    return nullptr;
+    break;
+  case print_service_t::PRINT_SERVICE: {
+    if (const auto printService = PrintService::getPrintService(serviceName.toStdString())) {
+      return createExternalPrintService(printService, fileFormat);
+    }
+    LOG("Unknown print service \"%1$s\"", serviceName.toStdString());
+    return nullptr;
+    break;
+  }
+  case print_service_t::OCTOPRINT:
+    return createOctoPrintService(fileFormat);
+    break;
+  case print_service_t::LOCAL_APPLICATION:
+    return createLocalProgramService(fileFormat);
+    break;
+  }
+  return {};
+}
+
+void MainWindow::sendToExternalTool(ExternalToolInterface& externalToolService)
+{
+  const QFileInfo activeFile(activeEditor->filepath);
+  QString activeFileName = activeFile.fileName();
+  if (activeFileName.isEmpty()) activeFileName = "Untitled.scad";
+  // TODO: Replace suffix to match exported file format?
+
+  activeFileName = activeFileName + QString::fromStdString("." + fileformat::toSuffix(externalToolService.fileFormat()));
+
+  bool export_status = externalToolService.exportTemporaryFile(rootGeom, activeFileName, &qglview->cam);
+
+  this->progresswidget = new ProgressWidget(this);
+  connect(this->progresswidget, SIGNAL(requestShow()), this, SLOT(showProgress()));
+
+  bool process_status = externalToolService.process(activeFileName.toStdString(), [this](double permille) {
+    return network_progress_func(permille);
+  });
+  updateStatusBar(nullptr);
+
+  const auto url = externalToolService.getURL();
+  if (!url.empty()) {
+    QDesktopServices::openUrl(QUrl{QString::fromStdString(url)});
+  }
+}
+
 void MainWindow::action3DPrint()
 {
 #ifdef ENABLE_3D_PRINTING
@@ -2232,174 +2401,25 @@ void MainWindow::action3DPrint()
   const unsigned int dim = 3;
   if (!canExport(dim)) return;
 
-  const auto printService = PrintService::inst();
-  auto printInitDialog = new PrintInitDialog();
-  auto printInitResult = printInitDialog->exec();
-  printInitDialog->deleteLater();
-  if (printInitResult == QDialog::Rejected) {
-    return;
-  }
+  PrintInitDialog printInitDialog;
+  const auto status = printInitDialog.exec();
 
-  const auto selectedService = printInitDialog->getResult();
-  Preferences::Preferences::inst()->updateGUI();
+  if (status == QDialog::Accepted) {
+    const print_service_t serviceType = printInitDialog.getServiceType();
+    const QString serviceName = printInitDialog.getServiceName();
+    const FileFormat fileFormat = printInitDialog.getFileFormat();
 
-  switch (selectedService) {
-  case print_service_t::PRINT_SERVICE:
-    LOG("Sending design to print service %1$s...", printService->getDisplayName().toStdString());
-    sendToPrintService();
-    break;
-  case print_service_t::OCTOPRINT:
-    LOG("Sending design to OctoPrint...");
-    sendToOctoPrint();
-    break;
-  default:
-    break;
-  }
-#endif // ifdef ENABLE_3D_PRINTING
-}
+    LOG("Selected File format: %1$s", fileformat::info(fileFormat).description);
 
-namespace {
 
-ExportInfo createExportInfo(FileFormat format, const QString& exportFilename, const QString& sourceFilePath)
-{
-  const QFileInfo info(sourceFilePath);
-
-  ExportInfo exportInfo;
-  exportInfo.format = format;
-  exportInfo.fileName = exportFilename.toLocal8Bit().constData();
-  exportInfo.displayName = exportFilename.toUtf8().toStdString();
-  exportInfo.sourceFilePath = sourceFilePath.toUtf8().toStdString();
-  exportInfo.sourceFileName = info.fileName().toUtf8().toStdString();
-  exportInfo.useStdOut = false;
-  exportInfo.options = nullptr;
-  return exportInfo;
-}
-
-}
-
-void MainWindow::sendToOctoPrint()
-{
-#ifdef ENABLE_3D_PRINTING
-  OctoPrint octoPrint;
-
-  if (octoPrint.url().trimmed().isEmpty()) {
-    LOG(message_group::Error, "OctoPrint connection not configured. Please check preferences.");
-    return;
-  }
-
-  const QString fileFormat = QString::fromStdString(Settings::Settings::octoPrintFileFormat.value());
-  FileFormat exportFileFormat{FileFormat::STL};
-  if (fileFormat == "OBJ") {
-    exportFileFormat = FileFormat::OBJ;
-  } else if (fileFormat == "OFF") {
-    exportFileFormat = FileFormat::OFF;
-  } else if (fileFormat == "ASCIISTL") {
-    exportFileFormat = FileFormat::ASCIISTL;
-  } else if (fileFormat == "AMF") {
-    exportFileFormat = FileFormat::AMF;
-  } else if (fileFormat == "3MF") {
-    exportFileFormat = FileFormat::_3MF;
-  } else {
-    exportFileFormat = FileFormat::STL;
-  }
-
-  QTemporaryFile exportFile{QDir::temp().filePath("OpenSCAD.XXXXXX." + fileFormat.toLower())};
-  if (!exportFile.open()) {
-    LOG("Could not open temporary file.");
-    return;
-  }
-  const QString exportFileName = exportFile.fileName();
-  exportFile.close();
-
-  QString userFileName;
-  if (activeEditor->filepath.isEmpty()) {
-    userFileName = exportFileName;
-  } else {
-    QFileInfo fileInfo{activeEditor->filepath};
-    userFileName = fileInfo.baseName() + "." + fileFormat.toLower();
-  }
-
-  ExportInfo exportInfo = createExportInfo(exportFileFormat, exportFileName, activeEditor->filepath);
-  exportFileByName(this->root_geom, exportInfo);
-
-  try {
-    this->progresswidget = new ProgressWidget(this);
-    connect(this->progresswidget, SIGNAL(requestShow()), this, SLOT(showProgress()));
-    const QString fileUrl = octoPrint.upload(exportFileName, userFileName, [this](double v) -> bool {
-      return network_progress_func(v);
-    });
-
-    const std::string& action = Settings::Settings::octoPrintAction.value();
-    if (action == "upload") {
+    Preferences::Preferences::inst()->updateGUI();
+    const auto externalToolService = createExternalToolService(serviceType, serviceName, fileFormat);
+    if (!externalToolService) {
+      LOG("Error: Unable to create service: %1$d %2$s %3$d", static_cast<int>(serviceType), serviceName.toStdString(), static_cast<int>(fileFormat));
       return;
     }
-
-    const QString slicer = QString::fromStdString(Settings::Settings::octoPrintSlicerEngine.value());
-    const QString profile = QString::fromStdString(Settings::Settings::octoPrintSlicerProfile.value());
-    octoPrint.slice(fileUrl, slicer, profile, action != "slice", action == "print");
-  } catch (const NetworkException& e) {
-    LOG(message_group::Error, "%1$s", e.getErrorMessage());
+    sendToExternalTool(*externalToolService);
   }
-
-  updateStatusBar(nullptr);
-#endif // ifdef ENABLE_3D_PRINTING
-}
-
-void MainWindow::sendToPrintService()
-{
-#ifdef ENABLE_3D_PRINTING
-  //Keeps track of how many times we've exported and tries to create slightly unique filenames.
-  //Not mission critical, since non-unique file names are fine for the API, just harder to
-  //differentiate between in customer support later.
-  static unsigned int printCounter = 0;
-
-  QTemporaryFile exportFile;
-  if (!exportFile.open()) {
-    LOG(message_group::Error, "Could not open temporary file.");
-    return;
-  }
-  const QString exportFilename = exportFile.fileName();
-
-  //Render the stl to a temporary file:
-  ExportInfo exportInfo = createExportInfo(FileFormat::STL, exportFilename, activeEditor->filepath);
-  exportFileByName(this->root_geom, exportInfo);
-
-  //Create a name that the order process will use to refer to the file. Base it off of the project name
-  QString userFacingName = "unsaved.stl";
-  if (!activeEditor->filepath.isEmpty()) {
-    const QString baseName = QFileInfo(activeEditor->filepath).baseName();
-    userFacingName = QString{"%1_%2.stl"}.arg(baseName).arg(printCounter++);
-  }
-
-  QFile file(exportFilename);
-  if (!file.open(QIODevice::ReadOnly)) {
-    LOG(message_group::Error, "Unable to open exported STL file.");
-    return;
-  }
-  const QString fileContentBase64 = file.readAll().toBase64();
-
-  if (fileContentBase64.length() > PrintService::inst()->getFileSizeLimit()) {
-    const auto msg = QString{_("Exported design exceeds the service upload limit of (%1 MB).")}.arg(PrintService::inst()->getFileSizeLimitMB());
-    QMessageBox::warning(this, _("Upload Error"), msg, QMessageBox::Ok);
-    LOG(message_group::Error, "%1$s", msg.toStdString());
-    return;
-  }
-
-  //Upload the file to the 3D Printing server and get the corresponding url to see it.
-  //The result is put in partUrl.
-  try
-  {
-    this->progresswidget = new ProgressWidget(this);
-    connect(this->progresswidget, SIGNAL(requestShow()), this, SLOT(showProgress()));
-    const QString partUrl = PrintService::inst()->upload(userFacingName, fileContentBase64, [this](double v) -> bool {
-      return network_progress_func(v);
-    });
-    QDesktopServices::openUrl(QUrl{partUrl});
-  } catch (const NetworkException& e) {
-    LOG(message_group::Error, "%1$s", e.getErrorMessage());
-  }
-
-  updateStatusBar(nullptr);
 #endif // ifdef ENABLE_3D_PRINTING
 }
 
@@ -2414,22 +2434,22 @@ void MainWindow::actionRender()
 
 void MainWindow::cgalRender()
 {
-  if (!this->root_file || !this->root_node) {
+  if (!this->rootFile || !this->rootNode) {
     compileEnded();
     return;
   }
 
   this->qglview->setRenderer(nullptr);
   this->cgalRenderer = nullptr;
-  this->root_geom.reset();
+  rootGeom.reset();
 
   LOG("Rendering Polygon Mesh using %1$s...",
-      Feature::ExperimentalManifold.is_enabled() ? "Manifold" : "CGAL");
+      renderBackend3DToString(RenderSettings::inst()->backend3D).c_str());
 
   this->progresswidget = new ProgressWidget(this);
   connect(this->progresswidget, SIGNAL(requestShow()), this, SLOT(showProgress()));
 
-  if (!isClosing) progress_report_prep(this->root_node, report_func, this);
+  if (!isClosing) progress_report_prep(this->rootNode, report_func, this);
   else return;
 
   this->cgalworker->start(this->tree);
@@ -2437,6 +2457,9 @@ void MainWindow::cgalRender()
 
 void MainWindow::actionRenderDone(const std::shared_ptr<const Geometry>& root_geom)
 {
+#ifdef ENABLE_PYTHON
+  python_lock();	
+#endif
   progress_report_fin();
   if (root_geom) {
     std::vector<std::string> options;
@@ -2452,19 +2475,14 @@ void MainWindow::actionRenderDone(const std::shared_ptr<const Geometry>& root_ge
     renderStatistic.printAll(root_geom, qglview->cam, options);
     LOG("Rendering finished.");
 
-    this->root_geom = root_geom;
-#ifdef USE_LEGACY_RENDERERS
-    this->cgalRenderer = std::make_shared<LegacyCGALRenderer>(root_geom);
-#else
+    rootGeom = root_geom;
     this->cgalRenderer = std::make_shared<CGALRenderer>(root_geom);
-#endif
     // Go to CGAL view mode
-    if (viewActionWireframe->isChecked()) viewModeWireframe();
-    else viewModeSurface();
-    this->designActionMeasureDist->setEnabled(true);
+    viewModeRender();
+    this->designActionMeasureDistance->setEnabled(true);
     this->designActionMeasureAngle->setEnabled(true);
   } else {
-    this->designActionMeasureDist->setEnabled(false);
+    this->designActionMeasureDistance->setEnabled(false);
     this->designActionMeasureAngle->setEnabled(false);
     LOG(message_group::UI_Warning, "No top level geometry to render");
   }
@@ -2497,15 +2515,15 @@ void MainWindow::actionFindHandle()
   qglview->handle_mode=true;
 }
 
-void MainWindow::leftClick(QPoint mouse) 
+void MainWindow::leftClick(QPoint mouse)
 {
   QString str = meas.statemachine(mouse);
-  if(str.size() > 0) {
+  if(!str.isEmpty()) {
     this->qglview->measure_state = MEASURE_IDLE;
     if(str.startsWith("I:")) {
       this->activeEditor->insert(QString(str.toStdString().c_str()+2));
       this->qglview->selected_obj.clear();
-      this->qglview->shown_obj.clear();
+      this->qglview->shown_obj = nullptr;
       this->qglview->update();
       this->qglview->measure_state = MEASURE_IDLE;
       this->qglview->handle_mode=false;
@@ -2536,11 +2554,11 @@ void MainWindow::rightClick(QPoint mouse)
   }
 
   // Nothing to select
-  if (!this->root_products) {
+  if (!this->rootProduct) {
     return;
   }
 
-  this->qglview->renderer->prepare(true, false, &this->selector->shaderinfo);
+  this->qglview->renderer->prepare(&this->selector->shaderinfo);
 
   // Update the selector with the right image size
   this->selector->reset(this->qglview);
@@ -2548,7 +2566,7 @@ void MainWindow::rightClick(QPoint mouse)
   // Select the object at mouse coordinates
   int index = this->selector->select(this->qglview->getRenderer(), mouse.x(), mouse.y());
   std::deque<std::shared_ptr<const AbstractNode>> path;
-  std::shared_ptr<const AbstractNode> result = this->root_node->getNodeByID(index, path);
+  std::shared_ptr<const AbstractNode> result = this->rootNode->getNodeByID(index, path);
 
   if (result) {
     // Create context menu with the backtrace
@@ -2563,22 +2581,31 @@ void MainWindow::rightClick(QPoint mouse)
       auto location = step->modinst->location();
       ss.str("");
 
+      // Remove the "module" prefix if any as it induce confusion between the module declaration and instanciation
+      int first_position = (step->verbose_name().find("module") == std::string::npos)? 0 : 7;
+      std::string name = step->verbose_name().substr(first_position);
+
+      // It happens that the verbose_name is empty (eg: in for loops), when this happens instead of letting
+      // empty entry in the menu we prefer using the name in the modinstanciation.
+      if (step->verbose_name().empty()) name = step->modinst->name();
+
       // Check if the path is contained in a library (using parsersettings.h)
       fs::path libpath;
       if(!location.filePath().empty()) libpath = get_library_for_path(location.filePath());
       if (!libpath.empty()) {
         // Display the library (without making the window too wide!)
-        ss << step->verbose_name() << " (library "
+        ss << name << " (library "
            << location.fileName().substr(libpath.string().length() + 1) << ":"
            << location.firstLine() << ")";
       } else if (activeEditor->filepath.toStdString() == location.fileName()) {
-        ss << step->verbose_name() << " (" << location.filePath().filename().string() << ":"
+        // removes the "module" prefix if any as it makes it not clear if it is module declaration or call.
+        ss << name << " (" << location.filePath().filename().string() << ":"
            << location.firstLine() << ")";
       } else {
-        auto relname = boostfs_uncomplete(location.filePath(), fs::path(activeEditor->filepath.toStdString()).parent_path())
+        auto relative_filename = fs_uncomplete(location.filePath(), fs::path(activeEditor->filepath.toStdString()).parent_path())
           .generic_string();
         // Set the displayed name relative to the active editor window
-        ss << step->verbose_name() << " (" << relname << ":" << location.firstLine() << ")";
+        ss << name << " (" << relative_filename << ":" << location.firstLine() << ")";
       }
 
       // Prepare the action to be sent
@@ -2593,40 +2620,175 @@ void MainWindow::rightClick(QPoint mouse)
     }
 
     tracemenu.exec(this->qglview->mapToGlobal(mouse));
+  } else {
+    clearAllSelectionIndicators();
   }
 }
-void MainWindow::measureFinished(void)
+
+void MainWindow::measureFinished()
 {
   this->qglview->selected_obj.clear();
-  this->qglview->shown_obj.clear();
+  this->qglview->shown_obj = nullptr;
   this->qglview->update();
   this->qglview->measure_state = MEASURE_IDLE;
   this->qglview->handle_mode=false;
 }
 
-/**
- * Expects the sender to have properties "file", "line" and "column" defined
- */
-void MainWindow::setCursor()
+void MainWindow::clearAllSelectionIndicators()
 {
-  auto *action = qobject_cast<QAction *>(sender());
-  if (!action || !action->property("file").isValid() || !action->property("line").isValid() ||
-      !action->property("column").isValid()) {
-    return;
+  this->activeEditor->clearAllSelectionIndicators();
+}
+
+void findNodesWithSameMod(std::shared_ptr<const AbstractNode> tree,
+                          std::shared_ptr<const AbstractNode> node_mod,
+                          std::vector<std::shared_ptr<const AbstractNode>>& nodes){
+  if (node_mod->modinst == tree->modinst) {
+    nodes.push_back(tree);
+  }
+  for (const auto& step : tree->children) {
+    findNodesWithSameMod(step, node_mod, nodes);
+  }
+}
+
+void getCodeLocation(const AbstractNode *self, int currentLevel,  int includeLevel, int *firstLine, int *firstColumn, int *lastLine, int *lastColumn, int nestedModuleDepth)
+{
+  auto location = self->modinst->location();
+  if (currentLevel >= includeLevel && nestedModuleDepth == 0) {
+    if (*firstLine < 0 || *firstLine > location.firstLine()) {
+      *firstLine = location.firstLine();
+      *firstColumn = location.firstColumn();
+    } else if (*firstLine == location.firstLine() && *firstColumn > location.firstColumn()) {
+      *firstColumn = location.firstColumn();
+    }
+
+    if (*lastLine < 0 || *lastLine < location.lastLine()) {
+      *lastLine = location.lastLine();
+      *lastColumn = location.lastColumn();
+    } else {
+      if (*firstLine < 0 || *firstLine > location.firstLine()) {
+        *firstLine = location.firstLine();
+        *firstColumn = location.firstColumn();
+      } else if (*firstLine == location.firstLine() && *firstColumn > location.firstColumn()) {
+        *firstColumn = location.firstColumn();
+      }
+      if (*lastLine < 0 || *lastLine < location.lastLine()) {
+        *lastLine = location.lastLine();
+        *lastColumn = location.lastColumn();
+      } else if (*lastLine == location.lastLine() && *lastColumn < location.lastColumn()) {
+        *lastColumn = location.lastColumn();
+      }
+    }
   }
 
-  auto file = action->property("file").toString();
-  auto line = action->property("line").toInt();
-  auto column = action->property("column").toInt();
+  if (self->verbose_name().rfind("module", 0) == 0) {
+    nestedModuleDepth++;
+  }
+  if (self->modinst->name() == "children") {
+    nestedModuleDepth--;
+  }
+
+  if (nestedModuleDepth >= 0) {
+    for (const auto& node : self->children) {
+      getCodeLocation(node.get(), currentLevel + 1, includeLevel, firstLine,  firstColumn, lastLine, lastColumn, nestedModuleDepth);
+    }
+  }
+}
+
+void MainWindow::setSelectionIndicatorStatus(int nodeIndex, EditorSelectionIndicatorStatus status)
+{
+  std::deque<std::shared_ptr<const AbstractNode>> stack;
+  this->rootNode->getNodeByID(nodeIndex, stack);
+
+  int level = 1;
+
+  // first we flags all the nodes in the stack of the provided index
+  // ends at size - 1 because we are not doing anything for the root node.
+  // starts at 1 because we will process this one after later
+  for (int i = 1; i < stack.size() - 1; i++) {
+    const auto& node = stack[i];
+
+    auto& location = node->modinst->location();
+    if (location.filePath().compare(activeEditor->filepath.toStdString()) != 0) {
+      std::cout << "--->>> Line of code in a different file -- PATH -- " << location.fileName() << std::endl;
+      node->modinst->print(std::cout, "");
+      level++;
+      continue;
+    }
+
+    if (node->verbose_name().rfind("module", 0) == 0 || node->modinst->name() == "children") {
+      this->activeEditor->setSelectionIndicatorStatus(
+        status, level,
+        location.firstLine() - 1, location.firstColumn() - 1, location.lastLine() - 1, location.lastColumn() - 1);
+      level++;
+    }
+  }
+
+  auto& node = stack[0];
+  auto location = node->modinst->location();
+  auto line = location.firstLine();
+  auto column = location.firstColumn();
+  auto lastLine = location.lastLine();
+  auto lastColumn = location.lastColumn();
+
+  // Update the location returned by location to cover the whole section.
+  getCodeLocation(node.get(), 0, 0, &line, &column, &lastLine, &lastColumn, 0);
+
+  this->activeEditor->setSelectionIndicatorStatus(status, 0, line - 1, column - 1, lastLine - 1, lastColumn - 1);
+}
+
+void MainWindow::setSelection(int index)
+{
+  if (currentlySelectedObject == index) return;
+
+  std::deque<std::shared_ptr<const AbstractNode>> path;
+  std::shared_ptr<const AbstractNode> selected_node = rootNode->getNodeByID(index, path);
+
+  if (!selected_node) return;
+
+  currentlySelectedObject = index;
+
+  auto location = selected_node->modinst->location();
+  auto file = location.fileName();
+  auto line = location.firstLine();
+  auto column = location.firstColumn();
 
   // Unsaved files do have the pwd as current path, therefore we will not open a new
   // tab on click
-  if (!fs::is_directory(fs::path(file.toStdString()))) {
-    this->tabManager->open(file);
+  if (!fs::is_directory(fs::path(file))) {
+    tabManager->open(QString::fromStdString(file));
   }
 
-  // move the cursor, the editor is 0 based whereby location is 1 based
-  this->activeEditor->setCursorPosition(line - 1, column - 1);
+  // removes all previsly configure selection indicators.
+  clearAllSelectionIndicators();
+
+  std::vector<std::shared_ptr<const AbstractNode>> nodesSameModule{};
+  findNodesWithSameMod(rootNode, selected_node, nodesSameModule);
+
+  // highlight in the text editor all the text fragment of the hierarchy of object with same mode.
+  for (const auto& element : nodesSameModule) {
+    if (element->index() != currentlySelectedObject) {
+      setSelectionIndicatorStatus(element->index(), EditorSelectionIndicatorStatus::IMPACTED);
+    }
+  }
+
+  // highlight in the text editor only the fragment correponding to the selected stack.
+  // this step must be done after all the impacted element have been marked.
+  setSelectionIndicatorStatus(currentlySelectedObject, EditorSelectionIndicatorStatus::SELECTED);
+
+  activeEditor->setCursorPosition(line - 1, column - 1);
+}
+
+/**
+ * Expects the sender to have properties "id" defined
+ */
+void MainWindow::onHoveredObjectInSelectionMenu()
+{
+  auto *action = qobject_cast<QAction *>(sender());
+  if (!action || !action->property("id").isValid()) {
+    return;
+  }
+
+  setSelection(action->property("id").toInt());
 }
 
 void MainWindow::setLastFocus(QWidget *widget) {
@@ -2694,10 +2856,29 @@ void MainWindow::actionDisplayAST()
   e->setTabStopDistance(tabStopWidth);
   e->setWindowTitle("AST Dump");
   e->setReadOnly(true);
-  if (root_file) {
-    e->setPlainText(QString::fromStdString(root_file->dump("")));
+  if (rootFile) {
+    e->setPlainText(QString::fromStdString(rootFile->dump("")));
   } else {
     e->setPlainText("No AST to dump. Please try compiling first...");
+  }
+  e->resize(600, 400);
+  e->show();
+  clearCurrentOutput();
+}
+
+void MainWindow::actionDisplayPython()
+{
+  setCurrentOutput();
+  auto e = new QTextEdit(this);
+  e->setAttribute(Qt::WA_DeleteOnClose);
+  e->setWindowFlags(Qt::Window);
+  e->setTabStopDistance(tabStopWidth);
+  e->setWindowTitle("Python Dump");
+  e->setReadOnly(true);
+  if (rootFile) {
+    e->setPlainText(QString::fromStdString(rootFile->dump_python("")));
+  } else {
+    e->setPlainText("No Python to dump. Please try compiling first...");
   }
   e->resize(600, 400);
   e->show();
@@ -2713,8 +2894,8 @@ void MainWindow::actionDisplayCSGTree()
   e->setTabStopDistance(tabStopWidth);
   e->setWindowTitle("CSG Tree Dump");
   e->setReadOnly(true);
-  if (this->root_node) {
-    e->setPlainText(QString::fromStdString(this->tree.getString(*this->root_node, "  ")));
+  if (this->rootNode) {
+    e->setPlainText(QString::fromStdString(this->tree.getString(*this->rootNode, "  ")));
   } else {
     e->setPlainText("No CSG to dump. Please try compiling first...");
   }
@@ -2737,13 +2918,200 @@ void MainWindow::actionDisplayCSGProducts()
 
                   .arg(QString::fromStdString(this->csgRoot ? this->csgRoot->dump() : NA),
                        QString::fromStdString(this->normalizedRoot ? this->normalizedRoot->dump() : NA),
-                       QString::fromStdString(this->root_products ? this->root_products->dump() : NA),
-                       QString::fromStdString(this->highlights_products ? this->highlights_products->dump() : NA),
-                       QString::fromStdString(this->background_products ? this->background_products->dump() : NA)));
+                       QString::fromStdString(this->rootProduct ? this->rootProduct->dump() : NA),
+                       QString::fromStdString(this->highlightsProducts ? this->highlightsProducts->dump() : NA),
+                       QString::fromStdString(this->backgroundProducts ? this->backgroundProducts->dump() : NA)));
 
   e->resize(600, 400);
   e->show();
   clearCurrentOutput();
+}
+
+void html_encode(std::string& data) {
+    std::string buffer;
+    buffer.reserve(data.size());
+    for(size_t pos = 0; pos != data.size(); ++pos) {
+        switch(data[pos]) {
+            case '\"': buffer.append("%22");        break;
+            case '<':  buffer.append("%3C");        break;
+            case '+':  buffer.append("%2b");        break;
+            case '>':  buffer.append("%3e");        break;
+            case ' ':  buffer.append("%20");        break;
+            case '&':  buffer.append("%26");        break;
+            case '\'': buffer.append("%27");        break;
+            case '%':  buffer.append("%%");         break;
+            default:   buffer.append(&data[pos], 1); break;
+        }
+    }
+    data.swap(buffer);
+}
+
+ShareDesignDialog *shareDesignDialog;
+void MainWindow::actionShareDesignPublish()
+{
+  QMessageBox::StandardButton disclaimer;
+  disclaimer = QMessageBox::question(this, "Disclaimer", "By Clicking Yes, you accept that:\n\
+\n\
+1) Your design will be public on pythonscad.org\n\
+2) it's on good purpose and not offending to anybody\n\
+3) you keep the copyright by your name \n\
+4) you accept that anybody can use it\n\
+5) no commerical use/adverisement\n\
+6) inapropriate content will be deleted without prior  notice\n\
+\n\
+\nProceed?", QMessageBox::Yes|QMessageBox::No);
+  if (disclaimer != QMessageBox::Yes) {
+    shareDesignDialog->close();
+    return;	  
+  }
+  int success=0;	
+  CURL *curl;
+  CURLcode res;
+  auto design = shareDesignDialog->getDesignName();
+  auto author = shareDesignDialog->getAuthorName();
+  std::string code=std::string(this->lastCompiledDoc.toUtf8().constData());
+  html_encode(design);
+  html_encode(author);
+  html_encode(code);
+  std::string poststring="author=" + author +"&design=" + design + "&code="+code;
+
+  curl = curl_easy_init();
+  if(curl) {
+    curl_easy_setopt(curl, CURLOPT_URL, "https://pythonscad.org/share_design.php");
+//    curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, poststring.size());
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, poststring.c_str());
+    curl_easy_setopt(curl, CURLOPT_FORBID_REUSE, 1L);
+//    curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+ 
+    res = curl_easy_perform(curl);
+    /* Check for errors */
+    if(res != CURLE_OK) {
+      fprintf(stderr, "curl_easy_perform() failed: %s\n",
+              curl_easy_strerror(res));
+    }
+    else success=1;
+    
+    /* always cleanup */
+    curl_easy_cleanup(curl);
+  }
+  shareDesignDialog->close();
+  if(success) 
+    QMessageBox::information(this,"Share Design","Design successfully submitted");  
+  else QMessageBox::information(this,"Share Design","Error during submission");  
+}
+
+void MainWindow::actionShareDesign()
+{
+  shareDesignDialog = new ShareDesignDialog();
+  connect(shareDesignDialog->publishButton, SIGNAL(clicked()), this, SLOT(actionShareDesignPublish()));
+
+  if (shareDesignDialog->exec() == QDialog::Rejected) {
+    return;
+  };
+}
+
+LoadShareDesignDialog *loadShareDesignDialog;
+std::string actionLoadSharedDesignData;
+
+size_t actionLoadSharedDesignDataFunc(void *ptr, size_t size, size_t nmemb, struct string *s)
+{
+  actionLoadSharedDesignData += std::string((char *)ptr, size*nmemb);
+  return size*nmemb;
+}
+
+std::vector<std::vector<std::string>> loadShareDesignDatabase;
+
+void MainWindow::actionLoadShareDesignSelect()
+{
+  CURL *curl;
+  CURLcode res;
+  int success=0;
+  int selected =loadShareDesignDialog->list_design->currentRow();
+  if(selected < 0 || selected >= loadShareDesignDatabase.size()) return;
+  std::string url = "https://pythonscad.org/shared_designs/"+loadShareDesignDatabase[selected][2];
+  curl = curl_easy_init();
+  if(curl) {
+    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curl, CURLOPT_FORBID_REUSE, 1L);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, actionLoadSharedDesignDataFunc);
+ 
+    actionLoadSharedDesignData="";
+    res = curl_easy_perform(curl);
+    /* Check for errors */
+    if(res != CURLE_OK) {
+      fprintf(stderr, "curl_easy_perform() failed: %s\n",
+              curl_easy_strerror(res));
+    }
+    else success=1;
+    
+    /* always cleanup */
+    curl_easy_cleanup(curl);
+  }
+  this->activeEditor->setPlainText(QString(actionLoadSharedDesignData.c_str()));
+
+  loadShareDesignDialog->close();
+}
+
+void MainWindow::actionLoadShareDesign()
+{
+  CURL *curl;
+  CURLcode res;
+  int success=0;
+  curl = curl_easy_init();
+  if(curl) {
+    curl_easy_setopt(curl, CURLOPT_URL, "https://pythonscad.org/list_design.php");
+    curl_easy_setopt(curl, CURLOPT_FORBID_REUSE, 1L);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, actionLoadSharedDesignDataFunc);
+ 
+    actionLoadSharedDesignData="";
+    res = curl_easy_perform(curl);
+    /* Check for errors */
+    if(res != CURLE_OK) {
+      fprintf(stderr, "curl_easy_perform() failed: %s\n",
+              curl_easy_strerror(res));
+    }
+    else success=1;
+    
+    /* always cleanup */
+    curl_easy_cleanup(curl);
+  }
+
+  loadShareDesignDialog = new LoadShareDesignDialog();
+  // now json_decode
+  std::string word;
+  std::vector<std::string> words;
+  loadShareDesignDatabase.clear();
+  int in_string=0;
+  int level=0;
+  for(int i=0;i<actionLoadSharedDesignData.size();i++){
+    switch(actionLoadSharedDesignData[i])
+    {	  
+      case '[': level++; break;
+      case ']': 
+        if(level == 2) {
+          loadShareDesignDatabase.push_back(words);
+	  if(words.size() > 0) loadShareDesignDialog->list_design->addItem(QString(words[0].c_str()));
+
+          words.clear();	  
+	}		
+        level--; break;		
+      case '\'':
+        if(in_string){
+         words.push_back(word);
+         word="";	 
+        }		
+        in_string=1-in_string;		
+        break;	      
+      default:
+        if(in_string)word += actionLoadSharedDesignData[i];	      
+	break;
+	    
+    }
+  }
+  connect(loadShareDesignDialog->selectButton, SIGNAL(clicked()), this, SLOT(actionLoadShareDesignSelect()));
+  if (loadShareDesignDialog->exec() == QDialog::Rejected) {
+    return;
+  };
 }
 
 void MainWindow::actionCheckValidity()
@@ -2752,28 +3120,26 @@ void MainWindow::actionCheckValidity()
   GuiLocker lock;
   setCurrentOutput();
 
-  if (!this->root_geom) {
+  if (!rootGeom) {
     LOG("Nothing to validate! Try building first (press F6).");
     clearCurrentOutput();
     return;
   }
 
-  if (this->root_geom->getDimension() != 3) {
+  if (rootGeom->getDimension() != 3) {
     LOG("Current top level object is not a 3D object.");
     clearCurrentOutput();
     return;
   }
 
-  bool valid = false;
+  bool valid = true;
 #ifdef ENABLE_CGAL
-  if (auto N = CGALUtils::getNefPolyhedronFromGeometry(this->root_geom)) {
+  if (auto N = std::dynamic_pointer_cast<const CGAL_Nef_polyhedron>(rootGeom)) {
     valid = N->p3 ? const_cast<CGAL_Nef_polyhedron3&>(*N->p3).is_valid() : false;
-  } else if (auto hybrid = std::dynamic_pointer_cast<const CGALHybridPolyhedron>(this->root_geom)) {
-    valid = hybrid->isValid();
   } else
 #endif
 #ifdef ENABLE_MANIFOLD
-  if (auto mani = std::dynamic_pointer_cast<const ManifoldGeometry>(this->root_geom)) {
+  if (auto mani = std::dynamic_pointer_cast<const ManifoldGeometry>(rootGeom)) {
     valid = mani->isValid();
   }
 #endif
@@ -2785,7 +3151,7 @@ void MainWindow::actionCheckValidity()
 //Separated into it's own function for re-use.
 bool MainWindow::canExport(unsigned int dim)
 {
-  if (!this->root_geom) {
+  if (!rootGeom) {
     LOG(message_group::Error, "Nothing to export! Try rendering first (press F6)");
     clearCurrentOutput();
     return false;
@@ -2813,35 +3179,41 @@ bool MainWindow::canExport(unsigned int dim)
     }
   }
 
-  if (this->root_geom->getDimension() != dim && dim != 0) {
+  if (this->rootGeom->getDimension() != dim && dim != 0) {
     LOG(message_group::UI_Error, "Current top level object is not a %1$dD object.", dim);
     clearCurrentOutput();
     return false;
   }
 
-  if (this->root_geom->isEmpty()) {
+  if (rootGeom->isEmpty()) {
     LOG(message_group::UI_Error, "Current top level object is empty.");
     clearCurrentOutput();
     return false;
   }
 
 #ifdef ENABLE_CGAL
-  auto N = dynamic_cast<const CGAL_Nef_polyhedron *>(this->root_geom.get());
+  auto N = dynamic_cast<const CGAL_Nef_polyhedron *>(rootGeom.get());
   if (N && !N->p3->is_simple()) {
     LOG(message_group::UI_Warning, "Object may not be a valid 2-manifold and may need repair! See https://en.wikibooks.org/wiki/OpenSCAD_User_Manual/STL_Import_and_Export");
+  }
+#endif
+#ifdef ENABLE_MANIFOLD
+  auto manifold = dynamic_cast<const ManifoldGeometry *>(rootGeom.get());
+  if (manifold && !manifold->isValid() ) {
+    LOG(message_group::UI_Warning, "Object may not be a valid manifold and may need repair! "
+        "Error message: %1$s. See https://en.wikibooks.org/wiki/OpenSCAD_User_Manual/STL_Import_and_Export",
+        ManifoldUtils::statusToString(manifold->getManifold().Status()));
   }
 #endif
 
   return true;
 }
 
-void MainWindow::actionExport(FileFormat format, const char *type_name, const char *suffix, unsigned int dim){
-  ExportPdfOptions* empty = nullptr;
-  actionExport(format, type_name, suffix, dim, empty);
-};
-
-void MainWindow::actionExport(FileFormat format, const char *type_name, const char *suffix, unsigned int dim, ExportPdfOptions *options)
+void MainWindow::actionExport(unsigned int dim, ExportInfo& exportInfo)
 {
+  const auto type_name = QString::fromStdString(exportInfo.info.description);
+  const auto suffix = QString::fromStdString(exportInfo.info.suffix);
+
   //Setting filename skips the file selection dialog and uses the path provided instead.
   if (GuiLocker::isLocked()) return;
   GuiLocker lock;
@@ -2850,7 +3222,7 @@ void MainWindow::actionExport(FileFormat format, const char *type_name, const ch
 
   //Return if something is wrong and we can't export.
   if (!canExport(dim)) return;
-  
+
   auto title = QString(_("Export %1 File")).arg(type_name);
   auto filter = QString(_("%1 Files (*%2)")).arg(type_name, suffix);
   auto exportFilename = QFileDialog::getSaveFileName(this, title, exportPath(suffix), filter);
@@ -2858,161 +3230,98 @@ void MainWindow::actionExport(FileFormat format, const char *type_name, const ch
     clearCurrentOutput();
     return;
   }
-  this->export_paths[suffix] = exportFilename;
+  this->exportPaths[suffix] = exportFilename;
 
-  ExportInfo exportInfo = createExportInfo(format, exportFilename, activeEditor->filepath);
-  // Add options
-exportInfo.options=options;
-  
-  bool exportResult = exportFileByName(this->root_geom, exportInfo);
+  bool exportResult = exportFileByName(rootGeom, exportFilename.toStdString(), exportInfo);
 
   if (exportResult) fileExportedMessage(type_name, exportFilename);
   clearCurrentOutput();
 }
 
-void MainWindow::actionExportSTL()
+void MainWindow::actionExportFileFormat(int fmt)
 {
-  if (Settings::Settings::exportUseAsciiSTL.value()) {
-    actionExport(FileFormat::ASCIISTL, "ASCIISTL", ".stl", 3);
-  } else {
-    actionExport(FileFormat::STL, "STL", ".stl", 3);
-  }
-}
+  const auto format = static_cast<FileFormat>(fmt);
+  const FileFormatInfo& info = fileformat::info(format);
 
-void MainWindow::actionExport3MF()
-{
-  actionExport(FileFormat::_3MF, "3MF", ".3mf", 3);
-}
+  ExportInfo exportInfo = createExportInfo(format, info, activeEditor->filepath.toStdString(), &qglview->cam, {});
 
-void MainWindow::actionExportOBJ()
-{
-  actionExport(FileFormat::OBJ, "OBJ", ".obj", 3);
-}
-
-void MainWindow::actionExportOFF()
-{
-  actionExport(FileFormat::OFF, "OFF", ".off", 3);
-}
-
-void MainWindow::actionExportWRL()
-{
-  actionExport(FileFormat::WRL, "WRL", ".wrl", 3);
-}
-
-void MainWindow::actionExportFoldable()
-{
-  actionExport(FileFormat::PS, "PS", ".ps", 3);
-}
-
-void MainWindow::actionExportAMF()
-{
-  actionExport(FileFormat::AMF, "AMF", ".amf", 3);
-}
-
-void MainWindow::actionExportDXF()
-{
-  actionExport(FileFormat::DXF, "DXF", ".dxf", 2);
-}
-
-void MainWindow::actionExportSVG()
-{
-  actionExport(FileFormat::SVG, "SVG", ".svg", 2);
-}
-
-void MainWindow::actionExportPDF()
-{
-
-ExportPdfOptions exportPdfOptions;
-QSettingsCached settings;
-
-// Prepopulated with default values in export.h
-auto exportPdfDialog = new ExportPdfDialog();
-
-// Get current settings or defaults
-//  modify the two enums (next two rows) to explicitly use default by lookup to string (see the later set methods).
-exportPdfDialog->setPaperSize(sizeString2Enum(settings.value("exportPdfOpts/paperSize",
-	QString::fromStdString(paperSizeStrings[static_cast<int>(exportPdfOptions.paperSize)])).toString()));  // enum map
-exportPdfDialog->setOrientation(orientationsString2Enum(settings.value("exportPdfOpts/orientation",
-	QString::fromStdString(paperOrientationsStrings[static_cast<int>(exportPdfOptions.Orientation)])).toString()));  // enum map
-exportPdfDialog->setShowDsnFn(settings.value("exportPdfOpts/showDsgnFN",exportPdfOptions.showDsgnFN).toBool());
-exportPdfDialog->setShowScale(settings.value("exportPdfOpts/showScale",exportPdfOptions.showScale).toBool());
-exportPdfDialog->setShowScaleMsg(settings.value("exportPdfOpts/showScaleMsg",exportPdfOptions.showScaleMsg).toBool());
-exportPdfDialog->setShowGrid(settings.value("exportPdfOpts/showGrid",exportPdfOptions.showGrid).toBool());
-exportPdfDialog->setGridSize(settings.value("exportPdfOpts/gridSize",exportPdfOptions.gridSize).toDouble());
-
-
-if (exportPdfDialog->exec() == QDialog::Rejected) {
-  return;
-}; 
-
-exportPdfOptions.paperSize=exportPdfDialog->getPaperSize();
-exportPdfOptions.Orientation=exportPdfDialog->getOrientation();
-exportPdfOptions.showDsgnFN=exportPdfDialog->getShowDsnFn();
-exportPdfOptions.showScale=exportPdfDialog->getShowScale();
-exportPdfOptions.showScaleMsg=exportPdfDialog->getShowScaleMsg();
-exportPdfOptions.showGrid=exportPdfDialog->getShowGrid();
-exportPdfOptions.gridSize=exportPdfDialog->getGridSize();
-
-settings.setValue("exportPdfOpts/paperSize",QString::fromStdString(paperSizeStrings[static_cast<int>( exportPdfDialog->getPaperSize())]));
-settings.setValue("exportPdfOpts/orientation",QString::fromStdString(paperOrientationsStrings[static_cast<int>(exportPdfDialog->getOrientation())]));
-settings.setValue("exportPdfOpts/showDsgnFN",exportPdfDialog->getShowDsnFn());
-settings.setValue("exportPdfOpts/showScale",exportPdfDialog->getShowScale());
-settings.setValue("exportPdfOpts/showScaleMsg",exportPdfDialog->getShowScaleMsg());
-settings.setValue("exportPdfOpts/showGrid",exportPdfDialog->getShowGrid());
-settings.setValue("exportPdfOpts/gridSize",exportPdfDialog->getGridSize());
-
-actionExport(FileFormat::PDF, "PDF", ".pdf", 0, &exportPdfOptions);
-
-}
-
-void MainWindow::actionExportCSG()
-{
-  setCurrentOutput();
-
-  if (!this->root_node) {
-    LOG(message_group::Error, "Nothing to export. Please try compiling first.");
-    clearCurrentOutput();
-    return;
-  }
-  const auto suffix = ".csg";
-  auto csg_filename = QFileDialog::getSaveFileName(this,
-                                                   _("Export CSG File"), exportPath(suffix), _("CSG Files (*.csg)"));
-
-  if (csg_filename.isEmpty()) {
-    clearCurrentOutput();
-    return;
-  }
-
-  std::ofstream fstream(csg_filename.toLocal8Bit());
-  if (!fstream.is_open()) {
-    LOG("Can't open file \"%1$s\" for export", csg_filename.toLocal8Bit().constData());
-  } else {
-    fstream << this->tree.getString(*this->root_node, "\t") << "\n";
-    fstream.close();
-    fileExportedMessage("CSG", csg_filename);
-    this->export_paths[suffix] = csg_filename;
-  }
-
-  clearCurrentOutput();
-}
-
-void MainWindow::actionExportImage()
-{
-  // Grab first to make sure dialog box isn't part of the grabbed image
-  qglview->grabFrame();
-  const auto suffix = ".png";
-  auto img_filename = QFileDialog::getSaveFileName(this,
-                                                   _("Export Image"), exportPath(suffix), _("PNG Files (*.png)"));
-  if (!img_filename.isEmpty()) {
-    bool saveResult = qglview->save(img_filename.toLocal8Bit().constData());
-    if (saveResult) {
-      this->export_paths[suffix] = img_filename;
-      setCurrentOutput();
-      fileExportedMessage("PNG", img_filename);
-      clearCurrentOutput();
-    } else {
-      LOG("Can't open file \"%1$s\" for export image", img_filename.toLocal8Bit().constData());
+  switch (format) {
+  case FileFormat::PDF:
+  {
+    auto exportPdfDialog = new ExportPdfDialog();
+    exportPdfDialog->deleteLater();
+    if (exportPdfDialog->exec() == QDialog::Rejected) {
+      return;
     }
+
+    exportInfo.optionsPdf = exportPdfDialog->getOptions();
+    actionExport(2, exportInfo);
+  }
+  break;
+  case FileFormat::_3MF:
+  {
+    auto export3mfDialog = new Export3mfDialog();
+    export3mfDialog->deleteLater();
+    if (export3mfDialog->exec() == QDialog::Rejected) {
+      return;
+    }
+
+    exportInfo.options3mf = export3mfDialog->getOptions();
+    actionExport(3, exportInfo);
+  }
+  break;
+  case FileFormat::CSG:
+  {
+    setCurrentOutput();
+
+    if (!this->rootNode) {
+      LOG(message_group::Error, "Nothing to export. Please try compiling first.");
+      clearCurrentOutput();
+      return;
+    }
+    const QString suffix = "csg";
+    auto csg_filename = QFileDialog::getSaveFileName(this,
+                                                     _("Export CSG File"), exportPath(suffix), _("CSG Files (*.csg)"));
+
+    if (csg_filename.isEmpty()) {
+      clearCurrentOutput();
+      return;
+    }
+
+    std::ofstream fstream(csg_filename.toLocal8Bit());
+    if (!fstream.is_open()) {
+      LOG("Can't open file \"%1$s\" for export", csg_filename.toLocal8Bit().constData());
+    } else {
+      fstream << this->tree.getString(*this->rootNode, "\t") << "\n";
+      fstream.close();
+      fileExportedMessage("CSG", csg_filename);
+      this->exportPaths[suffix] = csg_filename;
+    }
+
+    clearCurrentOutput();
+  }      break;
+  case FileFormat::PNG:
+  {
+    // Grab first to make sure dialog box isn't part of the grabbed image
+    qglview->grabFrame();
+    const QString suffix = "png";
+    auto img_filename = QFileDialog::getSaveFileName(this,
+                                                     _("Export Image"), exportPath(suffix), _("PNG Files (*.png)"));
+    if (!img_filename.isEmpty()) {
+      bool saveResult = qglview->save(img_filename.toLocal8Bit().constData());
+      if (saveResult) {
+        this->exportPaths[suffix] = img_filename;
+        setCurrentOutput();
+        fileExportedMessage("PNG", img_filename);
+        clearCurrentOutput();
+      } else {
+        LOG("Can't open file \"%1$s\" for export image", img_filename.toLocal8Bit().constData());
+      }
+    }
+  }
+  break;
+  default:
+    actionExport(fileformat::is3D(format) ? 3 : fileformat::is2D(format) ? 2 : 0, exportInfo);
   }
 }
 
@@ -3048,12 +3357,19 @@ void MainWindow::actionFlushCaches()
 void MainWindow::viewModeActionsUncheck()
 {
   viewActionPreview->setChecked(false);
-  viewActionSurfaces->setChecked(false);
-  viewActionWireframe->setChecked(false);
   viewActionThrownTogether->setChecked(false);
 }
 
 #ifdef ENABLE_OPENCSG
+
+void MainWindow::viewModeRender()
+{
+  viewActionThrownTogether->setEnabled(false);
+  viewActionPreview->setEnabled(false);
+  this->qglview->setRenderer(this->cgalRenderer);
+  this->qglview->updateColorScheme();
+  this->qglview->update();
+}
 
 /*!
    Go to the OpenCSG view mode.
@@ -3061,9 +3377,11 @@ void MainWindow::viewModeActionsUncheck()
  */
 void MainWindow::viewModePreview()
 {
+  viewActionThrownTogether->setEnabled(true);
+  viewActionPreview->setEnabled(this->qglview->hasOpenCSGSupport());
   if (this->qglview->hasOpenCSGSupport()) {
-    viewModeActionsUncheck();
     viewActionPreview->setChecked(true);
+    viewActionThrownTogether->setChecked(false);
     this->qglview->setRenderer(this->opencsgRenderer ? this->opencsgRenderer : this->thrownTogetherRenderer);
     this->qglview->updateColorScheme();
     this->qglview->update();
@@ -3074,30 +3392,12 @@ void MainWindow::viewModePreview()
 
 #endif /* ENABLE_OPENCSG */
 
-void MainWindow::viewModeSurface()
-{
-  viewModeActionsUncheck();
-  viewActionSurfaces->setChecked(true);
-  this->qglview->setShowFaces(true);
-  this->qglview->setRenderer(this->cgalRenderer);
-  this->qglview->updateColorScheme();
-  this->qglview->update();
-}
-
-void MainWindow::viewModeWireframe()
-{
-  viewModeActionsUncheck();
-  viewActionWireframe->setChecked(true);
-  this->qglview->setShowFaces(false);
-  this->qglview->setRenderer(this->cgalRenderer);
-  this->qglview->updateColorScheme();
-  this->qglview->update();
-}
-
 void MainWindow::viewModeThrownTogether()
 {
-  viewModeActionsUncheck();
+  viewActionThrownTogether->setEnabled(true);
+  viewActionPreview->setEnabled(this->qglview->hasOpenCSGSupport());
   viewActionThrownTogether->setChecked(true);
+  viewActionPreview->setChecked(false);
   this->qglview->setRenderer(this->thrownTogetherRenderer);
   this->qglview->updateColorScheme();
   this->qglview->update();
@@ -3145,44 +3445,53 @@ bool MainWindow::isEmpty()
 void MainWindow::editorContentChanged()
 {
   auto current_doc = activeEditor->toPlainText();
-  if (current_doc != last_compiled_doc) {
+  if (current_doc != lastCompiledDoc) {
     animateWidget->editorContentChanged();
+
+    // removes the live selection feedbacks in both the 3d view and editor.
+    clearAllSelectionIndicators();
   }
 }
 
 void MainWindow::viewAngleTop()
 {
   qglview->cam.object_rot << 90, 0, 0;
+  qglview->cam.object_trans << 0, 0, 0;
   this->qglview->update();
 }
 
 void MainWindow::viewAngleBottom()
 {
   qglview->cam.object_rot << 270, 0, 0;
+  qglview->cam.object_trans << 0, 0, 0;
   this->qglview->update();
 }
 
 void MainWindow::viewAngleLeft()
 {
   qglview->cam.object_rot << 0, 0, 90;
+  qglview->cam.object_trans << 0, 0, 0;
   this->qglview->update();
 }
 
 void MainWindow::viewAngleRight()
 {
   qglview->cam.object_rot << 0, 0, 270;
+  qglview->cam.object_trans << 0, 0, 0;
   this->qglview->update();
 }
 
 void MainWindow::viewAngleFront()
 {
   qglview->cam.object_rot << 0, 0, 0;
+  qglview->cam.object_trans << 0, 0, 0;
   this->qglview->update();
 }
 
 void MainWindow::viewAngleBack()
 {
   qglview->cam.object_rot << 0, 0, 180;
+  qglview->cam.object_trans << 0, 0, 0;
   this->qglview->update();
 }
 
@@ -3241,8 +3550,6 @@ void MainWindow::viewAll()
 
 void MainWindow::on_editorDock_visibilityChanged(bool)
 {
-  changedTopLevelEditor(editorDock->isFloating());
-  tabToolBar->setVisible((tabCount > 1) && editorDock->isVisible());
   updateExportActions();
 }
 
@@ -3266,27 +3573,14 @@ void MainWindow::on_animateDock_visibilityChanged(bool)
   animateTopLevelChanged(animateDock->isFloating());
 }
 
+void MainWindow::on_fontListDock_visibilityChanged(bool)
+{
+  fontListTopLevelChanged(fontListDock->isFloating());
+}
+
 void MainWindow::on_viewportControlDock_visibilityChanged(bool)
 {
   viewportControlTopLevelChanged(viewportControlDock->isFloating());
-}
-
-void MainWindow::changedTopLevelEditor(bool topLevel)
-{
-  setDockWidgetTitle(editorDock, QString(_("Editor")), topLevel);
-}
-
-void MainWindow::editorTopLevelChanged(bool topLevel)
-{
-  setDockWidgetTitle(editorDock, QString(_("Editor")), topLevel);
-  if (topLevel) {
-    this->removeToolBar(tabToolBar);
-    ((QVBoxLayout *)editorDockContents->layout())->insertWidget(0, tabToolBar);
-  } else {
-    editorDockContents->layout()->removeWidget(tabToolBar);
-    this->addToolBar(tabToolBar);
-  }
-  tabToolBar->setVisible((tabCount > 1) && editorDock->isVisible());
 }
 
 void MainWindow::changedTopLevelConsole(bool topLevel)
@@ -3331,7 +3625,6 @@ void MainWindow::changedTopLevelAnimate(bool topLevel)
   setDockWidgetTitle(animateDock, QString(_("Animate")), topLevel);
 }
 
-
 void MainWindow::animateTopLevelChanged(bool topLevel)
 {
   setDockWidgetTitle(animateDock, QString(_("Animate")), topLevel);
@@ -3340,6 +3633,22 @@ void MainWindow::animateTopLevelChanged(bool topLevel)
   if (topLevel) {
     animateDock->setWindowFlags(flags);
     animateDock->show();
+  }
+}
+
+void MainWindow::changedTopLevelFontList(bool topLevel)
+{
+  setDockWidgetTitle(fontListDock, QString(_("Font List")), topLevel);
+}
+
+void MainWindow::fontListTopLevelChanged(bool topLevel)
+{
+  setDockWidgetTitle(fontListDock, QString(_("Font List")), topLevel);
+
+  Qt::WindowFlags flags = (fontListDock->windowFlags() & ~Qt::WindowType_Mask) | Qt::Window;
+  if (topLevel) {
+    fontListDock->setWindowFlags(flags);
+    fontListDock->show();
   }
 }
 
@@ -3481,6 +3790,25 @@ void MainWindow::hideAnimate()
   }
 }
 
+void MainWindow::showFontList()
+{
+  windowActionHideFontList->setChecked(false);
+  fontListWidget->update_font_list();
+  fontListDock->show();
+  fontListDock->raise();
+  fontListWidget->setFocus();
+}
+
+void MainWindow::hideFontList()
+{
+  if (windowActionHideFontList->isChecked()) {
+    fontListDock->hide();
+  } else {
+    fontListWidget->update_font_list();
+    fontListDock->show();
+  }
+}
+
 void MainWindow::showViewportControl()
 {
   windowActionHideViewportControl->setChecked(false);
@@ -3536,6 +3864,11 @@ void MainWindow::on_windowActionSelectAnimate_triggered()
   showAnimate();
 }
 
+void MainWindow::on_windowActionSelectFontList_triggered()
+{
+  showFontList();
+}
+
 void MainWindow::on_windowActionSelectViewportControl_triggered()
 {
   showViewportControl();
@@ -3568,11 +3901,12 @@ void MainWindow::on_editActionFoldAll_triggered()
 
 void MainWindow::activateWindow(int offset)
 {
-  const std::array<DockFocus, 6> docks = {{
+  const std::array<DockFocus, 7> docks = {{
     { editorDock, &MainWindow::on_windowActionSelectEditor_triggered },
     { consoleDock, &MainWindow::on_windowActionSelectConsole_triggered },
     { errorLogDock, &MainWindow::on_windowActionSelectErrorLog_triggered },
     { parameterDock, &MainWindow::on_windowActionSelectCustomizer_triggered },
+    { fontListDock, &MainWindow::on_windowActionSelectFontList_triggered },
     { animateDock, &MainWindow::on_windowActionSelectAnimate_triggered },
     { viewportControlDock, &MainWindow::on_windowActionSelectViewportControl_triggered },
   }};
@@ -3661,22 +3995,22 @@ void MainWindow::helpOfflineCheatSheet()
 
 void MainWindow::helpLibrary()
 {
-  if (!this->library_info_dialog) {
+  if (!this->libraryInfoDialog) {
     QString rendererInfo(qglview->getRendererInfo().c_str());
     auto dialog = new LibraryInfoDialog(rendererInfo);
-    this->library_info_dialog = dialog;
+    this->libraryInfoDialog = dialog;
   }
-  this->library_info_dialog->show();
+  this->libraryInfoDialog->show();
 }
 
 void MainWindow::helpFontInfo()
 {
-  if (!this->font_list_dialog) {
+  if (!this->fontListDialog) {
     auto dialog = new FontListDialog();
-    this->font_list_dialog = dialog;
+    this->fontListDialog = dialog;
   }
-  this->font_list_dialog->update_font_list();
-  this->font_list_dialog->show();
+  this->fontListDialog->updateFontList();
+  this->fontListDialog->show();
 }
 
 void MainWindow::closeEvent(QCloseEvent *event)
@@ -3737,6 +4071,9 @@ void MainWindow::quit()
 #ifdef Q_OS_MACOS
   CocoaUtils::endApplication();
 #endif
+  for(auto &temp: this->allTempFiles) {
+    temp->setAutoRemove(true);
+  }
 }
 
 void MainWindow::consoleOutput(const Message& msgObj, void *userdata)
@@ -3808,39 +4145,21 @@ void MainWindow::processEvents()
   if (this->procevents) QApplication::processEvents();
 }
 
-QString MainWindow::exportPath(const char *suffix) {
-  QString path;
-  auto path_it = this->export_paths.find(suffix);
-  if (path_it != export_paths.end()) {
-    path = QFileInfo(path_it->second).absolutePath() + QString("/");
-    if (activeEditor->filepath.isEmpty()) path += QString(_("Untitled")) + suffix;
-    else path += QFileInfo(activeEditor->filepath).completeBaseName() + suffix;
+QString MainWindow::exportPath(const QString& suffix) {
+  const auto path_it = this->exportPaths.find(suffix);
+  const auto basename = activeEditor->filepath.isEmpty() ? "Untitled" : QFileInfo(activeEditor->filepath).completeBaseName();
+  QString dir;
+  if (path_it != exportPaths.end()) {
+    dir = QFileInfo(path_it->second).absolutePath();
+  } else if (activeEditor->filepath.isEmpty()) {
+    dir = QString::fromStdString(PlatformUtils::userDocumentsPath());
   } else {
-    if (activeEditor->filepath.isEmpty()) path = QString(PlatformUtils::userDocumentsPath().c_str()) + QString("/") + QString(_("Untitled")) + suffix;
-    else {
-      auto info = QFileInfo(activeEditor->filepath);
-      path = info.absolutePath() + QString("/") + info.completeBaseName() + suffix;
-    }
+    dir = QFileInfo(activeEditor->filepath).absolutePath();
   }
-  return path;
+  return QString("%1/%2.%3").arg(dir, basename, suffix);
 }
 
 void MainWindow::jumpToLine(int line, int col)
 {
   this->activeEditor->setCursorPosition(line, col);
 }
-
-paperSizes MainWindow::sizeString2Enum(QString current){
-   for(size_t i = 0; i < paperSizeStrings.size(); i++){
-       if (current.toStdString()==paperSizeStrings[i]) return static_cast<paperSizes>(i);
-   };
-   return paperSizes::A4;
-};
-
-paperOrientations MainWindow::orientationsString2Enum(QString current){
-   for(size_t i = 0; i < paperOrientationsStrings.size(); i++){
-       if (current.toStdString()==paperOrientationsStrings[i]) return static_cast<paperOrientations>(i);
-   };
-   return paperOrientations::PORTRAIT;
-};
-

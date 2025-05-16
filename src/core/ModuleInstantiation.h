@@ -1,8 +1,10 @@
 #pragma once
 
-#include "AST.h"
-#include "LocalScope.h"
-#include <utility>
+#include "core/AST.h"
+#include "core/LocalScope.h"
+#include <ostream>
+#include <memory>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -14,8 +16,13 @@ public:
   ModuleInstantiation(std::string name, AssignmentList args = AssignmentList(), const Location& loc = Location::NONE)
     : ASTNode(loc), arguments(std::move(args)), modname(std::move(name)) { }
 
+  ModuleInstantiation(const ModuleInstantiation &ref)
+    : ASTNode(ref.loc), arguments(std::move(ref.arguments)), modname(std::move(ref.modname)) { }
+
   virtual void print(std::ostream& stream, const std::string& indent, const bool inlined) const;
+  virtual void print_python(std::ostream& stream, std::ostream& stream_def, const std::string& indent, const bool inlined, const int context_mode) const;
   void print(std::ostream& stream, const std::string& indent) const override { print(stream, indent, false); }
+  void print_python(std::ostream& stream, std::ostream& stream_def, const std::string& indent) const override { print_python(stream, stream_def, indent, false, 0); }
   std::shared_ptr<AbstractNode> evaluate(const std::shared_ptr<const Context>& context) const;
 
   const std::string& name() const { return this->modname; }
@@ -42,6 +49,7 @@ public:
   LocalScope *makeElseScope();
   LocalScope *getElseScope() const { return this->else_scope.get(); }
   void print(std::ostream& stream, const std::string& indent, const bool inlined) const final;
+  void print_python(std::ostream& stream, std::ostream& stream_ref,const std::string& indent, const bool inlined, const int context_mode) const final;
 private:
   std::unique_ptr<LocalScope> else_scope;
 };

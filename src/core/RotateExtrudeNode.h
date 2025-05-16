@@ -1,8 +1,10 @@
 #pragma once
 
-#include "node.h"
-#include "Value.h"
-#include "linalg.h"
+#include <string>
+
+#include "core/node.h"
+#include "core/Value.h"
+#include "geometry/linalg.h"
 
 #ifdef ENABLE_PYTHON
 #include <src/python/python_public.h>
@@ -16,18 +18,17 @@ public:
     fn = fs = fa = 0;
     origin_x = origin_y = scale = offset_x = offset_y = 0;
     angle = 360;
+    start = 0;
   }
   std::string toString() const override;
   std::string name() const override { return "rotate_extrude"; }
 
   int convexity;
   double fn, fs, fa;
-  double origin_x, origin_y, scale, offset_x, offset_y, angle;
+  double angle, start, origin_x, origin_y, scale, offset_x, offset_y;
   double twist;
   std::string method;
   Vector3d v;
-  Filename filename;
-  std::string layername;
  #ifdef ENABLE_PYTHON
   void *profile_func;
   void *twist_func;

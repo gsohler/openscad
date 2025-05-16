@@ -1,13 +1,15 @@
 #pragma once
 
+#include <ostream>
+#include <memory>
 #include <string>
 #include <unordered_map>
-#include <unordered_set>
 #include <ctime>
+#include <vector>
 
-#include "module.h"
-#include "LocalScope.h"
-#include "IndicatorData.h"
+#include "core/module.h"
+#include "core/LocalScope.h"
+#include "core/IndicatorData.h"
 
 class SourceFile : public ASTNode
 {
@@ -16,6 +18,7 @@ public:
 
   std::shared_ptr<AbstractNode> instantiate(const std::shared_ptr<const Context>& context, std::shared_ptr<const class FileContext> *resulting_file_context) const;
   void print(std::ostream& stream, const std::string& indent) const override;
+  void print_python(std::ostream& stream, std::ostream& stream_def, const std::string& indent) const override;
 
   void setModulePath(const std::string& path) { this->path = path; }
   const std::string& modulePath() const { return this->path; }

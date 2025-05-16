@@ -1,15 +1,16 @@
 #pragma once
 
-#include "NodeVisitor.h"
-#include "enums.h"
-#include "Geometry.h"
+#include "core/NodeVisitor.h"
+#include "core/enums.h"
+#include "geometry/Geometry.h"
 
+#include <cassert>
 #include <memory>
 #include <utility>
-#include <list>
 #include <vector>
 #include <map>
 #include "GeometryUtils.h"
+#include <boost/functional/hash.hpp>
 
 class CGAL_Nef_polyhedron;
 class Polygon2d;
@@ -91,12 +92,14 @@ public:
   std::shared_ptr<const Geometry> evaluateGeometry(const AbstractNode& node, bool allownef);
 
   Response visit(State& state, const AbstractNode& node) override;
+  Response visit(State& state, const ColorNode& node) override;
   Response visit(State& state, const AbstractIntersectionNode& node) override;
   Response visit(State& state, const AbstractPolyNode& node) override;
   Response visit(State& state, const LinearExtrudeNode& node) override;
   Response visit(State& state, const PathExtrudeNode& node) override;
   Response visit(State& state, const RotateExtrudeNode& node) override;
   Response visit(State& state, const PullNode& node) override;
+  Response visit(State& state, const DebugNode& node) override;
   Response visit(State& state, const WrapNode& node) override;
 #if defined(ENABLE_EXPERIMENTAL) && defined(ENABLE_CGAL)
   Response visit(State& state, const RoofNode& node) override;

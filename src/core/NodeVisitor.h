@@ -1,8 +1,8 @@
 #pragma once
 
-#include "BaseVisitable.h"
-#include "node.h"
-#include "State.h"
+#include "core/BaseVisitable.h"
+#include "core/node.h"
+#include "core/State.h"
 
 class State;
 
@@ -21,6 +21,7 @@ class NodeVisitor :
   public Visitor<class PathExtrudeNode>,
   public Visitor<class RotateExtrudeNode>,
   public Visitor<class PullNode>,
+  public Visitor<class DebugNode>,
   public Visitor<class WrapNode>,
   public Visitor<class RoofNode>,
   public Visitor<class ImportNode>,
@@ -73,6 +74,9 @@ public:
     return visit(state, (const AbstractPolyNode&) node);
   }
   Response visit(State& state, const PullNode& node) override {
+    return visit(state, (const AbstractPolyNode&) node);
+  }
+  Response visit(State& state, const DebugNode& node) override {
     return visit(state, (const AbstractPolyNode&) node);
   }
   Response visit(State& state, const WrapNode& node) override {

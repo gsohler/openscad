@@ -24,10 +24,14 @@
  *
  */
 
-#include "Arguments.h"
-#include "Expression.h"
-#include "function.h"
+#include "core/function.h"
 
+#include "core/Arguments.h"
+#include "core/Expression.h"
+
+#include <ostream>
+#include <memory>
+#include <cstddef>
 #include <utility>
 
 BuiltinFunction::BuiltinFunction(Value(*f)(const std::shared_ptr<const Context>&, const FunctionCall *), const Feature *feature) :
@@ -58,4 +62,16 @@ void UserFunction::print(std::ostream& stream, const std::string& indent) const
     if (parameter->getExpr()) stream << " = " << *parameter->getExpr();
   }
   stream << ") = " << *expr << ";\n";
+}
+
+void UserFunction::print_python(std::ostream& stream, std::ostream& stream_def, const std::string& indent) const
+{
+  stream << indent << "def " << name << "(";
+  for (size_t i = 0; i < parameters.size(); ++i) {
+    const auto& parameter = parameters[i];
+    if (i > 0) stream << ", ";
+    stream << parameter->getName();
+    if (parameter->getExpr()) stream << " = " << *parameter->getExpr();
+  }
+  stream << "):\n\treturn " << *expr << "\n\n";
 }

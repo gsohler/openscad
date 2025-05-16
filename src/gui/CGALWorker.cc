@@ -1,11 +1,21 @@
-#include "CGALWorker.h"
+#include "gui/CGALWorker.h"
+#include <exception>
+#include <memory>
 #include <QThread>
 
-#include "Tree.h"
-#include "GeometryEvaluator.h"
-#include "progress.h"
-#include "printutils.h"
-#include "exceptions.h"
+#ifdef ENABLE_MANIFOLD
+#include "geometry/manifold/ManifoldGeometry.h"
+#endif
+
+#include "core/Tree.h"
+#include "geometry/GeometryEvaluator.h"
+#include "core/progress.h"
+#include "utils/printutils.h"
+#include "utils/exceptions.h"
+
+#ifdef ENABLE_PYTHON
+#include "python/python_public.h"
+#endif
 
 CGALWorker::CGALWorker()
 {
@@ -23,6 +33,9 @@ CGALWorker::~CGALWorker()
 
 void CGALWorker::start(const Tree& tree)
 {
+#ifdef ENABLE_PYTHON
+  python_unlock();
+#endif
   this->tree = &tree;
   this->thread->start();
 }
@@ -30,10 +43,23 @@ void CGALWorker::start(const Tree& tree)
 void CGALWorker::work()
 {
   // this is a worker thread: we don't want any exceptions escaping and crashing the app.
+#ifdef ENABLE_PYTHON
+  python_lock();
+#endif
   std::shared_ptr<const Geometry> root_geom;
   try {
     GeometryEvaluator evaluator(*this->tree);
     root_geom = evaluator.evaluateGeometry(*this->tree->root(), true);
+
+#ifdef ENABLE_MANIFOLD
+    if (auto manifold = std::dynamic_pointer_cast<const ManifoldGeometry>(root_geom)) {
+      // calling status forces evaluation
+      // we should complete evaluation within the worker thread, so computation
+      // will not block the GUI.
+      if (manifold->getManifold().Status() != manifold::Manifold::Error::NoError)
+        LOG(message_group::Error, "Rendering cancelled due to unknown manifold error.");
+    }
+#endif
   } catch (const ProgressCancelException& e) {
     LOG("Rendering cancelled.");
   } catch (const HardWarningException& e) {
@@ -43,7 +69,9 @@ void CGALWorker::work()
   } catch (...) {
     LOG(message_group::Error, "Rendering cancelled by unknown exception.");
   }
-
+ #ifdef ENABLE_PYTHON
+  python_unlock();
+ #endif
   emit done(root_geom);
   thread->quit();
 }

@@ -1,14 +1,15 @@
 #pragma once
 
-#include "AST.h"
-#include "Assignment.h"
+#include "core/AST.h"
+#include "core/Assignment.h"
 #include "Feature.h"
-#include "Value.h"
+#include "core/Value.h"
 
+#include <ostream>
+#include <memory>
 #include <functional>
 #include <string>
 #include <variant>
-#include <vector>
 
 class Arguments;
 class FunctionCall;
@@ -39,6 +40,7 @@ public:
   UserFunction(const char *name, AssignmentList& parameters, std::shared_ptr<Expression> expr, const Location& loc);
 
   void print(std::ostream& stream, const std::string& indent) const override;
+  void print_python(std::ostream& stream, std::ostream& stream_def, const std::string& indent) const override;
 };
 
 

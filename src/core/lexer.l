@@ -31,17 +31,16 @@
 %{
 
 #include "handle_dep.h"
-#include "str_utf8_wrapper.h"
-#include "printutils.h"
-#include "parsersettings.h"
-#include "Assignment.h"
+#include "core/str_utf8_wrapper.h"
+#include "utils/printutils.h"
+#include "core/parsersettings.h"
+#include "core/Assignment.h"
 #include "parser.hxx"
-#include "SourceFile.h"
+#include "core/SourceFile.h"
 #include <assert.h>
 #include <boost/lexical_cast.hpp>
-#include <boost/filesystem.hpp>
-//#include "boost-utils.h"
-namespace fs = boost::filesystem;
+#include <filesystem>
+namespace fs = std::filesystem;
 
 //isatty for visual c++ and mingw-cross-env
 #if defined __WIN32__ && ! defined _MSC_VER
@@ -99,15 +98,7 @@ extern YYLTYPE parserlloc;
         } \
     } 
 
-#ifdef DEBUG
-#define YY_USER_ACTION parserlloc.last_column += yyleng; \
-        PRINTDB("YY_USER_ACTION(): %3d, %3d - %3d, %3d | %3d: %s", \
-                parserlloc.first_line % parserlloc.first_column % \
-                parserlloc.last_line % parserlloc.last_column % \
-                yyleng % quoted_string(yytext));
-#else
 #define YY_USER_ACTION parserlloc.last_column += yyleng;
-#endif
 
 extern void parsererror(char const *s);
 void to_utf8(const char *, char *);

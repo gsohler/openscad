@@ -1,10 +1,12 @@
 #pragma once
 
+#include <limits>
+#include <memory>
 #include <string>
 #include <vector>
 
-#include "Arguments.h"
-#include "ContextFrame.h"
+#include "core/Arguments.h"
+#include "core/ContextFrame.h"
 
 /*
  * The parameters of a builtin function or module do not form a true Context;
@@ -49,11 +51,13 @@ public:
 
   void set_caller(const std::string& caller);
   const Value& get(const std::string& name) const;
+  const Value& get(const std::initializer_list<std::string> names) const;
   double get(const std::string& name, double default_value) const;
   const std::string& get(const std::string& name, const std::string& default_value) const;
 
   bool contains(const std::string& name) const { return bool(lookup(name)); }
   const Value& operator[](const std::string& name) const { return get(name); }
+  const Value& operator[](const std::initializer_list<std::string> names) const { return get(names); }
   bool valid(const std::string& name, Value::Type type);
   bool valid_required(const std::string& name, Value::Type type);
   bool validate_number(const std::string& name, double& out);

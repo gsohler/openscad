@@ -1,9 +1,12 @@
 #pragma once
 
-#include "qtgettext.h"
-#include "Settings.h"
+#include "gui/qtgettext.h"
+#include <QComboBox>
+#include <QWidget>
+#include <string>
+#include "core/Settings.h"
 #include "ui_AxisConfigWidget.h"
-#include "InitConfigurator.h"
+#include "gui/InitConfigurator.h"
 
 class AxisConfigWidget : public QWidget, public Ui::Axis, public InitConfigurator
 {
@@ -75,7 +78,7 @@ signals:
 
 private:
   /** Set value from combobox to settings */
-  void applyComboBox(QComboBox *comboBox, int val, Settings::SettingsEntryEnum& entry);
+  void applyComboBox(QComboBox *comboBox, int val, Settings::SettingsEntryEnum<std::string>& entry);
   void writeSettings();
 
   bool initialized = false;

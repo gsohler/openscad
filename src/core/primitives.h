@@ -24,11 +24,15 @@
  *
  */
 
-#include "GeometryUtils.h"
-#include "linalg.h"
-#include "node.h"
-#include <sstream>
+#include "geometry/GeometryUtils.h"
+#include "geometry/linalg.h"
+#include "core/node.h"
 
+#include <memory>
+#include <cstddef>
+#include <sstream>
+#include <string>
+#include <vector>
 
 class CubeNode : public LeafNode
 {
@@ -40,17 +44,29 @@ public:
     stream << "cube(size = ["
            << x << ", "
            << y << ", "
-           << z << "], center = "
-           << (center ? "true" : "false") << ")";
+           << z << "], center = " ;
+    if(center[0] == center[1] && center[1] == center[2])
+	    stream << ((center[0] == 0) ? "true" : "false");
+    else {
+      stream << "\"";	      
+      for(int i = 0; i<3;i++) {
+        if(center[i] < 0) stream << "-";
+        if(center[i] == 0) stream << "|";	      
+        if(center[i] > 0) stream << "+";	      
+      }	      
+      stream << "\"";	      
+    }
+    stream << ")";
     return stream.str();
   }
   std::string name() const override { return "cube"; }
   std::unique_ptr<const Geometry> createGeometry() const override;
 
   double x = 1, y = 1, z = 1;
-  bool center = false;
+  int center[3] = {1,1,1} ; // -1 means negative side, 0 means centered, 1 means positive side
 };
 
+std::unique_ptr<const Geometry> sphereCreateFuncGeometry(void *funcptr, double fs, int n);
 
 class SphereNode : public LeafNode
 {
@@ -185,3 +201,15 @@ public:
   int convexity = 1;
 };
 
+class SplineNode : public LeafNode
+{
+public:
+  SplineNode (const ModuleInstantiation *mi) : LeafNode(mi) {}
+  std::string toString() const override;
+  std::string name() const override { return "spline"; }
+  std::vector<Vector2d> draw_arc(int fn, const Vector2d &tang1, double l1, const Vector2d &tang2, double l2, const Vector2d &cornerpt) const;
+  std::unique_ptr<const Geometry> createGeometry() const override;
+
+  std::vector<Vector2d> points;
+  double fn, fa, fs;
+};

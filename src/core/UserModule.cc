@@ -24,16 +24,23 @@
  *
  */
 
-#include "UserModule.h"
-#include "ModuleInstantiation.h"
+#include "core/UserModule.h"
+
+#include <ostream>
+#include <memory>
+#include <vector>
+
+#include "core/ModuleInstantiation.h"
 #include "core/node.h"
-#include "exceptions.h"
-#include "StackCheck.h"
-#include "ScopeContext.h"
-#include "Expression.h"
-#include "printutils.h"
-#include "compiler_specific.h"
+#include "utils/exceptions.h"
+#include "utils/StackCheck.h"
+#include "core/ScopeContext.h"
+#include "core/Expression.h"
+#include "utils/printutils.h"
+#include "utils/compiler_specific.h"
+#include <cstddef>
 #include <sstream>
+#include <string>
 
 std::vector<std::string> StaticModuleNameStack::stack;
 
@@ -123,4 +130,26 @@ void UserModule::print(std::ostream& stream, const std::string& indent) const
   if (!this->name.empty()) {
     stream << indent << "}\n";
   }
+}
+
+void UserModule::print_python(std::ostream& stream, std::ostream& stream_def, const std::string& indent) const
+{
+  std::string tab;
+  if (!this->name.empty()) {
+    stream << indent << "def " << this->name << "(";
+    for (size_t i = 0; i < this->parameters.size(); ++i) {
+      const auto& parameter = this->parameters[i];
+      if (i > 0) stream << ", ";
+      stream << parameter->getName();
+      if (parameter->getExpr()) stream << " = " << *parameter->getExpr();
+    }
+    stream << "):\n";
+    tab = "\t";
+  }
+//  stream << "\t";
+  body.print_python(stream, stream_def, indent + tab,false, 1);
+  stream << "\n\n";
+//  if (!this->name.empty()) {
+//    stream << indent << "}\n";
+//  }
 }

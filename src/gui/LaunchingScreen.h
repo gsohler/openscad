@@ -1,10 +1,14 @@
 #pragma once
 
+#include <QModelIndex>
+#include <QStringList>
+#include <QVariant>
+#include <QWidget>
 #include <QString>
 #include <QDialog>
 #include <QTreeWidgetItem>
 
-#include "qtgettext.h" // IWYU pragma: keep
+#include "gui/qtgettext.h" // IWYU pragma: keep
 #include "ui_LaunchingScreen.h"
 
 class LaunchingScreen : public QDialog, public Ui::LaunchingScreen
@@ -26,6 +30,7 @@ private slots:
   void enableRecentButton(const QModelIndex& current, const QModelIndex& previous);
   void enableExampleButton(QTreeWidgetItem *current, QTreeWidgetItem *previous);
   void openUserFile();
+  void openPython();
   void openRecent();
   void openExample();
   void openUserManualURL() const;

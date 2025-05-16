@@ -1,10 +1,11 @@
 #pragma once
 
+#include <cstddef>
 #include <functional>
+#include <string>
 #include <QObject>
 #include <QSet>
-#include "Editor.h"
-#include "TabWidget.h"
+#include "gui/Editor.h"
 
 class MainWindow; // for circular dependency
 
@@ -14,7 +15,6 @@ class TabManager : public QObject
 
 public:
   TabManager(MainWindow *o, const QString& filename);
-  QWidget *getTabHeader();
   QWidget *getTabContent();
   EditorInterface *editor;
   QSet<EditorInterface *> editorList;
@@ -40,7 +40,8 @@ signals:
 
 private:
   MainWindow *par;
-  TabWidget *tabWidget;
+  QTabWidget *tabWidget;
+  bool use_gvim=false;
 
   bool maybeSave(int);
   bool save(EditorInterface *edt, const QString& path);
@@ -50,9 +51,6 @@ private:
 private slots:
   void tabSwitched(int);
   void closeTabRequested(int);
-  void middleMouseClicked(int);
-
-private slots:
   void highlightError(int);
   void unhighlightLastError();
   void undo();
@@ -72,6 +70,7 @@ private slots:
   void copyFilePath();
   void openFolder();
   void closeTab();
+
   void showContextMenuEvent(const QPoint&);
   void showTabHeaderContextMenu(const QPoint&);
 

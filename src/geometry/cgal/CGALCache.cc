@@ -1,9 +1,14 @@
-#include "CGALCache.h"
-#include "printutils.h"
-#include "CGAL_Nef_polyhedron.h"
-#include "CGALHybridPolyhedron.h"
+#include "geometry/cgal/CGALCache.h"
+
+#include <cassert>
+#include <memory>
+#include <cstddef>
+#include <string>
+
+#include "utils/printutils.h"
+#include "geometry/cgal/CGAL_Nef_polyhedron.h"
 #ifdef ENABLE_MANIFOLD
-#include "ManifoldGeometry.h"
+#include "geometry/manifold/ManifoldGeometry.h"
 #endif
 
 CGALCache *CGALCache::inst = nullptr;
@@ -23,10 +28,9 @@ std::shared_ptr<const Geometry> CGALCache::get(const std::string& id) const
 
 bool CGALCache::acceptsGeometry(const std::shared_ptr<const Geometry>& geom) {
   return
-    std::dynamic_pointer_cast<const CGALHybridPolyhedron>(geom) ||
-    std::dynamic_pointer_cast<const CGAL_Nef_polyhedron>(geom)
+    std::dynamic_pointer_cast<const CGAL_Nef_polyhedron>(geom) != nullptr
 #ifdef ENABLE_MANIFOLD
-    || std::dynamic_pointer_cast<const ManifoldGeometry>(geom)
+    || std::dynamic_pointer_cast<const ManifoldGeometry>(geom) != nullptr
 #endif
     ;
 }

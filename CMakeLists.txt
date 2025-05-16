@@ -31,16 +31,21 @@ include("cmake/Modules/openscad_version.cmake")
 option(INFO "Display build configuration info at end of cmake config" ON)
 option(ENABLE_TESTS "Run testsuite after building." ON)
 option(EXPERIMENTAL "Enable Experimental Features" OFF)
-option(USE_MANIFOLD_TRIANGULATOR "Use Manifold's triangulator instead of CGAL's" OFF)
-option(USE_LEGACY_RENDERERS "Use legacy (non-VBO) OpenGL renderers" OFF)
+option(USE_MANIFOLD_TRIANGULATOR "Use Manifold's triangulator instead of CGAL's" ON)
+option(USE_BUILTIN_MANIFOLD "Use manifold from submodule" ON)
+option(USE_BUILTIN_CLIPPER2 "Use Clipper2 from submodule" ON)
 option(SNAPSHOT "Create dev snapshot, uses nightly icons" OFF)
 option(HEADLESS "Build without GUI frontend" OFF)
+if(APPLE)
+  option(USE_QT6 "Build the GUI with Qt6" ON)
+else()
 option(USE_QT6 "Build the GUI with Qt6" OFF)
+endif()
 option(ENABLE_EGL "Enable EGL support if available" ON)
 option(ENABLE_GLX "Enable GLX support if available" ON)
 # For now, we'll default to whatever OpenCSG uses (>=1.6 -> GLAD, <1.6 -> GLEW)
 option(USE_GLAD "Use GLAD. Mutually exclusive from USE_GLEW" OFF)
-option(USE_GLEW "Use GLEW. Mutually exclusive from USE_GLEW" OFF)
+option(USE_GLEW "Use GLEW. Mutually exclusive from USE_GLAD" OFF)
 option(NULLGL "Build without OpenGL, (implies HEADLESS=ON) " OFF)
 option(IDPREFIX "Prefix CSG nodes with index # (debugging purposes only, will break node cache)" OFF)
 option(PROFILE "Enable compiling with profiling / test coverage instrumentation" OFF)
@@ -52,27 +57,27 @@ option(USE_CCACHE "Use ccache to speed up compilation." ON)
 option(ENABLE_CAIRO "Enable support for cairo vector graphics library." ON)
 option(ENABLE_SPNAV "Enable support for libspnav input driver." ON)
 option(ENABLE_HIDAPI "Enable support for HIDAPI input driver." ON)
-option(ENABLE_TBB "Enable support for oneAPI Threading Building Blocks." ON)
 option(ENABLE_CGAL "Enable CGAL." ON)
+option(ENABLE_MANIFOLD "Enable Manifold." ON)
 option(ALLOW_BUNDLED_HIDAPI "Allow usage of bundled HIDAPI library (Windows only)." OFF)
 option(ENABLE_PYTHON "Enable experimental Python Interpreter" OFF)
 option(ENABLE_JS "Enable experimental Javascript Interpreter" OFF)
+option(PYTHON_VERSION "Specify Exact Python Version" "")
 option(ENABLE_LIBFIVE "Enable libfive Library" OFF)
 option(BUILD_SHARED_LIBS "Build shared library" OFF)
 include(CMakeDependentOption)
 cmake_dependent_option(APPLE_UNIX "Build OpenSCAD in Unix mode in MacOS X instead of an Apple Bundle" OFF "APPLE" OFF)
 cmake_dependent_option(ENABLE_QTDBUS "Enable DBus input driver for Qt." ON "NOT HEADLESS" OFF)
 cmake_dependent_option(ENABLE_GAMEPAD "Enable Qt5Gamepad input driver." ON "NOT HEADLESS;NOT USE_QT6" OFF)
+set(WASM_BUILD_TYPE "web" CACHE STRING 
+  "WebAssembly build type. Support web (builds an OpenSCAD module) or node (standalone .js executable)")
 
-if(USE_QT6)
-  set(DEPLOYMENT_TARGET "10.15")
-elseif(EXPERIMENTAL AND ENABLE_TBB)
-  # TBB 2021.8.0 uses aligned memory deallocation.
-  # While this is technically supported in macOS 10.13, an LLVM bug used to limit this to macOS 10.14+.
-  # The bug was fixed in LLVM 15.0.0 (https://reviews.llvm.org/D129198), but was still present in Xcode 14.3.1a.
-  set(DEPLOYMENT_TARGET "10.14")
+if (USE_QT6)
+  # Minimum version required for Qt-6.5
+  set(DEPLOYMENT_TARGET "11.0")
 else()
-  set(DEPLOYMENT_TARGET "10.13")
+  # Minimum version required for std::filesystem
+  set(DEPLOYMENT_TARGET "10.15")
 endif()
 
 # Note: CMAKE_OSX_DEPLOYMENT_TARGET must be set before the project() invocation
@@ -81,7 +86,7 @@ set(CMAKE_OSX_DEPLOYMENT_TARGET ${DEPLOYMENT_TARGET} CACHE STRING "Minimum OS X 
 project(OpenSCAD
   VERSION ${PROJECT_VERSION}
   DESCRIPTION "The Programmer's Solid 3D CAD Modeler"
-  HOMEPAGE_URL "https://openscad.org/"
+  HOMEPAGE_URL "https://pythonscad.org/"
   LANGUAGES C CXX
 )
 
@@ -121,7 +126,7 @@ set_property(TARGET OpenSCAD PROPERTY CXX_STANDARD_REQUIRED ON)
 set_property(TARGET OpenSCAD PROPERTY EXPORT_COMPILE_COMMANDS ON)
 set_property(TARGET OpenSCAD PROPERTY LINKER_LANGUAGE CXX)
 # Verbose link step
-if(("${CMAKE_CXX_COMPILER_FRONTEND_VARIANT}" STREQUAL "GNU") OR 
+if(("${CMAKE_CXX_COMPILER_FRONTEND_VARIANT}" STREQUAL "GNU") OR
    ("${CMAKE_CXX_COMPILER_ID}" MATCHES "AppleClang|Clang|GNU"))
   target_link_options(OpenSCAD BEFORE PRIVATE "-v")
 endif()
@@ -142,25 +147,65 @@ if (CMAKE_SYSTEM_NAME STREQUAL Emscripten)
   set(Boost_USE_STATIC_LIBS ON CACHE BOOL "" FORCE)
   set(Boost_USE_STATIC_RUNTIME ON CACHE BOOL "" FORCE)
   set(ENABLE_CAIRO OFF CACHE BOOL "" FORCE)
-  set(ENABLE_TBB OFF CACHE BOOL "" FORCE)
+  set(MANIFOLD_PAR OFF CACHE BOOL "" FORCE)
   set(NULLGL ON CACHE BOOL "" FORCE)
   set(ENABLE_PYTHON OFF CACHE BOOL "" FORCE)
   set(USE_MIMALLOC OFF CACHE BOOL "" FORCE)
   set(ENV{PKG_CONFIG_PATH} "/emsdk/upstream/emscripten/cache/sysroot/lib/pkgconfig")
   target_compile_definitions(OpenSCAD PRIVATE CGAL_DISABLE_ROUNDING_MATH_CHECK)
   target_link_libraries(OpenSCAD PRIVATE /emsdk/upstream/emscripten/cache/sysroot/lib/libz.a)
+  
+  # https://emscripten.org/docs/tools_reference/emcc.html
+  # https://emscripten.org/docs/tools_reference/settings_reference.html
+  target_compile_options(OpenSCAD PRIVATE -fexceptions)
   target_link_options(OpenSCAD PUBLIC
+    -fexceptions
+    -sABORT_ON_WASM_EXCEPTIONS
     -sALLOW_MEMORY_GROWTH=1
-    -sENVIRONMENT=web,worker
+    -sDISABLE_EXCEPTION_CATCHING=0
     -sEXIT_RUNTIME=1
-    -sEXPORT_ES6=1
-    -sEXPORT_NAME=OpenSCAD
-    -sEXPORTED_RUNTIME_METHODS=['FS','ENV','callMain','ERRNO_CODES']
-    -sFORCE_FILESYSTEM=1
-    -sMODULARIZE=1
-    -sNO_DISABLE_EXCEPTION_CATCHING
-    -sUSE_PTHREADS=0
+    -sEXPORTED_RUNTIME_METHODS=['ENV','ERRNO_CODES','FS','PATH','callMain']
+    -sMAXIMUM_MEMORY=4GB
+    
+    # -g produces DWARF debug info, which is quite large and may need debugger extensions.
+    # Alternatively, can pass -gsource-map -sLOAD_SOURCE_MAP but then variable debugging isn't possible
+    $<$<CONFIG:Debug>:-g -O0>
   )
+  if (WASM_BUILD_TYPE STREQUAL "web")
+    target_link_options(OpenSCAD PUBLIC
+      -sENVIRONMENT=web,worker
+      -sEXPORT_ES6=1
+      -sEXPORT_NAME=OpenSCAD
+      -sMODULARIZE=1
+    )
+  elseif (WASM_BUILD_TYPE STREQUAL "node")
+    target_link_options(OpenSCAD PUBLIC
+      -sENVIRONMENT=node,worker
+      -sNODEJS_CATCH_EXIT
+      -sNODERAWFS
+
+      # Single .js (more elegant for CLI release) is larger than separate .js & .wasm (preferred for web)
+      $<$<CONFIG:Release>:-sSINGLE_FILE> 
+      
+      # Alternatively to single-file mode, code caching could make repeated runs faster:
+      # -sNODE_CODE_CACHING -sWASM_ASYNC_COMPILATION=0
+    )
+
+    # Ensure the resulting .js file is executable on Unix:
+    file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/prepend_node_shebang.cmake "
+      file(READ \"\${FILE}\" CONTENT)
+      file(WRITE \"\${FILE}\" \"#!/usr/bin/env node\n\${CONTENT}\")
+      if(CMAKE_HOST_UNIX)
+        execute_process(COMMAND chmod +x \"\${FILE}\")
+      endif()
+    ")
+    add_custom_command(
+      POST_BUILD TARGET OpenSCAD
+      COMMAND ${CMAKE_COMMAND} "-DFILE=$<TARGET_FILE:OpenSCAD>" -P "${CMAKE_CURRENT_BINARY_DIR}/prepend_node_shebang.cmake"
+    )
+  else()
+    message(FATAL_ERROR "Invalid WASM_BUILD_TYPE: ${WASM_BUILD_TYPE} (allowed: node, web)")
+  endif()
 endif()
 
 if(NULLGL)
@@ -171,9 +216,6 @@ if(EXPERIMENTAL)
 endif()
 if(IDPREFIX)
   target_compile_definitions(OpenSCAD PRIVATE IDPREFIX)
-endif()
-if(USE_LEGACY_RENDERERS)
-  target_compile_definitions(OpenSCAD PRIVATE USE_LEGACY_RENDERERS)
 endif()
 
 if (NOT "${SUFFIX}" STREQUAL "")
@@ -200,7 +242,11 @@ file(MAKE_DIRECTORY ${OPENSCAD_LIB_OUTPUT_DIR})
 
 target_compile_options(OpenSCAD PRIVATE "$<$<CONFIG:DEBUG>:-DDEBUG>")
 
-target_compile_definitions(OpenSCAD PRIVATE _REENTRANT UNICODE _UNICODE)
+target_compile_definitions(OpenSCAD PRIVATE
+  _REENTRANT
+  UNICODE
+  _UNICODE
+  _USE_MATH_DEFINES)
 
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -frounding-math")
@@ -213,7 +259,7 @@ find_package(PkgConfig)
 
 add_subdirectory(submodules)
 
-# The submodules will set up mimalloc if needed, and we need to defer any 
+# The submodules will set up mimalloc if needed, and we need to defer any
 # target_link_libraries() calls until after that.
 
 if (MXECROSS)
@@ -290,10 +336,11 @@ if (MSVC)
   message(STATUS "Eigen: ${Eigen3_VERSION}")
 
   set(Boost_USE_STATIC_LIBS TRUE)
-  find_package(Boost 1.56 REQUIRED COMPONENTS filesystem system regex program_options)
+  find_package(Boost 1.61 REQUIRED COMPONENTS system regex program_options)
   message(STATUS "Boost: ${Boost_VERSION}")
   target_include_directories(OpenSCAD SYSTEM PRIVATE ${Boost_INCLUDE_DIRS})
   target_link_libraries(OpenSCAD PRIVATE ${Boost_LIBRARIES})
+  target_compile_definitions(OpenSCAD PRIVATE BOOST_DLL_USE_STD_FS)
 
   find_package(harfbuzz CONFIG REQUIRED)
   find_path(HARFBUZZ_INCLUDE_DIRS harfbuzz)
@@ -337,10 +384,11 @@ else()
   target_compile_definitions(OpenSCAD PRIVATE EIGEN_DONT_ALIGN)
   message(STATUS "Eigen: ${Eigen3_VERSION}")
 
-  find_package(Boost 1.56 REQUIRED COMPONENTS filesystem system regex program_options)
+  find_package(Boost 1.61 REQUIRED COMPONENTS system regex program_options)
   message(STATUS "Boost: ${Boost_VERSION}")
   target_include_directories(OpenSCAD SYSTEM PRIVATE ${Boost_INCLUDE_DIRS})
   target_link_libraries(OpenSCAD PRIVATE ${Boost_LIBRARIES})
+  target_compile_definitions(OpenSCAD PRIVATE BOOST_DLL_USE_STD_FS)
 
   find_package(HarfBuzz 0.9.19 REQUIRED QUIET)
   message(STATUS "Harfbuzz: ${HARFBUZZ_VERSION}")
@@ -436,10 +484,10 @@ endif()
 if(ENABLE_PYTHON)
   SET(PYTHON_SOURCES
     src/python/pyopenscad.cc
+    src/python/pydata.cc 
     src/python/pyfunctions.cc)
   if(ENABLE_LIBFIVE)
     list(APPEND PYTHON_SOURCES
-      src/python/pylibfive.cc 
       src/python/FrepNode.cc)
   endif()
   add_library(OpenSCADPy
@@ -452,53 +500,52 @@ if(ENABLE_PYTHON)
        target_compile_definitions(OpenSCADPy PRIVATE BUILD_STUDIO_APP=OFF)
        target_compile_definitions(OpenSCADPy PRIVATE BUILD_GUILE_BINDINGS=OFF)
        target_compile_definitions(OpenSCADPy PRIVATE BUILD_PYTHON_BINDINGS=OFF)
+       target_compile_definitions(OpenSCADPy PRIVATE ENABLE_DEBUG=OFF)
      endif()
   message(STATUS "Python enabled, using Nettle ")
-  message(STATUS ${Nettle_INCLUDE_DIRS})
-  message(STATUS ${Nettle_LIBRARIES})
-  message(STATUS ${Nettle_FOUND})
   target_compile_definitions(OpenSCAD PRIVATE ENABLE_PYTHON)
   target_compile_definitions(OpenSCADPy PRIVATE ENABLE_PYTHON)
   if(WIN32) 
     #MINGW environment	  
     SET(PYTHON_MINGW_DEVPATH "${CMAKE_CURRENT_SOURCE_DIR}/python_mingw")
-    SET(PYTHON_MINGW_PACKAGEFOLDER "https://mirror.msys2.org/mingw/mingw64")
-    SET(PYTHON_MINGW_PACKAGEFILE "mingw-w64-x86_64-python-3.11.5-2-any.pkg.tar.zst")
-    SET(PYTHON_MINGW_PACKAGETAR "mingw-w64-x86_64-python-3.11.5-2-any.pkg.tar")
+    SET(CALLSTACK "ucrt")
+    #	SET(CALLSTACK "mingw")
+    #	SET(CALLSTACK "clang")
+    SET(PYTHON_MINGW_PACKAGEFOLDER "https://mirror.msys2.org/mingw/${CALLSTACK}64")
+    SET(PYTHON_MINGW_PACKAGETAR "mingw-w64-${CALLSTACK}-x86_64-python-3.11.5-2-any.pkg.tar")   
+    SET(PYTHON_MINGW_PACKAGEZST "${PYTHON_MINGW_PACKAGETAR}.zst")
     SET(PYTHON_MINGW_VERSION "python3.11")
-    SET(PYTHON_MINGW_ARCHIVE "${PYTHON_MINGW_DEVPATH}/mingw64/lib/lib${PYTHON_MINGW_VERSION}.dll.a")
+    SET(PYTHON_MINGW_ARCHIVE "${PYTHON_MINGW_DEVPATH}/${CALLSTACK}64/lib/lib${PYTHON_MINGW_VERSION}.dll.a")
     add_custom_command(
       WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-      COMMAND rm -rf python_mingw && mkdir python_mingw && cd python_mingw && wget ${PYTHON_MINGW_PACKAGEFOLDER}/${PYTHON_MINGW_PACKAGEFILE} && unzstd ${PYTHON_MINGW_PACKAGEFILE} && tar -xf ${PYTHON_MINGW_PACKAGETAR}
+      COMMAND rm -rf python_mingw && mkdir python_mingw && cd python_mingw && wget ${PYTHON_MINGW_PACKAGEFOLDER}/${PYTHON_MINGW_PACKAGEZST} && unzstd ${PYTHON_MINGW_PACKAGEZST} && tar -xf ${PYTHON_MINGW_PACKAGETAR} &&  ${CMAKE_CURRENT_SOURCE_DIR}/scripts/libpython_patch.sh
       OUTPUT ${PYTHON_MINGW_ARCHIVE}
     )
     add_custom_target(tgt_python_mingw DEPENDS ${PYTHON_MINGW_ARCHIVE})
 
-    # Python embeddable Package
-    SET(PYTHON_EMBEDDABLE_DEVPATH "${CMAKE_CURRENT_SOURCE_DIR}/bin")
-    SET(PYTHON_EMBEDDABLE_PACKAGEFILE "python-3.11.5-embed-amd64.zip")
-    SET(PYTHON_EMBEDDABLE_URL "http://www.python.org/ftp/python/3.11.5")
-    SET(PYTHON_EMBEDDABLE_DLL "${PYTHON_EMBEDDABLE_DEVPATH}/python311.dll")
-    add_custom_command(
-      WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-      COMMAND rm -rf bin && mkdir bin && cd bin && wget ${PYTHON_EMBEDDABLE_URL}/${PYTHON_EMBEDDABLE_PACKAGEFILE} && unzip ${PYTHON_EMBEDDABLE_PACKAGEFILE}
-      OUTPUT ${PYTHON_EMBEDDABLE_DLL}
-    )
-    add_custom_target(tgt_python_embed DEPENDS ${PYTHON_EMBEDDABLE_DLL})
-
-    add_dependencies(OpenSCADPy tgt_python_embed)
     add_dependencies(OpenSCADPy tgt_python_mingw)
 
-    target_include_directories(OpenSCADPy SYSTEM PRIVATE "${PYTHON_MINGW_DEVPATH}/mingw64/include/${PYTHON_MINGW_VERSION}")
+    target_include_directories(OpenSCADPy SYSTEM PRIVATE "${PYTHON_MINGW_DEVPATH}/${CALLSTACK}64/include/${PYTHON_MINGW_VERSION}")
     target_link_libraries(OpenSCADPy PRIVATE "${PYTHON_MINGW_ARCHIVE}")
     target_include_directories(OpenSCADPy SYSTEM PRIVATE ${HARFBUZZ_INCLUDE_DIRS})
     target_include_directories(OpenSCADPy SYSTEM PRIVATE ${FREETYPE_INCLUDE_DIRS})
   else() #MXE
-    SET(PYTHON_LIBRARIES ${Python_LIBRARIES} )
-    SET(PYTHON_INCLUDE_DIRS ${Python_INCLUDE_DIRS} )
-    target_link_libraries(OpenSCADPy PRIVATE ${PYTHON_LIBRARIES})
-    target_include_directories(OpenSCADPy PRIVATE ${PYTHON_INCLUDE_DIRS})
-    message(STATUS "Python enabled ${PYTHONLIBS_FOUND} ${PYTHON_LIBRARIES}")
+    if("${PYTHON_VERSION}" STREQUAL "")
+	    SET(Python_Eff_LIBRARIES ${Python_LIBRARIES} )
+	    SET(Python_Eff_INCLUDE_DIRS ${Python_INCLUDE_DIRS} )
+    else()
+	    if("${PYTHON_VERSION}" STREQUAL "OFF")
+                    SET(Python_Eff_LIBRARIES ${Python_LIBRARIES} )
+		    SET(Python_Eff_INCLUDE_DIRS ${Python_INCLUDE_DIRS} )
+            else()		    
+	   	     string(REGEX REPLACE "python[0-9.]+" "python${PYTHON_VERSION}"  Python_Eff_INCLUDE_DIRS "${Python_INCLUDE_DIRS}" )
+	             string(REGEX REPLACE "python[0-9.]+.so" "python${PYTHON_VERSION}.so"  Python_Eff_LIBRARIES "${Python_LIBRARIES}" )
+            endif()		     
+    endif()
+    target_link_libraries(OpenSCADPy PRIVATE ${Python_Eff_LIBRARIES})
+    target_include_directories(OpenSCADPy PRIVATE ${Python_Eff_INCLUDE_DIRS})
+    target_include_directories(OpenSCADPy PRIVATE "${CMAKE_SOURCE_DIR}/submodules/Clipper2/CPP/Clipper2Lib/include")
+    message(STATUS "Python enabled")
     target_include_directories(OpenSCADPy SYSTEM PRIVATE ${FREETYPE_INCLUDE_DIRS})
     target_link_libraries(OpenSCADPy PRIVATE ${Python_LIBRARIES})
   endif() # endif MXE
@@ -525,6 +572,7 @@ if(ENABLE_PYTHON)
   set_property(TARGET OpenSCADPy PROPERTY CXX_EXTENSIONS OFF)
   set_property(TARGET OpenSCADPy PROPERTY CXX_STANDARD_REQUIRED ON)
   target_compile_definitions(OpenSCADPy PRIVATE "STACKSIZE=${STACKSIZE}")
+  target_compile_definitions(OpenSCADPy PRIVATE EIGEN_DONT_ALIGN)
   target_compile_options(OpenSCADPy PRIVATE "$<$<CONFIG:DEBUG>:-DDEBUG>")
   target_compile_definitions(OpenSCADPy PRIVATE
     OPENSCAD_VERSION=${OPENSCAD_VERSION}
@@ -554,6 +602,19 @@ if(ENABLE_PYTHON)
     "src/utils"
   )
   target_link_libraries(OpenSCAD PRIVATE OpenSCADPy)
+endif()
+if(MXECROSS)
+  find_package(CURL REQUIRED)
+#  message(STATUS ${CURL_FOUND})
+#  message(STATUS ${CURL_INCLUDE_DIR})
+#  message(STATUS ${CURL_INCLUDE_LIBRARIES})
+#  message(STATUS ${CURL_VERSION_STRING})
+  target_compile_definitions(OpenSCAD PRIVATE CURL_STATICLIB)
+  target_include_directories(OpenSCAD SYSTEM PRIVATE ${CURL_INCLUDE_DIR})
+  target_link_libraries(OpenSCAD PRIVATE "libcurl.a;libidn2.a;libssh2.a;libunistring.a")
+else()	
+  target_link_directories(OpenSCAD PRIVATE "/usr/lib64")
+  target_link_libraries(OpenSCAD PRIVATE "libcurl.so")
 endif()
 
 if(ENABLE_JS)
@@ -599,6 +660,7 @@ if(ENABLE_JS)
     target_include_directories(OpenSCADJS SYSTEM PRIVATE ${FREETYPE_INCLUDE_DIRS})
   target_include_directories(OpenSCADJS SYSTEM PRIVATE ${FREETYPE_INCLUDE_DIRS})
     target_include_directories(OpenSCADJS SYSTEM PRIVATE ${HARFBUZZ_INCLUDE_DIRS})
+    target_include_directories(OpenSCADJS PRIVATE "${CMAKE_SOURCE_DIR}/submodules/Clipper2/CPP/Clipper2Lib/include")
   target_link_libraries(OpenSCADJS PRIVATE Eigen3::Eigen)
   target_link_libraries(OpenSCADJS PRIVATE ${GETTEXT_LIBRARY})
   target_link_libraries(OpenSCADJS PRIVATE ${GLIB2_LIBRARIES})
@@ -732,13 +794,17 @@ endif()
 
 target_include_directories(OpenSCAD PRIVATE
   "src"
-  "src/core"
   "src/python"
-  "src/core/customizer"
   "src/ext"
-  "src/ext/json"
   "src/ext/lexertl/include"
   "src/ext/libtess2/Include"
+
+  # All the following should go away, not needed anymore after
+  # PR #5312. Left here for now in case there are on-going PRs that
+  # rely on these. Should be removed soon.
+  "src/core"
+  "src/core/customizer"
+  "src/ext/json"
   "src/ext"
   "src/geometry"
   "src/geometry/cgal"
@@ -814,7 +880,7 @@ if(NOT HEADLESS)
       message(STATUS "DBus input driver disabled per user request.")
     endif()
   else()
-    find_package(Qt5 5.4 COMPONENTS Core Widgets Multimedia OpenGL Concurrent Network Svg REQUIRED QUIET)
+    find_package(Qt5 5.12 COMPONENTS Core Widgets Multimedia OpenGL Concurrent Network Svg REQUIRED QUIET)
     message(STATUS "Qt5: ${Qt5_VERSION}")
 
     if (Qt5_POSITION_INDEPENDENT_CODE)
@@ -950,74 +1016,73 @@ endif()
 set(CORE_SOURCES
   src/Feature.cc
   src/FontCache.cc
-  src/handle_dep.cc
   src/LibraryInfo.cc
   src/RenderStatistic.cc
-  src/version.cc
+  src/core/AST.cc
   src/core/Arguments.cc
-  src/core/Builtins.cc
+  src/core/Assignment.cc
   src/core/BuiltinContext.cc
+  src/core/Builtins.cc
+  src/core/CSGNode.cc
+  src/core/CSGTreeEvaluator.cc
   src/core/CgalAdvNode.cc
   src/core/Children.cc
   src/core/ColorNode.cc
   src/core/PullNode.cc
   src/core/WrapNode.cc
   src/core/TextureNode.cc
+  src/core/ColorUtil.cc
   src/core/Context.cc
   src/core/ContextFrame.cc
   src/core/ContextMemoryManager.cc
-  src/core/control.cc
-  src/core/CSGNode.cc
   src/core/CsgOpNode.cc
-  src/core/CSGTreeEvaluator.cc
-  src/core/customizer/Annotation.cc
-  src/core/customizer/CommentParser.cc
+  src/core/DrawingCallback.cc
   src/core/EvaluationSession.cc
   src/core/Expression.cc
-  src/core/builtin_functions.cc
-  src/core/function.cc
+  src/core/FreetypeRenderer.cc
   src/core/FunctionType.cc
+  src/core/GroupModule.cc
   src/core/ImportNode.cc
   src/core/LinearExtrudeNode.cc
   src/core/PathExtrudeNode.cc
   src/core/OversampleNode.cc
+  src/core/DebugNode.cc
   src/core/FilletNode.cc
   src/core/LocalScope.cc
-  src/core/ScopeContext.cc
-  src/core/module.cc
-  src/core/node.cc
   src/core/node_clone.cc
+  src/core/ModuleInstantiation.cc
   src/core/NodeDumper.cc
+  src/core/NodeVisitor.cc
   src/core/OffsetNode.cc
   src/core/Parameters.cc
-  src/core/parsersettings.cc
-  src/core/primitives.cc
-  src/core/progress.cc
   src/core/ProjectionNode.cc
   src/core/RenderNode.cc
   src/core/RenderVariables.cc
-  src/core/DrawingCallback.cc
   src/core/RotateExtrudeNode.cc
-  src/core/SurfaceNode.cc
-  src/core/TextNode.cc
-  src/core/TransformNode.cc
-  src/core/UndefType.cc
-  src/core/Value.cc
-  src/core/Assignment.cc
-  src/core/AST.cc
-  src/core/FreetypeRenderer.cc
-  src/core/GroupModule.cc
-  src/core/ModuleInstantiation.cc
-  src/core/NodeVisitor.cc
+  src/core/ScopeContext.cc
+  src/core/Settings.cc
   src/core/SourceFile.cc
   src/core/SourceFileCache.cc
   src/core/StatCache.cc
-  src/core/UserModule.cc
+  src/core/SurfaceNode.cc
+  src/core/TextNode.cc
+  src/core/TransformNode.cc
   src/core/Tree.cc
+  src/core/UndefType.cc
+  src/core/UserModule.cc
+  src/core/Value.cc
+  src/core/builtin_functions.cc
+  src/core/control.cc
+  src/core/customizer/Annotation.cc
+  src/core/customizer/CommentParser.cc
   src/core/customizer/ParameterObject.cc
   src/core/customizer/ParameterSet.cc
-  src/ext/lodepng/lodepng.cpp
-  src/ext/polyclipping/clipper.cpp
+  src/core/function.cc
+  src/core/module.cc
+  src/core/node.cc
+  src/core/parsersettings.cc
+  src/core/primitives.cc
+  src/core/progress.cc
   src/ext/libtess2/Source/bucketalloc.c
   src/ext/libtess2/Source/dict.c
   src/ext/libtess2/Source/geom.c
@@ -1025,24 +1090,28 @@ set(CORE_SOURCES
   src/ext/libtess2/Source/priorityq.c
   src/ext/libtess2/Source/sweep.c
   src/ext/libtess2/Source/tess.c
+  src/ext/lodepng/lodepng.cpp
   src/geometry/ClipperUtils.cc
   src/geometry/Geometry.cc
   src/geometry/GeometryCache.cc
+  src/geometry/GeometryEvaluator.cc
   src/geometry/GeometryUtils.cc
-  src/geometry/Polygon2d.cc
-  src/geometry/linalg.cc
   src/geometry/PolySet.cc
   src/geometry/PolySetBuilder.cc
+  src/geometry/Curve.cc
+  src/geometry/Surface.cc
   src/geometry/PolySetUtils.cc
-  src/geometry/GeometryEvaluator.cc
   src/geometry/rotextrude.cc
-  src/geometry/linear_extrude.cc
+  src/geometry/Polygon2d.cc
   src/geometry/boolean_utils.cc
-  src/glview/OffscreenContextFactory.cc
-  src/glview/RenderSettings.cc
+  src/geometry/linalg.cc
+  src/geometry/linear_extrude.cc
   src/glview/Camera.cc
   src/glview/ColorMap.cc
+  src/glview/OffscreenContextFactory.cc
+  src/glview/RenderSettings.cc
   src/glview/preview/CSGTreeNormalizer.cc
+  src/handle_dep.cc
   src/io/DxfData.cc
   src/io/dxfdim.cc
   src/io/export.cc
@@ -1050,46 +1119,51 @@ set(CORE_SOURCES
   src/io/export_dxf.cc
   src/io/export_obj.cc
   src/io/export_off.cc
-  src/io/export_wrl.cc
+  src/io/export_param.cc
   src/io/export_ps.cc
   src/io/export_foldable.cc
   src/io/export_pdf.cc
   src/io/export_stl.cc
   src/io/export_svg.cc
+  src/io/export_step.cc
+  src/io/export_pov.cc
   src/io/export_param.cc
+  src/io/export_wrl.cc
   src/io/fileutils.cc
   src/io/import_amf.cc
-  src/io/import_stl.cc
+  src/io/import_json.cc
   src/io/import_obj.cc
   src/io/import_off.cc
+  src/io/import_stl.cc
+  src/io/import_step.cc
+  src/io/StepKernel.cc
   src/io/import_svg.cc
-  src/io/import_json.cc
-  src/io/libsvg/circle.cc
-  src/io/libsvg/data.cc
-  src/io/libsvg/ellipse.cc
-  src/io/libsvg/group.cc
-  src/io/libsvg/libsvg.cc
-  src/io/libsvg/line.cc
-  src/io/libsvg/path.cc
-  src/io/libsvg/polygon.cc
-  src/io/libsvg/polyline.cc
-  src/io/libsvg/rect.cc
-  src/io/libsvg/shape.cc
-  src/io/libsvg/svgpage.cc
-  src/io/libsvg/text.cc
-  src/io/libsvg/transformation.cc
-  src/io/libsvg/tspan.cc
-  src/io/libsvg/use.cc
-  src/io/libsvg/util.cc
+  src/libsvg/circle.cc
+  src/libsvg/data.cc
+  src/libsvg/ellipse.cc
+  src/libsvg/group.cc
+  src/libsvg/libsvg.cc
+  src/libsvg/line.cc
+  src/libsvg/path.cc
+  src/libsvg/polygon.cc
+  src/libsvg/polyline.cc
+  src/libsvg/rect.cc
+  src/libsvg/shape.cc
+  src/libsvg/svgpage.cc
+  src/libsvg/text.cc
+  src/libsvg/transformation.cc
+  src/libsvg/tspan.cc
+  src/libsvg/use.cc
+  src/libsvg/util.cc
   src/platform/PlatformUtils.cc
-  src/utils/boost-utils.cc
+  src/utils/StackCheck.h
   src/utils/calc.cc
   src/utils/degree_trig.cc
   src/utils/hash.cc
   src/utils/printutils.cc
-  src/utils/StackCheck.h
   src/utils/svg.cc
   src/utils/version_check.h
+  src/version.cc
   ${LIB3MF_SOURCES}
   ${PLATFORM_SOURCES}
   ${FLEX_openscad_lexer_OUTPUTS}
@@ -1108,13 +1182,9 @@ endif()
 set(CGAL_SOURCES
   src/geometry/cgal/cgalutils.cc
   src/geometry/cgal/cgalutils-applyops.cc
-  src/geometry/cgal/cgalutils-applyops-hybrid.cc
-  src/geometry/cgal/cgalutils-applyops-hybrid-minkowski.cc
   src/geometry/cgal/cgalutils-closed.cc
   src/geometry/cgal/cgalutils-convex.cc
-  src/geometry/cgal/cgalutils-corefine.cc
   src/geometry/cgal/cgalutils-kernel.cc
-  src/geometry/cgal/cgalutils-hybrid.cc
   src/geometry/cgal/cgalutils-mesh.cc
   src/geometry/cgal/cgalutils-minkowski.cc
   src/geometry/cgal/cgalutils-nef.cc
@@ -1123,7 +1193,6 @@ set(CGAL_SOURCES
   src/geometry/cgal/cgalutils-project.cc
   src/geometry/cgal/cgalutils-tess.cc
   src/geometry/cgal/cgalutils-triangulate.cc
-  src/geometry/cgal/CGALHybridPolyhedron.cc
   src/geometry/cgal/CGAL_Nef_polyhedron.cc
   src/geometry/cgal/CGALCache.cc
   src/io/export_nef.cc
@@ -1141,58 +1210,64 @@ set(MANIFOLD_CGAL_SOURCES
   src/geometry/manifold/manifold-applyops-minkowski.cc
 )
 
-if(EXPERIMENTAL AND ENABLE_TBB)
-  # Note: currently only Manifold-related code makes use of TBB parallelization
-  # ("exact" CGAL numerics are not thread-safe)
-  target_compile_options(OpenSCAD PRIVATE 
-    -DENABLE_TBB
-    -DTHRUST_HOST_SYSTEM=THRUST_HOST_SYSTEM_TBB
-    -DTHRUST_DEVICE_SYSTEM=THRUST_DEVICE_SYSTEM_TBB
-  )
-  find_package(TBB QUIET)
-  if (NOT TBB_FOUND AND PKG_CONFIG_FOUND)
-    pkg_check_modules(TBB tbb REQUIRED)
-    add_library(TBB::tbb UNKNOWN IMPORTED)
-    set_target_properties(TBB::tbb
-      PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${TBB_INCLUDE_DIRS}")
-    set_target_properties(TBB::tbb
-      PROPERTIES INTERFACE_LINK_LIBRARIES "${TBB_LINK_LIBRARIES}")
-    list(GET TBB_LINK_LIBRARIES 0 TBB_IMPORTED_LOCATION)
-    set_target_properties(TBB::tbb
-      PROPERTIES IMPORTED_LOCATION "${TBB_IMPORTED_LOCATION}")
+if(USE_BUILTIN_CLIPPER2)
+  set(CLIPPER2_UTILS OFF)
+  set(CLIPPER2_EXAMPLES OFF)
+  set(CLIPPER2_TESTS OFF)
+  add_subdirectory("submodules/Clipper2/CPP" EXCLUDE_FROM_ALL)
+  set(Clipper2_FOUND "YES")
+  if(NOT TARGET Clipper2::Clipper2)
+    add_library(Clipper2::Clipper2 ALIAS Clipper2)
   endif()
-  message(STATUS "TBB: ${TBB_VERSION}")
-  target_link_libraries(OpenSCAD PRIVATE TBB::tbb)
+  message(STATUS "Clipper2 submodule")
+else()
+  find_package(Clipper2 REQUIRED QUIET)
+  message(STATUS "Clipper2: ${Clipper2_VERSION}")
 endif()
+target_link_libraries(OpenSCAD PRIVATE Clipper2::Clipper2)
 
-if(EXPERIMENTAL)
+if(ENABLE_MANIFOLD)
+  if(NOT DEFINED MANIFOLD_PAR)
+    # Note: currently only Manifold-related code makes use of TBB parallelization
+    # ("exact" CGAL numerics are not thread-safe)
+    target_compile_options(OpenSCAD PRIVATE
+      -DENABLE_TBB
+    )
+    find_package(TBB QUIET)
+    if (NOT TBB_FOUND AND PKG_CONFIG_FOUND)
+      pkg_check_modules(TBB tbb REQUIRED)
+      # add_library(TBB::tbb UNKNOWN IMPORTED)
+      set_target_properties(TBB::tbb
+        PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${TBB_INCLUDE_DIRS}")
+      set_target_properties(TBB::tbb
+        PROPERTIES INTERFACE_LINK_LIBRARIES "${TBB_LINK_LIBRARIES}")
+      list(GET TBB_LINK_LIBRARIES 0 TBB_IMPORTED_LOCATION)
+      set_target_properties(TBB::tbb
+        PROPERTIES IMPORTED_LOCATION "${TBB_IMPORTED_LOCATION}")
+    endif()
+    message(STATUS "TBB: ${TBB_VERSION}")
+    target_link_libraries(OpenSCAD PRIVATE TBB::tbb)
 
-  # Hack to find our wanted version of Python before Manifold's included googletest finds Python2
-  find_package(Python3 3.4 COMPONENTS Interpreter REQUIRED)
-
-  if(NOT DEFINED MANIFOLD_PAR AND ENABLE_TBB)
-    set(MANIFOLD_PAR TBB CACHE STRING "Parallel backend, either \"TBB\" or \"OpenMP\" or \"NONE\"" FORCE)
+    set(MANIFOLD_PAR ON CACHE BOOL "Parallel backend" FORCE)
   endif()
 
-  set(PYBIND11_FINDPYTHON OFF)
   set(MANIFOLD_PYBIND OFF)
   set(MANIFOLD_TEST OFF)
-
-  if(CMAKE_UNITY_BUILD)
-    set(CMAKE_UNITY_BUILD OFF)
-    add_subdirectory(submodules/manifold EXCLUDE_FROM_ALL)
-    set(CMAKE_UNITY_BUILD ON)
+  if(USE_BUILTIN_MANIFOLD)
+    if(CMAKE_UNITY_BUILD)
+      set(CMAKE_UNITY_BUILD OFF)
+      add_subdirectory(submodules/manifold EXCLUDE_FROM_ALL)
+      set(CMAKE_UNITY_BUILD ON)
+    else()
+      add_subdirectory(submodules/manifold EXCLUDE_FROM_ALL)
+    endif()
+    message(STATUS "mainfold submodule: ${manifold_VERSION}")
   else()
-    add_subdirectory(submodules/manifold EXCLUDE_FROM_ALL)
+    find_package(manifold REQUIRED QUIET)
+    message(STATUS "mainfold: ${manifold_VERSION}")
   endif()
-  target_link_libraries(OpenSCAD PRIVATE manifold polygon)
+  target_link_libraries(OpenSCAD PRIVATE manifold::manifold)
   add_sanitizers(manifold)
-
-  target_compile_definitions(OpenSCAD PRIVATE ENABLE_MANIFOLD)
-  list(APPEND Sources ${MANIFOLD_SOURCES})
-  if (ENABLE_CGAL)
-    list(APPEND Sources ${MANIFOLD_CGAL_SOURCES})
-  endif()
 
   if (USE_MANIFOLD_TRIANGULATOR)
     target_compile_definitions(OpenSCAD PRIVATE USE_MANIFOLD_TRIANGULATOR)
@@ -1212,23 +1287,17 @@ if(NULLGL)
     src/io/export_png.cc
     src/io/imageutils.cc)
 else()
-  if(USE_LEGACY_RENDERERS)
-    set(LEGACY_RENDERER_SOURCES
-      src/glview/cgal/LegacyCGALRenderer.cc
-      src/glview/preview/LegacyOpenCSGRenderer.cc
-      src/glview/preview/LegacyThrownTogetherRenderer.cc
-      src/glview/LegacyRendererUtils.cc
-    )
-  endif()
   set(OFFSCREEN_SOURCES
     src/glview/OpenGLContext.cc
     src/glview/fbo.cc
     src/glview/Renderer.cc
+    src/glview/ShaderUtils.cc
     src/glview/system-gl.cc
-    src/glview/VertexArray.cc
+    src/glview/VBOBuilder.cc
     src/glview/VertexState.cc
     src/glview/VBORenderer.cc
     src/glview/GLView.cc
+    src/glview/hershey.cc
     src/glview/OffscreenView.cc
     src/glview/cgal/CGALRenderer.cc
     src/glview/cgal/CGALRenderUtils.cc
@@ -1236,7 +1305,6 @@ else()
     src/glview/preview/ThrownTogetherRenderer.cc
     src/io/export_png.cc
     src/io/imageutils.cc
-    ${LEGACY_RENDERER_SOURCES}
     ${GLEW_SOURCES})
 endif()
 
@@ -1254,6 +1322,7 @@ set(INPUT_DRIVER_SOURCES
 
 set(GUI_SOURCES
   ${GUI_SOURCES}
+  src/openscad_gui.cc
   src/gui/AutoUpdater.cc
   src/gui/CGALWorker.cc
   src/gui/CSGWorker.cc
@@ -1263,7 +1332,10 @@ set(GUI_SOURCES
   src/gui/Editor.cc
   src/gui/ErrorLog.cc
   src/gui/EventFilter.h
+  src/gui/Export3mfDialog.cc
   src/gui/ExportPdfDialog.cc
+  src/gui/LoadShareDesignDialog.cc
+  src/gui/ShareDesignDialog.cc
   src/gui/FontListDialog.cc
   src/gui/FontListTableView.cc
   src/gui/InitConfigurator.cc
@@ -1272,6 +1344,7 @@ set(GUI_SOURCES
   src/gui/MainWindow.cc
   src/gui/Measurement.cc
   src/gui/Animate.cc
+  src/gui/FontList.cc
   src/gui/MouseSelector.cc
   src/gui/OctoPrint.cc
   src/gui/OpenCSGWarningDialog.cc
@@ -1279,6 +1352,7 @@ set(GUI_SOURCES
   src/gui/Preferences.cc
   src/gui/PrintInitDialog.cc
   src/gui/PrintService.cc
+  src/gui/ExternalToolInterface.cc
   src/gui/ProgressWidget.cc
   src/gui/QGLView.cc
   src/gui/QGLView2.cc
@@ -1287,10 +1361,8 @@ set(GUI_SOURCES
   src/gui/ScadApi.cc
   src/gui/ScadLexer.cc
   src/gui/ScintillaEditor.cc
-  src/gui/Settings.cc
   src/gui/SettingsWriter.cc
   src/gui/TabManager.cc
-  src/gui/TabWidget.cc
   src/gui/UIUtils.cc
   src/gui/WindowManager.cc
   src/gui/IgnoreWheelWhenNotFocused.cc
@@ -1329,7 +1401,11 @@ set(GUI_HEADERS
     src/gui/Editor.h
     src/gui/ErrorLog.h
     src/gui/EventFilter.h
+    src/gui/LoadShareDesignDialog.h
+    src/gui/ShareDesignDialog.h
+    src/gui/Export3mfDialog.h
     src/gui/ExportPdfDialog.h
+    src/gui/FontList.h
     src/gui/FontListDialog.h
     src/gui/FontListTableView.h
     src/gui/IgnoreWheelWhenNotFocused.h
@@ -1353,10 +1429,8 @@ set(GUI_HEADERS
     src/gui/ScadApi.h
     src/gui/ScadLexer.h
     src/gui/ScintillaEditor.h
-    src/gui/Settings.h
     src/gui/SettingsWriter.h
     src/gui/TabManager.h
-    src/gui/TabWidget.h
     src/gui/UIUtils.h
     src/gui/ViewportControl.h
     src/gui/WindowManager.h
@@ -1381,7 +1455,11 @@ set(GUI_UIS
     src/gui/Animate.ui
     src/gui/Console.ui
     src/gui/ErrorLog.ui
+    src/gui/Export3mfDialog.ui
     src/gui/ExportPdfDialog.ui
+    src/gui/ShareDesignDialog.ui
+    src/gui/LoadShareDesignDialog.ui
+    src/gui/FontList.ui
     src/gui/FontListDialog.ui
     src/gui/LaunchingScreen.ui
     src/gui/LibraryInfoDialog.ui
@@ -1403,13 +1481,15 @@ set(GUI_UIS
     src/gui/parameter/ParameterWidget.ui
 )
 
-if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
-  # Ignore specific warning on external lib
-  set_source_files_properties("src/ext/polyclipping/clipper.cpp" PROPERTIES COMPILE_FLAGS "-Wno-class-memaccess")
+if (ENABLE_MANIFOLD)
+  target_compile_definitions(OpenSCAD PRIVATE ENABLE_MANIFOLD)
+  list(APPEND Sources ${MANIFOLD_SOURCES})
 endif()
-
 if (ENABLE_CGAL)
   list(APPEND Sources ${CGAL_SOURCES})
+endif()
+if (ENABLE_MANIFOLD AND ENABLE_CGAL)
+  list(APPEND Sources ${MANIFOLD_CGAL_SOURCES})
 endif()
 list(APPEND Sources src/openscad.cc ${CORE_SOURCES} ${OFFSCREEN_SOURCES})
 
@@ -1450,7 +1530,11 @@ set(RESOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/resources)
 if(HEADLESS)
   target_compile_definitions(OpenSCAD PRIVATE OPENSCAD_NOGUI)
 else()
-  list(APPEND RESOURCE_FILES ${RESOURCE_DIR}/common.qrc)
+  list(APPEND RESOURCE_FILES
+    ${RESOURCE_DIR}/common.qrc
+    ${RESOURCE_DIR}/icons-chokusen.qrc
+    ${RESOURCE_DIR}/icons-chokusen-dark.qrc
+  )
   # GUI_UIS for .ui files to be indexed by Qt Creator despite AUTOUIC usage
   # GUI_HEADERS for .h files to be indexed by Qt Creator despite AUTOUIC usage
   list(APPEND Sources ${GUI_SOURCES} ${GUI_HEADER_ONLY} ${GUI_UIS} ${GUI_HEADERS})
@@ -1551,22 +1635,20 @@ endif()
 
 if(NOT APPLE OR APPLE_UNIX)
   set_target_properties(OpenSCAD PROPERTIES OUTPUT_NAME openscad${SUFFIX_WITH_DASH})
+  install(TARGETS OpenSCAD RUNTIME DESTINATION "${OPENSCAD_BINDIR}")
   if(WIN32)
     if(ENABLE_PYTHON)
-      install(DIRECTORY ${CMAKE_SOURCE_DIR}/bin DESTINATION "." )
-      install(FILES ${CMAKE_SOURCE_DIR}/bin/python311.dll DESTINATION "bin" RENAME "libpython3.11.dll")
+      install(FILES ${CMAKE_SOURCE_DIR}/python311.dll DESTINATION "." )
     endif()  
-    install(TARGETS OpenSCAD RUNTIME DESTINATION "bin")
     if(USE_MIMALLOC AND MI_LINK_SHARED)
       if(CMAKE_SIZEOF_VOID_P EQUAL 8)
-        install(FILES ${CMAKE_SOURCE_DIR}/submodules/mimalloc/bin/mimalloc-redirect.dll DESTINATION "bin")
+        install(FILES ${CMAKE_SOURCE_DIR}/submodules/mimalloc/bin/mimalloc-redirect.dll DESTINATION ".")
       elseif(CMAKE_SIZEOF_VOID_P EQUAL 4)
-        install(FILES ${CMAKE_SOURCE_DIR}/submodules/mimalloc/bin/mimalloc-redirect32.dll DESTINATION "bin")
+        install(FILES ${CMAKE_SOURCE_DIR}/submodules/mimalloc/bin/mimalloc-redirect32.dll DESTINATION ".")
       endif()
-      install(FILES ${CMAKE_BINARY_DIR}/submodules/mimalloc/mimalloc.dll DESTINATION "bin")
+      install(FILES ${CMAKE_BINARY_DIR}/submodules/mimalloc/mimalloc.dll DESTINATION ".")
     endif()
   else()
-    install(TARGETS OpenSCAD RUNTIME DESTINATION "${OPENSCAD_BINDIR}")
     install(FILES ${CMAKE_CURRENT_LIST_DIR}/doc/openscad.1 DESTINATION ${CMAKE_INSTALL_MANDIR}/man1 RENAME openscad${SUFFIX_WITH_DASH}.1)
     install(FILES ${CMAKE_CURRENT_LIST_DIR}/openscad.appdata.xml DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/metainfo RENAME org.openscad.OpenSCAD${SUFFIX_WITH_DASH}.appdata.xml)
     if(ENABLE_LIBFIVE)
@@ -1587,14 +1669,19 @@ if(NOT APPLE OR APPLE_UNIX)
   install(DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/locale DESTINATION "${OPENSCAD_INSTALL_RESOURCEDIR}" FILES_MATCHING PATTERN "*/LC_MESSAGES/openscad.mo")
   install(DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/shaders DESTINATION "${OPENSCAD_INSTALL_RESOURCEDIR}")
   install(DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/templates DESTINATION "${OPENSCAD_INSTALL_RESOURCEDIR}" FILES_MATCHING PATTERN "*.json")
+else()
+  install(TARGETS ${CMAKE_PROJECT_NAME}
+      BUNDLE DESTINATION ${CMAKE_INSTALL_BINDIR}
+  )
 endif()
 
 # Packaging: CPACK_* settings should be configured before `include(CPack)`
 include(InstallRequiredSystemLibraries)
-set(CPACK_PACKAGE_NAME "OpenSCAD")
-set(CPACK_PACKAGE_VENDOR "The OpenSCAD Developers")
+set(CPACK_PACKAGE_NAME "PythonSCAD")
+set(CPACK_PACKAGE_VENDOR "The OpenSCAD and PythonSCAD Developers")
 set(CPACK_PACKAGE_VERSION "${OPENSCAD_VERSION}")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "The Programmer's Solid 3D CAD Modeler")
+
 
 if(MXECROSS)
   set(CPACK_GENERATOR ZIP;NSIS)
@@ -1617,6 +1704,22 @@ if(MXECROSS)
   set(CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS "\
     !include \\\"${CMAKE_BINARY_DIR}/nsis-extra-uninstall-commands.nsh\\\"\
   ")
+  set (CPACK_NSIS_MODIFY_PATH "ON")
+  else()
+  set(CPACK_GENERATOR RPM)
+  set(CPACK_RPM_COMPONENT_INSTALL OFF)
+  set(CPACK_RPM_PACKAGE_SUMMARY "The Programmer's Solid 3D CAD Modeler")
+  set(CPACK_RPM_FILE_NAME "pythonscad-${OPENSCAD_YEAR}${OPENSCAD_MONTH}${OPENSCAD_DAY}.x86_64.rpm")
+  set(CPACK_RPM_PACKAGE_ARCHITECTURE "x86_64")
+  set(CPACK_RPM_PACKAGE_RELEASE 1)
+  set(CPACK_RPM_PACKAGE_RELEASE_DIST "Release")
+  set(CPACK_RPM_PACKAGE_LICENSE "GPL")
+  set(CPACK_RPM_PACKAGE_GROUP  "PythonSCAD designers")
+  set(CPACK_RPM_PACKAGE_VENDOR "PythonSCAD designers")
+  set(CPACK_RPM_PACKAGE_DESCRIPTION "PythonSCAD RPM Package")
+  execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink "./openscad" "pythonscad")
+  install(FILES ${CMAKE_CURRENT_BINARY_DIR}/pythonscad DESTINATION "." COMPONENT libraries)
+
 endif()
 set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/COPYING")
 # None of config time variables are available for CPACK_PROJECT_CONFIG_FILE, so we configure it now with values.

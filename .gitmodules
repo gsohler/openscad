@@ -6,7 +6,7 @@
 	url = https://github.com/microsoft/mimalloc.git
 [submodule "submodules/manifold"]
 	path = submodules/manifold
-	url = https://github.com/elalish/manifold
+	url = https://github.com/elalish/manifold.git
 	ignore = dirty
 [submodule "submodules/libfive"]
 	path = submodules/libfive
@@ -21,3 +21,6 @@
 [submodule "submodules/mujs"]
 	path = submodules/mujs
 	url = http://git.ghostscript.com/mujs.git
+[submodule "Clipper2"]
+	path = submodules/Clipper2
+	url = https://github.com/AngusJohnson/Clipper2.git

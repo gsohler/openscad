@@ -24,24 +24,30 @@
  *
  */
 
-#include "primitives.h"
-#include "Builtins.h"
-#include "Children.h"
-#include "ModuleInstantiation.h"
-#include "Parameters.h"
-#include "PolySet.h"
-#include "Polygon2d.h"
-#include "calc.h"
+#include "core/primitives.h"
+#include "core/Builtins.h"
+#include "core/Children.h"
+#include "core/ModuleInstantiation.h"
+#include "core/Parameters.h"
+#include "geometry/PolySet.h"
+#include "geometry/Polygon2d.h"
+#include "utils/calc.h"
 #include "core/node.h"
-#include "degree_trig.h"
-#include "module.h"
-#include "printutils.h"
+#include "utils/degree_trig.h"
+#include "core/module.h"
+#include "utils/printutils.h"
+#include <algorithm>
+#include <utility>
 #include <boost/assign/std/vector.hpp>
 #include <cassert>
+#include <cstddef>
 #include <cmath>
 #include <iterator>
 #include <memory>
 #include <sstream>
+#include <string>
+#include <vector>
+
 using namespace boost::assign; // bring 'operator+=()' into scope
 
 #define F_MINIMUM 0.01
@@ -81,7 +87,8 @@ static Value lookup_radius(const Parameters& parameters, const ModuleInstantiati
   if (d.type() == Value::Type::NUMBER) {
     if (r_defined) {
       LOG(message_group::Warning, inst->location(), parameters.documentRoot(),
-          "Ignoring radius variable '%1$s' as diameter '%2$s' is defined too.", radius_var, diameter_var);
+          "Ignoring radius variable %1$s as diameter %2$s is defined too.",
+          quoteVar(radius_var), quoteVar(diameter_var));
     }
     return d.toDouble() / 2.0;
   } else if (r_defined) {
@@ -120,25 +127,28 @@ std::unique_ptr<const Geometry> CubeNode::createGeometry() const
     return PolySet::createEmpty();
   }
 
-  double x1, x2, y1, y2, z1, z2;
-  if (this->center) {
-    x1 = -this->x / 2;
-    x2 = +this->x / 2;
-    y1 = -this->y / 2;
-    y2 = +this->y / 2;
-    z1 = -this->z / 2;
-    z2 = +this->z / 2;
-  } else {
-    x1 = y1 = z1 = 0;
-    x2 = this->x;
-    y2 = this->y;
-    z2 = this->z;
+  double coord1[3], coord2[3], size;
+  for(int i=0;i<3;i++) {
+    switch(i) {
+      case 0: size=this->x; break;
+      case 1: size=this->y; break;
+      case 2: size=this->z; break;
+    }	    
+    if (this->center[i] > 0) {
+     coord1[i] = 0;
+     coord2[i] = size;
+    } else if (this->center[i] < 0) {
+     coord1[i] = -size;
+     coord2[i] = 0;
+    } else {
+     coord1[i] = -size/2;
+     coord2[i] = size/2;
+    }
   }
-  int dimension = 3;
   auto ps = std::make_unique<PolySet>(3, /*convex*/true);
   for (int i = 0; i < 8; i++) {
-    ps->vertices.emplace_back(i & 1 ? x2 : x1, i & 2 ? y2 : y1,
-                              i & 4 ? z2 : z1);
+    ps->vertices.emplace_back(i & 1 ? coord2[0] : coord1[0], i & 2 ? coord2[1] : coord1[1],
+                              i & 4 ? coord2[2] : coord1[2]);
   }
   ps->indices = {
       {4, 5, 7, 6}, // top
@@ -152,14 +162,9 @@ std::unique_ptr<const Geometry> CubeNode::createGeometry() const
   return ps;
 }
 
-static std::shared_ptr<AbstractNode> builtin_cube(const ModuleInstantiation *inst, Arguments arguments, const Children& children)
+static std::shared_ptr<AbstractNode> builtin_cube(const ModuleInstantiation *inst, Arguments arguments)
 {
   auto node = std::make_shared<CubeNode>(inst);
-
-  if (!children.empty()) {
-    LOG(message_group::Warning, inst->location(), arguments.documentRoot(),
-        "module %1$s() does not support child modules", node->name());
-  }
 
   Parameters parameters = Parameters::parse(std::move(arguments), inst->location(), {"size", "center"});
 
@@ -181,13 +186,12 @@ static std::shared_ptr<AbstractNode> builtin_cube(const ModuleInstantiation *ins
     }
   }
   if (parameters["center"].type() == Value::Type::BOOL) {
-    node->center = parameters["center"].toBool();
+     bool cent = parameters["center"].toBool();
+     for(int i=0;i<3;i++) node->center[i]=cent?0:1;
   }
 
   return node;
 }
-
-std::unique_ptr<const Geometry> sphereCreateFuncGeometry(void *funcptr, double fs, int n);
 
 std::unique_ptr<const Geometry> SphereNode::createGeometry() const
 {
@@ -195,9 +199,11 @@ std::unique_ptr<const Geometry> SphereNode::createGeometry() const
     return PolySet::createEmpty();
   }
   auto num_fragments = Calc::get_fragments_from_r(r, 360.0, fn, fs, fa);
+#ifdef ENABLE_PYTHON
   if(this->r_func != nullptr) {
     return sphereCreateFuncGeometry(this->r_func, fs,fn);
   }
+#endif
   size_t num_rings = (num_fragments + 1) / 2;
   // Uncomment the following three lines to enable experimental sphere
   // tessellation
@@ -239,14 +245,9 @@ std::unique_ptr<const Geometry> SphereNode::createGeometry() const
   return polyset;
 }
 
-static std::shared_ptr<AbstractNode> builtin_sphere(const ModuleInstantiation *inst, Arguments arguments, const Children& children)
+static std::shared_ptr<AbstractNode> builtin_sphere(const ModuleInstantiation *inst, Arguments arguments)
 {
   auto node = std::make_shared<SphereNode>(inst);
-
-  if (!children.empty()) {
-    LOG(message_group::Warning, inst->location(), arguments.documentRoot(),
-        "module %1$s() does not support child modules", node->name());
-  }
 
   Parameters parameters = Parameters::parse(std::move(arguments), inst->location(), {"r"}, {"d"});
 
@@ -290,7 +291,7 @@ std::unique_ptr<const Geometry> CylinderNode::createGeometry() const
 
   bool cone = (r2 == 0.0);
   bool inverted_cone = (r1 == 0.0);
-  
+
   auto polyset = std::make_unique<PolySet>(3, /*convex*/true);
   polyset->vertices.reserve((cone || inverted_cone) ? num_fragments + 1 : 2 * num_fragments);
 
@@ -329,14 +330,9 @@ std::unique_ptr<const Geometry> CylinderNode::createGeometry() const
   return polyset;
 }
 
-static std::shared_ptr<AbstractNode> builtin_cylinder(const ModuleInstantiation *inst, Arguments arguments, const Children& children)
+static std::shared_ptr<AbstractNode> builtin_cylinder(const ModuleInstantiation *inst, Arguments arguments)
 {
   auto node = std::make_shared<CylinderNode>(inst);
-
-  if (!children.empty()) {
-    LOG(message_group::Warning, inst->location(), arguments.documentRoot(),
-        "module %1$s() does not support child modules", node->name());
-  }
 
   Parameters parameters = Parameters::parse(std::move(arguments), inst->location(), {"h", "r1", "r2", "center"}, {"r", "d", "d1", "d2", "angle"});
 
@@ -374,15 +370,6 @@ static std::shared_ptr<AbstractNode> builtin_cylinder(const ModuleInstantiation 
           "cylinder(r1=%1$s, r2=%2$s, ...)",
           (r1.type() == Value::Type::NUMBER ? r1.toEchoStringNoThrow() : r.toEchoStringNoThrow()),
           (r2.type() == Value::Type::NUMBER ? r2.toEchoStringNoThrow() : r.toEchoStringNoThrow()));
-    }
-  }
-
-  if (parameters["angle"].isDefined()) {
-    if(!parameters["angle"].getFiniteDouble(node->angle)) {
-      LOG(message_group::Error, "Angle must be a double when specified.");
-    }  
-    if(node->angle < 0.0 || node->angle > 360.0) {
-      LOG(message_group::Error, "Angle must be between 0 and 360 degrees.");
     }
   }
 
@@ -448,14 +435,9 @@ std::unique_ptr<const Geometry> PolyhedronNode::createGeometry() const
   return p;
 }
 
-static std::shared_ptr<AbstractNode> builtin_polyhedron(const ModuleInstantiation *inst, Arguments arguments, const Children& children)
+static std::shared_ptr<AbstractNode> builtin_polyhedron(const ModuleInstantiation *inst, Arguments arguments)
 {
   auto node = std::make_shared<PolyhedronNode>(inst);
-
-  if (!children.empty()) {
-    LOG(message_group::Warning, inst->location(), arguments.documentRoot(),
-        "module %1$s() does not support child modules", node->name());
-  }
 
   Parameters parameters = Parameters::parse(std::move(arguments), inst->location(), {"points", "faces", "convexity"}, {"triangles"});
 
@@ -526,12 +508,9 @@ static std::shared_ptr<AbstractNode> builtin_polyhedron(const ModuleInstantiatio
 
 std::unique_ptr<const Geometry> SquareNode::createGeometry() const
 {
-  auto p = std::make_unique<Polygon2d>();
-  if (
-    this->x <= 0 || !std::isfinite(this->x)
-    || this->y <= 0 || !std::isfinite(this->y)
-    ) {
-    return p;
+  if (this->x <= 0 || !std::isfinite(this->x) ||
+      this->y <= 0 || !std::isfinite(this->y)) {
+    return std::make_unique<Polygon2d>();
   }
 
   Vector2d v1(0, 0);
@@ -543,19 +522,12 @@ std::unique_ptr<const Geometry> SquareNode::createGeometry() const
 
   Outline2d o;
   o.vertices = {v1, {v2[0], v1[1]}, v2, {v1[0], v2[1]}};
-  p->addOutline(o);
-  p->setSanitized(true);
-  return p;
+  return std::make_unique<Polygon2d>(o);
 }
 
-static std::shared_ptr<AbstractNode> builtin_square(const ModuleInstantiation *inst, Arguments arguments, const Children& children)
+static std::shared_ptr<AbstractNode> builtin_square(const ModuleInstantiation *inst, Arguments arguments)
 {
   auto node = std::make_shared<SquareNode>(inst);
-
-  if (!children.empty()) {
-    LOG(message_group::Warning, inst->location(), arguments.documentRoot(),
-        "module %1$s() does not support child modules", node->name());
-  }
 
   Parameters parameters = Parameters::parse(std::move(arguments), inst->location(), {"size", "center"});
 
@@ -605,14 +577,9 @@ std::unique_ptr<const Geometry> CircleNode::createGeometry() const
   return std::make_unique<Polygon2d>(o);
 }
 
-static std::shared_ptr<AbstractNode> builtin_circle(const ModuleInstantiation *inst, Arguments arguments, const Children& children)
+static std::shared_ptr<AbstractNode> builtin_circle(const ModuleInstantiation *inst, Arguments arguments)
 {
   auto node = std::make_shared<CircleNode>(inst);
-
-  if (!children.empty()) {
-    LOG(message_group::Warning, inst->location(), arguments.documentRoot(),
-        "module %1$s() does not support child modules", node->name());
-  }
 
   Parameters parameters = Parameters::parse(std::move(arguments), inst->location(), {"r"}, {"d","angle"});
 
@@ -625,15 +592,6 @@ static std::shared_ptr<AbstractNode> builtin_circle(const ModuleInstantiation *i
           "circle(r=%1$s)", r.toEchoStringNoThrow());
     }
   }
-  if (parameters["angle"].isDefined()) {
-    if(!parameters["angle"].getFiniteDouble(node->angle)) {
-      LOG(message_group::Error, "Angle must be a double when specified.");
-    }  
-    if(node->angle < 0.0 || node->angle > 360.0) {
-      LOG(message_group::Error, "Angle must be between 0 and 360 degrees.");
-    }
-  }
-
 
   return node;
 }
@@ -693,6 +651,7 @@ std::unique_ptr<const Geometry> PolygonNode::createGeometry() const
     }
     p->addOutline(outline);
   } else {
+    bool positive = true; // First outline is positive
     for (const auto& path : this->paths) {
       Outline2d outline;
       for (const auto& index : path) {
@@ -700,7 +659,9 @@ std::unique_ptr<const Geometry> PolygonNode::createGeometry() const
         const auto& point = points[index];
         outline.vertices.push_back(point);
       }
+      outline.positive = positive;
       p->addOutline(outline);
+      positive = false; // Subsequent outlines are holes
     }
   }
   if (p->outlines().size() > 0) {
@@ -709,14 +670,110 @@ std::unique_ptr<const Geometry> PolygonNode::createGeometry() const
   return p;
 }
 
-static std::shared_ptr<AbstractNode> builtin_polygon(const ModuleInstantiation *inst, Arguments arguments, const Children& children)
+
+std::string SplineNode::toString() const
+{
+  std::ostringstream stream;
+  stream << "polygon(points = [";
+  bool firstPoint = true;
+  for (const auto& point : this->points) {
+    if (firstPoint) {
+      firstPoint = false;
+    } else {
+      stream << ", ";
+    }
+    stream << "[" << point[0] << ", " << point[1] << "]";
+  }
+  stream << "], fn = " << this->fn << "fa = " << this -> fa << ", fs = " << this->fs << ")";
+  return stream.str();
+}
+
+int linsystem( Vector3d v1,Vector3d v2,Vector3d v3,Vector3d pt,Vector3d &res,double *detptr=NULL);
+
+std::vector<Vector2d> SplineNode::draw_arc(int fn, const Vector2d &tang1, double l1, const Vector2d &tang2, double l2, const Vector2d &cornerpt) const {
+  std::vector<Vector2d> result;	
+  if(fn == 1) result.push_back(cornerpt);
+  else {
+    // estimate ellipsis circumfence
+    double l=(l1-l2)/(l1+l2);
+    double circ = (l1+l2)*M_PI*(1+(3*l*l)/(10+sqrt(4-3*l*l)));
+    Vector2d vx = -tang1*(l1-circ/(8*fn));
+    Vector2d vy =  tang2*(l2-circ/(8*fn));
+//        printf("i=%d vx %g/%g vy %g/%g\n",i,vx[0], vx[1], vy[0], vy[1]);						       
+    for(int j=0;j<=fn-1;j++) {
+      double ang=M_PI/2.0*j/(fn-1);	      
+      Vector2d pt=cornerpt + vx*(1-sin(ang))+ vy *(1-cos(ang));
+      result.push_back(pt);
+    }  
+  }
+  return result;
+}
+std::unique_ptr<const Geometry> SplineNode::createGeometry() const
+{
+  auto p = std::make_unique<Polygon2d>();
+  Outline2d result;
+  Vector3d dirz(0,0,1);
+  Vector3d res;
+
+  std::vector<Vector3d> tangent;
+  int n=this->points.size();
+  for(int i=0;i<n;i++) {
+    Vector2d dir=(this->points[(i+1)%n] - this->points[(i+n-1)%n]).normalized();
+    tangent.push_back(Vector3d(dir[0], dir[1], 0));    
+  }
+  for(int i=0;i<n;i++) {
+    // point at corner	  
+    int fn=1;
+    if(this->fn > 0 && this->fn > fn) fn=this->fn;
+    if(this->fa > 0 && 90.0/this->fa > fn)
+      fn=90.0/this->fa;
+        
+
+    bool convex=true;
+    Vector2d diff=this->points[(i+1)%n]-this->points[i];
+    if(linsystem( tangent[i], tangent[(i+1)%n],dirz,Vector3d(diff[0], diff[1], 0),res)) convex=false;
+    if(res[0] < -1e-6 || res[1] < -1e-6) convex=false;
+    if(convex) {
+      Vector2d cornerpt=this->points[i] + res[0]*tangent[i].head<2>();
+      auto pts =draw_arc(fn, tangent[i].head<2>(), res[0], tangent[(i+1)%n].head<2>(), res[1],cornerpt);	    
+      for(const Vector2d &pt: pts) result.vertices.push_back(pt);	      
+
+    } else {
+      // create midpoint		    
+      Vector2d midpt = (this->points[i] + this->points[(i+1)%n])/2.0;
+      Vector2d dir = (this->points[(i+1)%n] - this->points[i]).normalized();
+      
+      // Mid tangent
+      Vector2d midtang = (tangent[i] + tangent[(i+1)%n]).normalized().head<2>().normalized();
+
+      // flip mid tangent
+      double l=midtang.dot(dir);
+      midtang = 2*dir*l-midtang;
+
+      Vector2d diff=midpt - this->points[i];
+
+      // 1st arc
+      if(linsystem( tangent[i], Vector3d(midtang[0], midtang[1], 0),dirz,Vector3d(diff[0], diff[1], 0),res)) printf("prog errr\n");
+      Vector2d cornerpt1=this->points[i] + res[0]*tangent[i].head<2>();
+      auto pts =draw_arc(fn, tangent[i].head<2>(), res[0], midtang, res[1],cornerpt1);	    
+      for(const Vector2d &pt: pts) result.vertices.push_back(pt);	      
+      
+      // 2nd arc
+      if(linsystem( Vector3d(midtang[0], midtang[1], 0),tangent[(i+1)%n],dirz,Vector3d(diff[0], diff[1], 0),res)) printf("prog errr\n");
+      Vector2d cornerpt2=this->points[(i+1)%n] - res[1]*tangent[(i+1)%n].head<2>();
+      auto pts2 =draw_arc(fn, midtang, res[0], tangent[(i+1)%n].head<2>(), res[1], cornerpt2);	    
+      for(const Vector2d &pt: pts2) result.vertices.push_back(pt);	      
+
+//      result.vertices.push_back(this->points[i]); // Debug pt
+    }
+  }
+  p->addOutline(result);
+  return p;
+}
+
+static std::shared_ptr<AbstractNode> builtin_polygon(const ModuleInstantiation *inst, Arguments arguments)
 {
   auto node = std::make_shared<PolygonNode>(inst);
-
-  if (!children.empty()) {
-    LOG(message_group::Warning, inst->location(), arguments.documentRoot(),
-        "module %1$s() does not support child modules", node->name());
-  }
 
   Parameters parameters = Parameters::parse(std::move(arguments), inst->location(), {"points", "paths", "convexity"});
 

@@ -36,20 +36,20 @@
 #include <unistd.h>
 #endif
 
-#include "SourceFile.h"
-#include "UserModule.h"
-#include "ModuleInstantiation.h"
-#include "Assignment.h"
-#include "Expression.h"
-#include "function.h"
-#include "printutils.h"
+#include "core/SourceFile.h"
+#include "core/UserModule.h"
+#include "core/ModuleInstantiation.h"
+#include "core/Assignment.h"
+#include "core/Expression.h"
+#include "core/function.h"
+#include "io/fileutils.h"
+#include "utils/printutils.h"
 #include <memory>
 #include <sstream>
 #include <stack>
-#include <boost/filesystem.hpp>
-#include "boost-utils.h"
+#include <filesystem>
 
-namespace fs = boost::filesystem;
+namespace fs = std::filesystem;
 
 #define YYMAXDEPTH 20000
 #define LOC(loc) Location(loc.first_line, loc.first_column, loc.last_line, loc.last_column, sourcefile())
@@ -312,6 +312,10 @@ child_statement
 // "for", "let" and "each" are valid module identifiers
 module_id
         : TOK_ID  { $$ = $1; }
+        | TOK_ID '.' TOK_ID  {
+		char tmp[100];
+                sprintf(tmp,"(%s.%s)",$1,$3);
+                $$ = strdup(tmp); }
         | TOK_FOR { $$ = strdup("for"); }
         | TOK_LET { $$ = strdup("let"); }
         | TOK_ASSERT { $$ = strdup("assert"); }
@@ -703,7 +707,7 @@ static void warn_reassignment(const Location& loc, const std::shared_ptr<Assignm
 			loc,
 			path.parent_path().generic_string(),
 			"%1$s was assigned on line %2$i but was overwritten",
-			assignment->getName(),
+			quoteVar(assignment->getName()),
 			assignment->location().firstLine());
 
 }
@@ -714,7 +718,7 @@ static void warn_reassignment(const Location& loc, const std::shared_ptr<Assignm
 			loc,
 			path1.parent_path().generic_string(),
 			"%1$s was assigned on line %2$i of %3$s but was overwritten",
-			assignment->getName(),
+			quoteVar(assignment->getName()),
 			assignment->location().firstLine(),
 			path2);
 }
@@ -728,8 +732,8 @@ void handle_assignment(const std::string token, Expression *expr, const Location
 			auto prevFile = assignment->location().fileName();
 			auto currFile = loc.fileName();
 
-			const auto uncPathCurr = boostfs_uncomplete(currFile, mainFilePath.parent_path());
-			const auto uncPathPrev = boostfs_uncomplete(prevFile, mainFilePath.parent_path());
+			const auto uncPathCurr = fs_uncomplete(currFile, mainFilePath.parent_path());
+			const auto uncPathPrev = fs_uncomplete(prevFile, mainFilePath.parent_path());
 			if (fileEnded) {
 				//assignments via commandline
 			} else if (prevFile == mainFile && currFile == mainFile) {
@@ -760,11 +764,11 @@ bool parse(SourceFile *&file, const std::string& text, const std::string &filena
 {
   fs::path filepath;
   try {
-    filepath = fs::absolute(fs::path(filename));
-    mainFilePath = fs::absolute(fs::path(mainFile));
+    filepath = filename.empty() ? fs::current_path() : fs::absolute(fs::path{filename});
+    mainFilePath = mainFile.empty() ? fs::current_path() : fs::absolute(fs::path{mainFile});
   } catch (...) {
     // yyerror tries to print the file path, which throws again, and we can't do that
-	LOG(message_group::Error, "Parser error: file access denied");
+    LOG(message_group::Error, "Parser error: file access denied");
     return false;
   }
 

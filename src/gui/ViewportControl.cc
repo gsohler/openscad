@@ -1,10 +1,20 @@
-#include "ViewportControl.h"
-#include "printutils.h"
-#include "MainWindow.h"
-#include "QGLView.h"
-#include <boost/filesystem.hpp>
+#include "gui/ViewportControl.h"
+#include <QBoxLayout>
+#include <QGridLayout>
+#include <QLayoutItem>
+#include <QObject>
+#include <QResizeEvent>
+#include <QString>
+#include <QWidget>
+#include <iostream>
+#include <filesystem>
 #include <cfloat>
 #include <QDoubleSpinBox>
+
+#include "utils/printutils.h"
+#include "gui/MainWindow.h"
+#include "gui/QGLView.h"
+#include "openscad_gui.h"
 
 ViewportControl::ViewportControl(QWidget *parent) : QWidget(parent)
 {
@@ -39,25 +49,20 @@ void ViewportControl::setMainWindow(MainWindow *mainWindow)
   this->qglview = mainWindow->qglview;
 }
 
-bool ViewportControl::isLightTheme()
-{
-  bool ret = true;
-  if (mainWindow) {
-    ret = mainWindow->isLightTheme();
-  } else {
-    std::cout << "ViewportControl: You need to set the mainWindow before calling isLightTheme" << std::endl;
-  }
-  return ret;
-}
-
 QString ViewportControl::yellowHintBackground()
 {
-  return {isLightTheme() ? "background-color:#ffffaa;" : "background-color:#30306;"};
+  QPalette defaultPalette;
+  const auto bgColor = defaultPalette.base().color().toRgb();
+  QString styleSheet = UIUtils::blendForBackgroundColorStyleSheet(bgColor, warnBlendColor);
+  return styleSheet;
 }
 
 QString ViewportControl::redHintBackground()
 {
-  return {isLightTheme() ? "background-color:#ffaaaa;" : "background-color:#502020;"};
+  QPalette defaultPalette;
+  const auto bgColor = defaultPalette.base().color().toRgb();
+  QString styleSheet = UIUtils::blendForBackgroundColorStyleSheet(bgColor, errorBlendColor);
+  return styleSheet;
 }
 
 void ViewportControl::resizeEvent(QResizeEvent *event)

@@ -24,22 +24,32 @@
  *
  */
 
+#include "core/Value.h"
+
+#include <cmath>
+#include <variant>
+#include <limits>
+#include <ostream>
+#include <utility>
+#include <cstdint>
 #include <cassert>
+#include <cstddef>
 #include <memory>
-#include <numeric>
 #include <sstream>
+#include <string>
+#include <vector>
 #include <boost/lexical_cast.hpp>
 
-#include "Value.h"
-#include "EvaluationSession.h"
-#include "printutils.h"
-#include "StackCheck.h"
-#include "boost-utils.h"
-#include "double-conversion/double-conversion.h"
-#include "double-conversion/utils.h"
-#include "double-conversion/ieee.h"
+#include "core/EvaluationSession.h"
+#include "io/fileutils.h"
+#include "utils/printutils.h"
+#include "utils/StackCheck.h"
+#include "utils/boost-utils.h"
+#include <double-conversion/double-conversion.h>
+#include <double-conversion/utils.h>
+#include <double-conversion/ieee.h>
 
-namespace fs = boost::filesystem;
+namespace fs = std::filesystem;
 
 const Value Value::undefined;
 const VectorType VectorType::EMPTY(nullptr);
@@ -171,7 +181,7 @@ static uint32_t convert_to_uint32(const double d)
 std::ostream& operator<<(std::ostream& stream, const Filename& filename)
 {
   fs::path fnpath{static_cast<std::string>(filename)}; // gcc-4.6
-  auto fpath = boostfs_uncomplete(fnpath, fs::current_path());
+  auto fpath = fs_uncomplete(fnpath, fs::current_path());
   stream << QuotedString(fpath.generic_string());
   return stream;
 }
@@ -200,6 +210,7 @@ Value Value::clone() const {
   case Type::NUMBER:    return std::get<double>(this->value);
   case Type::STRING:    return std::get<str_utf8_wrapper>(this->value).clone();
   case Type::RANGE:     return std::get<RangePtr>(this->value).clone();
+  case Type::PYTHONCLASS:return std::get<PythonClassPtr>(this->value).clone();
   case Type::VECTOR:    return std::get<VectorType>(this->value).clone();
   case Type::OBJECT:    return std::get<ObjectType>(this->value).clone();
   case Type::FUNCTION:  return std::get<FunctionPtr>(this->value).clone();
@@ -221,6 +232,7 @@ std::string Value::typeName(Type type)
   case Type::STRING:    return "string";
   case Type::VECTOR:    return "vector";
   case Type::RANGE:     return "range";
+  case Type::PYTHONCLASS:    return "pythonclass";
   case Type::OBJECT:    return "object";
   case Type::FUNCTION:  return "function";
   default: assert(false && "unknown Value variant type"); return "<unknown>";
@@ -240,6 +252,7 @@ std::string getTypeName(const str_utf8_wrapper&) { return "string"; }
 std::string getTypeName(const VectorType&) { return "vector"; }
 std::string getTypeName(const ObjectType&) { return "object"; }
 std::string getTypeName(const RangePtr&) { return "range"; }
+std::string getTypeName(const PythonClassPtr&) { return "pythonclass"; }
 std::string getTypeName(const FunctionPtr&) { return "function"; }
 
 bool Value::toBool() const
@@ -371,6 +384,10 @@ public:
     stream << *v;
   }
 
+  void operator()(const PythonClassPtr& v) const {
+    stream << *v;
+  }
+
   void operator()(const FunctionPtr& v) const {
     stream << *v;
   }
@@ -426,6 +443,10 @@ public:
   }
 
   std::string operator()(const RangePtr& v) const {
+    return STR(*v);
+  }
+
+  std::string operator()(const PythonClassPtr& v) const {
     return STR(*v);
   }
 
@@ -510,6 +531,11 @@ public:
     std::ostringstream stream;
     for (double d : *v) stream << Value(d).chrString();
     return stream.str();
+  }
+
+  std::string operator()(const PythonClassPtr& v) const
+  {
+    return "pythonclass";
   }
 };
 
@@ -691,6 +717,12 @@ const RangeType& Value::toRange() const
   if (val) {
     return **val;
   } else return RangeType::EMPTY;
+}
+
+const PythonClassType& Value::toPythonClass() const
+{
+  const PythonClassPtr *val = std::get_if<PythonClassPtr>(&this->value);
+  return **val;
 }
 
 const FunctionType& Value::toFunction() const
@@ -1178,6 +1210,13 @@ std::ostream& operator<<(std::ostream& stream, const RangeType& r)
                 << DoubleConvert(r.begin_value(), buffer, builder, dc) << " : "
                 << DoubleConvert(r.step_value(), buffer, builder, dc) << " : "
                 << DoubleConvert(r.end_value(),   buffer, builder, dc) << "]";
+}
+
+std::ostream& operator<<(std::ostream& stream, const PythonClassType& r)
+{
+  return stream << "["
+                << "pythonclass" 
+		<< "]" ;
 }
 
 // called by clone()

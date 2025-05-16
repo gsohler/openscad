@@ -24,20 +24,28 @@
  *
  */
 
-#include "SourceFile.h"
-#include "SourceFileCache.h"
-#include "node.h"
-#include "printutils.h"
-#include "exceptions.h"
-#include "ScopeContext.h"
-#include "parsersettings.h"
-#include "StatCache.h"
+#include "core/SourceFile.h"
+#include "core/SourceFileCache.h"
+#include "core/node.h"
+#include "utils/printutils.h"
+#include "utils/exceptions.h"
+#include "core/ScopeContext.h"
+#include "core/parsersettings.h"
+#include "core/StatCache.h"
+#include <algorithm>
+#include <ctime>
+#include <ostream>
+#include <memory>
 #include <boost/algorithm/string.hpp>
 #include <boost/filesystem.hpp>
+#include <filesystem>
+#include <string>
 #include <utility>
 #include <fstream>
 #include <streambuf>
-namespace fs = boost::filesystem;
+#include <vector>
+
+namespace fs = std::filesystem;
 #include "FontCache.h"
 #include <sys/stat.h>
 #ifdef ENABLE_PYTHON
@@ -52,6 +60,11 @@ SourceFile::SourceFile(std::string path, std::string filename)
 void SourceFile::print(std::ostream& stream, const std::string& indent) const
 {
   scope.print(stream, indent);
+}
+
+void SourceFile::print_python(std::ostream& stream, std::ostream& stream_def, const std::string& indent) const
+{
+  scope.print_python(stream, stream_def, indent);
 }
 
 void SourceFile::registerUse(const std::string& path, const Location& loc)
@@ -78,8 +91,8 @@ void SourceFile::registerUse(const std::string& path, const Location& loc)
       }	else trusted =  python_trusted;
 */      
       if(trusted) {
-        boost::filesystem::path boost_path(path); 
-        std::string cmd = "import sys\nsys.path.append('"+boost_path.parent_path().string()+"')\nimport "+boost_path.stem().string();
+        std::filesystem::path fs_path(path); 
+        std::string cmd = "import sys\nsys.path.append('"+fs_path.parent_path().string()+"')\nimport "+fs_path.stem().string();
         if(!pythonRuntimeInitialized) initPython(0.0);
         std::string error=evaluatePython(cmd); 
         if (error.size() > 0) LOG(message_group::Error, Location::NONE, "", error.c_str());

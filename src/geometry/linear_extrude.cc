@@ -1,19 +1,28 @@
-#include "linear_extrude.h"
+#include "geometry/linear_extrude.h"
 
+#include <algorithm>
+#include <cmath>
+#include <iterator>
+#include <cassert>
+#include <utility>
+#include <memory>
+#include <cstddef>
 #include <queue>
+#include <vector>
+
 #include <boost/logic/tribool.hpp>
 
-#include "GeometryUtils.h"
-#include "LinearExtrudeNode.h"
-#include "PolySet.h"
-#include "PolySetBuilder.h"
-#include "PolySetUtils.h"
-#include "calc.h"
-#include "degree_trig.h"
-#include "Feature.h"
+#include "geometry/GeometryUtils.h"
+#include "glview/RenderSettings.h"
+#include "core/LinearExtrudeNode.h"
+#include "geometry/PolySet.h"
+#include "geometry/PolySetBuilder.h"
+#include "geometry/PolySetUtils.h"
+#include "utils/calc.h"
+#include "utils/degree_trig.h"
 
 namespace {
-  
+
 /*
   Compare Euclidean length of vectors
   Return:
@@ -105,10 +114,9 @@ Outline2d splitOutlineByFn(
     auto current = q.top();
 
     // Group similar length segmented edges to keep result roughly symmetrical.
-    while (!q.empty() && (tmp_q.empty() || current.close_match(tmp_q.front()))) {
+    while (!q.empty() && (tmp_q.empty() || q.top().close_match(tmp_q.front()))) {
+      tmp_q.push_back(q.top());
       q.pop();
-      tmp_q.push_back(current);
-      current = q.top();
     }
 
     if (seg_total + tmp_q.size() <= fn) {
@@ -312,7 +320,7 @@ std::unique_ptr<PolySet> assemblePolySetForManifold(
 
   // LOG(PolySetUtils::polySetToPolyhedronSource(*final_polyset));
 
-  return final_polyset; 
+  return final_polyset;
 }
 
 std::unique_ptr<PolySet> assemblePolySetForCGAL(const Polygon2d& polyref,
@@ -402,7 +410,7 @@ void add_slice_indices(PolygonIndices &indices, int slice_idx, int slice_stride,
       Vector2d curr2 = trans2 * o.vertices[i % o.vertices.size()];
       int curr_idx = curr_outline + (i % o.vertices.size());
       int prev_idx = curr_outline + i - 1;
-      
+
       int diff_sign = sgn_vdiff(prev1 - curr2, curr1 - prev2);
       bool splitfirst = diff_sign == -1 || (diff_sign == 0 && !flip);
 
@@ -498,6 +506,7 @@ size_t calc_num_slices(const LinearExtrudeNode& node, const Polygon2d& poly) {
 
 std::unique_ptr<Geometry> extrudePolygon(const LinearExtrudeNode& node, const Polygon2d& poly)
 {
+  assert(poly.isSanitized());
   if (node.height[2] <= 0) return PolySet::createEmpty();
 
   bool non_linear = node.twist != 0 || node.scale_x != node.scale_y;
@@ -552,11 +561,13 @@ std::unique_ptr<Geometry> extrudePolygon(const LinearExtrudeNode& node, const Po
     is_segmented = true;
   }
 
+#ifdef ENABLE_PYTHON
   if(node.profile_func != nullptr){
     is_segmented = true;
     seg_poly = python_getprofile(node.profile_func, node.fn, 0);
     num_slices =  node.fn;	  
   }
+#endif
 
   const Polygon2d& polyref = is_segmented ? seg_poly : poly;
 
@@ -578,9 +589,6 @@ std::unique_ptr<Geometry> extrudePolygon(const LinearExtrudeNode& node, const Po
   PolygonIndices indices;
   indices.reserve(slice_stride * (num_slices + 1) * 2); // sides + endcaps
 
-//	lowerFace = alterprofile(python_getprofile(node.profile_func, node.fn, 0),lower_scalex, lower_scaley,node.origin_x, node.origin_y, 0, 0, lower_rot); TODO get custome profiles working later again
-//  upper_rot = python_doublefunc(node.twist_func, i/(double)slices);
-//  upperFace = alterprofile(python_getprofile(node.profile_func, node.fn, upper_h[2]), upper_scalex, upper_scaley , node.origin_x, node.origin_y, 0, 0, upper_rot);
   // Calculate all vertices
   Vector2d full_scale(1 - node.scale_x, 1 - node.scale_y);
   double full_rot = -node.twist;
@@ -598,13 +606,16 @@ std::unique_ptr<Geometry> extrudePolygon(const LinearExtrudeNode& node, const Po
       Eigen::Scaling(Vector2d(1,1) - full_scale * slice_idx / num_slices) * 
       Eigen::Affine2d(rotate_degrees(act_rot)));
 
+#ifdef ENABLE_PYTHON
     if(node.profile_func != nullptr) {
       auto o = python_getprofile(node.profile_func, node.fn, full_height[2]*slice_idx/num_slices);
         for (const auto& v : o.vertices) {
           auto tmp = trans * v;
           vertices.emplace_back(Vector3d(tmp[0], tmp[1], 0.0) + h1 + full_height * slice_idx / num_slices);
 	}
-    } else {
+    } else 
+#endif
+{
      for (const auto& o : polyref.outlines()) {
       for (const auto& v : o.vertices) {
         auto tmp = trans * v;
@@ -632,14 +643,12 @@ std::unique_ptr<Geometry> extrudePolygon(const LinearExtrudeNode& node, const Po
   // the polyset from vertices using PolySetBuilder
 
 #ifdef ENABLE_MANIFOLD
-  if (Feature::ExperimentalManifold.is_enabled()) {
+  if (RenderSettings::inst()->backend3D == RenderBackend3D::ManifoldBackend) {
     return assemblePolySetForManifold(polyref, vertices, indices,
                                       node.convexity, isConvex, slice_stride * num_slices);
   }
   else
 #endif
-  return assemblePolySetForCGAL(polyref, vertices, indices,
-                                node.convexity, isConvex, 
-                                node.scale_x, node.scale_y,
-                                h1, h2, node.twist);
+  return assemblePolySetForManifold(polyref, vertices, indices,
+                                      node.convexity, isConvex, slice_stride * num_slices);
 }

@@ -1,9 +1,12 @@
 #pragma once
 
+#include <QDialog>
+#include <QItemSelection>
+#include <QString>
 #include <QStandardItemModel>
 #include <QSortFilterProxyModel>
 
-#include "qtgettext.h"
+#include "gui/qtgettext.h"
 #include "ui_FontListDialog.h"
 
 class FontListDialog : public QDialog, public Ui::FontListDialog
@@ -12,7 +15,7 @@ class FontListDialog : public QDialog, public Ui::FontListDialog
 public:
   FontListDialog();
 
-  void update_font_list();
+  void updateFontList();
 
 public slots:
   void on_copyButton_clicked();

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "GLView.h"
-#include "Renderer.h"
+#include "glview/GLView.h"
+#include "glview/Renderer.h"
 #include <QOpenGLFramebufferObject>
 
 #include <memory>
@@ -19,11 +19,11 @@ public:
 
   int select(const Renderer *renderer, int x, int y);
 
-  Renderer::shaderinfo_t shaderinfo;
+  ShaderUtils::ShaderInfo shaderinfo;
 
 private:
-  void init_shader();
-  void setup_framebuffer(const GLView *view);
+  void initShader();
+  void setupFramebuffer(const GLView *view);
 
   std::unique_ptr<QOpenGLFramebufferObject> framebuffer;
 

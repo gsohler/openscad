@@ -1,0 +1,40 @@
+Ubuntu 24.04.1 Source
+
+sudo apt install git
+git clone https://github.com/gsohler/openscad
+cd openscad
+git checkout python
+git submodule update --init --recursive
+sudo ./scripts/uni-get-dependencies.sh 
+comment 3 lines in submodules/libfive/libfive/bind/python/CMakeLists.txt
+    install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/libfive
+            DESTINATION ${PYTHON_SITE_PACKAGES_DIR}
+            FILES_MATCHING PATTERN "*.py")
+
+mkdir build
+cd build
+cmake -DEXPERIMENTAL=1 -DENABLE_PYTHON=1 -DENABLE_LIBFIVE=1 ..
+make -j3
+===============================================
+Ubuntu 24.04.1 AppImage
+
+sudo apt-add-repository universe
+sudo apt install libfuse2
+chmod a+x PythonSCAD-2024-12-19.AppImage 
+
+===============================
+Fedora 41 Source
+
+git clone https://github.com/gsohler/openscad
+cd openscad
+git checkout python
+git submodule update --init --recursive
+sudo ./scripts/uni-get-dependencies.sh 
+mkdir build
+cd build
+cmake -DEXPERIMENTAL=1 -DENABLE_PYTHON=1 -DENABLE_LIBFIVE=1 ..
+make -j3
+
+
+
+

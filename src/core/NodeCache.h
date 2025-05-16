@@ -1,10 +1,13 @@
 #pragma once
 
+#include <utility>
 #include <string>
 #include <unordered_map>
 #include <cassert>
-#include "node.h"
-#include "printutils.h"
+#include <cstddef>
+
+#include "core/node.h"
+#include "utils/printutils.h"
 
 /*!
    Caches string values per node based on the node.index().
@@ -49,7 +52,10 @@ public:
 
   void insertEnd(const size_t nodeidx, const long endindex) {
     // throws std::out_of_range on miss
-    auto indexpair = this->cache.at(nodeidx);
+    std::pair<long int, long int> indexpair;
+    try {
+      indexpair = this->cache.at(nodeidx); 
+    } catch(std::exception &ex) { return; }
 #ifdef ENABLE_PYTHON
   if(true) { // should be MainWindow::python_active, fix is true
     if(indexpair.second == -1L)
